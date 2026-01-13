@@ -1,0 +1,452 @@
+import { useEffect, useState } from 'react';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { DataTable } from '@/components/shared/DataTable';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { Plus, Edit2, Trash2, Upload } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+
+interface Producto {
+  id: string;
+  codigo_articulo: string;
+  descripcion: string;
+  unidad_medida: string;
+  categoria_id: string | null;
+  subcategoria_id: string | null;
+  codigo_barra: string | null;
+  activo: boolean;
+  stock_actual: number;
+  stock_minimo: number;
+  categorias?: { nombre: string } | null;
+  subcategorias?: { nombre: string } | null;
+}
+
+interface Categoria {
+  id: string;
+  nombre: string;
+}
+
+interface Subcategoria {
+  id: string;
+  nombre: string;
+  categoria_id: string;
+}
+
+export default function Productos() {
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
+  const [formData, setFormData] = useState({
+    codigo_articulo: '',
+    descripcion: '',
+    unidad_medida: 'UN',
+    categoria_id: '',
+    subcategoria_id: '',
+    codigo_barra: '',
+    activo: true,
+    stock_actual: 0,
+    stock_minimo: 0,
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [productosRes, categoriasRes, subcategoriasRes] = await Promise.all([
+        supabase
+          .from('productos')
+          .select('*, categorias(nombre), subcategorias(nombre)')
+          .order('descripcion'),
+        supabase.from('categorias').select('id, nombre').eq('activo', true).order('nombre'),
+        supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
+      ]);
+
+      if (productosRes.data) setProductos(productosRes.data);
+      if (categoriasRes.data) setCategorias(categoriasRes.data);
+      if (subcategoriasRes.data) setSubcategorias(subcategoriasRes.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Error al cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const data = {
+        ...formData,
+        categoria_id: formData.categoria_id || null,
+        subcategoria_id: formData.subcategoria_id || null,
+        codigo_barra: formData.codigo_barra || null,
+      };
+
+      if (selectedProducto) {
+        const { error } = await supabase
+          .from('productos')
+          .update(data)
+          .eq('id', selectedProducto.id);
+        
+        if (error) throw error;
+        toast.success('Producto actualizado correctamente');
+      } else {
+        const { error } = await supabase.from('productos').insert([data]);
+        if (error) throw error;
+        toast.success('Producto creado correctamente');
+      }
+
+      setDialogOpen(false);
+      resetForm();
+      fetchData();
+    } catch (error: any) {
+      console.error('Error saving producto:', error);
+      if (error.code === '23505') {
+        toast.error('Ya existe un producto con ese código');
+      } else {
+        toast.error('Error al guardar el producto');
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedProducto) return;
+
+    try {
+      const { error } = await supabase
+        .from('productos')
+        .delete()
+        .eq('id', selectedProducto.id);
+
+      if (error) throw error;
+      toast.success('Producto eliminado correctamente');
+      setDeleteDialogOpen(false);
+      setSelectedProducto(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting producto:', error);
+      toast.error('Error al eliminar el producto');
+    }
+  };
+
+  const openEditDialog = (producto: Producto) => {
+    setSelectedProducto(producto);
+    setFormData({
+      codigo_articulo: producto.codigo_articulo,
+      descripcion: producto.descripcion,
+      unidad_medida: producto.unidad_medida,
+      categoria_id: producto.categoria_id || '',
+      subcategoria_id: producto.subcategoria_id || '',
+      codigo_barra: producto.codigo_barra || '',
+      activo: producto.activo,
+      stock_actual: producto.stock_actual,
+      stock_minimo: producto.stock_minimo,
+    });
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setSelectedProducto(null);
+    setFormData({
+      codigo_articulo: '',
+      descripcion: '',
+      unidad_medida: 'UN',
+      categoria_id: '',
+      subcategoria_id: '',
+      codigo_barra: '',
+      activo: true,
+      stock_actual: 0,
+      stock_minimo: 0,
+    });
+  };
+
+  const filteredSubcategorias = subcategorias.filter(
+    (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
+  );
+
+  const columns = [
+    { key: 'codigo_articulo', header: 'Código' },
+    { key: 'descripcion', header: 'Descripción' },
+    { key: 'unidad_medida', header: 'Unidad' },
+    {
+      key: 'categorias.nombre',
+      header: 'Categoría',
+      render: (item: Producto) => item.categorias?.nombre || '-',
+    },
+    {
+      key: 'subcategorias.nombre',
+      header: 'Subcategoría',
+      render: (item: Producto) => item.subcategorias?.nombre || '-',
+    },
+    {
+      key: 'stock_actual',
+      header: 'Stock',
+      render: (item: Producto) => (
+        <span className={item.stock_actual <= item.stock_minimo ? 'text-destructive font-medium' : ''}>
+          {item.stock_actual}
+        </span>
+      ),
+    },
+    {
+      key: 'activo',
+      header: 'Estado',
+      render: (item: Producto) => <StatusBadge status={item.activo} />,
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      render: (item: Producto) => (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSelectedProducto(item);
+              setDeleteDialogOpen(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <MainLayout>
+      <PageHeader title="Productos" description="Gestión del catálogo de productos">
+        <Button variant="outline">
+          <Upload className="mr-2 h-4 w-4" />
+          Importar Excel
+        </Button>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={resetForm}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Producto
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedProducto ? 'Editar Producto' : 'Nuevo Producto'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="codigo_articulo">Código *</Label>
+                  <Input
+                    id="codigo_articulo"
+                    value={formData.codigo_articulo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, codigo_articulo: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="codigo_barra">Código de Barras</Label>
+                  <Input
+                    id="codigo_barra"
+                    value={formData.codigo_barra}
+                    onChange={(e) =>
+                      setFormData({ ...formData, codigo_barra: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descripcion">Descripción *</Label>
+                <Input
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) =>
+                    setFormData({ ...formData, descripcion: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="unidad_medida">Unidad de Medida</Label>
+                  <Select
+                    value={formData.unidad_medida}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, unidad_medida: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UN">Unidad</SelectItem>
+                      <SelectItem value="KG">Kilogramo</SelectItem>
+                      <SelectItem value="LT">Litro</SelectItem>
+                      <SelectItem value="MT">Metro</SelectItem>
+                      <SelectItem value="CJ">Caja</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoría</Label>
+                  <Select
+                    value={formData.categoria_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoria_id: value, subcategoria_id: '' })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subcategoria">Subcategoría</Label>
+                  <Select
+                    value={formData.subcategoria_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, subcategoria_id: value })
+                    }
+                    disabled={!formData.categoria_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSubcategorias.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id}>
+                          {sub.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="stock_actual">Stock Actual</Label>
+                  <Input
+                    id="stock_actual"
+                    type="number"
+                    value={formData.stock_actual}
+                    onChange={(e) =>
+                      setFormData({ ...formData, stock_actual: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stock_minimo">Stock Mínimo</Label>
+                  <Input
+                    id="stock_minimo"
+                    type="number"
+                    value={formData.stock_minimo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, stock_minimo: Number(e.target.value) })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="activo"
+                  checked={formData.activo}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, activo: checked })
+                  }
+                />
+                <Label htmlFor="activo">Producto activo</Label>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  {selectedProducto ? 'Guardar Cambios' : 'Crear Producto'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </PageHeader>
+
+      <DataTable
+        data={productos}
+        columns={columns}
+        searchPlaceholder="Buscar productos..."
+        searchKeys={['codigo_articulo', 'descripcion', 'codigo_barra']}
+        loading={loading}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el producto
+              "{selectedProducto?.descripcion}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </MainLayout>
+  );
+}

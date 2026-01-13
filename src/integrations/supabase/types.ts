@@ -1,0 +1,849 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
+  public: {
+    Tables: {
+      auditoria: {
+        Row: {
+          accion: string
+          created_at: string | null
+          datos_anteriores: Json | null
+          datos_nuevos: Json | null
+          id: string
+          ip_address: string | null
+          modulo: string
+          registro_id: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          accion: string
+          created_at?: string | null
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          id?: string
+          ip_address?: string | null
+          modulo: string
+          registro_id?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          accion?: string
+          created_at?: string | null
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          id?: string
+          ip_address?: string | null
+          modulo?: string
+          registro_id?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      cajas: {
+        Row: {
+          conteo_declarado: number | null
+          created_at: string | null
+          diferencia: number | null
+          estado: Database["public"]["Enums"]["cash_register_status"] | null
+          fecha_apertura: string | null
+          fecha_cierre: string | null
+          fondo_inicial: number
+          id: string
+          observaciones: string | null
+          total_egresos: number | null
+          total_ventas: number | null
+          usuario_id: string
+        }
+        Insert: {
+          conteo_declarado?: number | null
+          created_at?: string | null
+          diferencia?: number | null
+          estado?: Database["public"]["Enums"]["cash_register_status"] | null
+          fecha_apertura?: string | null
+          fecha_cierre?: string | null
+          fondo_inicial?: number
+          id?: string
+          observaciones?: string | null
+          total_egresos?: number | null
+          total_ventas?: number | null
+          usuario_id: string
+        }
+        Update: {
+          conteo_declarado?: number | null
+          created_at?: string | null
+          diferencia?: number | null
+          estado?: Database["public"]["Enums"]["cash_register_status"] | null
+          fecha_apertura?: string | null
+          fecha_cierre?: string | null
+          fondo_inicial?: number
+          id?: string
+          observaciones?: string | null
+          total_egresos?: number | null
+          total_ventas?: number | null
+          usuario_id?: string
+        }
+        Relationships: []
+      }
+      categorias: {
+        Row: {
+          activo: boolean | null
+          codigo_familia: string
+          created_at: string | null
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo_familia: string
+          created_at?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo_familia?: string
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          direccion: string | null
+          dni_cuit: string | null
+          email: string | null
+          id: string
+          lista_precio_id: string | null
+          nombre: string
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          dni_cuit?: string | null
+          email?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          nombre: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          dni_cuit?: string | null
+          email?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          nombre?: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_lista_precio_id_fkey"
+            columns: ["lista_precio_id"]
+            isOneToOne: false
+            referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formas_pago: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
+      listas_precios: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
+      movimientos_caja: {
+        Row: {
+          caja_id: string
+          concepto: string
+          created_at: string | null
+          id: string
+          monto: number
+          tipo: string
+          usuario_id: string
+          venta_id: string | null
+        }
+        Insert: {
+          caja_id: string
+          concepto: string
+          created_at?: string | null
+          id?: string
+          monto: number
+          tipo: string
+          usuario_id: string
+          venta_id?: string | null
+        }
+        Update: {
+          caja_id?: string
+          concepto?: string
+          created_at?: string | null
+          id?: string
+          monto?: number
+          tipo?: string
+          usuario_id?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_caja_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_caja_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimientos_inventario: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          id: string
+          motivo: string | null
+          producto_id: string
+          stock_anterior: number
+          stock_nuevo: number
+          tipo: string
+          usuario_id: string
+          venta_id: string | null
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id: string
+          stock_anterior: number
+          stock_nuevo: number
+          tipo: string
+          usuario_id: string
+          venta_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id?: string
+          stock_anterior?: number
+          stock_nuevo?: number
+          tipo?: string
+          usuario_id?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_inventario_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      precios_productos: {
+        Row: {
+          created_at: string | null
+          id: string
+          lista_precio_id: string
+          precio: number
+          producto_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lista_precio_id: string
+          precio?: number
+          producto_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lista_precio_id?: string
+          precio?: number
+          producto_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precios_productos_lista_precio_id_fkey"
+            columns: ["lista_precio_id"]
+            isOneToOne: false
+            referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precios_productos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos: {
+        Row: {
+          activo: boolean | null
+          categoria_id: string | null
+          codigo_articulo: string
+          codigo_barra: string | null
+          created_at: string | null
+          descripcion: string
+          id: string
+          stock_actual: number | null
+          stock_minimo: number | null
+          subcategoria_id: string | null
+          unidad_medida: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria_id?: string | null
+          codigo_articulo: string
+          codigo_barra?: string | null
+          created_at?: string | null
+          descripcion: string
+          id?: string
+          stock_actual?: number | null
+          stock_minimo?: number | null
+          subcategoria_id?: string | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria_id?: string | null
+          codigo_articulo?: string
+          codigo_barra?: string | null
+          created_at?: string | null
+          descripcion?: string
+          id?: string
+          stock_actual?: number | null
+          stock_minimo?: number | null
+          subcategoria_id?: string | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          estado: boolean | null
+          id: string
+          nombre: string
+          sucursal: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          estado?: boolean | null
+          id: string
+          nombre: string
+          sucursal?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          estado?: boolean | null
+          id?: string
+          nombre?: string
+          sucursal?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          id: string
+          modulo: string
+          permiso: Database["public"]["Enums"]["app_permission"]
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          id?: string
+          modulo: string
+          permiso: Database["public"]["Enums"]["app_permission"]
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          id?: string
+          modulo?: string
+          permiso?: Database["public"]["Enums"]["app_permission"]
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      subcategorias: {
+        Row: {
+          activo: boolean | null
+          categoria_id: string
+          codigo_grupo: string
+          created_at: string | null
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria_id: string
+          codigo_grupo: string
+          created_at?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria_id?: string
+          codigo_grupo?: string
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategorias_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      venta_detalles: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          descuento: number | null
+          id: string
+          precio_unitario: number
+          producto_id: string
+          subtotal: number
+          venta_id: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string | null
+          descuento?: number | null
+          id?: string
+          precio_unitario: number
+          producto_id: string
+          subtotal: number
+          venta_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          descuento?: number | null
+          id?: string
+          precio_unitario?: number
+          producto_id?: string
+          subtotal?: number
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venta_pagos: {
+        Row: {
+          created_at: string | null
+          forma_pago_id: string
+          id: string
+          monto: number
+          venta_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          forma_pago_id: string
+          id?: string
+          monto: number
+          venta_id: string
+        }
+        Update: {
+          created_at?: string | null
+          forma_pago_id?: string
+          id?: string
+          monto?: number
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_pagos_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ventas: {
+        Row: {
+          anulada: boolean | null
+          anulada_por: string | null
+          caja_id: string | null
+          cliente_id: string | null
+          created_at: string | null
+          descuento: number | null
+          fecha: string | null
+          fecha_anulacion: string | null
+          id: string
+          motivo_anulacion: string | null
+          numero_comprobante: number
+          subtotal: number
+          total: number
+          usuario_id: string
+        }
+        Insert: {
+          anulada?: boolean | null
+          anulada_por?: string | null
+          caja_id?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          fecha?: string | null
+          fecha_anulacion?: string | null
+          id?: string
+          motivo_anulacion?: string | null
+          numero_comprobante?: number
+          subtotal?: number
+          total?: number
+          usuario_id: string
+        }
+        Update: {
+          anulada?: boolean | null
+          anulada_por?: string | null
+          caja_id?: string | null
+          cliente_id?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          fecha?: string | null
+          fecha_anulacion?: string | null
+          id?: string
+          motivo_anulacion?: string | null
+          numero_comprobante?: number
+          subtotal?: number
+          total?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ventas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      has_any_role: { Args: { _user_id: string }; Returns: boolean }
+      has_permission: {
+        Args: {
+          _modulo: string
+          _permiso: Database["public"]["Enums"]["app_permission"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+    }
+    Enums: {
+      app_permission:
+        | "ver"
+        | "crear"
+        | "editar"
+        | "eliminar"
+        | "anular"
+        | "exportar"
+      app_role: "admin" | "encargado" | "cajero" | "vendedor" | "deposito"
+      cash_register_status: "abierta" | "cerrada"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_permission: [
+        "ver",
+        "crear",
+        "editar",
+        "eliminar",
+        "anular",
+        "exportar",
+      ],
+      app_role: ["admin", "encargado", "cajero", "vendedor", "deposito"],
+      cash_register_status: ["abierta", "cerrada"],
+    },
+  },
+} as const
