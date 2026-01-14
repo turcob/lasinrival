@@ -1,5 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import forge from "https://esm.sh/node-forge@1.3.1";
+import forge from "https://esm.sh/node-forge@1.3.1?target=deno";
+
+// Polyfill for node-forge's randomBytes in Deno
+if (typeof globalThis.crypto === 'undefined') {
+  (globalThis as any).crypto = {
+    getRandomValues: (arr: Uint8Array) => {
+      for (let i = 0; i < arr.length; i++) {
+        arr[i] = Math.floor(Math.random() * 256);
+      }
+      return arr;
+    }
+  };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
