@@ -3,8 +3,12 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { KPICard } from '@/components/shared/KPICard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -31,6 +35,18 @@ interface DashboardStats {
   ventasCountSemana: number;
 }
 
+interface Venta {
+  id: string;
+  numero_comprobante: number;
+  fecha: string;
+  total: number;
+  anulada: boolean;
+  usuario_id: string;
+  cliente_id: string | null;
+  clientes?: { nombre: string } | null;
+  profiles?: { nombre: string } | null;
+}
+
 const CHART_COLORS = ['hsl(217, 91%, 50%)', 'hsl(173, 80%, 40%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)'];
 
 export default function Dashboard() {
@@ -45,12 +61,60 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [ventasPorDia, setVentasPorDia] = useState<{ dia: string; total: number }[]>([]);
   const [ventasPorFormaPago, setVentasPorFormaPago] = useState<{ nombre: string; total: number }[]>([]);
+  const [todasLasVentas, setTodasLasVentas] = useState<Venta[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      fetchTodasLasVentas();
     }
   }, [user]);
+
+  const fetchTodasLasVentas = async () => {
+    try {
+      // Fetch ALL sales without any user filter
+      const { data, error } = await supabase
+        .from('ventas')
+        .select(`
+          id,
+          numero_comprobante,
+          fecha,
+          total,
+          anulada,
+          usuario_id,
+          cliente_id,
+          clientes(nombre)
+        `)
+        .order('fecha', { ascending: false })
+        .limit(100);
+
+      console.log('=== DASHBOARD: Todas las ventas ===');
+      console.log('Total ventas fetched:', data?.length || 0);
+      console.log('Error:', error);
+
+      if (error) throw error;
+
+      // Fetch profiles for user names
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(v => v.usuario_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, nombre')
+          .in('id', userIds);
+
+        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+        const ventasWithProfiles = data.map(v => ({
+          ...v,
+          profiles: profilesMap.get(v.usuario_id) || null
+        }));
+        setTodasLasVentas(ventasWithProfiles);
+      } else {
+        setTodasLasVentas(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching all sales:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!user) return;
@@ -185,7 +249,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 mb-8">
         {/* Sales by Day */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -262,6 +326,59 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Listado de Ventas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Listado de Ventas (Últimas 100)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nº Comp.</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {todasLasVentas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      No hay ventas registradas
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  todasLasVentas.map((venta) => (
+                    <TableRow key={venta.id}>
+                      <TableCell className="font-medium">{venta.numero_comprobante}</TableCell>
+                      <TableCell>
+                        {venta.fecha ? format(new Date(venta.fecha), 'dd/MM/yyyy HH:mm', { locale: es }) : '-'}
+                      </TableCell>
+                      <TableCell>{venta.clientes?.nombre || 'Consumidor Final'}</TableCell>
+                      <TableCell>{venta.profiles?.nombre || '-'}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatCurrency(venta.total)}
+                      </TableCell>
+                      <TableCell>
+                        {venta.anulada ? (
+                          <Badge variant="destructive">Anulada</Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-green-600">Completada</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </MainLayout>
   );
 }
