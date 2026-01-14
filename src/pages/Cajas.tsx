@@ -12,7 +12,8 @@ import {
   ArrowDownCircle, 
   ArrowUpCircle,
   Eye,
-  Calculator
+  Calculator,
+  Printer
 } from 'lucide-react';
 import {
   Dialog,
@@ -65,8 +66,20 @@ interface Movimiento {
   profiles?: { nombre: string } | null;
 }
 
+interface ArqueoDetalle {
+  denominacion: number;
+  cantidad: number;
+  subtotal: number;
+}
+
+interface ArqueoOtroMedio {
+  tipo: string;
+  monto: number;
+}
+
 export default function Cajas() {
-  const { user, profile } = useAuth();
+  const { user, profile, hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [cajaActiva, setCajaActiva] = useState<Caja | null>(null);
@@ -76,6 +89,8 @@ export default function Cajas() {
   const [cierreDialogOpen, setCierreDialogOpen] = useState(false);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [selectedCaja, setSelectedCaja] = useState<Caja | null>(null);
+  const [arqueoDetalles, setArqueoDetalles] = useState<ArqueoDetalle[]>([]);
+  const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
@@ -263,11 +278,52 @@ export default function Cajas() {
 
       if (error) throw error;
 
+      // Guardar detalle de arqueo - denominaciones
+      const arqueoInserts = denominaciones
+        .filter(d => arqueo[d.valor.toString()] > 0)
+        .map(d => ({
+          caja_id: cajaActiva.id,
+          denominacion: d.valor,
+          cantidad: arqueo[d.valor.toString()],
+          subtotal: d.valor * arqueo[d.valor.toString()],
+        }));
+
+      if (arqueoInserts.length > 0) {
+        const { error: arqueoError } = await supabase
+          .from('arqueo_detalles')
+          .insert(arqueoInserts);
+        if (arqueoError) console.error('Error saving arqueo details:', arqueoError);
+      }
+
+      // Guardar otros medios (posnet, transferencias)
+      const otrosMediosInserts = [];
+      if (otrosMedios.posnet > 0) {
+        otrosMediosInserts.push({
+          caja_id: cajaActiva.id,
+          tipo: 'posnet',
+          monto: otrosMedios.posnet,
+        });
+      }
+      if (otrosMedios.transferencias > 0) {
+        otrosMediosInserts.push({
+          caja_id: cajaActiva.id,
+          tipo: 'transferencias',
+          monto: otrosMedios.transferencias,
+        });
+      }
+
+      if (otrosMediosInserts.length > 0) {
+        const { error: otrosError } = await supabase
+          .from('arqueo_otros_medios')
+          .insert(otrosMediosInserts);
+        if (otrosError) console.error('Error saving otros medios:', otrosError);
+      }
+
       toast.success('Caja cerrada correctamente');
       setCierreDialogOpen(false);
       setCierreData({ observaciones: '' });
       setArqueo({
-        '10000': 0, '5000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
+        '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
       });
       setOtrosMedios({ posnet: 0, transferencias: 0 });
       fetchData();
@@ -288,7 +344,136 @@ export default function Cajas() {
       .order('created_at', { ascending: false });
 
     setMovimientos(data || []);
+
+    // Fetch arqueo details if caja is closed
+    if (caja.estado === 'cerrada') {
+      const [detallesRes, otrosRes] = await Promise.all([
+        supabase
+          .from('arqueo_detalles')
+          .select('*')
+          .eq('caja_id', caja.id)
+          .order('denominacion', { ascending: false }),
+        supabase
+          .from('arqueo_otros_medios')
+          .select('*')
+          .eq('caja_id', caja.id)
+      ]);
+      
+      setArqueoDetalles((detallesRes.data || []).map((d: { denominacion: number; cantidad: number; subtotal: number }) => ({
+        denominacion: d.denominacion,
+        cantidad: d.cantidad,
+        subtotal: d.subtotal
+      })));
+      setArqueoOtrosMedios((otrosRes.data || []).map((o: { tipo: string; monto: number }) => ({
+        tipo: o.tipo,
+        monto: o.monto
+      })));
+    } else {
+      setArqueoDetalles([]);
+      setArqueoOtrosMedios([]);
+    }
+
     setDetalleDialogOpen(true);
+  };
+
+  const handlePrintArqueo = () => {
+    if (!selectedCaja) return;
+
+    const esperado = selectedCaja.fondo_inicial + (selectedCaja.total_ventas || 0) - (selectedCaja.total_egresos || 0);
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('No se pudo abrir la ventana de impresión');
+      return;
+    }
+
+    const totalEfectivoArqueo = arqueoDetalles.reduce((sum, d) => sum + d.subtotal, 0);
+    const totalOtrosMediosArqueo = arqueoOtrosMedios.reduce((sum, o) => sum + o.monto, 0);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Recibo de Arqueo</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
+          h1 { text-align: center; font-size: 18px; margin-bottom: 5px; }
+          h2 { text-align: center; font-size: 14px; color: #666; margin-top: 0; }
+          .divider { border-top: 1px dashed #000; margin: 15px 0; }
+          .row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 12px; }
+          .row.total { font-weight: bold; font-size: 14px; }
+          .section-title { font-weight: bold; margin-top: 15px; margin-bottom: 5px; font-size: 13px; }
+          .difference { font-size: 16px; text-align: center; padding: 10px; margin: 10px 0; }
+          .difference.positive { background: #e8f5e9; color: #2e7d32; }
+          .difference.negative { background: #ffebee; color: #c62828; }
+          .difference.zero { background: #e3f2fd; color: #1565c0; }
+          .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
+          @media print { button { display: none; } }
+        </style>
+      </head>
+      <body>
+        <h1>RECIBO DE ARQUEO</h1>
+        <h2>Cierre de Caja</h2>
+        <div class="divider"></div>
+        
+        <div class="row"><span>Fecha Apertura:</span><span>${format(new Date(selectedCaja.fecha_apertura), 'dd/MM/yyyy HH:mm')}</span></div>
+        <div class="row"><span>Fecha Cierre:</span><span>${selectedCaja.fecha_cierre ? format(new Date(selectedCaja.fecha_cierre), 'dd/MM/yyyy HH:mm') : '-'}</span></div>
+        
+        <div class="divider"></div>
+        
+        <div class="row"><span>Fondo Inicial:</span><span>$${selectedCaja.fondo_inicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        <div class="row"><span>Total Ingresos:</span><span>$${(selectedCaja.total_ventas || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        <div class="row"><span>Total Egresos:</span><span>-$${(selectedCaja.total_egresos || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        <div class="row total"><span>ESPERADO:</span><span>$${esperado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        
+        <div class="divider"></div>
+        <p class="section-title">DETALLE EFECTIVO</p>
+        ${arqueoDetalles.length > 0 
+          ? arqueoDetalles.map(d => `
+            <div class="row">
+              <span>$${d.denominacion.toLocaleString('es-AR')} x ${d.cantidad}</span>
+              <span>$${d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          `).join('')
+          : '<div class="row"><span>Sin detalle de efectivo</span></div>'
+        }
+        <div class="row total"><span>Subtotal Efectivo:</span><span>$${totalEfectivoArqueo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        
+        ${arqueoOtrosMedios.length > 0 ? `
+          <div class="divider"></div>
+          <p class="section-title">OTROS MEDIOS</p>
+          ${arqueoOtrosMedios.map(o => `
+            <div class="row">
+              <span>${o.tipo === 'posnet' ? 'Posnet' : 'Transferencias'}:</span>
+              <span>$${o.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          `).join('')}
+          <div class="row total"><span>Subtotal Otros:</span><span>$${totalOtrosMediosArqueo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        ` : ''}
+        
+        <div class="divider"></div>
+        <div class="row total"><span>TOTAL CONTADO:</span><span>$${(selectedCaja.conteo_declarado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+        
+        <div class="difference ${(selectedCaja.diferencia || 0) === 0 ? 'zero' : (selectedCaja.diferencia || 0) > 0 ? 'positive' : 'negative'}">
+          Diferencia: ${(selectedCaja.diferencia || 0) >= 0 ? '+' : ''}$${(selectedCaja.diferencia || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          ${(selectedCaja.diferencia || 0) === 0 ? ' ✓' : (selectedCaja.diferencia || 0) > 0 ? ' (Sobrante)' : ' (Faltante)'}
+        </div>
+        
+        ${selectedCaja.observaciones ? `
+          <div class="divider"></div>
+          <p class="section-title">OBSERVACIONES</p>
+          <p style="font-size: 12px;">${selectedCaja.observaciones}</p>
+        ` : ''}
+        
+        <div class="footer">
+          <p>Documento generado el ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+        </div>
+        
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const columns = [
@@ -689,10 +874,16 @@ export default function Cajas() {
 
       {/* Detalle Dialog */}
       <Dialog open={detalleDialogOpen} onOpenChange={setDetalleDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Detalle de Caja - {selectedCaja && format(new Date(selectedCaja.fecha_apertura), 'dd/MM/yyyy', { locale: es })}
+            <DialogTitle className="flex items-center justify-between">
+              <span>Detalle de Caja - {selectedCaja && format(new Date(selectedCaja.fecha_apertura), 'dd/MM/yyyy', { locale: es })}</span>
+              {isAdmin && selectedCaja?.estado === 'cerrada' && (
+                <Button variant="outline" size="sm" onClick={handlePrintArqueo}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir Arqueo
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
           
@@ -716,6 +907,62 @@ export default function Cajas() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Detalle de Arqueo - solo para cajas cerradas */}
+              {selectedCaja.estado === 'cerrada' && (arqueoDetalles.length > 0 || arqueoOtrosMedios.length > 0) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Detalle del Arqueo</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {arqueoDetalles.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Efectivo</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {arqueoDetalles.map((d) => (
+                            <div key={d.denominacion} className="flex justify-between bg-muted/50 px-2 py-1 rounded">
+                              <span>${d.denominacion.toLocaleString('es-AR')} x {d.cantidad}</span>
+                              <span className="font-medium">${d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {arqueoOtrosMedios.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Otros Medios</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {arqueoOtrosMedios.map((o) => (
+                            <div key={o.tipo} className="flex justify-between bg-muted/50 px-2 py-1 rounded">
+                              <span>{o.tipo === 'posnet' ? 'Posnet' : 'Transferencias'}</span>
+                              <span className="font-medium">${o.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="font-medium">Total Contado:</span>
+                      <span className="font-bold">${(selectedCaja.conteo_declarado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className={`flex justify-between text-sm ${
+                      (selectedCaja.diferencia || 0) === 0 
+                        ? 'text-success' 
+                        : (selectedCaja.diferencia || 0) > 0 
+                          ? 'text-blue-600' 
+                          : 'text-destructive'
+                    }`}>
+                      <span>Diferencia:</span>
+                      <span className="font-semibold">
+                        {(selectedCaja.diferencia || 0) >= 0 ? '+' : ''}${(selectedCaja.diferencia || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        {(selectedCaja.diferencia || 0) === 0 && ' ✓'}
+                        {(selectedCaja.diferencia || 0) > 0 && ' (Sobrante)'}
+                        {(selectedCaja.diferencia || 0) < 0 && ' (Faltante)'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="border rounded-lg">
                 <div className="p-4 border-b bg-muted/50">
