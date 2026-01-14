@@ -89,10 +89,11 @@ export default function Cajas() {
     if (!user) return;
     setLoading(true);
     try {
-      // Fetch cajas with profiles
+      // Fetch only user's cajas
       const { data: cajasData, error: cajasError } = await supabase
         .from('cajas')
         .select('*')
+        .eq('usuario_id', user.id)
         .order('fecha_apertura', { ascending: false });
 
       if (cajasError) throw cajasError;
