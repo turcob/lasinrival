@@ -39,6 +39,7 @@ const mainNavItems: NavItem[] = [
 
 const catalogNavItems: NavItem[] = [
   { title: 'Productos', href: '/productos', icon: Package, module: 'productos' },
+  { title: 'Listas de Precios', href: '/listas-precios', icon: DollarSign, module: 'precios' },
   { title: 'Categorías', href: '/categorias', icon: Tags, module: 'categorias' },
   { title: 'Subcategorías', href: '/subcategorias', icon: Layers, module: 'subcategorias' },
   { title: 'Clientes', href: '/clientes', icon: Users, module: 'clientes' },

@@ -47,6 +47,7 @@ interface Producto {
   activo: boolean;
   stock_actual: number;
   stock_minimo: number;
+  precio_costo: number;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
 }
@@ -80,6 +81,7 @@ export default function Productos() {
     activo: true,
     stock_actual: 0,
     stock_minimo: 0,
+    precio_costo: 0,
   });
 
   useEffect(() => {
@@ -179,6 +181,7 @@ export default function Productos() {
       activo: producto.activo,
       stock_actual: producto.stock_actual,
       stock_minimo: producto.stock_minimo,
+      precio_costo: producto.precio_costo || 0,
     });
     setDialogOpen(true);
   };
@@ -195,6 +198,7 @@ export default function Productos() {
       activo: true,
       stock_actual: 0,
       stock_minimo: 0,
+      precio_costo: 0,
     });
   };
 
@@ -215,6 +219,15 @@ export default function Productos() {
       key: 'subcategorias.nombre',
       header: 'Subcategoría',
       render: (item: Producto) => item.subcategorias?.nombre || '-',
+    },
+    {
+      key: 'precio_costo',
+      header: 'Costo',
+      render: (item: Producto) => (
+        <span className="font-medium">
+          ${item.precio_costo?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0.00'}
+        </span>
+      ),
     },
     {
       key: 'stock_actual',
@@ -394,6 +407,20 @@ export default function Productos() {
                     }
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="precio_costo">Precio de Costo</Label>
+                <Input
+                  id="precio_costo"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.precio_costo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, precio_costo: Number(e.target.value) })
+                  }
+                />
               </div>
 
               <div className="flex items-center gap-2">

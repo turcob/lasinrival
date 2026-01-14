@@ -45,12 +45,13 @@ interface Producto {
   descripcion: string;
   stock_actual: number;
   unidad_medida: string;
+  precio_costo: number;
 }
 
-interface PrecioProducto {
-  producto_id: string;
-  lista_precio_id: string;
-  precio: number;
+interface ListaPrecio {
+  id: string;
+  nombre: string;
+  porcentaje: number;
 }
 
 interface Cliente {
@@ -79,14 +80,13 @@ interface Pago {
 export default function POS() {
   const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [precios, setPrecios] = useState<PrecioProducto[]>([]);
+  const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
-  const [listasPrecios, setListasPrecios] = useState<{ id: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLista, setSelectedLista] = useState('');
+  const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
@@ -104,23 +104,21 @@ export default function POS() {
     if (!user) return;
     setLoading(true);
     try {
-      const [productosRes, preciosRes, clientesRes, formasPagoRes, listasRes, cajasRes] = await Promise.all([
-        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida').eq('activo', true).order('descripcion'),
-        supabase.from('precios_productos').select('producto_id, lista_precio_id, precio'),
+      const [productosRes, clientesRes, formasPagoRes, listasRes, cajasRes] = await Promise.all([
+        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo').eq('activo', true).order('descripcion'),
         supabase.from('clientes').select('id, nombre, dni_cuit').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
-        supabase.from('listas_precios').select('id, nombre').eq('activo', true),
+        supabase.from('listas_precios').select('id, nombre, porcentaje').eq('activo', true),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
       ]);
 
       if (productosRes.data) setProductos(productosRes.data);
-      if (preciosRes.data) setPrecios(preciosRes.data);
       if (clientesRes.data) setClientes(clientesRes.data);
       if (formasPagoRes.data) setFormasPago(formasPagoRes.data);
       if (listasRes.data) {
         setListasPrecios(listasRes.data);
         if (listasRes.data.length > 0 && !selectedLista) {
-          setSelectedLista(listasRes.data[0].id);
+          setSelectedLista(listasRes.data[0]);
         }
       }
       setCajaAbierta(!!cajasRes.data);
@@ -142,18 +140,19 @@ export default function POS() {
     ).slice(0, 10);
   }, [productos, searchTerm]);
 
-  const getProductoPrice = (productoId: string) => {
-    const precio = precios.find(
-      (p) => p.producto_id === productoId && p.lista_precio_id === selectedLista
-    );
-    return precio?.precio || 0;
+  // Calcular precio de venta: costo + (costo * porcentaje / 100)
+  const getProductoPrice = (producto: Producto) => {
+    if (!selectedLista) return 0;
+    const costo = producto.precio_costo || 0;
+    const porcentaje = selectedLista.porcentaje || 0;
+    return costo + (costo * porcentaje / 100);
   };
 
   const addToCart = (producto: Producto) => {
-    const precio = getProductoPrice(producto.id);
+    const precio = getProductoPrice(producto);
     
-    if (precio === 0) {
-      toast.error('Este producto no tiene precio en la lista seleccionada');
+    if (producto.precio_costo <= 0) {
+      toast.error('Este producto no tiene precio de costo definido');
       return;
     }
 
@@ -360,14 +359,20 @@ export default function POS() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle>Punto de Venta</CardTitle>
-                <Select value={selectedLista} onValueChange={setSelectedLista}>
+                <Select 
+                  value={selectedLista?.id || ''} 
+                  onValueChange={(id) => {
+                    const lista = listasPrecios.find(l => l.id === id);
+                    setSelectedLista(lista || null);
+                  }}
+                >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Lista de precios" />
                   </SelectTrigger>
                   <SelectContent>
                     {listasPrecios.map((lista) => (
                       <SelectItem key={lista.id} value={lista.id}>
-                        {lista.nombre}
+                        {lista.nombre} ({lista.porcentaje}%)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -403,7 +408,7 @@ export default function POS() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold">
-                            ${getProductoPrice(producto.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            ${getProductoPrice(producto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                           </p>
                           <Button size="sm" variant="ghost">
                             <Plus className="h-4 w-4" />

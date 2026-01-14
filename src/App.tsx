@@ -15,6 +15,7 @@ import Roles from "./pages/Roles";
 import Cajas from "./pages/Cajas";
 import POS from "./pages/POS";
 import Ventas from "./pages/Ventas";
+import ListasPrecios from "./pages/ListasPrecios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
+      <Route path="/listas-precios" element={<ProtectedRoute><ListasPrecios /></ProtectedRoute>} />
       <Route path="/categorias" element={<ProtectedRoute><Categorias /></ProtectedRoute>} />
       <Route path="/subcategorias" element={<ProtectedRoute><Subcategorias /></ProtectedRoute>} />
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
