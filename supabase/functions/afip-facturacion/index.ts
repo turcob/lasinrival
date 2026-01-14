@@ -195,18 +195,28 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   });
 
   const responseText = await response.text();
-  console.log("WSAA Response:", responseText.substring(0, 500));
+  console.log("WSAA Response (first 500):", responseText.substring(0, 500));
 
   if (!response.ok) {
     throw new Error(`Error WSAA: ${response.status} - ${responseText}`);
   }
 
+  // Decode HTML entities in the response
+  const decodedResponse = responseText
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+
+  console.log("Decoded response (first 500):", decodedResponse.substring(0, 500));
+
   // Parse response to extract token and sign
-  const tokenMatch = responseText.match(/<token>(.+?)<\/token>/s);
-  const signMatch = responseText.match(/<sign>(.+?)<\/sign>/s);
+  const tokenMatch = decodedResponse.match(/<token>(.+?)<\/token>/s);
+  const signMatch = decodedResponse.match(/<sign>(.+?)<\/sign>/s);
 
   if (!tokenMatch || !signMatch) {
-    throw new Error("No se pudo obtener token/sign de WSAA: " + responseText);
+    throw new Error("No se pudo obtener token/sign de WSAA: " + decodedResponse);
   }
 
   return {
