@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -28,7 +27,6 @@ export function ExcelImporter() {
     categorias: ImportResult;
     subcategorias: ImportResult;
     productos: ImportResult;
-    precios: ImportResult;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,31 +46,7 @@ export function ExcelImporter() {
         categorias: { success: 0, errors: [] as { row: number; message: string }[] },
         subcategorias: { success: 0, errors: [] as { row: number; message: string }[] },
         productos: { success: 0, errors: [] as { row: number; message: string }[] },
-        precios: { success: 0, errors: [] as { row: number; message: string }[] },
       };
-
-      // Get or create default price lists
-      let listaPrecio1Id: string;
-      let listaPrecio2Id: string;
-
-      const { data: listas } = await supabase.from('listas_precios').select('id, nombre');
-
-      const lista1 = listas?.find((l) => l.nombre === 'Precio 1');
-      const lista2 = listas?.find((l) => l.nombre === 'Precio 2');
-
-      if (lista1) {
-        listaPrecio1Id = lista1.id;
-      } else {
-        const { data } = await supabase.from('listas_precios').insert([{ nombre: 'Precio 1' }]).select().single();
-        listaPrecio1Id = data!.id;
-      }
-
-      if (lista2) {
-        listaPrecio2Id = lista2.id;
-      } else {
-        const { data } = await supabase.from('listas_precios').insert([{ nombre: 'Precio 2' }]).select().single();
-        listaPrecio2Id = data!.id;
-      }
 
       // Find sheet (try different names)
       const sheetName = workbook.SheetNames[0];
@@ -113,8 +87,7 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        const precio1 = parseFloat(row.PRECIO_1 || row.precio_1 || row.PRECIO1 || 0);
-        const precio2 = parseFloat(row.PRECIO_2 || row.precio_2 || row.PRECIO2 || 0);
+        const precioCosto = parseFloat(row.PRECIO_COSTO || row.precio_costo || row.COSTO || row.PRECIO_1 || 0);
 
         // Import categoria
         if (codigoFamilia && nombreFamilia && !categoriasMap.has(codigoFamilia)) {
@@ -176,6 +149,7 @@ export function ExcelImporter() {
                   unidad_medida: unidadMedida || 'UN',
                   categoria_id: categoriaId || null,
                   subcategoria_id: subcategoriaId || null,
+                  precio_costo: precioCosto,
                 }])
                 .select()
                 .single();
@@ -183,45 +157,19 @@ export function ExcelImporter() {
               if (error) throw error;
               productosMap.set(codigoArticulo, data.id);
               importResults.productos.success++;
-
-              // Import precios for new product
-              if (precio1 > 0) {
-                await supabase.from('precios_productos').insert([{
-                  producto_id: data.id,
-                  lista_precio_id: listaPrecio1Id,
-                  precio: precio1,
-                }]);
-                importResults.precios.success++;
-              }
-              if (precio2 > 0) {
-                await supabase.from('precios_productos').insert([{
-                  producto_id: data.id,
-                  lista_precio_id: listaPrecio2Id,
-                  precio: precio2,
-                }]);
-                importResults.precios.success++;
-              }
             } catch (error: any) {
               if (!error.message?.includes('duplicate')) {
                 importResults.productos.errors.push({ row: i + 2, message: error.message });
               }
             }
           } else {
-            // Update existing product prices
-            const productoId = productosMap.get(codigoArticulo)!;
-            if (precio1 > 0) {
-              await supabase.from('precios_productos').upsert([{
-                producto_id: productoId,
-                lista_precio_id: listaPrecio1Id,
-                precio: precio1,
-              }], { onConflict: 'producto_id,lista_precio_id' });
-            }
-            if (precio2 > 0) {
-              await supabase.from('precios_productos').upsert([{
-                producto_id: productoId,
-                lista_precio_id: listaPrecio2Id,
-                precio: precio2,
-              }], { onConflict: 'producto_id,lista_precio_id' });
+            // Update existing product with precio_costo if provided
+            if (precioCosto > 0) {
+              const productoId = productosMap.get(codigoArticulo)!;
+              await supabase
+                .from('productos')
+                .update({ precio_costo: precioCosto })
+                .eq('id', productoId);
             }
           }
         }
@@ -241,11 +189,11 @@ export function ExcelImporter() {
   };
 
   const totalSuccess = results
-    ? results.categorias.success + results.subcategorias.success + results.productos.success + results.precios.success
+    ? results.categorias.success + results.subcategorias.success + results.productos.success
     : 0;
 
   const totalErrors = results
-    ? results.categorias.errors.length + results.subcategorias.errors.length + results.productos.errors.length + results.precios.errors.length
+    ? results.categorias.errors.length + results.subcategorias.errors.length + results.productos.errors.length
     : 0;
 
   return (
@@ -271,7 +219,7 @@ export function ExcelImporter() {
               Importar desde Excel
             </DialogTitle>
             <DialogDescription>
-              Importe categorías, subcategorías, productos y precios desde un archivo Excel.
+              Importe categorías, subcategorías y productos desde un archivo Excel.
             </DialogDescription>
           </DialogHeader>
 
@@ -287,7 +235,7 @@ export function ExcelImporter() {
                     <p>FAMILIA, NOM_FAM (categorías)</p>
                     <p>GRUPO, NOM_GRU (subcategorías)</p>
                     <p>COD_ARTIC, DESCRIP, UNIDAD_MED (productos)</p>
-                    <p>PRECIO_1, PRECIO_2 (precios)</p>
+                    <p>PRECIO_COSTO o COSTO (precio de costo)</p>
                   </div>
                 </div>
                 
@@ -330,7 +278,7 @@ export function ExcelImporter() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="p-3 bg-muted rounded">
                     <p className="text-sm font-medium">Categorías</p>
                     <p className="text-xs text-muted-foreground">
@@ -349,17 +297,11 @@ export function ExcelImporter() {
                       {results.productos.success} importados
                     </p>
                   </div>
-                  <div className="p-3 bg-muted rounded">
-                    <p className="text-sm font-medium">Precios</p>
-                    <p className="text-xs text-muted-foreground">
-                      {results.precios.success} importados
-                    </p>
-                  </div>
                 </div>
 
                 {totalErrors > 0 && (
                   <ScrollArea className="h-32 border rounded p-2">
-                    {[...results.categorias.errors, ...results.subcategorias.errors, ...results.productos.errors, ...results.precios.errors].map((error, idx) => (
+                    {[...results.categorias.errors, ...results.subcategorias.errors, ...results.productos.errors].map((error, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs py-1">
                         <AlertCircle className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
                         <span>

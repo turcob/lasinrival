@@ -196,18 +196,21 @@ export type Database = {
           created_at: string | null
           id: string
           nombre: string
+          porcentaje: number
         }
         Insert: {
           activo?: boolean | null
           created_at?: string | null
           id?: string
           nombre: string
+          porcentaje?: number
         }
         Update: {
           activo?: boolean | null
           created_at?: string | null
           id?: string
           nombre?: string
+          porcentaje?: number
         }
         Relationships: []
       }
@@ -313,48 +316,6 @@ export type Database = {
           },
         ]
       }
-      precios_productos: {
-        Row: {
-          created_at: string | null
-          id: string
-          lista_precio_id: string
-          precio: number
-          producto_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          lista_precio_id: string
-          precio?: number
-          producto_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          lista_precio_id?: string
-          precio?: number
-          producto_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "precios_productos_lista_precio_id_fkey"
-            columns: ["lista_precio_id"]
-            isOneToOne: false
-            referencedRelation: "listas_precios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "precios_productos_producto_id_fkey"
-            columns: ["producto_id"]
-            isOneToOne: false
-            referencedRelation: "productos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       productos: {
         Row: {
           activo: boolean | null
@@ -364,6 +325,7 @@ export type Database = {
           created_at: string | null
           descripcion: string
           id: string
+          precio_costo: number
           stock_actual: number | null
           stock_minimo: number | null
           subcategoria_id: string | null
@@ -378,6 +340,7 @@ export type Database = {
           created_at?: string | null
           descripcion: string
           id?: string
+          precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
           subcategoria_id?: string | null
@@ -392,6 +355,7 @@ export type Database = {
           created_at?: string | null
           descripcion?: string
           id?: string
+          precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
           subcategoria_id?: string | null
