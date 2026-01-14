@@ -791,76 +791,180 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Ticket Dialog */}
+      {/* Ticket/Factura Dialog */}
       <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
-        <DialogContent>
+        <DialogContent className={lastVenta?.factura ? "max-w-2xl" : ""}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Printer className="h-5 w-5" />
-              Ticket de Venta
+              {lastVenta?.factura ? <FileText className="h-5 w-5" /> : <Printer className="h-5 w-5" />}
+              {lastVenta?.factura ? 'Factura Electrónica' : 'Ticket de Venta'}
             </DialogTitle>
           </DialogHeader>
           {lastVenta && (
-            <div className="space-y-4 font-mono text-sm">
-              <div className="text-center">
-                <p className="font-bold text-lg">TICKET</p>
-                <p>Comprobante #{lastVenta.numero_comprobante}</p>
-                <p className="text-muted-foreground">
-                  {new Date(lastVenta.fecha).toLocaleString('es-AR')}
-                </p>
-              </div>
-
-              <Separator />
-
-              <div>
-                <p className="font-medium">Cliente:</p>
-                <p>{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-              </div>
-
-              <Separator />
-
-              <div>
-                {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>{item.cantidad}x {item.producto.descripcion.substring(0, 20)}</span>
-                    <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            <div id="printable-invoice" className="space-y-4">
+              {lastVenta.factura ? (
+                // FACTURA FORMAL
+                <div className="border rounded-lg p-6 text-sm">
+                  {/* Header */}
+                  <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                    <div>
+                      <p className="font-bold text-lg">EMPRESA</p>
+                      <p className="text-muted-foreground">Razón Social del Comercio</p>
+                      <p className="text-muted-foreground text-xs mt-1">Dirección Comercial</p>
+                      <p className="text-xs text-muted-foreground">CUIT: 20-21395254-5</p>
+                      <p className="text-xs text-muted-foreground">IVA Responsable Inscripto</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
+                        <p className="font-bold text-2xl">
+                          {lastVenta.factura.tipo_comprobante === 1 ? 'A' : 
+                           lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
+                        </p>
+                      </div>
+                      <p className="font-bold">
+                        FACTURA {lastVenta.factura.tipo_comprobante === 1 ? 'A' : 
+                                 lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
+                      </p>
+                      <p className="text-lg font-mono">
+                        Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-
+                        {String(lastVenta.factura.numero_comprobante).padStart(8, '0')}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Fecha: {new Date(lastVenta.fecha).toLocaleDateString('es-AR')}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              <Separator />
+                  {/* Customer Info */}
+                  <div className="py-3 border-b">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Cliente:</p>
+                        <p className="font-medium">{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">CUIT/DNI:</p>
+                        <p>{lastVenta.cliente?.dni_cuit || 'S/D'}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground">Condición IVA:</p>
+                      <p>{CONDICIONES_IVA.find(c => c.value === facturaData.condicion_iva_receptor)?.label || 'Consumidor Final'}</p>
+                    </div>
+                  </div>
 
-              <div className="flex justify-between font-bold text-lg">
-                <span>TOTAL</span>
-                <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-              </div>
+                  {/* Items */}
+                  <div className="py-3 border-b">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-1">Cant.</th>
+                          <th className="text-left py-1">Descripción</th>
+                          <th className="text-right py-1">P. Unit.</th>
+                          <th className="text-right py-1">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lastVenta.detalles.map((item: CartItem, idx: number) => (
+                          <tr key={idx} className="border-b border-dashed">
+                            <td className="py-1">{item.cantidad}</td>
+                            <td className="py-1">{item.producto.descripcion}</td>
+                            <td className="text-right py-1">
+                              ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="text-right py-1">
+                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-              {lastVenta.factura && (
-                <>
+                  {/* Totals */}
+                  <div className="py-3 border-b">
+                    <div className="flex justify-end">
+                      <div className="w-64 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Subtotal Neto:</span>
+                          <span>${(lastVenta.total / 1.21).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>IVA 21%:</span>
+                          <span>${(lastVenta.total - lastVenta.total / 1.21).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg border-t pt-1">
+                          <span>TOTAL:</span>
+                          <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CAE Info */}
+                  <div className="pt-3 bg-muted/50 rounded p-3 mt-3">
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <p className="font-bold">CAE Nº: {lastVenta.factura.cae}</p>
+                        <p>Fecha Vto. CAE: {lastVenta.factura.cae_vencimiento}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-muted-foreground">Comprobante Autorizado</p>
+                        <p className="text-muted-foreground">AFIP - Factura Electrónica</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // TICKET SIMPLE
+                <div className="font-mono text-sm space-y-4">
+                  <div className="text-center">
+                    <p className="font-bold text-lg">TICKET</p>
+                    <p>Comprobante #{lastVenta.numero_comprobante}</p>
+                    <p className="text-muted-foreground">
+                      {new Date(lastVenta.fecha).toLocaleString('es-AR')}
+                    </p>
+                  </div>
+
                   <Separator />
-                  <div className="bg-muted p-3 rounded text-xs">
-                    <p className="font-bold text-center mb-2">FACTURA ELECTRÓNICA</p>
-                    <p>CAE: {lastVenta.factura.cae}</p>
-                    <p>Vto CAE: {lastVenta.factura.cae_vencimiento}</p>
-                    <p>Comprobante: {lastVenta.factura.numero_comprobante}</p>
-                  </div>
-                </>
-              )}
 
-              <div className="text-center text-muted-foreground">
-                <p>¡Gracias por su compra!</p>
-              </div>
+                  <div>
+                    <p className="font-medium">Cliente:</p>
+                    <p>{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    {lastVenta.detalles.map((item: CartItem, idx: number) => (
+                      <div key={idx} className="flex justify-between">
+                        <span>{item.cantidad}x {item.producto.descripcion.substring(0, 25)}</span>
+                        <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>TOTAL</span>
+                    <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+
+                  <div className="text-center text-muted-foreground">
+                    <p>¡Gracias por su compra!</p>
+                  </div>
+                </div>
+              )}
 
               <Button className="w-full" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" />
-                Imprimir Ticket
+                {lastVenta.factura ? 'Imprimir Factura' : 'Imprimir Ticket'}
               </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Factura Dialog */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
