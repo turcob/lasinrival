@@ -11,6 +11,7 @@ import Categorias from "./pages/Categorias";
 import Subcategorias from "./pages/Subcategorias";
 import Clientes from "./pages/Clientes";
 import Usuarios from "./pages/Usuarios";
+import Roles from "./pages/Roles";
 import Cajas from "./pages/Cajas";
 import POS from "./pages/POS";
 import Ventas from "./pages/Ventas";
@@ -52,7 +53,7 @@ function AppRoutes() {
       <Route path="/inventario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
-      <Route path="/roles" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
