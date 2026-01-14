@@ -13,6 +13,7 @@ import Clientes from "./pages/Clientes";
 import Usuarios from "./pages/Usuarios";
 import Cajas from "./pages/Cajas";
 import POS from "./pages/POS";
+import Ventas from "./pages/Ventas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
