@@ -57,6 +57,13 @@ const TIPOS_DOCUMENTO = [
   { value: 99, label: "Consumidor Final" },
 ];
 
+const CONDICIONES_IVA = [
+  { value: 1, label: "IVA Responsable Inscripto" },
+  { value: 4, label: "IVA Sujeto Exento" },
+  { value: 5, label: "Consumidor Final" },
+  { value: 6, label: "Responsable Monotributo" },
+];
+
 const ALICUOTAS_IVA = [
   { value: 5, label: "21%", porcentaje: 21 },
   { value: 4, label: "10.5%", porcentaje: 10.5 },
@@ -78,6 +85,7 @@ export default function Facturacion() {
     concepto: 1,
     doc_tipo: 99,
     doc_nro: "0",
+    condicion_iva_receptor: 5, // Consumidor Final por defecto
     cliente_id: "",
     items: [{ descripcion: "", cantidad: 1, precio_unitario: 0, iva_id: 5 }],
   });
@@ -163,6 +171,7 @@ export default function Facturacion() {
           concepto: formData.concepto,
           doc_tipo: formData.doc_tipo,
           doc_nro: parseInt(formData.doc_nro) || 0,
+          condicion_iva_receptor: formData.condicion_iva_receptor,
           importe_total: totales.total,
           importe_neto: totales.neto,
           importe_iva: totales.iva,
@@ -220,6 +229,7 @@ export default function Facturacion() {
       concepto: 1,
       doc_tipo: 99,
       doc_nro: "0",
+      condicion_iva_receptor: 5,
       cliente_id: "",
       items: [{ descripcion: "", cantidad: 1, precio_unitario: 0, iva_id: 5 }],
     });
@@ -392,7 +402,7 @@ export default function Facturacion() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <Label>Cliente</Label>
                 <Select value={formData.cliente_id} onValueChange={handleClienteChange}>
@@ -403,6 +413,25 @@ export default function Facturacion() {
                     {clientes.map((cliente) => (
                       <SelectItem key={cliente.id} value={cliente.id}>
                         {cliente.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Condición IVA</Label>
+                <Select
+                  value={formData.condicion_iva_receptor.toString()}
+                  onValueChange={(v) => setFormData({ ...formData, condicion_iva_receptor: parseInt(v) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONDICIONES_IVA.map((cond) => (
+                      <SelectItem key={cond.value} value={cond.value.toString()}>
+                        {cond.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
