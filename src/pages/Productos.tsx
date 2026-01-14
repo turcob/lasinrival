@@ -256,10 +256,7 @@ export default function Productos() {
   return (
     <MainLayout>
       <PageHeader title="Productos" description="Gestión del catálogo de productos">
-        <Button variant="outline">
-          <Upload className="mr-2 h-4 w-4" />
-          Importar Excel
-        </Button>
+        <ExcelImporter />
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
