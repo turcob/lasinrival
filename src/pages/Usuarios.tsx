@@ -5,16 +5,26 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Pencil } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Shield, UserX, UserCheck } from 'lucide-react';
+import { Plus, Shield, UserX, UserCheck, Pencil, Trash2, KeyRound } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -64,8 +74,12 @@ export default function Usuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [rolesDialogOpen, setRolesDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [newPassword, setNewPassword] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -200,6 +214,97 @@ export default function Usuarios() {
     }
   };
 
+  const openDeleteDialog = (user: UserWithRoles) => {
+    setSelectedUser(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const openPasswordDialog = (user: UserWithRoles) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setPasswordDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    setActionLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'delete',
+            userId: selectedUser.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al eliminar usuario');
+      }
+
+      toast.success('Usuario eliminado correctamente');
+      setDeleteDialogOpen(false);
+      fetchUsuarios();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast.error(error.message || 'Error al eliminar el usuario');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !newPassword) return;
+
+    setActionLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'reset-password',
+            userId: selectedUser.id,
+            newPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al restablecer contraseña');
+      }
+
+      toast.success('Contraseña restablecida correctamente');
+      setPasswordDialogOpen(false);
+      setNewPassword('');
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast.error(error.message || 'Error al restablecer la contraseña');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSaveRoles = async () => {
     if (!selectedUser) return;
 
@@ -284,7 +389,7 @@ export default function Usuarios() {
       key: 'actions',
       header: 'Acciones',
       render: (item: UserWithRoles) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {isAdmin && (
             <>
               <Button 
@@ -303,6 +408,14 @@ export default function Usuarios() {
               >
                 <Shield className="h-4 w-4" />
               </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => openPasswordDialog(item)}
+                title="Restablecer contraseña"
+              >
+                <KeyRound className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -314,6 +427,14 @@ export default function Usuarios() {
                 ) : (
                   <UserCheck className="h-4 w-4 text-green-600" />
                 )}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => openDeleteDialog(item)}
+                title="Eliminar usuario"
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </>
           )}
@@ -495,6 +616,64 @@ export default function Usuarios() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para restablecer contraseña */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restablecer Contraseña</DialogTitle>
+            <DialogDescription>
+              Ingresa la nueva contraseña para {selectedUser?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nueva Contraseña *</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={actionLoading}>
+                {actionLoading ? 'Guardando...' : 'Guardar Contraseña'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog para confirmar eliminación */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente al usuario{' '}
+              <strong>{selectedUser?.nombre}</strong> ({selectedUser?.email}) y todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
