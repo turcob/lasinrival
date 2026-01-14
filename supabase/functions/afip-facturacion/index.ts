@@ -24,9 +24,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// AFIP Homologación URLs
-const WSAA_URL = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms";
-const WSFE_URL = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx";
+// AFIP URLs - Homologación (Testing)
+const WSAA_URL_HOMO = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms";
+const WSFE_URL_HOMO = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx";
+
+// AFIP URLs - Producción
+const WSAA_URL_PROD = "https://wsaa.afip.gov.ar/ws/services/LoginCms";
+const WSFE_URL_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx";
+
+// Get URLs based on mode
+function getAfipUrls(modo: 'homologacion' | 'produccion') {
+  if (modo === 'produccion') {
+    return { wsaaUrl: WSAA_URL_PROD, wsfeUrl: WSFE_URL_PROD };
+  }
+  return { wsaaUrl: WSAA_URL_HOMO, wsfeUrl: WSFE_URL_HOMO };
+}
 
 interface FacturaRequest {
   tipo_comprobante: number;
@@ -223,12 +235,16 @@ async function saveToken(service: string, token: string, sign: string, expiratio
 }
 
 // Call WSAA to get token and sign
-async function authenticateWSAA(service: string): Promise<{ token: string; sign: string }> {
+async function authenticateWSAA(service: string, modo: 'homologacion' | 'produccion' = 'homologacion'): Promise<{ token: string; sign: string }> {
+  const serviceKey = `${service}_${modo}`;
+  
   // First, check for cached token
-  const cachedToken = await getCachedToken(service);
+  const cachedToken = await getCachedToken(serviceKey);
   if (cachedToken) {
     return cachedToken;
   }
+  
+  const { wsaaUrl } = getAfipUrls(modo);
   
   const cert = Deno.env.get("AFIP_CERT") || "";
   const privateKey = Deno.env.get("AFIP_PRIVATE_KEY") || "";
@@ -253,9 +269,9 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  console.log("Calling WSAA...");
+  console.log(`Calling WSAA (${modo})...`, wsaaUrl);
   
-  const response = await fetch(WSAA_URL, {
+  const response = await fetch(wsaaUrl, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
@@ -270,7 +286,7 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   // Check for "already authenticated" error - try to get token from cache again
   if (responseText.includes("coe.alreadyAuthenticated")) {
     console.log("Already authenticated with AFIP - checking cache again");
-    const cached = await getCachedToken(service);
+    const cached = await getCachedToken(serviceKey);
     if (cached) {
       return cached;
     }
@@ -303,9 +319,9 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   const token = tokenMatch[1];
   const sign = signMatch[1];
   
-  // Save token to cache
+  // Save token to cache with mode-specific key
   if (expirationMatch) {
-    await saveToken(service, token, sign, expirationMatch[1]);
+    await saveToken(serviceKey, token, sign, expirationMatch[1]);
   }
 
   return { token, sign };
@@ -317,8 +333,10 @@ async function getUltimoComprobante(
   sign: string,
   cuit: string,
   puntoVenta: number,
-  tipoComprobante: number
+  tipoComprobante: number,
+  modo: 'homologacion' | 'produccion' = 'homologacion'
 ): Promise<number> {
+  const { wsfeUrl } = getAfipUrls(modo);
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
   <soapenv:Header/>
@@ -335,7 +353,7 @@ async function getUltimoComprobante(
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  const response = await fetch(WSFE_URL, {
+  const response = await fetch(wsfeUrl, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
@@ -356,14 +374,18 @@ async function autorizarComprobante(
   token: string,
   sign: string,
   cuit: string,
-  factura: FacturaRequest
+  factura: FacturaRequest,
+  modo: 'homologacion' | 'produccion' = 'homologacion'
 ): Promise<{ cae: string; vencimiento: string; nroComprobante: number }> {
+  const { wsfeUrl } = getAfipUrls(modo);
+  
   const ultimoNro = await getUltimoComprobante(
     token,
     sign,
     cuit,
     factura.punto_venta,
-    factura.tipo_comprobante
+    factura.tipo_comprobante,
+    modo
   );
   
   const nroComprobante = ultimoNro + 1;
@@ -449,9 +471,9 @@ async function autorizarComprobante(
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  console.log("Calling FECAESolicitar...");
+  console.log(`Calling FECAESolicitar (${modo})...`);
   
-  const response = await fetch(WSFE_URL, {
+  const response = await fetch(wsfeUrl, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
@@ -501,14 +523,25 @@ serve(async (req) => {
 
     console.log(`AFIP Action: ${action}, CUIT: ${cuit}`);
 
+    // Get AFIP mode from configuracion_comercio
+    const { data: configData } = await supabase
+      .from('configuracion_comercio')
+      .select('afip_modo')
+      .limit(1)
+      .maybeSingle();
+    
+    const afipModo: 'homologacion' | 'produccion' = configData?.afip_modo || 'homologacion';
+    console.log(`AFIP Mode: ${afipModo}`);
+
     if (action === "test-connection") {
       // Test WSAA connection
       try {
-        const { token, sign } = await authenticateWSAA("wsfe");
+        const { token, sign } = await authenticateWSAA("wsfe", afipModo);
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: "Conexión exitosa con AFIP",
+            message: `Conexión exitosa con AFIP (${afipModo === 'produccion' ? 'Producción' : 'Homologación'})`,
+            modo: afipModo,
             hasToken: !!token,
             hasSign: !!sign
           }),
@@ -522,7 +555,8 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               success: true, 
-              message: "Conexión exitosa con AFIP (sesión activa)",
+              message: `Conexión exitosa con AFIP (${afipModo === 'produccion' ? 'Producción' : 'Homologación'}) - sesión activa`,
+              modo: afipModo,
               alreadyAuthenticated: true
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -533,6 +567,7 @@ serve(async (req) => {
           JSON.stringify({ 
             success: false, 
             error: message,
+            modo: afipModo,
             hint: "Verificá que el certificado y clave privada estén correctamente configurados"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -544,11 +579,11 @@ serve(async (req) => {
       const body = await req.json();
       const { punto_venta, tipo_comprobante } = body;
       
-      const { token, sign } = await authenticateWSAA("wsfe");
-      const ultimoNro = await getUltimoComprobante(token, sign, cuit, punto_venta, tipo_comprobante);
+      const { token, sign } = await authenticateWSAA("wsfe", afipModo);
+      const ultimoNro = await getUltimoComprobante(token, sign, cuit, punto_venta, tipo_comprobante, afipModo);
       
       return new Response(
-        JSON.stringify({ ultimo_numero: ultimoNro }),
+        JSON.stringify({ ultimo_numero: ultimoNro, modo: afipModo }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -556,13 +591,13 @@ serve(async (req) => {
     if (action === "emitir") {
       const factura: FacturaRequest = await req.json();
       
-      console.log("Emitiendo factura:", JSON.stringify(factura));
+      console.log(`Emitiendo factura (${afipModo}):`, JSON.stringify(factura));
       
       // Authenticate with WSAA
-      const { token, sign } = await authenticateWSAA("wsfe");
+      const { token, sign } = await authenticateWSAA("wsfe", afipModo);
       
       // Authorize voucher
-      const resultado = await autorizarComprobante(token, sign, cuit, factura);
+      const resultado = await autorizarComprobante(token, sign, cuit, factura, afipModo);
       
       return new Response(
         JSON.stringify({
@@ -572,6 +607,7 @@ serve(async (req) => {
           numero_comprobante: resultado.nroComprobante,
           punto_venta: factura.punto_venta,
           tipo_comprobante: factura.tipo_comprobante,
+          modo: afipModo,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

@@ -4,9 +4,10 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Building2, MapPin, Phone, Mail, FileText } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -37,6 +38,7 @@ interface ConfiguracionComercio {
   condicion_iva: string;
   inicio_actividades: string;
   punto_venta: number;
+  afip_modo: 'homologacion' | 'produccion';
 }
 
 const CONDICIONES_IVA = [
@@ -85,6 +87,7 @@ const initialFormData: ConfiguracionComercio = {
   condicion_iva: 'IVA Responsable Inscripto',
   inicio_actividades: '',
   punto_venta: 1,
+  afip_modo: 'homologacion',
 };
 
 export default function Configuracion() {
@@ -126,6 +129,7 @@ export default function Configuracion() {
           condicion_iva: data.condicion_iva || 'IVA Responsable Inscripto',
           inicio_actividades: data.inicio_actividades || '',
           punto_venta: data.punto_venta || 1,
+          afip_modo: (data as any).afip_modo || 'homologacion',
         });
       }
     } catch (error) {
@@ -183,6 +187,7 @@ export default function Configuracion() {
         condicion_iva: formData.condicion_iva,
         inicio_actividades: formData.inicio_actividades || null,
         punto_venta: formData.punto_venta,
+        afip_modo: formData.afip_modo,
       };
 
       if (configId) {
@@ -322,6 +327,65 @@ export default function Configuracion() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Configuración AFIP */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {formData.afip_modo === 'produccion' ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                )}
+                Modo AFIP
+              </CardTitle>
+              <CardDescription>
+                Configuración del entorno de facturación electrónica
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">
+                    {formData.afip_modo === 'produccion' ? 'Modo Producción' : 'Modo Homologación (Testing)'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.afip_modo === 'produccion' 
+                      ? 'Las facturas se emiten con validez fiscal real. Asegurate de tener los certificados de producción configurados.'
+                      : 'Las facturas se emiten en modo prueba. No tienen validez fiscal.'
+                    }
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm font-medium ${formData.afip_modo === 'homologacion' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                    Testing
+                  </span>
+                  <Switch
+                    checked={formData.afip_modo === 'produccion'}
+                    onCheckedChange={(checked) => setFormData({ ...formData, afip_modo: checked ? 'produccion' : 'homologacion' })}
+                    disabled={!isAdmin}
+                  />
+                  <span className={`text-sm font-medium ${formData.afip_modo === 'produccion' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                    Producción
+                  </span>
+                </div>
+              </div>
+              {formData.afip_modo === 'produccion' && (
+                <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800 dark:text-amber-200">
+                      <p className="font-medium">Importante: Modo Producción activo</p>
+                      <p className="mt-1">
+                        Asegurate de haber configurado los certificados de producción de AFIP antes de emitir facturas.
+                        Las facturas emitidas en este modo tienen validez fiscal.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

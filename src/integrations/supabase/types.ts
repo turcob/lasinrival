@@ -339,6 +339,7 @@ export type Database = {
       }
       configuracion_comercio: {
         Row: {
+          afip_modo: string
           codigo_postal: string | null
           condicion_iva: string
           created_at: string
@@ -356,6 +357,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          afip_modo?: string
           codigo_postal?: string | null
           condicion_iva?: string
           created_at?: string
@@ -373,6 +375,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          afip_modo?: string
           codigo_postal?: string | null
           condicion_iva?: string
           created_at?: string
