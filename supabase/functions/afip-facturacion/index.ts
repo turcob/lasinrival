@@ -197,6 +197,13 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   const responseText = await response.text();
   console.log("WSAA Response (first 500):", responseText.substring(0, 500));
 
+  // Check for "already authenticated" error - this is actually a success
+  if (responseText.includes("coe.alreadyAuthenticated")) {
+    console.log("Already authenticated with AFIP - token is still valid");
+    // Return a flag indicating we're already authenticated
+    throw new Error("ALREADY_AUTHENTICATED");
+  }
+
   if (!response.ok) {
     throw new Error(`Error WSAA: ${response.status} - ${responseText}`);
   }
@@ -414,6 +421,19 @@ serve(async (req) => {
         );
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
+        
+        // Handle "already authenticated" as success
+        if (message === "ALREADY_AUTHENTICATED") {
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              message: "Conexión exitosa con AFIP (sesión activa)",
+              alreadyAuthenticated: true
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
         return new Response(
           JSON.stringify({ 
             success: false, 
