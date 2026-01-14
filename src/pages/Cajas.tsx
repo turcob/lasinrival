@@ -82,8 +82,8 @@ export default function Cajas() {
   const [cierreData, setCierreData] = useState({ observaciones: '' });
   const [arqueo, setArqueo] = useState<Record<string, number>>({
     // Billetes
+    '20000': 0,
     '10000': 0,
-    '5000': 0,
     '2000': 0,
     '1000': 0,
     '500': 0,
@@ -96,8 +96,8 @@ export default function Cajas() {
   });
 
   const denominaciones = [
+    { valor: 20000, label: '$20.000' },
     { valor: 10000, label: '$10.000' },
-    { valor: 5000, label: '$5.000' },
     { valor: 2000, label: '$2.000' },
     { valor: 1000, label: '$1.000' },
     { valor: 500, label: '$500' },
