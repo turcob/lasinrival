@@ -1,1 +1,4 @@
 project_id = "zipqraqiztulxyuzhtjo"
+
+[functions.afip-facturacion]
+verify_jwt = false
