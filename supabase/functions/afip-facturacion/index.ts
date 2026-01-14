@@ -47,13 +47,13 @@ function generateTRA(service: string): string {
 
 // Normalize PEM format - handle common issues
 function normalizePem(pem: string, type: 'CERTIFICATE' | 'RSA PRIVATE KEY' | 'PRIVATE KEY'): string {
-  // Remove any existing headers/footers and whitespace
+  // Remove any existing headers/footers (with variable number of dashes) and whitespace
   let content = pem
-    .replace(/-----BEGIN [^-]+-----/g, '')
-    .replace(/-----END [^-]+-----/g, '')
+    .replace(/-+BEGIN [^-]+-+/gi, '')
+    .replace(/-+END [^-]+-+/gi, '')
     .replace(/[\r\n\s]/g, '');
   
-  // Re-add proper headers with correct line breaks
+  // Re-add proper headers with correct line breaks (5 dashes)
   const header = `-----BEGIN ${type}-----`;
   const footer = `-----END ${type}-----`;
   
