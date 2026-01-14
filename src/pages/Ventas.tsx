@@ -150,7 +150,8 @@ export default function Ventas() {
 
   const fetchVentas = async (adminAccess: boolean) => {
     setLoading(true);
-    console.log('fetchVentas called with adminAccess:', adminAccess);
+    console.log('=== VENTAS PAGE: fetchVentas called ===');
+    console.log('adminAccess:', adminAccess);
     try {
       const { data, error } = await supabase
         .from('ventas')
@@ -161,17 +162,22 @@ export default function Ventas() {
         `)
         .order('fecha', { ascending: false });
 
-      console.log('Ventas fetched:', data?.length, 'records');
+      console.log('Ventas fetched:', data?.length || 0, 'records');
+      console.log('Error:', error);
+      
       if (error) throw error;
       
       // Fetch profiles for each venta if admin
-      if (adminAccess && data) {
+      if (adminAccess && data && data.length > 0) {
+        console.log('Fetching profiles for admin view...');
         const userIds = [...new Set(data.map(v => v.usuario_id))];
+        console.log('Unique user IDs:', userIds);
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, nombre')
           .in('id', userIds);
         
+        console.log('Profiles fetched:', profilesData?.length || 0);
         const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
         const ventasWithProfiles = data.map(v => ({
           ...v,
