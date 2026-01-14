@@ -382,28 +382,25 @@ export default function POS() {
           const ivaAmount = total - netoSinIva;
 
           const { data: facturaResult, error: facturaError } = await supabase.functions.invoke(
-            'afip-facturacion',
+            'afip-facturacion/emitir',
             {
               body: {
-                action: 'emitir',
-                factura: {
-                  tipo_comprobante: facturaData.tipo_comprobante,
-                  punto_venta: 1,
-                  concepto: 1,
-                  doc_tipo: facturaData.doc_tipo,
-                  doc_nro: parseInt(facturaData.doc_nro) || 0,
-                  condicion_iva_receptor: facturaData.condicion_iva_receptor,
-                  importe_total: total,
-                  importe_neto: parseFloat(netoSinIva.toFixed(2)),
-                  importe_iva: parseFloat(ivaAmount.toFixed(2)),
-                  items: cart.map(item => ({
-                    descripcion: item.producto.descripcion,
-                    cantidad: item.cantidad,
-                    precio_unitario: item.precio / 1.21, // Precio sin IVA
-                    iva_id: 5, // 21%
-                  })),
-                  venta_id: venta.id,
-                },
+                tipo_comprobante: facturaData.tipo_comprobante,
+                punto_venta: 1,
+                concepto: 1,
+                doc_tipo: facturaData.doc_tipo,
+                doc_nro: parseInt(facturaData.doc_nro) || 0,
+                condicion_iva_receptor: facturaData.condicion_iva_receptor,
+                importe_total: total,
+                importe_neto: parseFloat(netoSinIva.toFixed(2)),
+                importe_iva: parseFloat(ivaAmount.toFixed(2)),
+                items: cart.map(item => ({
+                  descripcion: item.producto.descripcion,
+                  cantidad: item.cantidad,
+                  precio_unitario: item.precio / 1.21, // Precio sin IVA
+                  iva_id: 5, // 21%
+                })),
+                venta_id: venta.id,
               },
             }
           );
