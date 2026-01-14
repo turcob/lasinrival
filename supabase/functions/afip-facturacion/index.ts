@@ -369,29 +369,44 @@ async function autorizarComprobante(
   const nroComprobante = ultimoNro + 1;
   const fechaHoy = new Date().toISOString().split("T")[0].replace(/-/g, "");
   
-  // Build IVA array
-  const ivaItems = factura.items.reduce((acc, item) => {
-    const baseImp = item.cantidad * item.precio_unitario;
-    const alicuota = item.iva_id === 5 ? 21 : item.iva_id === 4 ? 10.5 : 0;
-    const importe = baseImp * (alicuota / 100);
-    
-    const existing = acc.find(i => i.id === item.iva_id);
-    if (existing) {
-      existing.baseImp += baseImp;
-      existing.importe += importe;
-    } else {
-      acc.push({ id: item.iva_id, baseImp, importe });
-    }
-    return acc;
-  }, [] as Array<{ id: number; baseImp: number; importe: number }>);
+  // Check if it's a Factura C (tipo 11) - Monotributistas don't discriminate IVA
+  const esFacturaC = factura.tipo_comprobante === 11;
+  
+  // For Factura C: IVA must be 0 and no IVA breakdown
+  let ivaXml = "";
+  let impNeto = factura.importe_neto;
+  let impIva = factura.importe_iva;
+  
+  if (esFacturaC) {
+    // Factura C: Total = Neto (no IVA discrimination)
+    impNeto = factura.importe_total;
+    impIva = 0;
+    ivaXml = ""; // No IVA breakdown for Factura C
+  } else {
+    // Factura A or B: Include IVA breakdown
+    const ivaItems = factura.items.reduce((acc, item) => {
+      const baseImp = item.cantidad * item.precio_unitario;
+      const alicuota = item.iva_id === 5 ? 21 : item.iva_id === 4 ? 10.5 : 0;
+      const importe = baseImp * (alicuota / 100);
+      
+      const existing = acc.find(i => i.id === item.iva_id);
+      if (existing) {
+        existing.baseImp += baseImp;
+        existing.importe += importe;
+      } else {
+        acc.push({ id: item.iva_id, baseImp, importe });
+      }
+      return acc;
+    }, [] as Array<{ id: number; baseImp: number; importe: number }>);
 
-  const ivaXml = ivaItems.map(iva => `
-    <ar:AlicIva>
-      <ar:Id>${iva.id}</ar:Id>
-      <ar:BaseImp>${iva.baseImp.toFixed(2)}</ar:BaseImp>
-      <ar:Importe>${iva.importe.toFixed(2)}</ar:Importe>
-    </ar:AlicIva>
-  `).join("");
+    ivaXml = `<ar:Iva>${ivaItems.map(iva => `
+      <ar:AlicIva>
+        <ar:Id>${iva.id}</ar:Id>
+        <ar:BaseImp>${iva.baseImp.toFixed(2)}</ar:BaseImp>
+        <ar:Importe>${iva.importe.toFixed(2)}</ar:Importe>
+      </ar:AlicIva>
+    `).join("")}</ar:Iva>`;
+  }
 
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
@@ -419,14 +434,14 @@ async function autorizarComprobante(
             <ar:CbteFch>${fechaHoy}</ar:CbteFch>
             <ar:ImpTotal>${factura.importe_total.toFixed(2)}</ar:ImpTotal>
             <ar:ImpTotConc>0.00</ar:ImpTotConc>
-            <ar:ImpNeto>${factura.importe_neto.toFixed(2)}</ar:ImpNeto>
+            <ar:ImpNeto>${impNeto.toFixed(2)}</ar:ImpNeto>
             <ar:ImpOpEx>0.00</ar:ImpOpEx>
-            <ar:ImpIVA>${factura.importe_iva.toFixed(2)}</ar:ImpIVA>
+            <ar:ImpIVA>${impIva.toFixed(2)}</ar:ImpIVA>
             <ar:ImpTrib>0.00</ar:ImpTrib>
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
             <ar:CondicionIVAReceptorId>${factura.condicion_iva_receptor}</ar:CondicionIVAReceptorId>
-            <ar:Iva>${ivaXml}</ar:Iva>
+            ${ivaXml}
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
       </ar:FeCAEReq>
