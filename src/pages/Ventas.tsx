@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -42,8 +42,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface ComprobanteAfip {
@@ -114,6 +116,7 @@ export default function Ventas() {
   const { user, hasPermission, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const [ventas, setVentas] = useState<Venta[]>([]);
+  const [pagosPorVenta, setPagosPorVenta] = useState<Record<string, VentaPago[]>>({});
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
@@ -125,6 +128,8 @@ export default function Ventas() {
   
   // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
+  const [fechaDesde, setFechaDesde] = useState<Date | undefined>(undefined);
+  const [fechaHasta, setFechaHasta] = useState<Date | undefined>(undefined);
 
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
@@ -150,8 +155,6 @@ export default function Ventas() {
 
   const fetchVentas = async (adminAccess: boolean) => {
     setLoading(true);
-    console.log('=== VENTAS PAGE: fetchVentas called ===');
-    console.log('adminAccess:', adminAccess);
     try {
       const { data, error } = await supabase
         .from('ventas')
@@ -162,22 +165,16 @@ export default function Ventas() {
         `)
         .order('fecha', { ascending: false });
 
-      console.log('Ventas fetched:', data?.length || 0, 'records');
-      console.log('Error:', error);
-      
       if (error) throw error;
       
       // Fetch profiles for each venta if admin
       if (adminAccess && data && data.length > 0) {
-        console.log('Fetching profiles for admin view...');
         const userIds = [...new Set(data.map(v => v.usuario_id))];
-        console.log('Unique user IDs:', userIds);
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, nombre')
           .in('id', userIds);
         
-        console.log('Profiles fetched:', profilesData?.length || 0);
         const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
         const ventasWithProfiles = data.map(v => ({
           ...v,
@@ -187,6 +184,26 @@ export default function Ventas() {
       } else {
         setVentas(data || []);
       }
+
+      // Fetch all payments for these sales
+      if (data && data.length > 0) {
+        const ventaIds = data.map(v => v.id);
+        const { data: pagosData } = await supabase
+          .from('venta_pagos')
+          .select('*, formas_pago(nombre)')
+          .in('venta_id', ventaIds);
+
+        if (pagosData) {
+          const pagosByVenta: Record<string, VentaPago[]> = {};
+          pagosData.forEach(pago => {
+            if (!pagosByVenta[pago.venta_id]) {
+              pagosByVenta[pago.venta_id] = [];
+            }
+            pagosByVenta[pago.venta_id].push(pago);
+          });
+          setPagosPorVenta(pagosByVenta);
+        }
+      }
     } catch (error) {
       console.error('Error fetching ventas:', error);
       toast.error('Error al cargar las ventas');
@@ -195,10 +212,63 @@ export default function Ventas() {
     }
   };
 
-  // Filtrar ventas según usuario seleccionado
-  const ventasFiltradas = filtroUsuario === 'todos' 
-    ? ventas 
-    : ventas.filter(v => v.usuario_id === filtroUsuario);
+  // Filtrar ventas según filtros aplicados
+  const ventasFiltradas = useMemo(() => {
+    return ventas.filter(v => {
+      // Filtro por usuario
+      if (filtroUsuario !== 'todos' && v.usuario_id !== filtroUsuario) {
+        return false;
+      }
+      
+      // Filtro por fecha
+      if (fechaDesde || fechaHasta) {
+        const ventaFecha = new Date(v.fecha);
+        if (fechaDesde && ventaFecha < startOfDay(fechaDesde)) {
+          return false;
+        }
+        if (fechaHasta && ventaFecha > endOfDay(fechaHasta)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [ventas, filtroUsuario, fechaDesde, fechaHasta]);
+
+  // Calcular totales por medio de pago
+  const totalesPorMedioPago = useMemo(() => {
+    const totales: Record<string, number> = {};
+    let totalGeneral = 0;
+    
+    ventasFiltradas.forEach(venta => {
+      if (!venta.anulada) {
+        totalGeneral += venta.total;
+        const pagosVenta = pagosPorVenta[venta.id] || [];
+        pagosVenta.forEach(pago => {
+          const nombreMedio = pago.formas_pago?.nombre || 'Otro';
+          totales[nombreMedio] = (totales[nombreMedio] || 0) + pago.monto;
+        });
+      }
+    });
+    
+    return { totales, totalGeneral };
+  }, [ventasFiltradas, pagosPorVenta]);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const getMedioPagoIcon = (nombre: string) => {
+    const lower = nombre.toLowerCase();
+    if (lower.includes('efectivo')) return <Banknote className="h-4 w-4" />;
+    if (lower.includes('transfer')) return <Landmark className="h-4 w-4" />;
+    if (lower.includes('tarjeta') || lower.includes('debito') || lower.includes('credito')) return <CreditCard className="h-4 w-4" />;
+    return <Banknote className="h-4 w-4" />;
+  };
 
   const openDetalleDialog = async (venta: Venta) => {
     setSelectedVenta(venta);
@@ -408,11 +478,19 @@ export default function Ventas() {
   return (
     <MainLayout>
       <PageHeader title="Ventas" description="Historial de ventas y comprobantes">
+        <Button variant="outline" onClick={() => toast.info('Función de exportación próximamente')}>
+          <Download className="mr-2 h-4 w-4" />
+          Exportar
+        </Button>
+      </PageHeader>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-4 mb-6">
         {isAdmin && (
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filtrar por vendedor" />
               </SelectTrigger>
               <SelectContent>
@@ -424,11 +502,94 @@ export default function Ventas() {
             </Select>
           </div>
         )}
-        <Button variant="outline" onClick={() => toast.info('Función de exportación próximamente')}>
-          <Download className="mr-2 h-4 w-4" />
-          Exportar
-        </Button>
-      </PageHeader>
+
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
+                {fechaDesde ? format(fechaDesde, 'dd/MM/yyyy') : 'Desde'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={fechaDesde}
+                onSelect={setFechaDesde}
+                locale={es}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <span className="text-muted-foreground">-</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
+                {fechaHasta ? format(fechaHasta, 'dd/MM/yyyy') : 'Hasta'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={fechaHasta}
+                onSelect={setFechaHasta}
+                locale={es}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          {(fechaDesde || fechaHasta) && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => { setFechaDesde(undefined); setFechaHasta(undefined); }}
+            >
+              Limpiar
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Resumen de Totales */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            {/* Total Grande */}
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground mb-1">Total Ventas</p>
+              <p className="text-4xl font-bold text-primary">
+                {formatCurrency(totalesPorMedioPago.totalGeneral)}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {ventasFiltradas.filter(v => !v.anulada).length} ventas
+                {(fechaDesde || fechaHasta) && ' en el período seleccionado'}
+              </p>
+            </div>
+
+            {/* Desglose por Medio de Pago */}
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground mb-2">Desglose por Medio de Pago</p>
+              <div className="flex flex-wrap gap-4">
+                {Object.entries(totalesPorMedioPago.totales).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin datos</p>
+                ) : (
+                  Object.entries(totalesPorMedioPago.totales)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([nombre, total]) => (
+                      <div key={nombre} className="flex items-center gap-2 bg-muted/50 px-3 py-2 rounded-lg">
+                        {getMedioPagoIcon(nombre)}
+                        <div>
+                          <p className="text-xs text-muted-foreground">{nombre}</p>
+                          <p className="font-semibold">{formatCurrency(total)}</p>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <DataTable
         data={ventasFiltradas}
