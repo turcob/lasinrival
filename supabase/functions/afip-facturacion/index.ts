@@ -45,18 +45,54 @@ function generateTRA(service: string): string {
 </loginTicketRequest>`;
 }
 
+// Normalize PEM format - handle common issues
+function normalizePem(pem: string, type: 'CERTIFICATE' | 'RSA PRIVATE KEY' | 'PRIVATE KEY'): string {
+  // Remove any existing headers/footers and whitespace
+  let content = pem
+    .replace(/-----BEGIN [^-]+-----/g, '')
+    .replace(/-----END [^-]+-----/g, '')
+    .replace(/[\r\n\s]/g, '');
+  
+  // Re-add proper headers with correct line breaks
+  const header = `-----BEGIN ${type}-----`;
+  const footer = `-----END ${type}-----`;
+  
+  // Split into 64-character lines
+  const lines: string[] = [];
+  for (let i = 0; i < content.length; i += 64) {
+    lines.push(content.slice(i, i + 64));
+  }
+  
+  return `${header}\n${lines.join('\n')}\n${footer}`;
+}
+
 // Sign TRA with certificate and private key using PKCS#7/CMS
 function signTRA(tra: string, certPem: string, privateKeyPem: string): string {
   try {
-    console.log("Parsing certificate...");
+    // Log raw input for debugging (first 100 chars)
+    console.log("Raw cert input (first 100):", certPem.substring(0, 100));
+    console.log("Raw key input (first 100):", privateKeyPem.substring(0, 100));
     
-    // Parse the certificate
-    const cert = forge.pki.certificateFromPem(certPem);
+    // Normalize the PEM formats
+    const normalizedCert = normalizePem(certPem, 'CERTIFICATE');
+    console.log("Normalized cert (first 100):", normalizedCert.substring(0, 100));
+    
+    // Detect key type and normalize
+    let normalizedKey: string;
+    if (privateKeyPem.includes('RSA PRIVATE KEY') || !privateKeyPem.includes('PRIVATE KEY')) {
+      normalizedKey = normalizePem(privateKeyPem, 'RSA PRIVATE KEY');
+    } else {
+      normalizedKey = normalizePem(privateKeyPem, 'PRIVATE KEY');
+    }
+    console.log("Normalized key (first 100):", normalizedKey.substring(0, 100));
+    
+    console.log("Parsing certificate...");
+    const cert = forge.pki.certificateFromPem(normalizedCert);
+    console.log("Certificate parsed successfully");
     
     console.log("Parsing private key...");
-    
-    // Parse the private key
-    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+    const privateKey = forge.pki.privateKeyFromPem(normalizedKey);
+    console.log("Private key parsed successfully");
     
     console.log("Creating PKCS#7 signed data...");
     
