@@ -34,6 +34,7 @@ interface FacturaRequest {
   concepto: number;
   doc_tipo: number;
   doc_nro: number;
+  condicion_iva_receptor: number; // 1=Resp.Inscripto, 4=Exento, 5=Cons.Final, 6=Monotributo
   importe_total: number;
   importe_neto: number;
   importe_iva: number;
@@ -424,6 +425,7 @@ async function autorizarComprobante(
             <ar:ImpTrib>0.00</ar:ImpTrib>
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
+            <ar:CondicionIVAReceptor>${factura.condicion_iva_receptor}</ar:CondicionIVAReceptor>
             <ar:Iva>${ivaXml}</ar:Iva>
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
