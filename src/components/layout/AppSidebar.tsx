@@ -32,7 +32,7 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { title: 'Punto de Venta', href: '/pos', icon: ShoppingCart, module: 'ventas' },
   { title: 'Ventas', href: '/ventas', icon: DollarSign, module: 'ventas' },
 ];
