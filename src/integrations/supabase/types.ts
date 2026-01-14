@@ -219,6 +219,7 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean | null
+          condicion_iva: number | null
           created_at: string | null
           direccion: string | null
           dni_cuit: string | null
@@ -231,6 +232,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean | null
+          condicion_iva?: number | null
           created_at?: string | null
           direccion?: string | null
           dni_cuit?: string | null
@@ -243,6 +245,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean | null
+          condicion_iva?: number | null
           created_at?: string | null
           direccion?: string | null
           dni_cuit?: string | null
