@@ -87,7 +87,8 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        const precioCosto = parseFloat(row.PRECIO_COSTO || row.precio_costo || row.COSTO || row.PRECIO_1 || 0);
+        // PRECIO_1 es el precio de costo en el Excel de Las Inrival
+        const precioCosto = parseFloat(row.PRECIO_1 || row.PRECIO_COSTO || row.precio_costo || row.COSTO || 0);
 
         // Import categoria
         if (codigoFamilia && nombreFamilia && !categoriasMap.has(codigoFamilia)) {
