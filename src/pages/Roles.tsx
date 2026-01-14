@@ -58,6 +58,7 @@ const permissionLabels: Record<AppPermission, string> = {
 };
 
 const modules = [
+  { key: 'dashboard', label: 'Dashboard' },
   { key: 'productos', label: 'Productos' },
   { key: 'categorias', label: 'Categorías' },
   { key: 'subcategorias', label: 'Subcategorías' },
