@@ -8,13 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   DollarSign, 
   ShoppingCart, 
-  Package, 
-  Users,
   TrendingUp,
-  ArrowRight
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import {
   BarChart,
   Bar,
@@ -32,81 +27,113 @@ interface DashboardStats {
   ventasHoy: number;
   ventasSemana: number;
   ventasMes: number;
-  totalProductos: number;
-  totalClientes: number;
-  ventasCount: number;
+  ventasCountHoy: number;
+  ventasCountSemana: number;
 }
 
 const CHART_COLORS = ['hsl(217, 91%, 50%)', 'hsl(173, 80%, 40%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)'];
 
 export default function Dashboard() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     ventasHoy: 0,
     ventasSemana: 0,
     ventasMes: 0,
-    totalProductos: 0,
-    totalClientes: 0,
-    ventasCount: 0,
+    ventasCountHoy: 0,
+    ventasCountSemana: 0,
   });
   const [loading, setLoading] = useState(true);
   const [ventasPorDia, setVentasPorDia] = useState<{ dia: string; total: number }[]>([]);
   const [ventasPorFormaPago, setVentasPorFormaPago] = useState<{ nombre: string; total: number }[]>([]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const fetchDashboardData = async () => {
+    if (!user) return;
+    
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay())).toISOString();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      
+      // Calculate start of week (Monday)
+      const dayOfWeek = now.getDay();
+      const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday).toISOString();
+      
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
+      // Fetch only current user's sales
       const [
         ventasHoyRes,
         ventasSemanaRes,
         ventasMesRes,
-        productosRes,
-        clientesRes,
-        ventasCountRes,
       ] = await Promise.all([
-        supabase.from('ventas').select('total').gte('fecha', startOfDay).eq('anulada', false),
-        supabase.from('ventas').select('total').gte('fecha', startOfWeek).eq('anulada', false),
-        supabase.from('ventas').select('total').gte('fecha', startOfMonth).eq('anulada', false),
-        supabase.from('productos').select('id', { count: 'exact', head: true }).eq('activo', true),
-        supabase.from('clientes').select('id', { count: 'exact', head: true }).eq('activo', true),
-        supabase.from('ventas').select('id', { count: 'exact', head: true }).eq('anulada', false),
+        supabase.from('ventas').select('total').gte('fecha', startOfDay).eq('anulada', false).eq('usuario_id', user.id),
+        supabase.from('ventas').select('total').gte('fecha', startOfWeek).eq('anulada', false).eq('usuario_id', user.id),
+        supabase.from('ventas').select('total').gte('fecha', startOfMonth).eq('anulada', false).eq('usuario_id', user.id),
       ]);
 
       setStats({
         ventasHoy: ventasHoyRes.data?.reduce((sum, v) => sum + (v.total || 0), 0) || 0,
         ventasSemana: ventasSemanaRes.data?.reduce((sum, v) => sum + (v.total || 0), 0) || 0,
         ventasMes: ventasMesRes.data?.reduce((sum, v) => sum + (v.total || 0), 0) || 0,
-        totalProductos: productosRes.count || 0,
-        totalClientes: clientesRes.count || 0,
-        ventasCount: ventasCountRes.count || 0,
+        ventasCountHoy: ventasHoyRes.data?.length || 0,
+        ventasCountSemana: ventasSemanaRes.data?.length || 0,
       });
 
-      // Simulated data for charts (would come from real queries)
-      setVentasPorDia([
-        { dia: 'Lun', total: 15000 },
-        { dia: 'Mar', total: 22000 },
-        { dia: 'Mié', total: 18000 },
-        { dia: 'Jue', total: 25000 },
-        { dia: 'Vie', total: 32000 },
-        { dia: 'Sáb', total: 28000 },
-        { dia: 'Dom', total: 12000 },
-      ]);
+      // Fetch sales by day for the current week (user's sales only)
+      const ventasSemanaData = ventasSemanaRes.data || [];
+      const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      
+      // We need to fetch with fecha to group by day
+      const { data: ventasConFecha } = await supabase
+        .from('ventas')
+        .select('total, fecha')
+        .gte('fecha', startOfWeek)
+        .eq('anulada', false)
+        .eq('usuario_id', user.id);
 
-      setVentasPorFormaPago([
-        { nombre: 'Efectivo', total: 45000 },
-        { nombre: 'Débito', total: 30000 },
-        { nombre: 'Crédito', total: 20000 },
-        { nombre: 'Transferencia', total: 15000 },
-        { nombre: 'QR', total: 10000 },
-      ]);
+      const ventasPorDiaMap: Record<string, number> = {};
+      diasSemana.forEach(dia => ventasPorDiaMap[dia] = 0);
+      
+      (ventasConFecha || []).forEach(venta => {
+        if (venta.fecha) {
+          const fecha = new Date(venta.fecha);
+          const diaSemana = fecha.getDay();
+          const diaIndex = diaSemana === 0 ? 6 : diaSemana - 1;
+          ventasPorDiaMap[diasSemana[diaIndex]] += venta.total || 0;
+        }
+      });
+
+      setVentasPorDia(diasSemana.map(dia => ({ dia, total: ventasPorDiaMap[dia] })));
+
+      // Fetch sales by payment method (user's sales only)
+      const { data: pagosData } = await supabase
+        .from('venta_pagos')
+        .select(`
+          monto,
+          forma_pago_id,
+          formas_pago!inner(nombre),
+          ventas!inner(usuario_id, anulada)
+        `)
+        .eq('ventas.usuario_id', user.id)
+        .eq('ventas.anulada', false);
+
+      const pagosPorForma: Record<string, number> = {};
+      (pagosData || []).forEach((pago: any) => {
+        const nombre = pago.formas_pago?.nombre || 'Otro';
+        pagosPorForma[nombre] = (pagosPorForma[nombre] || 0) + (pago.monto || 0);
+      });
+
+      setVentasPorFormaPago(
+        Object.entries(pagosPorForma)
+          .map(([nombre, total]) => ({ nombre, total }))
+          .sort((a, b) => b.total - a.total)
+      );
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -127,7 +154,7 @@ export default function Dashboard() {
     <MainLayout>
       <PageHeader 
         title={`¡Hola, ${profile?.nombre || 'Usuario'}!`}
-        description="Aquí tienes un resumen de tu negocio"
+        description="Aquí tienes un resumen de tus ventas"
       />
 
       {/* KPI Cards */}
@@ -136,32 +163,33 @@ export default function Dashboard() {
           title="Ventas del Día"
           value={formatCurrency(stats.ventasHoy)}
           icon={<DollarSign className="h-6 w-6" />}
-          trend={{ value: 12, label: 'vs ayer' }}
+          description={`${stats.ventasCountHoy} venta${stats.ventasCountHoy !== 1 ? 's' : ''}`}
         />
         <KPICard
           title="Ventas de la Semana"
           value={formatCurrency(stats.ventasSemana)}
           icon={<TrendingUp className="h-6 w-6" />}
-          trend={{ value: 8, label: 'vs semana ant.' }}
+          description={`${stats.ventasCountSemana} venta${stats.ventasCountSemana !== 1 ? 's' : ''}`}
         />
         <KPICard
-          title="Total Productos"
-          value={stats.totalProductos.toLocaleString()}
-          icon={<Package className="h-6 w-6" />}
+          title="Ventas del Mes"
+          value={formatCurrency(stats.ventasMes)}
+          icon={<ShoppingCart className="h-6 w-6" />}
         />
         <KPICard
-          title="Total Clientes"
-          value={stats.totalClientes.toLocaleString()}
-          icon={<Users className="h-6 w-6" />}
+          title="Promedio por Venta"
+          value={formatCurrency(stats.ventasCountSemana > 0 ? stats.ventasSemana / stats.ventasCountSemana : 0)}
+          icon={<DollarSign className="h-6 w-6" />}
+          description="Esta semana"
         />
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-8">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Sales by Day */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Ventas por Día</CardTitle>
+            <CardTitle className="text-lg font-semibold">Tus Ventas por Día (Esta Semana)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -171,7 +199,7 @@ export default function Dashboard() {
                   <XAxis dataKey="dia" className="text-xs" />
                   <YAxis 
                     className="text-xs"
-                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    tickFormatter={(value) => value >= 1000 ? `$${(value / 1000).toFixed(0)}k` : `$${value}`}
                   />
                   <Tooltip 
                     formatter={(value: number) => [formatCurrency(value), 'Total']}
@@ -195,74 +223,45 @@ export default function Dashboard() {
         {/* Sales by Payment Method */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Ventas por Forma de Pago</CardTitle>
+            <CardTitle className="text-lg font-semibold">Tus Ventas por Forma de Pago</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={ventasPorFormaPago}
-                    dataKey="total"
-                    nameKey="nombre"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={({ nombre, percent }) => `${nombre} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {ventasPorFormaPago.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [formatCurrency(value), 'Total']}
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {ventasPorFormaPago.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={ventasPorFormaPago}
+                      dataKey="total"
+                      nameKey="nombre"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ nombre, percent }) => `${nombre} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {ventasPorFormaPago.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), 'Total']}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  No hay ventas registradas
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Acciones Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Link to="/pos">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <ShoppingCart className="h-6 w-6 text-primary" />
-                <span>Nueva Venta</span>
-              </Button>
-            </Link>
-            <Link to="/productos">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <Package className="h-6 w-6 text-primary" />
-                <span>Ver Productos</span>
-              </Button>
-            </Link>
-            <Link to="/clientes">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <Users className="h-6 w-6 text-primary" />
-                <span>Ver Clientes</span>
-              </Button>
-            </Link>
-            <Link to="/reportes">
-              <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-                <TrendingUp className="h-6 w-6 text-primary" />
-                <span>Ver Reportes</span>
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
     </MainLayout>
   );
 }
