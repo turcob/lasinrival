@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -59,41 +59,91 @@ const adminNavItems: NavItem[] = [
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [modulePermissions, setModulePermissions] = useState<Record<string, boolean>>({});
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const location = useLocation();
-  const { profile, signOut, hasRole } = useAuth();
+  const { profile, signOut, hasRole, hasPermission } = useAuth();
 
   const isAdmin = hasRole('admin');
   const isEncargado = hasRole('encargado');
 
-  const NavSection = ({ title, items }: { title: string; items: NavItem[] }) => (
-    <div className="mb-6">
-      {!collapsed && (
-        <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-          {title}
-        </h3>
-      )}
-      <nav className="space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.href;
-          
-          return (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              className={cn(
-                "sidebar-item",
-                isActive ? "sidebar-item-active" : "sidebar-item-inactive"
-              )}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              {!collapsed && <span>{item.title}</span>}
-            </NavLink>
-          );
-        })}
-      </nav>
-    </div>
-  );
+  // Load permissions for all modules on mount
+  useEffect(() => {
+    const loadPermissions = async () => {
+      // Admins have all permissions
+      if (isAdmin) {
+        setPermissionsLoaded(true);
+        return;
+      }
+
+      const allItems = [...mainNavItems, ...catalogNavItems, ...operationsNavItems, ...adminNavItems];
+      const modules = [...new Set(allItems.filter(item => item.module).map(item => item.module!))];
+      
+      const permissions: Record<string, boolean> = {};
+      
+      await Promise.all(
+        modules.map(async (module) => {
+          const canView = await hasPermission(module, 'ver');
+          permissions[module] = canView;
+        })
+      );
+      
+      setModulePermissions(permissions);
+      setPermissionsLoaded(true);
+    };
+
+    loadPermissions();
+  }, [isAdmin, hasPermission]);
+
+  const canAccessItem = (item: NavItem): boolean => {
+    // Admins can access everything
+    if (isAdmin) return true;
+    // Items without module restriction are accessible to all
+    if (!item.module) return true;
+    // Check permission
+    return modulePermissions[item.module] ?? false;
+  };
+
+  const filterItems = (items: NavItem[]): NavItem[] => {
+    return items.filter(canAccessItem);
+  };
+
+  const NavSection = ({ title, items }: { title: string; items: NavItem[] }) => {
+    const filteredItems = filterItems(items);
+    
+    // Don't render section if no items are visible
+    if (filteredItems.length === 0) return null;
+    
+    return (
+      <div className="mb-6">
+        {!collapsed && (
+          <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+            {title}
+          </h3>
+        )}
+        <nav className="space-y-1">
+          {filteredItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.href;
+            
+            return (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "sidebar-item",
+                  isActive ? "sidebar-item-active" : "sidebar-item-inactive"
+                )}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {!collapsed && <span>{item.title}</span>}
+              </NavLink>
+            );
+          })}
+        </nav>
+      </div>
+    );
+  };
 
   return (
     <aside
