@@ -13,7 +13,8 @@ import {
   User,
   CreditCard,
   Printer,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import {
   Dialog,
@@ -38,6 +39,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface Producto {
   id: string;
@@ -58,6 +61,7 @@ interface Cliente {
   id: string;
   nombre: string;
   dni_cuit: string | null;
+  condicion_iva?: number;
 }
 
 interface FormaPago {
@@ -77,6 +81,26 @@ interface Pago {
   monto: number;
 }
 
+const TIPOS_COMPROBANTE = [
+  { value: 1, label: "Factura A" },
+  { value: 6, label: "Factura B" },
+  { value: 11, label: "Factura C" },
+];
+
+const TIPOS_DOCUMENTO = [
+  { value: 80, label: "CUIT" },
+  { value: 86, label: "CUIL" },
+  { value: 96, label: "DNI" },
+  { value: 99, label: "Consumidor Final" },
+];
+
+const CONDICIONES_IVA = [
+  { value: 1, label: "IVA Responsable Inscripto" },
+  { value: 4, label: "IVA Sujeto Exento" },
+  { value: 5, label: "Consumidor Final" },
+  { value: 6, label: "Responsable Monotributo" },
+];
+
 export default function POS() {
   const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -95,6 +119,17 @@ export default function POS() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [lastVenta, setLastVenta] = useState<any>(null);
   const [cajaAbierta, setCajaAbierta] = useState(false);
+  
+  // Facturación
+  const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
+  const [emitirFactura, setEmitirFactura] = useState(false);
+  const [facturaData, setFacturaData] = useState({
+    tipo_comprobante: 6, // Factura B default
+    doc_tipo: 99,
+    doc_nro: "",
+    condicion_iva_receptor: 5, // Consumidor Final
+  });
+  const [emitiendo, setEmitiendo] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -106,7 +141,7 @@ export default function POS() {
     try {
       const [productosRes, clientesRes, formasPagoRes, listasRes, cajasRes] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo').eq('activo', true).order('descripcion'),
-        supabase.from('clientes').select('id, nombre, dni_cuit').eq('activo', true).order('nombre'),
+        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
         supabase.from('listas_precios').select('id, nombre, porcentaje').eq('activo', true),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
@@ -193,6 +228,29 @@ export default function POS() {
 
   const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
 
+  // Abrir diálogo de facturación antes de procesar
+  const handleOpenFacturaDialog = () => {
+    // Pre-fill data from selected cliente
+    if (selectedCliente) {
+      const docTipo = selectedCliente.dni_cuit?.length === 11 ? 80 : 96; // CUIT o DNI
+      setFacturaData({
+        tipo_comprobante: 6,
+        doc_tipo: docTipo,
+        doc_nro: selectedCliente.dni_cuit || "",
+        condicion_iva_receptor: selectedCliente.condicion_iva || 5,
+      });
+    } else {
+      setFacturaData({
+        tipo_comprobante: 6,
+        doc_tipo: 99,
+        doc_nro: "0",
+        condicion_iva_receptor: 5,
+      });
+    }
+    setEmitirFactura(false);
+    setFacturaDialogOpen(true);
+  };
+
   const handleProcesarVenta = async () => {
     if (!user) return;
 
@@ -211,6 +269,8 @@ export default function POS() {
       return;
     }
 
+    setEmitiendo(true);
+
     try {
       // Get open cash register
       const { data: caja } = await supabase
@@ -222,6 +282,7 @@ export default function POS() {
 
       if (!caja) {
         toast.error('No tiene una caja abierta');
+        setEmitiendo(false);
         return;
       }
 
@@ -312,13 +373,65 @@ export default function POS() {
         .update({ total_ventas: (cajaData?.total_ventas || 0) + total })
         .eq('id', caja.id);
 
-      setLastVenta({ ...venta, detalles: cart, pagos, cliente: selectedCliente });
+      // Emit AFIP invoice if requested
+      let facturaInfo = null;
+      if (emitirFactura) {
+        try {
+          // Calculate IVA (21% assumed)
+          const netoSinIva = total / 1.21;
+          const ivaAmount = total - netoSinIva;
+
+          const { data: facturaResult, error: facturaError } = await supabase.functions.invoke(
+            'afip-facturacion',
+            {
+              body: {
+                action: 'emitir',
+                factura: {
+                  tipo_comprobante: facturaData.tipo_comprobante,
+                  punto_venta: 1,
+                  concepto: 1,
+                  doc_tipo: facturaData.doc_tipo,
+                  doc_nro: parseInt(facturaData.doc_nro) || 0,
+                  condicion_iva_receptor: facturaData.condicion_iva_receptor,
+                  importe_total: total,
+                  importe_neto: parseFloat(netoSinIva.toFixed(2)),
+                  importe_iva: parseFloat(ivaAmount.toFixed(2)),
+                  items: cart.map(item => ({
+                    descripcion: item.producto.descripcion,
+                    cantidad: item.cantidad,
+                    precio_unitario: item.precio / 1.21, // Precio sin IVA
+                    iva_id: 5, // 21%
+                  })),
+                  venta_id: venta.id,
+                },
+              },
+            }
+          );
+
+          if (facturaError) {
+            console.error('Error AFIP:', facturaError);
+            toast.error('Error al emitir factura AFIP: ' + facturaError.message);
+          } else if (facturaResult?.error) {
+            console.error('Error AFIP:', facturaResult.error);
+            toast.error('Error AFIP: ' + facturaResult.error);
+          } else {
+            facturaInfo = facturaResult;
+            toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
+          }
+        } catch (facturaErr: any) {
+          console.error('Error emitting factura:', facturaErr);
+          toast.error('Error al emitir factura: ' + facturaErr.message);
+        }
+      }
+
+      setLastVenta({ ...venta, detalles: cart, pagos, cliente: selectedCliente, factura: facturaInfo });
       
       // Clear cart and show ticket
       setCart([]);
       setPagos([]);
       setSelectedCliente(null);
       setPagoDialogOpen(false);
+      setFacturaDialogOpen(false);
       setTicketDialogOpen(true);
       
       toast.success('Venta procesada correctamente');
@@ -326,6 +439,8 @@ export default function POS() {
     } catch (error) {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
+    } finally {
+      setEmitiendo(false);
     }
   };
 
@@ -671,8 +786,8 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleProcesarVenta} disabled={totalPagado < total}>
-                Confirmar Venta
+              <Button onClick={handleOpenFacturaDialog} disabled={totalPagado < total}>
+                Continuar
               </Button>
             </div>
           </div>
@@ -723,6 +838,18 @@ export default function POS() {
                 <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
               </div>
 
+              {lastVenta.factura && (
+                <>
+                  <Separator />
+                  <div className="bg-muted p-3 rounded text-xs">
+                    <p className="font-bold text-center mb-2">FACTURA ELECTRÓNICA</p>
+                    <p>CAE: {lastVenta.factura.cae}</p>
+                    <p>Vto CAE: {lastVenta.factura.cae_vencimiento}</p>
+                    <p>Comprobante: {lastVenta.factura.numero_comprobante}</p>
+                  </div>
+                </>
+              )}
+
               <div className="text-center text-muted-foreground">
                 <p>¡Gracias por su compra!</p>
               </div>
@@ -733,6 +860,123 @@ export default function POS() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Factura Dialog */}
+      <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Confirmar Venta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5" />
+                <div>
+                  <p className="font-medium">Emitir Factura AFIP</p>
+                  <p className="text-sm text-muted-foreground">Generar comprobante electrónico</p>
+                </div>
+              </div>
+              <Switch
+                checked={emitirFactura}
+                onCheckedChange={setEmitirFactura}
+              />
+            </div>
+
+            {emitirFactura && (
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Tipo Comprobante</Label>
+                    <Select
+                      value={facturaData.tipo_comprobante.toString()}
+                      onValueChange={(v) => setFacturaData({ ...facturaData, tipo_comprobante: parseInt(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_COMPROBANTE.map((tipo) => (
+                          <SelectItem key={tipo.value} value={tipo.value.toString()}>
+                            {tipo.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Condición IVA</Label>
+                    <Select
+                      value={facturaData.condicion_iva_receptor.toString()}
+                      onValueChange={(v) => setFacturaData({ ...facturaData, condicion_iva_receptor: parseInt(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONDICIONES_IVA.map((cond) => (
+                          <SelectItem key={cond.value} value={cond.value.toString()}>
+                            {cond.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Tipo Documento</Label>
+                    <Select
+                      value={facturaData.doc_tipo.toString()}
+                      onValueChange={(v) => setFacturaData({ ...facturaData, doc_tipo: parseInt(v) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_DOCUMENTO.map((doc) => (
+                          <SelectItem key={doc.value} value={doc.value.toString()}>
+                            {doc.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Nro Documento</Label>
+                    <Input
+                      value={facturaData.doc_nro}
+                      onChange={(e) => setFacturaData({ ...facturaData, doc_nro: e.target.value })}
+                      placeholder="20123456789"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total:</span>
+              <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setFacturaDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleProcesarVenta} disabled={emitiendo}>
+                {emitiendo ? 'Procesando...' : emitirFactura ? 'Confirmar y Facturar' : 'Confirmar Venta'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </MainLayout>
