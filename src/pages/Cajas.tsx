@@ -79,7 +79,44 @@ export default function Cajas() {
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
-  const [cierreData, setCierreData] = useState({ conteo_declarado: '', observaciones: '' });
+  const [cierreData, setCierreData] = useState({ observaciones: '' });
+  const [arqueo, setArqueo] = useState<Record<string, number>>({
+    // Billetes
+    '10000': 0,
+    '5000': 0,
+    '2000': 0,
+    '1000': 0,
+    '500': 0,
+    '200': 0,
+    '100': 0,
+    // Monedas
+    '50': 0,
+    '25': 0,
+    '10': 0,
+    '5': 0,
+    '2': 0,
+    '1': 0,
+  });
+
+  const denominaciones = [
+    { valor: 10000, label: '$10.000', tipo: 'billete' },
+    { valor: 5000, label: '$5.000', tipo: 'billete' },
+    { valor: 2000, label: '$2.000', tipo: 'billete' },
+    { valor: 1000, label: '$1.000', tipo: 'billete' },
+    { valor: 500, label: '$500', tipo: 'billete' },
+    { valor: 200, label: '$200', tipo: 'billete' },
+    { valor: 100, label: '$100', tipo: 'billete' },
+    { valor: 50, label: '$50', tipo: 'moneda' },
+    { valor: 25, label: '$25', tipo: 'moneda' },
+    { valor: 10, label: '$10', tipo: 'moneda' },
+    { valor: 5, label: '$5', tipo: 'moneda' },
+    { valor: 2, label: '$2', tipo: 'moneda' },
+    { valor: 1, label: '$1', tipo: 'moneda' },
+  ];
+
+  const totalArqueo = Object.entries(arqueo).reduce((sum, [denominacion, cantidad]) => {
+    return sum + (parseInt(denominacion) * cantidad);
+  }, 0);
 
   useEffect(() => {
     fetchData();
@@ -211,22 +248,21 @@ export default function Cajas() {
     e.preventDefault();
     if (!cajaActiva || !user) return;
 
-    const conteo = parseFloat(cierreData.conteo_declarado);
-    if (isNaN(conteo) || conteo < 0) {
-      toast.error('Ingrese el conteo de caja válido');
+    if (totalArqueo < 0) {
+      toast.error('El arqueo no puede ser negativo');
       return;
     }
 
     try {
       const esperado = cajaActiva.fondo_inicial + (cajaActiva.total_ventas || 0) - (cajaActiva.total_egresos || 0);
-      const diferencia = conteo - esperado;
+      const diferencia = totalArqueo - esperado;
 
       const { error } = await supabase
         .from('cajas')
         .update({
           estado: 'cerrada' as CashRegisterStatus,
           fecha_cierre: new Date().toISOString(),
-          conteo_declarado: conteo,
+          conteo_declarado: totalArqueo,
           diferencia: diferencia,
           observaciones: cierreData.observaciones || null,
         })
@@ -236,7 +272,11 @@ export default function Cajas() {
 
       toast.success('Caja cerrada correctamente');
       setCierreDialogOpen(false);
-      setCierreData({ conteo_declarado: '', observaciones: '' });
+      setCierreData({ observaciones: '' });
+      setArqueo({
+        '10000': 0, '5000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
+        '50': 0, '25': 0, '10': 0, '5': 0, '2': 0, '1': 0,
+      });
       fetchData();
     } catch (error) {
       console.error('Error closing caja:', error);
@@ -488,11 +528,15 @@ export default function Cajas() {
 
       {/* Cierre Dialog */}
       <Dialog open={cierreDialogOpen} onOpenChange={setCierreDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Cerrar Caja</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Arqueo y Cierre de Caja
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCerrarCaja} className="space-y-4">
+            {/* Resumen */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Resumen de Caja</CardTitle>
@@ -517,28 +561,94 @@ export default function Cajas() {
               </CardContent>
             </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="conteo_declarado">Conteo Declarado *</Label>
-              <Input
-                id="conteo_declarado"
-                type="number"
-                step="0.01"
-                min="0"
-                value={cierreData.conteo_declarado}
-                onChange={(e) => setCierreData({ ...cierreData, conteo_declarado: e.target.value })}
-                placeholder="0.00"
-                required
-              />
-              {cierreData.conteo_declarado && (
-                <p className={`text-sm ${parseFloat(cierreData.conteo_declarado) - esperado === 0 
-                  ? 'text-muted-foreground' 
-                  : parseFloat(cierreData.conteo_declarado) - esperado > 0 
+            {/* Arqueo de Billetes */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Conteo de Billetes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {denominaciones.filter(d => d.tipo === 'billete').map((denom) => (
+                    <div key={denom.valor} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{denom.label}</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={arqueo[denom.valor.toString()] || ''}
+                          onChange={(e) => setArqueo({
+                            ...arqueo,
+                            [denom.valor.toString()]: parseInt(e.target.value) || 0
+                          })}
+                          className="h-8 text-center"
+                          placeholder="0"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-right">
+                        ${((arqueo[denom.valor.toString()] || 0) * denom.valor).toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Arqueo de Monedas */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Conteo de Monedas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                  {denominaciones.filter(d => d.tipo === 'moneda').map((denom) => (
+                    <div key={denom.valor} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{denom.label}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={arqueo[denom.valor.toString()] || ''}
+                        onChange={(e) => setArqueo({
+                          ...arqueo,
+                          [denom.valor.toString()]: parseInt(e.target.value) || 0
+                        })}
+                        className="h-8 text-center"
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-muted-foreground text-right">
+                        ${((arqueo[denom.valor.toString()] || 0) * denom.valor).toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Total del Arqueo */}
+            <Card className={totalArqueo - esperado === 0 ? 'border-success' : totalArqueo - esperado > 0 ? 'border-blue-500' : 'border-destructive'}>
+              <CardContent className="pt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium">Total Contado:</span>
+                  <span className="text-2xl font-bold">
+                    ${totalArqueo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className={`flex justify-between items-center text-sm ${
+                  totalArqueo - esperado === 0 
                     ? 'text-success' 
-                    : 'text-destructive'}`}>
-                  Diferencia: ${(parseFloat(cierreData.conteo_declarado) - esperado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                </p>
-              )}
-            </div>
+                    : totalArqueo - esperado > 0 
+                      ? 'text-blue-600' 
+                      : 'text-destructive'
+                }`}>
+                  <span>Diferencia:</span>
+                  <span className="font-semibold">
+                    {totalArqueo - esperado >= 0 ? '+' : ''}${(totalArqueo - esperado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    {totalArqueo - esperado === 0 && ' ✓'}
+                    {totalArqueo - esperado > 0 && ' (Sobrante)'}
+                    {totalArqueo - esperado < 0 && ' (Faltante)'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones</Label>
@@ -546,7 +656,7 @@ export default function Cajas() {
                 id="observaciones"
                 value={cierreData.observaciones}
                 onChange={(e) => setCierreData({ ...cierreData, observaciones: e.target.value })}
-                placeholder="Notas adicionales..."
+                placeholder="Notas adicionales sobre el cierre..."
               />
             </div>
 
@@ -554,7 +664,10 @@ export default function Cajas() {
               <Button type="button" variant="outline" onClick={() => setCierreDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit">Cerrar Caja</Button>
+              <Button type="submit">
+                <Lock className="mr-2 h-4 w-4" />
+                Cerrar Caja
+              </Button>
             </div>
           </form>
         </DialogContent>
