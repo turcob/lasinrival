@@ -246,3 +246,34 @@
     to { opacity: 1; transform: translateX(0); }
   }
 }
+
+/* Print styles for invoices */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #printable-invoice,
+  #printable-invoice * {
+    visibility: visible;
+  }
+  
+  #printable-invoice {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    background: white !important;
+    color: black !important;
+  }
+  
+  #printable-invoice button {
+    display: none !important;
+  }
+  
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
