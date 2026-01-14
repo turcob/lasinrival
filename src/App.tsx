@@ -17,6 +17,7 @@ import POS from "./pages/POS";
 import Ventas from "./pages/Ventas";
 import ListasPrecios from "./pages/ListasPrecios";
 import Facturacion from "./pages/Facturacion";
+import Configuracion from "./pages/Configuracion";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,7 +59,7 @@ function AppRoutes() {
       <Route path="/reportes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
-      <Route path="/configuracion" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
