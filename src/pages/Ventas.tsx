@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -104,9 +111,10 @@ const TIPOS_COMPROBANTE: Record<number, string> = {
 };
 
 export default function Ventas() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const [ventas, setVentas] = useState<Venta[]>([]);
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [anularDialogOpen, setAnularDialogOpen] = useState(false);
@@ -114,15 +122,31 @@ export default function Ventas() {
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
+  
+  // Filtros
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
 
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
 
   const canAnular = hasPermission('ventas', 'anular');
+  const isAdmin = hasRole('admin');
 
   useEffect(() => {
     fetchVentas();
-  }, []);
+    if (isAdmin) {
+      fetchUsuarios();
+    }
+  }, [isAdmin]);
+
+  const fetchUsuarios = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, nombre')
+      .eq('estado', true)
+      .order('nombre');
+    setUsuarios(data || []);
+  };
 
   const fetchVentas = async () => {
     setLoading(true);
@@ -137,7 +161,24 @@ export default function Ventas() {
         .order('fecha', { ascending: false });
 
       if (error) throw error;
-      setVentas(data || []);
+      
+      // Fetch profiles for each venta if admin
+      if (isAdmin && data) {
+        const userIds = [...new Set(data.map(v => v.usuario_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, nombre')
+          .in('id', userIds);
+        
+        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+        const ventasWithProfiles = data.map(v => ({
+          ...v,
+          profiles: profilesMap.get(v.usuario_id) || null
+        }));
+        setVentas(ventasWithProfiles);
+      } else {
+        setVentas(data || []);
+      }
     } catch (error) {
       console.error('Error fetching ventas:', error);
       toast.error('Error al cargar las ventas');
@@ -145,6 +186,11 @@ export default function Ventas() {
       setLoading(false);
     }
   };
+
+  // Filtrar ventas según usuario seleccionado
+  const ventasFiltradas = filtroUsuario === 'todos' 
+    ? ventas 
+    : ventas.filter(v => v.usuario_id === filtroUsuario);
 
   const openDetalleDialog = async (venta: Venta) => {
     setSelectedVenta(venta);
@@ -276,6 +322,11 @@ export default function Ventas() {
       header: 'Fecha',
       render: (item: Venta) => format(new Date(item.fecha), 'dd/MM/yyyy HH:mm', { locale: es }),
     },
+    ...(isAdmin ? [{
+      key: 'vendedor',
+      header: 'Vendedor',
+      render: (item: Venta) => item.profiles?.nombre || 'Sin asignar',
+    }] : []),
     {
       key: 'cliente',
       header: 'Cliente',
@@ -349,6 +400,22 @@ export default function Ventas() {
   return (
     <MainLayout>
       <PageHeader title="Ventas" description="Historial de ventas y comprobantes">
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filtrar por vendedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los usuarios</SelectItem>
+                {usuarios.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <Button variant="outline" onClick={() => toast.info('Función de exportación próximamente')}>
           <Download className="mr-2 h-4 w-4" />
           Exportar
@@ -356,7 +423,7 @@ export default function Ventas() {
       </PageHeader>
 
       <DataTable
-        data={ventas}
+        data={ventasFiltradas}
         columns={columns}
         searchPlaceholder="Buscar por Nº comprobante..."
         searchKeys={['numero_comprobante']}

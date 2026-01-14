@@ -13,8 +13,16 @@ import {
   ArrowUpCircle,
   Eye,
   Calculator,
-  Printer
+  Printer,
+  Users
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -81,6 +89,7 @@ export default function Cajas() {
   const { user, profile, hasRole } = useAuth();
   const isAdmin = hasRole('admin');
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [cajaActiva, setCajaActiva] = useState<Caja | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +104,9 @@ export default function Cajas() {
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
   const [cierreData, setCierreData] = useState({ observaciones: '' });
+  
+  // Filtro por usuario para admins
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
   const [arqueo, setArqueo] = useState<Record<string, number>>({
     // Billetes
     '20000': 0,
@@ -128,23 +140,57 @@ export default function Cajas() {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+    if (isAdmin) {
+      fetchUsuarios();
+    }
+  }, [user, isAdmin]);
+
+  const fetchUsuarios = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, nombre')
+      .eq('estado', true)
+      .order('nombre');
+    setUsuarios(data || []);
+  };
 
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Fetch only user's cajas
-      const { data: cajasData, error: cajasError } = await supabase
+      // Si es admin, traer todas las cajas; sino solo las del usuario
+      let query = supabase
         .from('cajas')
         .select('*')
-        .eq('usuario_id', user.id)
         .order('fecha_apertura', { ascending: false });
+      
+      if (!isAdmin) {
+        query = query.eq('usuario_id', user.id);
+      }
+      
+      const { data: cajasData, error: cajasError } = await query;
 
       if (cajasError) throw cajasError;
-      setCajas(cajasData || []);
+      
+      // Si es admin, obtener nombres de usuarios
+      if (isAdmin && cajasData) {
+        const userIds = [...new Set(cajasData.map(c => c.usuario_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, nombre')
+          .in('id', userIds);
+        
+        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+        const cajasWithProfiles = cajasData.map(c => ({
+          ...c,
+          profiles: profilesMap.get(c.usuario_id) || null
+        }));
+        setCajas(cajasWithProfiles);
+      } else {
+        setCajas(cajasData || []);
+      }
 
-      // Check if user has an open cash register
+      // Check if user has an open cash register (siempre buscar la del usuario actual)
       const cajaAbierta = (cajasData || []).find(
         (c) => c.usuario_id === user.id && c.estado === 'abierta'
       );
@@ -167,6 +213,11 @@ export default function Cajas() {
       setLoading(false);
     }
   };
+
+  // Filtrar cajas según usuario seleccionado (solo para admins)
+  const cajasFiltradas = filtroUsuario === 'todos' 
+    ? cajas 
+    : cajas.filter(c => c.usuario_id === filtroUsuario);
 
   const handleAbrirCaja = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -482,6 +533,11 @@ export default function Cajas() {
       header: 'Fecha Apertura',
       render: (item: Caja) => format(new Date(item.fecha_apertura), 'dd/MM/yyyy HH:mm', { locale: es }),
     },
+    ...(isAdmin ? [{
+      key: 'usuario',
+      header: 'Usuario',
+      render: (item: Caja) => item.profiles?.nombre || 'Sin asignar',
+    }] : []),
     {
       key: 'fondo_inicial',
       header: 'Fondo Inicial',
@@ -624,8 +680,26 @@ export default function Cajas() {
         </div>
       )}
 
+      {/* Filtro por usuario para admins */}
+      {isAdmin && (
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Filtrar por usuario" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los usuarios</SelectItem>
+              {usuarios.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <DataTable
-        data={cajas}
+        data={cajasFiltradas}
         columns={columns}
         searchPlaceholder="Buscar cajas..."
         searchKeys={[]}
