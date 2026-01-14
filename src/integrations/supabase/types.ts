@@ -14,6 +14,73 @@ export type Database = {
   }
   public: {
     Tables: {
+      arqueo_detalles: {
+        Row: {
+          caja_id: string
+          cantidad: number
+          created_at: string | null
+          denominacion: number
+          id: string
+          subtotal: number
+        }
+        Insert: {
+          caja_id: string
+          cantidad?: number
+          created_at?: string | null
+          denominacion: number
+          id?: string
+          subtotal?: number
+        }
+        Update: {
+          caja_id?: string
+          cantidad?: number
+          created_at?: string | null
+          denominacion?: number
+          id?: string
+          subtotal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arqueo_detalles_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arqueo_otros_medios: {
+        Row: {
+          caja_id: string
+          created_at: string | null
+          id: string
+          monto: number
+          tipo: string
+        }
+        Insert: {
+          caja_id: string
+          created_at?: string | null
+          id?: string
+          monto?: number
+          tipo: string
+        }
+        Update: {
+          caja_id?: string
+          created_at?: string | null
+          id?: string
+          monto?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arqueo_otros_medios_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auditoria: {
         Row: {
           accion: string
