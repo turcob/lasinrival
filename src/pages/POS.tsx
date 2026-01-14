@@ -291,12 +291,6 @@ export default function POS() {
         }]);
       }
 
-      // Update caja totals
-      await supabase
-        .from('cajas')
-        .update({ total_ventas: supabase.rpc })
-        .eq('id', caja.id);
-
       // Register cash movement
       await supabase.from('movimientos_caja').insert([{
         caja_id: caja.id,
