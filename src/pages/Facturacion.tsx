@@ -44,10 +44,8 @@ interface Cliente {
 const TIPOS_COMPROBANTE = [
   { value: 1, label: "Factura A" },
   { value: 6, label: "Factura B" },
-  { value: 11, label: "Factura C" },
   { value: 3, label: "Nota de Crédito A" },
   { value: 8, label: "Nota de Crédito B" },
-  { value: 13, label: "Nota de Crédito C" },
 ];
 
 const TIPOS_DOCUMENTO = [

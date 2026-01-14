@@ -82,9 +82,8 @@ interface Pago {
 }
 
 const TIPOS_COMPROBANTE = [
-  { value: 1, label: "Factura A" },
-  { value: 6, label: "Factura B" },
-  { value: 11, label: "Factura C" },
+  { value: 1, label: "Factura A", descripcion: "Para Resp. Inscriptos" },
+  { value: 6, label: "Factura B", descripcion: "Para Cons. Final / Monotrib." },
 ];
 
 const TIPOS_DOCUMENTO = [
