@@ -133,7 +133,7 @@ export default function Ventas() {
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
-    fetchVentas();
+    fetchVentas(isAdmin);
     if (isAdmin) {
       fetchUsuarios();
     }
@@ -148,8 +148,9 @@ export default function Ventas() {
     setUsuarios(data || []);
   };
 
-  const fetchVentas = async () => {
+  const fetchVentas = async (adminAccess: boolean) => {
     setLoading(true);
+    console.log('fetchVentas called with adminAccess:', adminAccess);
     try {
       const { data, error } = await supabase
         .from('ventas')
@@ -160,10 +161,11 @@ export default function Ventas() {
         `)
         .order('fecha', { ascending: false });
 
+      console.log('Ventas fetched:', data?.length, 'records');
       if (error) throw error;
       
       // Fetch profiles for each venta if admin
-      if (isAdmin && data) {
+      if (adminAccess && data) {
         const userIds = [...new Set(data.map(v => v.usuario_id))];
         const { data: profilesData } = await supabase
           .from('profiles')
@@ -302,7 +304,7 @@ export default function Ventas() {
       setAnularDialogOpen(false);
       setMotivoAnulacion('');
       setSelectedVenta(null);
-      fetchVentas();
+      fetchVentas(isAdmin);
     } catch (error) {
       console.error('Error anulando venta:', error);
       toast.error('Error al anular la venta');
