@@ -10,10 +10,11 @@ interface KPICardProps {
     value: number;
     label: string;
   };
+  description?: string;
   className?: string;
 }
 
-export function KPICard({ title, value, icon, trend, className }: KPICardProps) {
+export function KPICard({ title, value, icon, trend, description, className }: KPICardProps) {
   const trendIcon = trend ? (
     trend.value > 0 ? (
       <TrendingUp className="h-4 w-4 text-success" />
@@ -46,6 +47,9 @@ export function KPICard({ title, value, icon, trend, className }: KPICardProps) 
               </span>
               <span className="text-sm text-muted-foreground">{trend.label}</span>
             </div>
+          )}
+          {description && !trend && (
+            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
         {icon && (
