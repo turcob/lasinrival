@@ -236,6 +236,77 @@ export type Database = {
           },
         ]
       }
+      comprobantes_afip: {
+        Row: {
+          cae: string
+          cae_vencimiento: string
+          created_at: string
+          cuit_emisor: string
+          cuit_receptor: string | null
+          doc_nro: number
+          doc_tipo: number
+          estado: string
+          fecha_emision: string
+          id: string
+          importe_iva: number
+          importe_neto: number
+          importe_total: number
+          numero_comprobante: number
+          punto_venta: number
+          tipo_comprobante: number
+          usuario_id: string
+          venta_id: string | null
+        }
+        Insert: {
+          cae: string
+          cae_vencimiento: string
+          created_at?: string
+          cuit_emisor: string
+          cuit_receptor?: string | null
+          doc_nro: number
+          doc_tipo: number
+          estado?: string
+          fecha_emision?: string
+          id?: string
+          importe_iva: number
+          importe_neto: number
+          importe_total: number
+          numero_comprobante: number
+          punto_venta: number
+          tipo_comprobante: number
+          usuario_id: string
+          venta_id?: string | null
+        }
+        Update: {
+          cae?: string
+          cae_vencimiento?: string
+          created_at?: string
+          cuit_emisor?: string
+          cuit_receptor?: string | null
+          doc_nro?: number
+          doc_tipo?: number
+          estado?: string
+          fecha_emision?: string
+          id?: string
+          importe_iva?: number
+          importe_neto?: number
+          importe_total?: number
+          numero_comprobante?: number
+          punto_venta?: number
+          tipo_comprobante?: number
+          usuario_id?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comprobantes_afip_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pago: {
         Row: {
           activo: boolean | null
