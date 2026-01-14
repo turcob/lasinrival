@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      afip_tokens: {
+        Row: {
+          created_at: string
+          expiration: string
+          id: string
+          service: string
+          sign: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expiration: string
+          id?: string
+          service: string
+          sign: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          expiration?: string
+          id?: string
+          service?: string
+          sign?: string
+          token?: string
+        }
+        Relationships: []
+      }
       arqueo_detalles: {
         Row: {
           caja_id: string

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import forge from "https://esm.sh/node-forge@1.3.1?target=deno";
 
 // Polyfill for node-forge's randomBytes in Deno
@@ -12,6 +13,11 @@ if (typeof globalThis.crypto === 'undefined') {
     }
   };
 }
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,8 +164,71 @@ function signTRA(tra: string, certPem: string, privateKeyPem: string): string {
   }
 }
 
+// Get cached token from database
+async function getCachedToken(service: string): Promise<{ token: string; sign: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('afip_tokens')
+      .select('token, sign, expiration')
+      .eq('service', service)
+      .single();
+    
+    if (error || !data) {
+      console.log("No cached token found for service:", service);
+      return null;
+    }
+    
+    // Check if token is still valid (with 5 minute buffer)
+    const expiration = new Date(data.expiration);
+    const now = new Date();
+    const buffer = 5 * 60 * 1000; // 5 minutes
+    
+    if (expiration.getTime() - buffer > now.getTime()) {
+      console.log("Using cached token, expires:", expiration.toISOString());
+      return { token: data.token, sign: data.sign };
+    }
+    
+    console.log("Cached token expired");
+    return null;
+  } catch (err) {
+    console.error("Error getting cached token:", err);
+    return null;
+  }
+}
+
+// Save token to database
+async function saveToken(service: string, token: string, sign: string, expirationTime: string): Promise<void> {
+  try {
+    // Parse expiration time from AFIP format (2026-01-15T06:03:47.356-03:00)
+    const expiration = new Date(expirationTime);
+    
+    const { error } = await supabase
+      .from('afip_tokens')
+      .upsert({
+        service,
+        token,
+        sign,
+        expiration: expiration.toISOString(),
+      }, { onConflict: 'service' });
+    
+    if (error) {
+      console.error("Error saving token:", error);
+    } else {
+      console.log("Token cached successfully, expires:", expiration.toISOString());
+    }
+  } catch (err) {
+    console.error("Error saving token:", err);
+  }
+}
+
 // Call WSAA to get token and sign
 async function authenticateWSAA(service: string): Promise<{ token: string; sign: string }> {
+  // First, check for cached token
+  const cachedToken = await getCachedToken(service);
+  if (cachedToken) {
+    return cachedToken;
+  }
+  
   const cert = Deno.env.get("AFIP_CERT") || "";
   const privateKey = Deno.env.get("AFIP_PRIVATE_KEY") || "";
   
@@ -170,7 +239,7 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   const tra = generateTRA(service);
   console.log("TRA generado:", tra);
   
-  const signedTRA = await signTRA(tra, cert, privateKey);
+  const signedTRA = signTRA(tra, cert, privateKey);
   
   // Call WSAA
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
@@ -197,10 +266,13 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   const responseText = await response.text();
   console.log("WSAA Response (first 500):", responseText.substring(0, 500));
 
-  // Check for "already authenticated" error - this is actually a success
+  // Check for "already authenticated" error - try to get token from cache again
   if (responseText.includes("coe.alreadyAuthenticated")) {
-    console.log("Already authenticated with AFIP - token is still valid");
-    // Return a flag indicating we're already authenticated
+    console.log("Already authenticated with AFIP - checking cache again");
+    const cached = await getCachedToken(service);
+    if (cached) {
+      return cached;
+    }
     throw new Error("ALREADY_AUTHENTICATED");
   }
 
@@ -221,15 +293,21 @@ async function authenticateWSAA(service: string): Promise<{ token: string; sign:
   // Parse response to extract token and sign
   const tokenMatch = decodedResponse.match(/<token>(.+?)<\/token>/s);
   const signMatch = decodedResponse.match(/<sign>(.+?)<\/sign>/s);
+  const expirationMatch = decodedResponse.match(/<expirationTime>(.+?)<\/expirationTime>/s);
 
   if (!tokenMatch || !signMatch) {
     throw new Error("No se pudo obtener token/sign de WSAA: " + decodedResponse);
   }
 
-  return {
-    token: tokenMatch[1],
-    sign: signMatch[1],
-  };
+  const token = tokenMatch[1];
+  const sign = signMatch[1];
+  
+  // Save token to cache
+  if (expirationMatch) {
+    await saveToken(service, token, sign, expirationMatch[1]);
+  }
+
+  return { token, sign };
 }
 
 // Get last authorized voucher number
