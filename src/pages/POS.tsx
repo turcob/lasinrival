@@ -372,7 +372,7 @@ export default function POS() {
                   <SelectContent>
                     {listasPrecios.map((lista) => (
                       <SelectItem key={lista.id} value={lista.id}>
-                        {lista.nombre} ({lista.porcentaje}%)
+                        {lista.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
