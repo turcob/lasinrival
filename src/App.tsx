@@ -8,7 +8,11 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Productos from "./pages/Productos";
 import Categorias from "./pages/Categorias";
+import Subcategorias from "./pages/Subcategorias";
 import Clientes from "./pages/Clientes";
+import Usuarios from "./pages/Usuarios";
+import Cajas from "./pages/Cajas";
+import POS from "./pages/POS";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,14 +43,14 @@ function AppRoutes() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
       <Route path="/categorias" element={<ProtectedRoute><Categorias /></ProtectedRoute>} />
+      <Route path="/subcategorias" element={<ProtectedRoute><Subcategorias /></ProtectedRoute>} />
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-      <Route path="/subcategorias" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/pos" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
       <Route path="/ventas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/cajas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/cajas" element={<ProtectedRoute><Cajas /></ProtectedRoute>} />
       <Route path="/inventario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/usuarios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
