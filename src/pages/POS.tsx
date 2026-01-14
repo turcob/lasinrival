@@ -414,6 +414,37 @@ export default function POS() {
             toast.error('Error AFIP: ' + facturaResult.error);
           } else {
             facturaInfo = facturaResult;
+            
+            // Guardar comprobante en la base de datos para que aparezca en Facturación
+            const formatFechaAfip = (fecha: string): string => {
+              if (fecha && fecha.length === 8) {
+                return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
+              }
+              return fecha || new Date().toISOString().split('T')[0];
+            };
+            
+            const { error: insertComprobanteError } = await supabase
+              .from('comprobantes_afip')
+              .insert({
+                tipo_comprobante: facturaData.tipo_comprobante,
+                punto_venta: facturaResult.punto_venta,
+                numero_comprobante: facturaResult.numero_comprobante,
+                cae: facturaResult.cae,
+                cae_vencimiento: formatFechaAfip(facturaResult.cae_vencimiento),
+                cuit_emisor: comercioConfig?.cuit?.replace(/\D/g, '') || '',
+                doc_tipo: facturaData.doc_tipo,
+                doc_nro: parseInt(facturaData.doc_nro) || 0,
+                importe_total: total,
+                importe_neto: parseFloat(netoSinIva.toFixed(2)),
+                importe_iva: parseFloat(ivaAmount.toFixed(2)),
+                usuario_id: user.id,
+                venta_id: venta.id,
+              });
+            
+            if (insertComprobanteError) {
+              console.error('Error guardando comprobante:', insertComprobanteError);
+            }
+            
             toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
           }
         } catch (facturaErr: any) {
