@@ -425,7 +425,7 @@ async function autorizarComprobante(
             <ar:ImpTrib>0.00</ar:ImpTrib>
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
-            <ar:CondicionIvaReceptor>${factura.condicion_iva_receptor}</ar:CondicionIvaReceptor>
+            <ar:CondicionIVAReceptorId>${factura.condicion_iva_receptor}</ar:CondicionIVAReceptorId>
             <ar:Iva>${ivaXml}</ar:Iva>
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
