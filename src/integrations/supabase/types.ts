@@ -337,6 +337,60 @@ export type Database = {
           },
         ]
       }
+      configuracion_comercio: {
+        Row: {
+          codigo_postal: string | null
+          condicion_iva: string
+          created_at: string
+          cuit: string
+          direccion: string
+          email: string | null
+          id: string
+          inicio_actividades: string | null
+          localidad: string | null
+          nombre_fantasia: string | null
+          provincia: string | null
+          punto_venta: number
+          razon_social: string
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          codigo_postal?: string | null
+          condicion_iva?: string
+          created_at?: string
+          cuit: string
+          direccion: string
+          email?: string | null
+          id?: string
+          inicio_actividades?: string | null
+          localidad?: string | null
+          nombre_fantasia?: string | null
+          provincia?: string | null
+          punto_venta?: number
+          razon_social: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          codigo_postal?: string | null
+          condicion_iva?: string
+          created_at?: string
+          cuit?: string
+          direccion?: string
+          email?: string | null
+          id?: string
+          inicio_actividades?: string | null
+          localidad?: string | null
+          nombre_fantasia?: string | null
+          provincia?: string | null
+          punto_venta?: number
+          razon_social?: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       formas_pago: {
         Row: {
           activo: boolean | null

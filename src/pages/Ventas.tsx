@@ -5,6 +5,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { Eye, XCircle, FileText, Download, Printer } from 'lucide-react';
 import {
   Dialog,
@@ -104,6 +105,7 @@ const TIPOS_COMPROBANTE: Record<number, string> = {
 
 export default function Ventas() {
   const { user, hasPermission } = useAuth();
+  const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
@@ -553,11 +555,11 @@ export default function Ventas() {
                 {/* Header */}
                 <div className="grid grid-cols-2 gap-4 border-b pb-4">
                   <div>
-                    <p className="font-bold text-lg">EMPRESA</p>
-                    <p className="text-muted-foreground">Razón Social del Comercio</p>
-                    <p className="text-muted-foreground text-xs mt-1">Dirección Comercial</p>
-                    <p className="text-xs text-muted-foreground">CUIT: 20-21395254-5</p>
-                    <p className="text-xs text-muted-foreground">IVA Responsable Inscripto</p>
+                    <p className="font-bold text-lg">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
+                    <p className="text-muted-foreground">{comercioConfig?.razon_social || 'Razón Social'}</p>
+                    <p className="text-muted-foreground text-xs mt-1">{comercioConfig?.direccion || 'Dirección'}</p>
+                    <p className="text-xs text-muted-foreground">CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
+                    <p className="text-xs text-muted-foreground">{comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}</p>
                   </div>
                   <div className="text-right">
                     <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
