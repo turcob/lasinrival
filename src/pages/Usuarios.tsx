@@ -5,6 +5,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { Pencil } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Shield, UserX, UserCheck } from 'lucide-react';
 import {
@@ -61,6 +62,7 @@ export default function Usuarios() {
   const [usuarios, setUsuarios] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [rolesDialogOpen, setRolesDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -68,6 +70,10 @@ export default function Usuarios() {
     nombre: '',
     email: '',
     password: '',
+    sucursal: '',
+  });
+  const [editFormData, setEditFormData] = useState({
+    nombre: '',
     sucursal: '',
   });
 
@@ -161,6 +167,39 @@ export default function Usuarios() {
     setRolesDialogOpen(true);
   };
 
+  const openEditDialog = (user: UserWithRoles) => {
+    setSelectedUser(user);
+    setEditFormData({
+      nombre: user.nombre,
+      sucursal: user.sucursal || '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          nombre: editFormData.nombre,
+          sucursal: editFormData.sucursal || null,
+        })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+
+      toast.success('Usuario actualizado correctamente');
+      setEditDialogOpen(false);
+      fetchUsuarios();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast.error(error.message || 'Error al actualizar el usuario');
+    }
+  };
+
   const handleSaveRoles = async () => {
     if (!selectedUser) return;
 
@@ -248,6 +287,14 @@ export default function Usuarios() {
         <div className="flex items-center gap-2">
           {isAdmin && (
             <>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => openEditDialog(item)}
+                title="Editar usuario"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -392,6 +439,60 @@ export default function Usuarios() {
               <Button onClick={handleSaveRoles}>Guardar Roles</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar usuario */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-nombre">Nombre *</Label>
+              <Input
+                id="edit-nombre"
+                value={editFormData.nombre}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, nombre: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={selectedUser?.email || ''}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">
+                El email no puede ser modificado
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-sucursal">Sucursal</Label>
+              <Input
+                id="edit-sucursal"
+                value={editFormData.sucursal}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, sucursal: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar Cambios</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </MainLayout>
