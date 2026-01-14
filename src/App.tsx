@@ -52,7 +52,7 @@ function AppRoutes() {
       <Route path="/subcategorias" element={<ProtectedRoute><Subcategorias /></ProtectedRoute>} />
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
       <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
-      <Route path="/ventas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/ventas" element={<ProtectedRoute><Ventas /></ProtectedRoute>} />
       <Route path="/cajas" element={<ProtectedRoute><Cajas /></ProtectedRoute>} />
       <Route path="/facturacion" element={<ProtectedRoute><Facturacion /></ProtectedRoute>} />
       <Route path="/inventario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
