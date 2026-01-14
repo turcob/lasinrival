@@ -89,34 +89,27 @@ export default function Cajas() {
     '500': 0,
     '200': 0,
     '100': 0,
-    // Monedas
-    '50': 0,
-    '25': 0,
-    '10': 0,
-    '5': 0,
-    '2': 0,
-    '1': 0,
+  });
+  const [otrosMedios, setOtrosMedios] = useState({
+    posnet: 0,
+    transferencias: 0,
   });
 
   const denominaciones = [
-    { valor: 10000, label: '$10.000', tipo: 'billete' },
-    { valor: 5000, label: '$5.000', tipo: 'billete' },
-    { valor: 2000, label: '$2.000', tipo: 'billete' },
-    { valor: 1000, label: '$1.000', tipo: 'billete' },
-    { valor: 500, label: '$500', tipo: 'billete' },
-    { valor: 200, label: '$200', tipo: 'billete' },
-    { valor: 100, label: '$100', tipo: 'billete' },
-    { valor: 50, label: '$50', tipo: 'moneda' },
-    { valor: 25, label: '$25', tipo: 'moneda' },
-    { valor: 10, label: '$10', tipo: 'moneda' },
-    { valor: 5, label: '$5', tipo: 'moneda' },
-    { valor: 2, label: '$2', tipo: 'moneda' },
-    { valor: 1, label: '$1', tipo: 'moneda' },
+    { valor: 10000, label: '$10.000' },
+    { valor: 5000, label: '$5.000' },
+    { valor: 2000, label: '$2.000' },
+    { valor: 1000, label: '$1.000' },
+    { valor: 500, label: '$500' },
+    { valor: 200, label: '$200' },
+    { valor: 100, label: '$100' },
   ];
 
-  const totalArqueo = Object.entries(arqueo).reduce((sum, [denominacion, cantidad]) => {
+  const totalEfectivo = Object.entries(arqueo).reduce((sum, [denominacion, cantidad]) => {
     return sum + (parseInt(denominacion) * cantidad);
   }, 0);
+
+  const totalArqueo = totalEfectivo + otrosMedios.posnet + otrosMedios.transferencias;
 
   useEffect(() => {
     fetchData();
@@ -275,8 +268,8 @@ export default function Cajas() {
       setCierreData({ observaciones: '' });
       setArqueo({
         '10000': 0, '5000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
-        '50': 0, '25': 0, '10': 0, '5': 0, '2': 0, '1': 0,
       });
+      setOtrosMedios({ posnet: 0, transferencias: 0 });
       fetchData();
     } catch (error) {
       console.error('Error closing caja:', error);
@@ -564,11 +557,11 @@ export default function Cajas() {
             {/* Arqueo de Billetes */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Conteo de Billetes</CardTitle>
+                <CardTitle className="text-sm font-medium">Conteo de Efectivo</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {denominaciones.filter(d => d.tipo === 'billete').map((denom) => (
+                  {denominaciones.map((denom) => (
                     <div key={denom.valor} className="space-y-1">
                       <Label className="text-xs text-muted-foreground">{denom.label}</Label>
                       <div className="flex items-center gap-2">
@@ -590,35 +583,56 @@ export default function Cajas() {
                     </div>
                   ))}
                 </div>
+                <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                  <span className="text-sm font-medium">Subtotal Efectivo:</span>
+                  <span className="font-bold">${totalEfectivo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Arqueo de Monedas */}
+            {/* Otros Medios de Pago */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Conteo de Monedas</CardTitle>
+                <CardTitle className="text-sm font-medium">Comprobantes Posnet y Transferencias</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                  {denominaciones.filter(d => d.tipo === 'moneda').map((denom) => (
-                    <div key={denom.valor} className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">{denom.label}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={arqueo[denom.valor.toString()] || ''}
-                        onChange={(e) => setArqueo({
-                          ...arqueo,
-                          [denom.valor.toString()]: parseInt(e.target.value) || 0
-                        })}
-                        className="h-8 text-center"
-                        placeholder="0"
-                      />
-                      <p className="text-xs text-muted-foreground text-right">
-                        ${((arqueo[denom.valor.toString()] || 0) * denom.valor).toLocaleString('es-AR')}
-                      </p>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="posnet">Comprobantes Posnet (Débito/Crédito)</Label>
+                    <Input
+                      id="posnet"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={otrosMedios.posnet || ''}
+                      onChange={(e) => setOtrosMedios({
+                        ...otrosMedios,
+                        posnet: parseFloat(e.target.value) || 0
+                      })}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Suma total de los comprobantes del posnet
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="transferencias">Transferencias Bancarias</Label>
+                    <Input
+                      id="transferencias"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={otrosMedios.transferencias || ''}
+                      onChange={(e) => setOtrosMedios({
+                        ...otrosMedios,
+                        transferencias: parseFloat(e.target.value) || 0
+                      })}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Suma total de transferencias recibidas
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
