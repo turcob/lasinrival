@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import forge from "https://esm.sh/node-forge@1.3.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,10 +11,10 @@ const WSAA_URL = "https://wsaahomo.afip.gov.ar/ws/services/LoginCms";
 const WSFE_URL = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx";
 
 interface FacturaRequest {
-  tipo_comprobante: number; // 1=Factura A, 6=Factura B, 11=Factura C, 3=Nota Crédito A, 8=Nota Crédito B
+  tipo_comprobante: number;
   punto_venta: number;
-  concepto: number; // 1=Productos, 2=Servicios, 3=Productos y Servicios
-  doc_tipo: number; // 80=CUIT, 86=CUIL, 96=DNI, 99=Consumidor Final
+  concepto: number;
+  doc_tipo: number;
   doc_nro: number;
   importe_total: number;
   importe_neto: number;
@@ -23,7 +23,7 @@ interface FacturaRequest {
     descripcion: string;
     cantidad: number;
     precio_unitario: number;
-    iva_id: number; // 5=21%, 4=10.5%, 3=0%
+    iva_id: number;
   }>;
 }
 
@@ -45,35 +45,64 @@ function generateTRA(service: string): string {
 </loginTicketRequest>`;
 }
 
-// Sign TRA with certificate and private key using Web Crypto API
-async function signTRA(tra: string, cert: string, privateKey: string): Promise<string> {
+// Sign TRA with certificate and private key using PKCS#7/CMS
+function signTRA(tra: string, certPem: string, privateKeyPem: string): string {
   try {
-    // For Deno, we need to use the native crypto API
-    // This is a simplified implementation - in production, you'd use a proper PKCS#7 signing library
+    console.log("Parsing certificate...");
     
-    // Convert PEM to raw key
-    const pemHeader = "-----BEGIN PRIVATE KEY-----";
-    const pemFooter = "-----END PRIVATE KEY-----";
-    let pemContents = privateKey.replace(pemHeader, "").replace(pemFooter, "");
-    pemContents = pemContents.replace(/\s/g, "");
+    // Parse the certificate
+    const cert = forge.pki.certificateFromPem(certPem);
     
-    // For RSA PRIVATE KEY format
-    const rsaPemHeader = "-----BEGIN RSA PRIVATE KEY-----";
-    const rsaPemFooter = "-----END RSA PRIVATE KEY-----";
-    pemContents = pemContents.replace(rsaPemHeader, "").replace(rsaPemFooter, "");
-    pemContents = pemContents.replace(/\s/g, "");
+    console.log("Parsing private key...");
     
-    // Encode TRA as base64 for the CMS
-    const traBase64 = btoa(tra);
+    // Parse the private key
+    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
     
-    // Note: This is a placeholder. Real CMS/PKCS#7 signing requires a proper library
-    // In production, you would use a library like 'pkijs' or call an external signing service
-    console.log("TRA generated, attempting to sign...");
-    console.log("Certificate loaded:", cert.substring(0, 50) + "...");
+    console.log("Creating PKCS#7 signed data...");
     
-    // For now, return the base64 encoded TRA
-    // You will need to implement proper CMS signing or use an external service
-    return traBase64;
+    // Create PKCS#7 signed data
+    const p7 = forge.pkcs7.createSignedData();
+    
+    // Set the content
+    p7.content = forge.util.createBuffer(tra, 'utf8');
+    
+    // Add the certificate
+    p7.addCertificate(cert);
+    
+    // Add a signer
+    p7.addSigner({
+      key: privateKey,
+      certificate: cert,
+      digestAlgorithm: forge.pki.oids.sha256,
+      authenticatedAttributes: [
+        {
+          type: forge.pki.oids.contentType,
+          value: forge.pki.oids.data
+        },
+        {
+          type: forge.pki.oids.messageDigest
+        },
+        {
+          type: forge.pki.oids.signingTime,
+          value: new Date()
+        }
+      ]
+    });
+    
+    // Sign the data
+    p7.sign();
+    
+    console.log("Converting to DER...");
+    
+    // Convert to DER format
+    const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+    
+    // Convert to base64
+    const base64 = forge.util.encode64(der);
+    
+    console.log("CMS signed successfully, length:", base64.length);
+    
+    return base64;
   } catch (error: unknown) {
     console.error("Error signing TRA:", error);
     const message = error instanceof Error ? error.message : String(error);
