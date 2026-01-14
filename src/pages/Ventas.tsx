@@ -5,7 +5,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, XCircle, FileText, Download } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,21 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+interface ComprobanteAfip {
+  id: string;
+  tipo_comprobante: number;
+  punto_venta: number;
+  numero_comprobante: number;
+  cae: string;
+  cae_vencimiento: string;
+  importe_total: number;
+  importe_neto: number;
+  importe_iva: number;
+  doc_tipo: number;
+  doc_nro: number;
+  fecha_emision: string;
+}
+
 interface Venta {
   id: string;
   numero_comprobante: number;
@@ -51,8 +66,9 @@ interface Venta {
   usuario_id: string;
   cliente_id: string | null;
   caja_id: string | null;
-  clientes?: { nombre: string; dni_cuit: string | null } | null;
+  clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number } | null;
   profiles?: { nombre: string } | null;
+  comprobantes_afip?: ComprobanteAfip[] | null;
 }
 
 interface VentaDetalle {
@@ -70,6 +86,22 @@ interface VentaPago {
   formas_pago?: { nombre: string } | null;
 }
 
+const CONDICIONES_IVA: Record<number, string> = {
+  1: "IVA Responsable Inscripto",
+  4: "IVA Sujeto Exento",
+  5: "Consumidor Final",
+  6: "Responsable Monotributo",
+};
+
+const TIPOS_COMPROBANTE: Record<number, string> = {
+  1: "A",
+  6: "B",
+  11: "C",
+  3: "NCA",
+  8: "NCB",
+  13: "NCC",
+};
+
 export default function Ventas() {
   const { user, hasPermission } = useAuth();
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -80,6 +112,9 @@ export default function Ventas() {
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
+
+  const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
+  const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
 
   const canAnular = hasPermission('ventas', 'anular');
 
@@ -94,7 +129,8 @@ export default function Ventas() {
         .from('ventas')
         .select(`
           *,
-          clientes(nombre, dni_cuit)
+          clientes(nombre, dni_cuit, condicion_iva),
+          comprobantes_afip(*)
         `)
         .order('fecha', { ascending: false });
 
@@ -256,9 +292,16 @@ export default function Ventas() {
       key: 'estado',
       header: 'Estado',
       render: (item: Venta) => (
-        <Badge variant={item.anulada ? 'destructive' : 'default'}>
-          {item.anulada ? 'Anulada' : 'Válida'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={item.anulada ? 'destructive' : 'default'}>
+            {item.anulada ? 'Anulada' : 'Válida'}
+          </Badge>
+          {item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+            <Badge variant="outline" className="text-xs">
+              Fact. {TIPOS_COMPROBANTE[item.comprobantes_afip[0].tipo_comprobante] || '?'}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -266,9 +309,23 @@ export default function Ventas() {
       header: 'Acciones',
       render: (item: Venta) => (
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)}>
+          <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)} title="Ver detalle">
             <Eye className="h-4 w-4" />
           </Button>
+          {item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => {
+                setSelectedVenta(item);
+                setSelectedFactura(item.comprobantes_afip![0]);
+                setFacturaDialogOpen(true);
+              }}
+              title="Reimprimir factura"
+            >
+              <Printer className="h-4 w-4 text-primary" />
+            </Button>
+          )}
           {!item.anulada && canAnular && (
             <Button
               variant="ghost"
@@ -277,6 +334,7 @@ export default function Ventas() {
                 setSelectedVenta(item);
                 setAnularDialogOpen(true);
               }}
+              title="Anular venta"
             >
               <XCircle className="h-4 w-4 text-destructive" />
             </Button>
@@ -478,6 +536,118 @@ export default function Ventas() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Factura Dialog for Reprint */}
+      <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Factura Electrónica
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedVenta && selectedFactura && (
+            <div id="printable-invoice" className="space-y-4">
+              <div className="border rounded-lg p-6 text-sm">
+                {/* Header */}
+                <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                  <div>
+                    <p className="font-bold text-lg">EMPRESA</p>
+                    <p className="text-muted-foreground">Razón Social del Comercio</p>
+                    <p className="text-muted-foreground text-xs mt-1">Dirección Comercial</p>
+                    <p className="text-xs text-muted-foreground">CUIT: 20-21395254-5</p>
+                    <p className="text-xs text-muted-foreground">IVA Responsable Inscripto</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
+                      <p className="font-bold text-2xl">
+                        {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante] || '?'}
+                      </p>
+                    </div>
+                    <p className="font-bold">
+                      FACTURA {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante]}
+                    </p>
+                    <p className="text-lg font-mono">
+                      Nº {String(selectedFactura.punto_venta).padStart(4, '0')}-
+                      {String(selectedFactura.numero_comprobante).padStart(8, '0')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Fecha: {format(new Date(selectedFactura.fecha_emision), 'dd/MM/yyyy')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer Info */}
+                <div className="py-3 border-b">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Cliente:</p>
+                      <p className="font-medium">{selectedVenta.clientes?.nombre || 'Consumidor Final'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">CUIT/DNI:</p>
+                      <p>{selectedFactura.doc_nro || 'S/D'}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground">Condición IVA:</p>
+                    <p>{CONDICIONES_IVA[selectedVenta.clientes?.condicion_iva || 5]}</p>
+                  </div>
+                </div>
+
+                {/* Items - Need to fetch from venta_detalles */}
+                <div className="py-3 border-b">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    (Ver detalle de productos en la venta)
+                  </p>
+                </div>
+
+                {/* Totals */}
+                <div className="py-3 border-b">
+                  <div className="flex justify-end">
+                    <div className="w-64 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Subtotal Neto:</span>
+                        <span>${selectedFactura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {selectedFactura.importe_iva > 0 && (
+                        <div className="flex justify-between">
+                          <span>IVA 21%:</span>
+                          <span>${selectedFactura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-lg border-t pt-1">
+                        <span>TOTAL:</span>
+                        <span>${selectedFactura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CAE Info */}
+                <div className="pt-3 bg-muted/50 rounded p-3 mt-3">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <p className="font-bold">CAE Nº: {selectedFactura.cae}</p>
+                      <p>Fecha Vto. CAE: {selectedFactura.cae_vencimiento}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-muted-foreground">Comprobante Autorizado</p>
+                      <p className="text-muted-foreground">AFIP - Factura Electrónica</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button className="w-full" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir Factura
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
