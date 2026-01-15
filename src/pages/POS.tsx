@@ -54,6 +54,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
+import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 
 interface Producto {
   id: string;
@@ -231,6 +233,11 @@ export default function POS() {
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
   const [efectivoEntregado, setEfectivoEntregado] = useState('');
 
+  // Modal de búsqueda de productos
+  const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
+  const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
+  const [selectedProductForQuantity, setSelectedProductForQuantity] = useState<Producto | null>(null);
+
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
@@ -397,6 +404,37 @@ export default function POS() {
     });
     setSearchTerm('');
     setShowAllResults(false);
+  };
+
+  // Handler para selección de producto desde el modal de búsqueda
+  const handleProductSelectedFromModal = (producto: Producto) => {
+    if (producto.precio_costo <= 0) {
+      toast.error('Este producto no tiene precio de costo definido');
+      return;
+    }
+    setSelectedProductForQuantity(producto);
+    setProductQuantityModalOpen(true);
+  };
+
+  // Handler para confirmar cantidad desde el modal
+  const handleConfirmProductQuantity = (producto: Producto, cantidad: number) => {
+    const precio = getProductoPrice(producto);
+    
+    setCart((prev) => {
+      const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
+      if (existing) {
+        const nuevaCantidad = existing.cantidad + cantidad;
+        return prev.map((item) =>
+          item.id === existing.id
+            ? { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) }
+            : item
+        );
+      }
+      const newId = crypto.randomUUID();
+      return [...prev, { id: newId, producto, cantidad, precio, subtotal: calcSubtotal(cantidad, precio, 0), descuento_porcentaje: 0 }];
+    });
+    
+    toast.success(`${producto.descripcion} agregado al pedido`);
   };
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
@@ -1254,24 +1292,33 @@ export default function POS() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-10"
-                  placeholder="Buscar producto por código o descripción..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setShowAllResults(false);
-                  }}
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-10"
+                    placeholder="Buscar producto por código o descripción..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setShowAllResults(false);
+                    }}
+                  />
+                </div>
+                <Button 
+                  variant="default"
+                  onClick={() => setProductSearchModalOpen(true)}
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Buscar
+                </Button>
               </div>
               
-              {/* Search Results */}
-              {filteredProductos.length > 0 && (
-                <Card className="absolute z-10 mt-1 w-full max-w-xl shadow-lg">
-                  <ScrollArea className="max-h-80">
-                    {filteredProductos.map((producto) => (
+              {/* Quick Search Results - mantener para búsqueda rápida inline */}
+              {filteredProductos.length > 0 && searchTerm && (
+                <Card className="absolute z-10 mt-1 w-full max-w-xl shadow-lg bg-background">
+                  <ScrollArea className="max-h-60">
+                    {filteredProductos.slice(0, 4).map((producto) => (
                       <div
                         key={producto.id}
                         className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-0"
@@ -1293,13 +1340,16 @@ export default function POS() {
                         </div>
                       </div>
                     ))}
-                    {totalResults > 8 && !showAllResults && (
+                    {totalResults > 4 && (
                       <div 
-                        className="p-3 text-center text-primary hover:bg-muted cursor-pointer"
-                        onClick={() => setShowAllResults(true)}
+                        className="p-3 text-center text-primary hover:bg-muted cursor-pointer font-medium"
+                        onClick={() => {
+                          setProductSearchModalOpen(true);
+                          setSearchTerm('');
+                        }}
                       >
-                        <ChevronDown className="h-4 w-4 inline mr-1" />
-                        Ver {totalResults - 8} resultados más
+                        <Search className="h-4 w-4 inline mr-1" />
+                        Ver todos los {totalResults} resultados
                       </div>
                     )}
                   </ScrollArea>
@@ -2347,6 +2397,24 @@ export default function POS() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Búsqueda de Productos */}
+      <ProductSearchModal
+        open={productSearchModalOpen}
+        onOpenChange={setProductSearchModalOpen}
+        productos={productos}
+        getProductoPrice={getProductoPrice}
+        onSelectProduct={handleProductSelectedFromModal}
+      />
+
+      {/* Modal de Selección de Cantidad */}
+      <ProductQuantityModal
+        open={productQuantityModalOpen}
+        onOpenChange={setProductQuantityModalOpen}
+        producto={selectedProductForQuantity}
+        precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}
+        onConfirm={handleConfirmProductQuantity}
+      />
     </MainLayout>
   );
 }
