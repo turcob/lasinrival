@@ -531,6 +531,8 @@ export default function POS() {
   const totalDescuentos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
   const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
+  // Total a facturar: si hay pagos con intereses, usar totalPagado; sino usar total de productos
+  const totalFacturar = useMemo(() => totalPagado > 0 ? totalPagado : total, [totalPagado, total]);
 
   const handleOpenFacturaDialog = () => {
     if (selectedCliente) {
@@ -746,7 +748,7 @@ export default function POS() {
             caja_id: caja.id,
             subtotal: subtotal,
             descuento: totalDescuentos,
-            total: total,
+            total: totalFacturar,
             estado: 'confirmada',
           })
           .eq('id', editingPedidoId);
@@ -793,7 +795,7 @@ export default function POS() {
             caja_id: caja.id,
             subtotal: subtotal,
             descuento: totalDescuentos,
-            total: total,
+            total: totalFacturar,
             estado: 'confirmada',
           }])
           .select()
@@ -865,7 +867,7 @@ export default function POS() {
         usuario_id: user.id,
         tipo: 'ingreso',
         concepto: `Venta #${venta.numero_comprobante}`,
-        monto: total,
+        monto: totalFacturar,
         venta_id: venta.id,
       }]);
 
@@ -877,14 +879,14 @@ export default function POS() {
 
       await supabase
         .from('cajas')
-        .update({ total_ventas: (cajaData?.total_ventas || 0) + total })
+        .update({ total_ventas: (cajaData?.total_ventas || 0) + totalFacturar })
         .eq('id', caja.id);
 
       let facturaInfo = null;
       if (emitirFactura) {
         try {
-          const netoSinIva = total / 1.21;
-          const ivaAmount = total - netoSinIva;
+          const netoSinIva = totalFacturar / 1.21;
+          const ivaAmount = totalFacturar - netoSinIva;
 
           const { data: facturaResult, error: facturaError } = await supabase.functions.invoke(
             'afip-facturacion/emitir',
@@ -896,7 +898,7 @@ export default function POS() {
                 doc_tipo: facturaData.doc_tipo,
                 doc_nro: parseInt(facturaData.doc_nro) || 0,
                 condicion_iva_receptor: facturaData.condicion_iva_receptor,
-                importe_total: total,
+                importe_total: totalFacturar,
                 importe_neto: parseFloat(netoSinIva.toFixed(2)),
                 importe_iva: parseFloat(ivaAmount.toFixed(2)),
                 items: cart.map(item => ({
@@ -2165,9 +2167,23 @@ export default function POS() {
 
             <Separator />
 
+            {/* Mostrar desglose si hay intereses */}
+            {totalPagado > total && (
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Subtotal productos:</span>
+                  <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Intereses tarjeta:</span>
+                  <span>+${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between text-lg font-bold">
-              <span>Total:</span>
-              <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              <span>Total a facturar:</span>
+              <span>${(totalPagado > 0 ? totalPagado : total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
 
             <div className="flex justify-end gap-3">
