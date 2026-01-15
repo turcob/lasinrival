@@ -253,14 +253,26 @@ export function ExcelImporter() {
               }
             }
           } else {
-            // Update existing product
+            // Update existing product - now updates all fields including description
             const productoId = productosMap.get(codigoArticulo)!;
+            const subcategoriaId = categoriaId ? subcategoriasMap.get(`${categoriaId}-${codigoGrupo}`) : null;
             const updateData: any = {};
             
+            // Always update description if provided
+            if (descripcion) updateData.descripcion = descripcion;
+            // Update unit of measure if provided
+            if (unidadMedida) updateData.unidad_medida = unidadMedida;
+            // Update price if valid
             if (precioCosto > 0) updateData.precio_costo = precioCosto;
+            // Update brand if exists
             if (marcaId) updateData.marca_id = marcaId;
+            // Update product type if exists
             if (tipoProductoId) updateData.tipo_producto_id = tipoProductoId;
+            // Update quantity per package
             if (cantidadPorEmpaque > 1) updateData.cantidad_por_empaque = cantidadPorEmpaque;
+            // Update category/subcategory if provided
+            if (categoriaId) updateData.categoria_id = categoriaId;
+            if (subcategoriaId) updateData.subcategoria_id = subcategoriaId;
 
             if (Object.keys(updateData).length > 0) {
               try {
