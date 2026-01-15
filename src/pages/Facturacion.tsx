@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useConfiguracionComercio } from "@/hooks/useConfiguracionComercio";
 import { FileText, Plus, TestTube } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -70,6 +71,7 @@ const ALICUOTAS_IVA = [
 
 export default function Facturacion() {
   const { user } = useAuth();
+  const { config: comercioConfig } = useConfiguracionComercio();
   const [comprobantes, setComprobantes] = useState<Comprobante[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,7 @@ export default function Facturacion() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     tipo_comprobante: 6, // Factura B por defecto
-    punto_venta: 1,
+    punto_venta: 1, // Se actualiza con useEffect cuando carga comercioConfig
     concepto: 1,
     doc_tipo: 99,
     doc_nro: "0",
@@ -87,6 +89,13 @@ export default function Facturacion() {
     cliente_id: "",
     items: [{ descripcion: "", cantidad: 1, precio_unitario: 0, iva_id: 5 }],
   });
+  
+  // Actualizar punto_venta cuando cargue la configuración
+  useEffect(() => {
+    if (comercioConfig?.punto_venta) {
+      setFormData(prev => ({ ...prev, punto_venta: comercioConfig.punto_venta }));
+    }
+  }, [comercioConfig]);
 
   useEffect(() => {
     fetchData();
@@ -223,7 +232,7 @@ export default function Facturacion() {
   const resetForm = () => {
     setFormData({
       tipo_comprobante: 6,
-      punto_venta: 1,
+      punto_venta: comercioConfig?.punto_venta || 1,
       concepto: 1,
       doc_tipo: 99,
       doc_nro: "0",

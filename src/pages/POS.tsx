@@ -387,7 +387,7 @@ export default function POS() {
             {
               body: {
                 tipo_comprobante: facturaData.tipo_comprobante,
-                punto_venta: 1,
+                punto_venta: comercioConfig?.punto_venta || 1,
                 concepto: 1,
                 doc_tipo: facturaData.doc_tipo,
                 doc_nro: parseInt(facturaData.doc_nro) || 0,
