@@ -564,7 +564,20 @@ export default function POS() {
     }
     
     const tarjeta = tarjetas.find(t => t.id === selectedTarjeta);
-    const cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta && c.cuotas === selectedCuotas);
+    
+    // Para débito, buscar cualquier coeficiente configurado (no depende de cuotas)
+    // Para crédito, buscar por cuotas seleccionadas
+    let cuotaConfig;
+    let cuotasUsadas = selectedCuotas;
+    
+    if (tarjeta?.tipo === 'debito') {
+      // Para débito, tomar el primer (y único) coeficiente configurado
+      cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta);
+      cuotasUsadas = 1; // Débito siempre es 1 cuota
+    } else {
+      cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta && c.cuotas === selectedCuotas);
+    }
+    
     const coeficiente = cuotaConfig?.coeficiente || 1;
     const montoConInteres = monto * coeficiente;
     
@@ -572,7 +585,7 @@ export default function POS() {
       forma_pago_id: selectedFormaPago,
       monto: montoConInteres,
       tarjeta_id: selectedTarjeta,
-      cuotas: selectedCuotas,
+      cuotas: cuotasUsadas,
       coeficiente,
     }]);
     
@@ -581,8 +594,8 @@ export default function POS() {
     setSelectedCuotas(1);
     setMontoTarjeta('');
     
-    if (tarjeta?.tipo === 'credito' && coeficiente > 1) {
-      toast.success(`Tarjeta agregada con ${selectedCuotas} cuotas (${((coeficiente - 1) * 100).toFixed(1)}% interés)`);
+    if (coeficiente > 1) {
+      toast.success(`Pago agregado con ${((coeficiente - 1) * 100).toFixed(1)}% de interés`);
     } else {
       toast.success('Pago con tarjeta agregado');
     }
