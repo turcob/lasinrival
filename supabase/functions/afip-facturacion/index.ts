@@ -528,23 +528,33 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const action = url.pathname.split("/").pop();
-    
-    const cuit = Deno.env.get("AFIP_CUIT");
-    if (!cuit) {
-      throw new Error("CUIT no configurado");
-    }
 
-    console.log(`AFIP Action: ${action}, CUIT: ${cuit}`);
-
-    // Get AFIP mode from configuracion_comercio
+    // Get AFIP mode and CUIT from configuracion_comercio
     const { data: configData } = await supabase
       .from('configuracion_comercio')
-      .select('afip_modo')
+      .select('afip_modo, cuit')
       .limit(1)
       .maybeSingle();
     
     const afipModo: 'homologacion' | 'produccion' = configData?.afip_modo || 'homologacion';
-    console.log(`AFIP Mode: ${afipModo}`);
+    
+    // En producción usar CUIT del comercio, en homologación usar CUIT de prueba
+    let cuit: string;
+    if (afipModo === 'produccion') {
+      cuit = configData?.cuit || '';
+      if (!cuit) {
+        throw new Error("CUIT del comercio no configurado en Configuración");
+      }
+      // Limpiar CUIT (quitar guiones si los tiene)
+      cuit = cuit.replace(/\D/g, '');
+    } else {
+      cuit = Deno.env.get("AFIP_CUIT") || '';
+      if (!cuit) {
+        throw new Error("CUIT de homologación no configurado");
+      }
+    }
+
+    console.log(`AFIP Action: ${action}, CUIT: ${cuit}, Mode: ${afipModo}`);
 
     if (action === "test-connection") {
       // Test WSAA connection
