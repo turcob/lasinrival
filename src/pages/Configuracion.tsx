@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -39,6 +39,8 @@ interface ConfiguracionComercio {
   inicio_actividades: string;
   punto_venta: number;
   afip_modo: 'homologacion' | 'produccion';
+  nombre_sistema: string;
+  texto_login_footer: string;
 }
 
 const CONDICIONES_IVA = [
@@ -88,6 +90,8 @@ const initialFormData: ConfiguracionComercio = {
   inicio_actividades: '',
   punto_venta: 1,
   afip_modo: 'homologacion',
+  nombre_sistema: 'GestiónPro',
+  texto_login_footer: 'Sistema de Gestión Comercial © 2024',
 };
 
 export default function Configuracion() {
@@ -130,6 +134,8 @@ export default function Configuracion() {
           inicio_actividades: data.inicio_actividades || '',
           punto_venta: data.punto_venta || 1,
           afip_modo: (data as any).afip_modo || 'homologacion',
+          nombre_sistema: (data as any).nombre_sistema || 'GestiónPro',
+          texto_login_footer: (data as any).texto_login_footer || 'Sistema de Gestión Comercial © 2024',
         });
       }
     } catch (error) {
@@ -188,6 +194,8 @@ export default function Configuracion() {
         inicio_actividades: formData.inicio_actividades || null,
         punto_venta: formData.punto_venta,
         afip_modo: formData.afip_modo,
+        nombre_sistema: formData.nombre_sistema.trim() || 'GestiónPro',
+        texto_login_footer: formData.texto_login_footer.trim() || 'Sistema de Gestión Comercial © 2024',
       };
 
       if (configId) {
@@ -489,6 +497,50 @@ export default function Configuracion() {
                     maxLength={100}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Personalización del Sistema */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Personalización del Sistema
+              </CardTitle>
+              <CardDescription>
+                Configura el nombre y textos que aparecen en la aplicación
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre_sistema">Nombre del Sistema</Label>
+                <Input
+                  id="nombre_sistema"
+                  value={formData.nombre_sistema}
+                  onChange={(e) => setFormData({ ...formData, nombre_sistema: e.target.value })}
+                  placeholder="GestiónPro"
+                  disabled={!isAdmin}
+                  maxLength={50}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este nombre aparece en el menú lateral y en la pantalla de login
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="texto_login_footer">Texto del pie de página (Login)</Label>
+                <Input
+                  id="texto_login_footer"
+                  value={formData.texto_login_footer}
+                  onChange={(e) => setFormData({ ...formData, texto_login_footer: e.target.value })}
+                  placeholder="Sistema de Gestión Comercial © 2024"
+                  disabled={!isAdmin}
+                  maxLength={100}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este texto aparece en la parte inferior de la pantalla de inicio de sesión
+                </p>
               </div>
             </CardContent>
           </Card>
