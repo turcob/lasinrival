@@ -246,6 +246,12 @@ export default function ListasPrecios() {
       // Primero obtener los IDs de las listas activas para borrar sus porcentajes
       const listaIds = listas.map(l => l.id);
       
+      if (listaIds.length === 0) {
+        toast.error('No hay listas para guardar');
+        setSaving(false);
+        return;
+      }
+      
       // Eliminar porcentajes existentes de las listas que estamos editando
       const { error: deleteError } = await supabase
         .from('lista_precio_porcentajes')
@@ -257,22 +263,34 @@ export default function ListasPrecios() {
         throw deleteError;
       }
       
-      const nuevoPorcentajes: Omit<Porcentaje, 'id'>[] = [];
+      // Usar Map para deduplicar por clave única
+      const porcentajesMap = new Map<string, Omit<Porcentaje, 'id'>>();
       
-      Object.entries(matrizTemp).forEach(([listaId, columnas]) => {
-        Object.entries(columnas).forEach(([columnaId, porcentaje]) => {
-          const columna = columnasActivas.find(c => c.id === columnaId);
-          if (!columna) return;
+      listas.forEach(lista => {
+        columnasActivas.forEach(columna => {
+          const porcentaje = matrizTemp[lista.id]?.[columna.id] || 0;
           
-          nuevoPorcentajes.push({
-            lista_precio_id: listaId,
+          // Crear clave única basada en el tipo de columna
+          let key: string;
+          if (columna.tipo === 'general') {
+            key = `${lista.id}_general`;
+          } else if (columna.tipo === 'marca') {
+            key = `${lista.id}_marca_${columna.referencia_id}`;
+          } else {
+            key = `${lista.id}_tipo_${columna.referencia_id}`;
+          }
+          
+          porcentajesMap.set(key, {
+            lista_precio_id: lista.id,
             marca_id: columna.tipo === 'marca' ? columna.referencia_id : null,
             tipo_producto_id: columna.tipo === 'tipo_producto' ? columna.referencia_id : null,
             es_general: columna.tipo === 'general',
-            porcentaje: porcentaje || 0,
+            porcentaje: porcentaje,
           });
         });
       });
+      
+      const nuevoPorcentajes = Array.from(porcentajesMap.values());
       
       if (nuevoPorcentajes.length > 0) {
         const { error } = await supabase.from('lista_precio_porcentajes').insert(nuevoPorcentajes);
