@@ -400,6 +400,62 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracion_descuentos: {
+        Row: {
+          created_at: string | null
+          descuento_maximo_global: number
+          id: string
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descuento_maximo_global?: number
+          id?: string
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descuento_maximo_global?: number
+          id?: string
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      descuentos_producto_rol: {
+        Row: {
+          created_at: string | null
+          descuento_maximo: number
+          id: string
+          producto_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string | null
+          descuento_maximo?: number
+          id?: string
+          producto_id: string
+          role: string
+        }
+        Update: {
+          created_at?: string | null
+          descuento_maximo?: number
+          id?: string
+          producto_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "descuentos_producto_rol_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pago: {
         Row: {
           activo: boolean | null
@@ -846,6 +902,65 @@ export type Database = {
           },
         ]
       }
+      tarjeta_cuotas: {
+        Row: {
+          activo: boolean | null
+          coeficiente: number
+          created_at: string | null
+          cuotas: number
+          id: string
+          tarjeta_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          coeficiente?: number
+          created_at?: string | null
+          cuotas: number
+          id?: string
+          tarjeta_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          coeficiente?: number
+          created_at?: string | null
+          cuotas?: number
+          id?: string
+          tarjeta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarjeta_cuotas_tarjeta_id_fkey"
+            columns: ["tarjeta_id"]
+            isOneToOne: false
+            referencedRelation: "tarjetas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tarjetas: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
+          tipo: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+          tipo: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       tipos_producto: {
         Row: {
           activo: boolean | null
@@ -890,9 +1005,12 @@ export type Database = {
           cantidad: number
           created_at: string | null
           descuento: number | null
+          descuento_porcentaje: number | null
           id: string
           precio_unitario: number
-          producto_id: string
+          producto_id: string | null
+          producto_temporal_nombre: string | null
+          producto_temporal_precio: number | null
           subtotal: number
           venta_id: string
         }
@@ -900,9 +1018,12 @@ export type Database = {
           cantidad: number
           created_at?: string | null
           descuento?: number | null
+          descuento_porcentaje?: number | null
           id?: string
           precio_unitario: number
-          producto_id: string
+          producto_id?: string | null
+          producto_temporal_nombre?: string | null
+          producto_temporal_precio?: number | null
           subtotal: number
           venta_id: string
         }
@@ -910,9 +1031,12 @@ export type Database = {
           cantidad?: number
           created_at?: string | null
           descuento?: number | null
+          descuento_porcentaje?: number | null
           id?: string
           precio_unitario?: number
-          producto_id?: string
+          producto_id?: string | null
+          producto_temporal_nombre?: string | null
+          producto_temporal_precio?: number | null
           subtotal?: number
           venta_id?: string
         }
@@ -935,25 +1059,40 @@ export type Database = {
       }
       venta_pagos: {
         Row: {
+          coeficiente: number | null
           created_at: string | null
+          cuotas: number | null
+          efectivo_entregado: number | null
           forma_pago_id: string
           id: string
           monto: number
+          tarjeta_id: string | null
           venta_id: string
+          vuelto: number | null
         }
         Insert: {
+          coeficiente?: number | null
           created_at?: string | null
+          cuotas?: number | null
+          efectivo_entregado?: number | null
           forma_pago_id: string
           id?: string
           monto: number
+          tarjeta_id?: string | null
           venta_id: string
+          vuelto?: number | null
         }
         Update: {
+          coeficiente?: number | null
           created_at?: string | null
+          cuotas?: number | null
+          efectivo_entregado?: number | null
           forma_pago_id?: string
           id?: string
           monto?: number
+          tarjeta_id?: string | null
           venta_id?: string
+          vuelto?: number | null
         }
         Relationships: [
           {
@@ -961,6 +1100,13 @@ export type Database = {
             columns: ["forma_pago_id"]
             isOneToOne: false
             referencedRelation: "formas_pago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_tarjeta_id_fkey"
+            columns: ["tarjeta_id"]
+            isOneToOne: false
+            referencedRelation: "tarjetas"
             referencedColumns: ["id"]
           },
           {

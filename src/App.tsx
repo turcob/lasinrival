@@ -20,6 +20,7 @@ import Marcas from "./pages/Marcas";
 import TiposProducto from "./pages/TiposProducto";
 import Facturacion from "./pages/Facturacion";
 import Configuracion from "./pages/Configuracion";
+import Tarjetas from "./pages/Tarjetas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ function AppRoutes() {
       <Route path="/ventas" element={<ProtectedRoute><Ventas /></ProtectedRoute>} />
       <Route path="/cajas" element={<ProtectedRoute><Cajas /></ProtectedRoute>} />
       <Route path="/facturacion" element={<ProtectedRoute><Facturacion /></ProtectedRoute>} />
+      <Route path="/tarjetas" element={<ProtectedRoute><Tarjetas /></ProtectedRoute>} />
       <Route path="/inventario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
