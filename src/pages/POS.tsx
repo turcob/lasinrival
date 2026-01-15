@@ -368,7 +368,7 @@ export default function POS() {
 
       if (editingPedidoId) {
         // Actualizar pedido existente a venta confirmada
-        const { data: updatedVenta, error: updateError } = await supabase
+        const { error: updateError } = await supabase
           .from('ventas')
           .update({
             cliente_id: selectedCliente?.id || null,
@@ -377,12 +377,18 @@ export default function POS() {
             total: total,
             estado: 'confirmada',
           })
-          .eq('id', editingPedidoId)
-          .select()
-          .maybeSingle();
+          .eq('id', editingPedidoId);
 
         if (updateError) throw updateError;
-        if (!updatedVenta) throw new Error('No se pudo actualizar la venta');
+        
+        // Fetch the updated venta
+        const { data: updatedVenta, error: fetchError } = await supabase
+          .from('ventas')
+          .select('*')
+          .eq('id', editingPedidoId)
+          .single();
+          
+        if (fetchError) throw fetchError;
         venta = updatedVenta;
 
         // Eliminar detalles anteriores
@@ -420,10 +426,9 @@ export default function POS() {
             estado: 'confirmada',
           }])
           .select()
-          .maybeSingle();
+          .single();
 
         if (ventaError) throw ventaError;
-        if (!newVenta) throw new Error('No se pudo crear la venta');
         venta = newVenta;
 
         // Create venta_detalles
