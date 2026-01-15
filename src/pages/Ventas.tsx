@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -76,6 +76,7 @@ interface Venta {
   usuario_id: string;
   cliente_id: string | null;
   caja_id: string | null;
+  estado: string;
   clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number } | null;
   profiles?: { nombre: string } | null;
   comprobantes_afip?: ComprobanteAfip[] | null;
@@ -128,6 +129,7 @@ export default function Ventas() {
   
   // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
+  const [filtroEstado, setFiltroEstado] = useState<string>('confirmada');
   const [fechaDesde, setFechaDesde] = useState<Date | undefined>(undefined);
   const [fechaHasta, setFechaHasta] = useState<Date | undefined>(undefined);
 
@@ -220,6 +222,11 @@ export default function Ventas() {
         return false;
       }
       
+      // Filtro por estado
+      if (filtroEstado !== 'todos' && v.estado !== filtroEstado) {
+        return false;
+      }
+      
       // Filtro por fecha
       if (fechaDesde || fechaHasta) {
         const ventaFecha = new Date(v.fecha);
@@ -233,15 +240,20 @@ export default function Ventas() {
       
       return true;
     });
-  }, [ventas, filtroUsuario, fechaDesde, fechaHasta]);
+  }, [ventas, filtroUsuario, filtroEstado, fechaDesde, fechaHasta]);
 
-  // Calcular totales por medio de pago
+  // Calcular totales por medio de pago (solo ventas confirmadas, no pedidos)
   const totalesPorMedioPago = useMemo(() => {
     const totales: Record<string, number> = {};
     let totalGeneral = 0;
+    let countVentas = 0;
+    let countPedidos = 0;
     
     ventasFiltradas.forEach(venta => {
-      if (!venta.anulada) {
+      if (venta.estado === 'pedido' && !venta.anulada) {
+        countPedidos++;
+      } else if (!venta.anulada && venta.estado === 'confirmada') {
+        countVentas++;
         totalGeneral += venta.total;
         const pagosVenta = pagosPorVenta[venta.id] || [];
         pagosVenta.forEach(pago => {
@@ -251,7 +263,7 @@ export default function Ventas() {
       }
     });
     
-    return { totales, totalGeneral };
+    return { totales, totalGeneral, countVentas, countPedidos };
   }, [ventasFiltradas, pagosPorVenta]);
 
   const formatCurrency = (value: number) => {
@@ -424,9 +436,15 @@ export default function Ventas() {
       header: 'Estado',
       render: (item: Venta) => (
         <div className="flex items-center gap-2">
-          <Badge variant={item.anulada ? 'destructive' : 'default'}>
-            {item.anulada ? 'Anulada' : 'Válida'}
-          </Badge>
+          {item.anulada ? (
+            <Badge variant="destructive">Anulada</Badge>
+          ) : item.estado === 'pedido' ? (
+            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+              Pedido
+            </Badge>
+          ) : (
+            <Badge variant="default">Válida</Badge>
+          )}
           {item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
             <Badge variant="outline" className="text-xs">
               Fact. {TIPOS_COMPROBANTE[item.comprobantes_afip[0].tipo_comprobante] || '?'}
@@ -504,6 +522,20 @@ export default function Ventas() {
         )}
 
         <div className="flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="confirmada">Confirmadas</SelectItem>
+              <SelectItem value="pedido">Pedidos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <Popover>
             <PopoverTrigger asChild>
@@ -556,12 +588,16 @@ export default function Ventas() {
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             {/* Total Grande */}
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground mb-1">Total Ventas</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                {filtroEstado === 'pedido' ? 'Total Pedidos Pendientes' : 'Total Ventas'}
+              </p>
               <p className="text-4xl font-bold text-primary">
                 {formatCurrency(totalesPorMedioPago.totalGeneral)}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {ventasFiltradas.filter(v => !v.anulada).length} ventas
+                {totalesPorMedioPago.countVentas > 0 && `${totalesPorMedioPago.countVentas} ventas`}
+                {totalesPorMedioPago.countVentas > 0 && totalesPorMedioPago.countPedidos > 0 && ', '}
+                {totalesPorMedioPago.countPedidos > 0 && `${totalesPorMedioPago.countPedidos} pedidos`}
                 {(fechaDesde || fechaHasta) && ' en el período seleccionado'}
               </p>
             </div>

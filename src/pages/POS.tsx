@@ -15,7 +15,10 @@ import {
   CreditCard,
   Printer,
   X,
-  FileText
+  FileText,
+  ClipboardList,
+  Edit,
+  Check
 } from 'lucide-react';
 import {
   Dialog,
@@ -131,6 +134,13 @@ export default function POS() {
     condicion_iva_receptor: 5, // Consumidor Final
   });
   const [emitiendo, setEmitiendo] = useState(false);
+  
+  // Pedidos
+  const [pedidosDialogOpen, setPedidosDialogOpen] = useState(false);
+  const [pedidos, setPedidos] = useState<any[]>([]);
+  const [loadingPedidos, setLoadingPedidos] = useState(false);
+  const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
+  const [guardandoPedido, setGuardandoPedido] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -287,37 +297,82 @@ export default function POS() {
         return;
       }
 
-      // Create venta
-      const { data: venta, error: ventaError } = await supabase
-        .from('ventas')
-        .insert([{
-          usuario_id: user.id,
-          cliente_id: selectedCliente?.id || null,
-          caja_id: caja.id,
-          subtotal: total,
+      let venta: any;
+
+      if (editingPedidoId) {
+        // Actualizar pedido existente a venta confirmada
+        const { data: updatedVenta, error: updateError } = await supabase
+          .from('ventas')
+          .update({
+            cliente_id: selectedCliente?.id || null,
+            caja_id: caja.id,
+            subtotal: total,
+            total: total,
+            estado: 'confirmada',
+          })
+          .eq('id', editingPedidoId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        venta = updatedVenta;
+
+        // Eliminar detalles anteriores
+        await supabase
+          .from('venta_detalles')
+          .delete()
+          .eq('venta_id', editingPedidoId);
+
+        // Crear nuevos detalles
+        const detalles = cart.map((item) => ({
+          venta_id: venta.id,
+          producto_id: item.producto.id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
           descuento: 0,
-          total: total,
-        }])
-        .select()
-        .single();
+          subtotal: item.subtotal,
+        }));
 
-      if (ventaError) throw ventaError;
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
 
-      // Create venta_detalles
-      const detalles = cart.map((item) => ({
-        venta_id: venta.id,
-        producto_id: item.producto.id,
-        cantidad: item.cantidad,
-        precio_unitario: item.precio,
-        descuento: 0,
-        subtotal: item.subtotal,
-      }));
+        if (detallesError) throw detallesError;
+      } else {
+        // Create new venta
+        const { data: newVenta, error: ventaError } = await supabase
+          .from('ventas')
+          .insert([{
+            usuario_id: user.id,
+            cliente_id: selectedCliente?.id || null,
+            caja_id: caja.id,
+            subtotal: total,
+            descuento: 0,
+            total: total,
+            estado: 'confirmada',
+          }])
+          .select()
+          .single();
 
-      const { error: detallesError } = await supabase
-        .from('venta_detalles')
-        .insert(detalles);
+        if (ventaError) throw ventaError;
+        venta = newVenta;
 
-      if (detallesError) throw detallesError;
+        // Create venta_detalles
+        const detalles = cart.map((item) => ({
+          venta_id: venta.id,
+          producto_id: item.producto.id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: 0,
+          subtotal: item.subtotal,
+        }));
+
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
+
+        if (detallesError) throw detallesError;
+      }
 
       // Create venta_pagos
       const ventaPagos = pagos.map((p) => ({
@@ -459,6 +514,7 @@ export default function POS() {
       setCart([]);
       setPagos([]);
       setSelectedCliente(null);
+      setEditingPedidoId(null);
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
       setTicketDialogOpen(true);
@@ -492,6 +548,235 @@ export default function POS() {
 
   const removePago = (formaPagoId: string) => {
     setPagos((prev) => prev.filter((p) => p.forma_pago_id !== formaPagoId));
+  };
+
+  // Cargar pedidos pendientes
+  const fetchPedidos = async () => {
+    if (!user) return;
+    setLoadingPedidos(true);
+    try {
+      const { data, error } = await supabase
+        .from('ventas')
+        .select(`
+          *,
+          clientes(id, nombre, dni_cuit, condicion_iva),
+          venta_detalles(*, productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo))
+        `)
+        .eq('estado', 'pedido')
+        .eq('anulada', false)
+        .order('fecha', { ascending: false });
+
+      if (error) throw error;
+      setPedidos(data || []);
+    } catch (error) {
+      console.error('Error fetching pedidos:', error);
+      toast.error('Error al cargar los pedidos');
+    } finally {
+      setLoadingPedidos(false);
+    }
+  };
+
+  // Guardar como pedido
+  const handleGuardarPedido = async () => {
+    if (!user) return;
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+
+    setGuardandoPedido(true);
+
+    try {
+      if (editingPedidoId) {
+        // Actualizar pedido existente
+        const { error: updateError } = await supabase
+          .from('ventas')
+          .update({
+            cliente_id: selectedCliente?.id || null,
+            subtotal: total,
+            total: total,
+          })
+          .eq('id', editingPedidoId);
+
+        if (updateError) throw updateError;
+
+        // Eliminar detalles anteriores
+        await supabase
+          .from('venta_detalles')
+          .delete()
+          .eq('venta_id', editingPedidoId);
+
+        // Insertar nuevos detalles
+        const detalles = cart.map((item) => ({
+          venta_id: editingPedidoId,
+          producto_id: item.producto.id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: 0,
+          subtotal: item.subtotal,
+        }));
+
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
+
+        if (detallesError) throw detallesError;
+
+        toast.success('Pedido actualizado correctamente');
+        setEditingPedidoId(null);
+      } else {
+        // Crear nuevo pedido
+        const { data: pedido, error: pedidoError } = await supabase
+          .from('ventas')
+          .insert([{
+            usuario_id: user.id,
+            cliente_id: selectedCliente?.id || null,
+            subtotal: total,
+            descuento: 0,
+            total: total,
+            estado: 'pedido',
+          }])
+          .select()
+          .single();
+
+        if (pedidoError) throw pedidoError;
+
+        // Crear detalles
+        const detalles = cart.map((item) => ({
+          venta_id: pedido.id,
+          producto_id: item.producto.id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: 0,
+          subtotal: item.subtotal,
+        }));
+
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
+
+        if (detallesError) throw detallesError;
+
+        toast.success(`Pedido #${pedido.numero_comprobante} guardado correctamente`);
+      }
+
+      // Limpiar carrito
+      setCart([]);
+      setSelectedCliente(null);
+    } catch (error) {
+      console.error('Error saving pedido:', error);
+      toast.error('Error al guardar el pedido');
+    } finally {
+      setGuardandoPedido(false);
+    }
+  };
+
+  // Cargar pedido para editar
+  const handleCargarPedido = (pedido: any) => {
+    // Cargar cliente
+    if (pedido.clientes) {
+      setSelectedCliente({
+        id: pedido.clientes.id,
+        nombre: pedido.clientes.nombre,
+        dni_cuit: pedido.clientes.dni_cuit,
+        condicion_iva: pedido.clientes.condicion_iva,
+      });
+    } else {
+      setSelectedCliente(null);
+    }
+
+    // Cargar items al carrito
+    const cartItems: CartItem[] = pedido.venta_detalles.map((detalle: any) => ({
+      producto: {
+        id: detalle.productos.id,
+        codigo_articulo: detalle.productos.codigo_articulo,
+        descripcion: detalle.productos.descripcion,
+        stock_actual: detalle.productos.stock_actual,
+        unidad_medida: detalle.productos.unidad_medida,
+        precio_costo: detalle.productos.precio_costo,
+      },
+      cantidad: detalle.cantidad,
+      precio: detalle.precio_unitario,
+      subtotal: detalle.subtotal,
+    }));
+
+    setCart(cartItems);
+    setEditingPedidoId(pedido.id);
+    setPedidosDialogOpen(false);
+    toast.info(`Pedido #${pedido.numero_comprobante} cargado para edición`);
+  };
+
+  // Eliminar pedido
+  const handleEliminarPedido = async (pedidoId: string) => {
+    try {
+      // Primero eliminar detalles
+      await supabase
+        .from('venta_detalles')
+        .delete()
+        .eq('venta_id', pedidoId);
+
+      // Luego eliminar el pedido (marcar como anulado ya que no se puede DELETE)
+      await supabase
+        .from('ventas')
+        .update({ anulada: true, motivo_anulacion: 'Pedido cancelado' })
+        .eq('id', pedidoId);
+
+      toast.success('Pedido eliminado');
+      fetchPedidos();
+    } catch (error) {
+      console.error('Error deleting pedido:', error);
+      toast.error('Error al eliminar el pedido');
+    }
+  };
+
+  // Imprimir pedido
+  const handleImprimirPedido = (pedido: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Pedido #${pedido.numero_comprobante}</title>
+        <style>
+          body { font-family: monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .item { display: flex; justify-content: space-between; margin: 5px 0; }
+          .total { font-weight: bold; margin-top: 10px; border-top: 1px dashed #000; padding-top: 10px; }
+          .footer { text-align: center; margin-top: 20px; font-size: 12px; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>PEDIDO</h2>
+          <p>#${String(pedido.numero_comprobante).padStart(8, '0')}</p>
+          <p>${new Date(pedido.fecha).toLocaleString('es-AR')}</p>
+        </div>
+        <p><strong>Cliente:</strong> ${pedido.clientes?.nombre || 'Consumidor Final'}</p>
+        <hr>
+        ${pedido.venta_detalles.map((d: any) => `
+          <div class="item">
+            <span>${d.cantidad}x ${d.productos?.descripcion?.substring(0, 20) || 'Producto'}</span>
+            <span>$${d.subtotal.toLocaleString('es-AR')}</span>
+          </div>
+        `).join('')}
+        <div class="item total">
+          <span>TOTAL</span>
+          <span>$${pedido.total.toLocaleString('es-AR')}</span>
+        </div>
+        <div class="footer">
+          <p>*** PEDIDO PENDIENTE ***</p>
+          <p>Verificar stock antes de facturar</p>
+        </div>
+        <script>window.print(); window.close();</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (
@@ -693,18 +978,70 @@ export default function POS() {
           </Card>
 
           {/* Payment Button */}
-          <Button
-            size="lg"
-            className="w-full"
-            disabled={cart.length === 0 || !cajaAbierta}
-            onClick={() => {
-              setPagos([]);
-              setPagoDialogOpen(true);
-            }}
-          >
-            <CreditCard className="mr-2 h-5 w-5" />
-            Cobrar ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={cart.length === 0 || !cajaAbierta}
+              onClick={() => {
+                setPagos([]);
+                setPagoDialogOpen(true);
+              }}
+            >
+              <CreditCard className="mr-2 h-5 w-5" />
+              Cobrar ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+            </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                disabled={cart.length === 0}
+                onClick={handleGuardarPedido}
+              >
+                {guardandoPedido ? (
+                  'Guardando...'
+                ) : editingPedidoId ? (
+                  <>
+                    <Check className="mr-1 h-4 w-4" />
+                    Actualizar
+                  </>
+                ) : (
+                  <>
+                    <ClipboardList className="mr-1 h-4 w-4" />
+                    Pedido
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  fetchPedidos();
+                  setPedidosDialogOpen(true);
+                }}
+              >
+                <Edit className="mr-1 h-4 w-4" />
+                Ver Pedidos
+              </Button>
+            </div>
+
+            {editingPedidoId && (
+              <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/30 rounded text-sm">
+                <span className="text-amber-600 dark:text-amber-400">Editando pedido</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => {
+                    setEditingPedidoId(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
 
           {!cajaAbierta && (
             <p className="text-sm text-destructive text-center">
@@ -1110,6 +1447,110 @@ export default function POS() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pedidos Pendientes Dialog */}
+      <Dialog open={pedidosDialogOpen} onOpenChange={setPedidosDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Pedidos Pendientes
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {loadingPedidos ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Cargando pedidos...</p>
+              </div>
+            ) : pedidos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <ClipboardList className="h-12 w-12 mb-2" />
+                <p>No hay pedidos pendientes</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pedidos.map((pedido) => (
+                  <Card key={pedido.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono font-medium">
+                              #{String(pedido.numero_comprobante).padStart(8, '0')}
+                            </span>
+                            <Badge variant="secondary">Pedido</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(pedido.fecha).toLocaleString('es-AR')}
+                          </p>
+                          <p className="text-sm mt-1">
+                            Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {pedido.venta_detalles?.length || 0} productos
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">
+                            ${pedido.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <div className="flex gap-1 mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleImprimirPedido(pedido)}
+                              title="Imprimir pedido"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleCargarPedido(pedido)}
+                              title="Cargar para editar/facturar"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleEliminarPedido(pedido.id)}
+                              title="Eliminar pedido"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Detalle expandido */}
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">Productos:</p>
+                        <div className="space-y-1">
+                          {pedido.venta_detalles?.slice(0, 3).map((d: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span className="truncate max-w-[200px]">
+                                {d.cantidad}x {d.productos?.descripcion || 'Producto'}
+                              </span>
+                              <span>${d.subtotal.toLocaleString('es-AR')}</span>
+                            </div>
+                          ))}
+                          {pedido.venta_detalles?.length > 3 && (
+                            <p className="text-xs text-muted-foreground">
+                              +{pedido.venta_detalles.length - 3} productos más...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </MainLayout>
