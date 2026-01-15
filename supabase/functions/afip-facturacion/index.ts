@@ -246,11 +246,24 @@ async function authenticateWSAA(service: string, modo: 'homologacion' | 'producc
   
   const { wsaaUrl } = getAfipUrls(modo);
   
-  const cert = Deno.env.get("AFIP_CERT") || "";
-  const privateKey = Deno.env.get("AFIP_PRIVATE_KEY") || "";
+  // Seleccionar certificados según el modo
+  let cert: string;
+  let privateKey: string;
   
-  if (!cert || !privateKey) {
-    throw new Error("Certificado o clave privada no configurados");
+  if (modo === 'produccion') {
+    cert = Deno.env.get("AFIP_CERT_PROD") || "";
+    privateKey = Deno.env.get("AFIP_PRIVATE_KEY_PROD") || "";
+    
+    if (!cert || !privateKey) {
+      throw new Error("Certificados de PRODUCCIÓN no configurados. Configure AFIP_CERT_PROD y AFIP_PRIVATE_KEY_PROD en los secretos.");
+    }
+  } else {
+    cert = Deno.env.get("AFIP_CERT") || "";
+    privateKey = Deno.env.get("AFIP_PRIVATE_KEY") || "";
+    
+    if (!cert || !privateKey) {
+      throw new Error("Certificados de HOMOLOGACIÓN no configurados. Configure AFIP_CERT y AFIP_PRIVATE_KEY en los secretos.");
+    }
   }
 
   const tra = generateTRA(service);
