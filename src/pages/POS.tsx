@@ -225,6 +225,7 @@ export default function POS() {
   const [selectedTarjeta, setSelectedTarjeta] = useState<string | null>(null);
   const [selectedCuotas, setSelectedCuotas] = useState<number>(1);
   const [montoTarjeta, setMontoTarjeta] = useState('');
+  const [tipoTarjetaFiltro, setTipoTarjetaFiltro] = useState<'credito' | 'debito' | null>(null);
   
   // Pago efectivo
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
@@ -631,9 +632,36 @@ export default function POS() {
       return;
     }
     
-    // Si es débito o crédito, abrir diálogo de tarjeta
-    if (fpNombre.includes('débito') || fpNombre.includes('debito') || fpNombre.includes('crédito') || fpNombre.includes('credito') || fpNombre.includes('tarjeta')) {
+    // Si es débito, abrir diálogo de tarjeta con filtro débito
+    if (fpNombre.includes('débito') || fpNombre.includes('debito')) {
       setSelectedFormaPago(formaPagoId);
+      setTipoTarjetaFiltro('debito');
+      setSelectedTarjeta(null);
+      setSelectedCuotas(1);
+      const pendiente = total - totalPagado;
+      setMontoTarjeta(pendiente.toString());
+      setTarjetaDialogOpen(true);
+      return;
+    }
+    
+    // Si es crédito, abrir diálogo de tarjeta con filtro crédito
+    if (fpNombre.includes('crédito') || fpNombre.includes('credito')) {
+      setSelectedFormaPago(formaPagoId);
+      setTipoTarjetaFiltro('credito');
+      setSelectedTarjeta(null);
+      setSelectedCuotas(1);
+      const pendiente = total - totalPagado;
+      setMontoTarjeta(pendiente.toString());
+      setTarjetaDialogOpen(true);
+      return;
+    }
+    
+    // Si es tarjeta genérica, mostrar todas
+    if (fpNombre.includes('tarjeta')) {
+      setSelectedFormaPago(formaPagoId);
+      setTipoTarjetaFiltro(null);
+      setSelectedTarjeta(null);
+      setSelectedCuotas(1);
       const pendiente = total - totalPagado;
       setMontoTarjeta(pendiente.toString());
       setTarjetaDialogOpen(true);
@@ -1674,7 +1702,9 @@ export default function POS() {
       <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pago con Tarjeta</DialogTitle>
+            <DialogTitle>
+              Pago con Tarjeta {tipoTarjetaFiltro === 'debito' ? 'de Débito' : tipoTarjetaFiltro === 'credito' ? 'de Crédito' : ''}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1684,35 +1714,62 @@ export default function POS() {
                   <SelectValue placeholder="Seleccione una tarjeta" />
                 </SelectTrigger>
                 <SelectContent>
-                  {tarjetas.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.nombre} ({t.tipo === 'credito' ? 'Crédito' : 'Débito'})
-                    </SelectItem>
-                  ))}
+                  {tarjetas
+                    .filter((t) => !tipoTarjetaFiltro || t.tipo === tipoTarjetaFiltro)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nombre}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedTarjeta && tarjetas.find(t => t.id === selectedTarjeta)?.tipo === 'credito' && (
-              <div>
-                <Label>Cuotas</Label>
-                <Select value={selectedCuotas.toString()} onValueChange={(v) => setSelectedCuotas(parseInt(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tarjetaCuotas
-                      .filter(c => c.tarjeta_id === selectedTarjeta)
-                      .map((c) => (
+            {selectedTarjeta && (() => {
+              const tarjetaSeleccionada = tarjetas.find(t => t.id === selectedTarjeta);
+              const cuotasDisponibles = tarjetaCuotas.filter(c => c.tarjeta_id === selectedTarjeta);
+              
+              if (cuotasDisponibles.length === 0) return null;
+              
+              // Para débito, mostrar solo el coeficiente si existe
+              if (tarjetaSeleccionada?.tipo === 'debito') {
+                const cuotaConfig = cuotasDisponibles[0];
+                if (cuotaConfig && cuotaConfig.coeficiente > 1) {
+                  const monto = parseFloat(montoTarjeta.replace(',', '.')) || 0;
+                  return (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm">
+                        Interés: <span className="font-medium">+{((cuotaConfig.coeficiente - 1) * 100).toFixed(1)}%</span>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Total a cobrar: ${(monto * cuotaConfig.coeficiente).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }
+              
+              // Para crédito, mostrar selector de cuotas
+              return (
+                <div>
+                  <Label>Cuotas</Label>
+                  <Select value={selectedCuotas.toString()} onValueChange={(v) => setSelectedCuotas(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cuotasDisponibles.map((c) => (
                         <SelectItem key={c.cuotas} value={c.cuotas.toString()}>
                           {c.cuotas} cuota{c.cuotas > 1 ? 's' : ''} 
                           {c.coeficiente > 1 && ` (+${((c.coeficiente - 1) * 100).toFixed(1)}%)`}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })()}
 
             <div>
               <Label>Monto</Label>
@@ -1722,7 +1779,7 @@ export default function POS() {
                 onChange={(e) => setMontoTarjeta(e.target.value)}
                 placeholder="0.00"
               />
-              {selectedTarjeta && selectedCuotas > 1 && (
+              {selectedTarjeta && tarjetas.find(t => t.id === selectedTarjeta)?.tipo === 'credito' && selectedCuotas > 0 && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {(() => {
                     const cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta && c.cuotas === selectedCuotas);
