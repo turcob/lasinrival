@@ -16,6 +16,8 @@ import Cajas from "./pages/Cajas";
 import POS from "./pages/POS";
 import Ventas from "./pages/Ventas";
 import ListasPrecios from "./pages/ListasPrecios";
+import Marcas from "./pages/Marcas";
+import TiposProducto from "./pages/TiposProducto";
 import Facturacion from "./pages/Facturacion";
 import Configuracion from "./pages/Configuracion";
 import NotFound from "./pages/NotFound";
@@ -48,6 +50,8 @@ function AppRoutes() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
       <Route path="/listas-precios" element={<ProtectedRoute><ListasPrecios /></ProtectedRoute>} />
+      <Route path="/marcas" element={<ProtectedRoute><Marcas /></ProtectedRoute>} />
+      <Route path="/tipos-producto" element={<ProtectedRoute><TiposProducto /></ProtectedRoute>} />
       <Route path="/categorias" element={<ProtectedRoute><Categorias /></ProtectedRoute>} />
       <Route path="/subcategorias" element={<ProtectedRoute><Subcategorias /></ProtectedRoute>} />
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
