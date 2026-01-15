@@ -1382,12 +1382,13 @@ export default function POS() {
                     <p className="text-sm">Busque productos para agregar</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {cart.map((item) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
+                      const maxDescuento = getDescuentoMaximo();
                       
                       return (
                         <div
@@ -1395,14 +1396,14 @@ export default function POS() {
                           className="p-3 bg-muted/50 rounded-lg border"
                         >
                           {/* Header: Nombre y badges */}
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium">{nombreProducto}</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                              <p className="font-medium truncate">{nombreProducto}</p>
                               {item.es_temporal && (
-                                <Badge variant="secondary" className="text-xs">Libre</Badge>
+                                <Badge variant="secondary" className="text-xs shrink-0">Libre</Badge>
                               )}
                               {esPorPeso && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs shrink-0">
                                   <Scale className="h-3 w-3 mr-1" />
                                   KG
                                 </Badge>
@@ -1411,120 +1412,118 @@ export default function POS() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-6 w-6 text-destructive shrink-0"
+                              className="h-6 w-6 text-destructive shrink-0 ml-2"
                               onClick={() => removeFromCart(item.id)}
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                           
-                          {/* Detalles del item */}
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-2">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Precio unit.:</span>
-                              <span>${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Cantidad:</span>
-                              <span>{esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) + ' kg' : item.cantidad}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Subtotal:</span>
-                              <span>${totalSinDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            {item.descuento_porcentaje > 0 && (
-                              <div className="flex justify-between text-destructive">
-                                <span>Desc. ({item.descuento_porcentaje}%):</span>
-                                <span>-${montoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Total final del item */}
-                          <div className="flex justify-between items-center pt-2 border-t border-border/50">
-                            <span className="font-medium text-sm">Total:</span>
-                            <span className="font-bold text-primary">
-                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                          
-                          {/* Controles */}
-                          <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-border/50">
-                            {/* Botón descuento */}
-                            {getDescuentoMaximo() > 0 && (
-                              <Button
-                                size="sm"
-                                variant={item.descuento_porcentaje > 0 ? "secondary" : "outline"}
-                                className="h-7 text-xs"
-                                onClick={() => {
-                                  setEditingDescuentoItem(item.id);
-                                  setDescuentoInput(item.descuento_porcentaje.toString());
-                                  setDescuentoDialogOpen(true);
-                                }}
-                              >
-                                <Percent className="h-3 w-3 mr-1" />
-                                {item.descuento_porcentaje > 0 ? `${item.descuento_porcentaje}%` : 'Descuento'}
-                              </Button>
-                            )}
+                          {/* Tabla de columnas */}
+                          <div className="grid grid-cols-6 gap-1 text-xs">
+                            {/* Headers */}
+                            <div className="text-muted-foreground font-medium text-center">P.Unit</div>
+                            <div className="text-muted-foreground font-medium text-center">Cant.</div>
+                            <div className="text-muted-foreground font-medium text-center">Subtotal</div>
+                            <div className="text-muted-foreground font-medium text-center">Desc.%</div>
+                            <div className="text-muted-foreground font-medium text-center">Desc.$</div>
+                            <div className="text-muted-foreground font-medium text-center">Total</div>
                             
-                            {esPorPeso ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                onClick={() => {
-                                  setEditingPesoItem(item.id);
-                                  setPesoInput(item.cantidad.toString().replace('.', ','));
-                                  setPesoDialogOpen(true);
+                            {/* Values */}
+                            <div className="text-center py-1">
+                              ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-center py-1">
+                              <Input
+                                type="text"
+                                inputMode={esPorPeso ? "decimal" : "numeric"}
+                                className="h-6 w-full text-center text-xs p-1 text-foreground"
+                                value={editingCantidadItem === item.id ? cantidadInput : (esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) : item.cantidad.toString())}
+                                onFocus={() => {
+                                  setEditingCantidadItem(item.id);
+                                  setCantidadInput(esPorPeso ? item.cantidad.toString().replace('.', ',') : item.cantidad.toString());
                                 }}
-                              >
-                                <Scale className="h-3 w-3 mr-1" />
-                                Cambiar peso
-                              </Button>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-7 w-7"
-                                  onClick={() => updateQuantity(item.id, -1)}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  className="h-7 w-10 px-0 font-medium text-sm"
-                                  onClick={() => {
-                                    setEditingCantidadItem(item.id);
-                                    setCantidadInput(item.cantidad.toString());
+                                onChange={(e) => setCantidadInput(e.target.value)}
+                                onBlur={() => {
+                                  if (editingCantidadItem === item.id) {
+                                    const cantidadNormalizada = cantidadInput.replace(',', '.');
+                                    const cantidad = parseFloat(cantidadNormalizada);
+                                    if (!isNaN(cantidad) && cantidad > 0) {
+                                      updateCantidadDirecta(item.id, cantidad);
+                                    }
+                                    setEditingCantidadItem(null);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const cantidadNormalizada = cantidadInput.replace(',', '.');
+                                    const cantidad = parseFloat(cantidadNormalizada);
+                                    if (!isNaN(cantidad) && cantidad > 0) {
+                                      updateCantidadDirecta(item.id, cantidad);
+                                    }
+                                    setEditingCantidadItem(null);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingCantidadItem(null);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="text-center py-1">
+                              ${totalSinDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-center py-1">
+                              {maxDescuento > 0 ? (
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  className="h-6 w-full text-center text-xs p-1 text-foreground"
+                                  value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
+                                  onFocus={() => {
+                                    setEditingDescuentoItem(item.id);
+                                    setDescuentoInput(item.descuento_porcentaje.toString());
                                   }}
-                                >
-                                  {editingCantidadItem === item.id ? (
-                                    <Input
-                                      className="h-5 w-8 text-center p-0 text-foreground text-sm"
-                                      value={cantidadInput}
-                                      onChange={(e) => setCantidadInput(e.target.value)}
-                                      onBlur={handleGuardarCantidad}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleGuardarCantidad();
-                                        if (e.key === 'Escape') setEditingCantidadItem(null);
-                                      }}
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    item.cantidad
-                                  )}
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-7 w-7"
-                                  onClick={() => updateQuantity(item.id, 1)}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
+                                  onChange={(e) => setDescuentoInput(e.target.value)}
+                                  onBlur={() => {
+                                    if (editingDescuentoItem === item.id) {
+                                      const descuento = parseFloat(descuentoInput.replace(',', '.'));
+                                      if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
+                                        updateDescuento(item.id, descuento);
+                                      } else if (descuento > maxDescuento) {
+                                        toast.error(`Máximo permitido: ${maxDescuento}%`);
+                                      }
+                                      setEditingDescuentoItem(null);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const descuento = parseFloat(descuentoInput.replace(',', '.'));
+                                      if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
+                                        updateDescuento(item.id, descuento);
+                                      } else if (descuento > maxDescuento) {
+                                        toast.error(`Máximo permitido: ${maxDescuento}%`);
+                                      }
+                                      setEditingDescuentoItem(null);
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setEditingDescuentoItem(null);
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
+                            <div className="text-center py-1 text-destructive">
+                              {montoDescuento > 0 ? `-$${montoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
+                            </div>
+                            <div className="text-center py-1 font-bold text-primary">
+                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </div>
                           </div>
                         </div>
                       );
