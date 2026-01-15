@@ -368,7 +368,8 @@ export default function POS() {
 
       if (editingPedidoId) {
         // Actualizar pedido existente a venta confirmada
-        const { error: updateError } = await supabase
+        console.log('Actualizando pedido:', editingPedidoId);
+        const { error: updateError, count } = await supabase
           .from('ventas')
           .update({
             cliente_id: selectedCliente?.id || null,
@@ -379,6 +380,7 @@ export default function POS() {
           })
           .eq('id', editingPedidoId);
 
+        console.log('Update result:', { updateError, count });
         if (updateError) throw updateError;
         
         // Fetch the updated venta
@@ -387,7 +389,8 @@ export default function POS() {
           .select('*')
           .eq('id', editingPedidoId)
           .single();
-          
+        
+        console.log('Fetch result:', { updatedVenta, fetchError });
         if (fetchError) throw fetchError;
         venta = updatedVenta;
 
