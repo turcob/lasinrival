@@ -812,6 +812,7 @@ export type Database = {
           cliente_id: string | null
           created_at: string | null
           descuento: number | null
+          estado: string
           fecha: string | null
           fecha_anulacion: string | null
           id: string
@@ -828,6 +829,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string | null
           descuento?: number | null
+          estado?: string
           fecha?: string | null
           fecha_anulacion?: string | null
           id?: string
@@ -844,6 +846,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string | null
           descuento?: number | null
+          estado?: string
           fecha?: string | null
           fecha_anulacion?: string | null
           id?: string
