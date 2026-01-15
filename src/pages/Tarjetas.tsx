@@ -412,38 +412,109 @@ export default function Tarjetas() {
               Tarjetas de Débito
             </CardTitle>
             <CardDescription>
-              Configuración de tarjetas de débito
+              Configuración de tarjetas de débito y coeficientes
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {tarjetasDebito.length === 0 ? (
               <p className="text-muted-foreground text-sm">No hay tarjetas de débito configuradas</p>
             ) : (
-              tarjetasDebito.map((tarjeta) => (
-                <div key={tarjeta.id} className="border rounded-lg p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={tarjeta.activo}
-                      onCheckedChange={() => handleToggleActivo(tarjeta)}
-                      disabled={!isAdmin}
-                    />
-                    <span className={tarjeta.activo ? '' : 'text-muted-foreground line-through'}>
-                      {tarjeta.nombre}
-                    </span>
-                    <Badge variant="secondary">Débito</Badge>
-                  </div>
-                  {isAdmin && (
-                    <div className="flex items-center gap-2">
-                      <Button size="icon" variant="ghost" onClick={() => handleOpenDialog(tarjeta)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDeleteTarjeta(tarjeta.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              tarjetasDebito.map((tarjeta) => {
+                const tarjetaCuotas = cuotas.filter(c => c.tarjeta_id === tarjeta.id);
+                const isExpanded = expandedCards.has(tarjeta.id);
+                
+                return (
+                  <Collapsible key={tarjeta.id} open={isExpanded} onOpenChange={() => toggleExpand(tarjeta.id)}>
+                    <div className="border rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={tarjeta.activo}
+                            onCheckedChange={() => handleToggleActivo(tarjeta)}
+                            disabled={!isAdmin}
+                          />
+                          <span className={tarjeta.activo ? '' : 'text-muted-foreground line-through'}>
+                            {tarjeta.nombre}
+                          </span>
+                          <Badge variant="secondary">Débito</Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isAdmin && (
+                            <>
+                              <Button size="icon" variant="ghost" onClick={() => handleOpenDialog(tarjeta)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleDeleteTarjeta(tarjeta.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <CollapsibleTrigger asChild>
+                            <Button size="icon" variant="ghost">
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          </CollapsibleTrigger>
+                        </div>
+                      </div>
+                      
+                      <CollapsibleContent>
+                        <Separator className="my-3" />
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">Coeficiente de Interés</span>
+                            {isAdmin && tarjetaCuotas.length === 0 && (
+                              <Button size="sm" variant="outline" onClick={() => handleOpenCuotaDialog(tarjeta.id)}>
+                                <Plus className="h-3 w-3 mr-1" />
+                                Agregar
+                              </Button>
+                            )}
+                          </div>
+                          {tarjetaCuotas.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">Sin coeficiente configurado (1.00 por defecto)</p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              {tarjetaCuotas.map((cuota) => (
+                                <div 
+                                  key={cuota.id} 
+                                  className="text-xs border rounded p-2 flex items-center justify-between group"
+                                >
+                                  <div>
+                                    <span className="font-medium">Coeficiente</span>
+                                    <div className="text-muted-foreground flex items-center gap-1">
+                                      <Percent className="h-3 w-3" />
+                                      {((cuota.coeficiente - 1) * 100).toFixed(1)}%
+                                    </div>
+                                  </div>
+                                  {isAdmin && (
+                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-6 w-6"
+                                        onClick={() => handleOpenCuotaDialog(tarjeta.id, cuota)}
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-6 w-6"
+                                        onClick={() => handleDeleteCuota(cuota.id)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                  )}
-                </div>
-              ))
+                  </Collapsible>
+                );
+              })
             )}
           </CardContent>
         </Card>
