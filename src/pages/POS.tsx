@@ -1521,7 +1521,7 @@ export default function POS() {
                             <div className="text-center py-1 text-destructive">
                               {montoDescuento > 0 ? `-$${montoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
                             </div>
-                            <div className="text-center py-1 font-bold text-primary">
+                            <div className="text-center py-1 font-bold text-primary text-sm">
                               ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </div>
                           </div>
