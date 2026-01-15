@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Shield } from 'lucide-react';
+import { Save, Shield, Percent } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
 
 type AppRole = 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito';
 type AppPermission = 'ver' | 'crear' | 'editar' | 'eliminar' | 'anular' | 'exportar';
@@ -77,30 +79,56 @@ export default function Roles() {
   const isAdmin = hasRole('admin');
   
   const [permissions, setPermissions] = useState<RolePermission[]>([]);
+  const [discountLimits, setDiscountLimits] = useState<Record<string, number>>({});
+  const [pendingDiscountChanges, setPendingDiscountChanges] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedRole, setSelectedRole] = useState<AppRole>('encargado');
   const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
-    fetchPermissions();
+    fetchData();
   }, []);
 
-  const fetchPermissions = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('role_permissions')
-        .select('*')
-        .order('role, modulo, permiso');
+      const [permissionsRes, discountsRes] = await Promise.all([
+        supabase.from('role_permissions').select('*').order('role, modulo, permiso'),
+        supabase.from('configuracion_descuentos').select('role, descuento_maximo_global')
+      ]);
 
-      if (error) throw error;
-      setPermissions(data || []);
+      if (permissionsRes.error) throw permissionsRes.error;
+      setPermissions(permissionsRes.data || []);
+
+      if (discountsRes.data) {
+        const limits: Record<string, number> = {};
+        discountsRes.data.forEach(d => {
+          limits[d.role] = d.descuento_maximo_global;
+        });
+        setDiscountLimits(limits);
+      }
     } catch (error) {
-      console.error('Error fetching permissions:', error);
-      toast.error('Error al cargar los permisos');
+      console.error('Error fetching data:', error);
+      toast.error('Error al cargar los datos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getDiscountLimit = (role: AppRole): number => {
+    if (pendingDiscountChanges[role] !== undefined) {
+      return pendingDiscountChanges[role];
+    }
+    return discountLimits[role] ?? 0;
+  };
+
+  const handleDiscountLimitChange = (role: AppRole, value: string) => {
+    const numValue = parseFloat(value.replace(',', '.'));
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+      setPendingDiscountChanges(prev => ({ ...prev, [role]: numValue }));
+    } else if (value === '') {
+      setPendingDiscountChanges(prev => ({ ...prev, [role]: 0 }));
     }
   };
 
@@ -125,13 +153,17 @@ export default function Roles() {
   };
 
   const handleSaveChanges = async () => {
-    if (pendingChanges.size === 0) {
+    const hasPermissionChanges = pendingChanges.size > 0;
+    const hasDiscountChanges = Object.keys(pendingDiscountChanges).length > 0;
+
+    if (!hasPermissionChanges && !hasDiscountChanges) {
       toast.info('No hay cambios pendientes');
       return;
     }
 
     setSaving(true);
     try {
+      // Save permission changes
       for (const [key, shouldHave] of pendingChanges.entries()) {
         const [role, modulo, permiso] = key.split('-') as [AppRole, string, AppPermission];
         const existing = permissions.find(
@@ -139,13 +171,11 @@ export default function Roles() {
         );
 
         if (shouldHave && !existing) {
-          // Add permission
           const { error } = await supabase
             .from('role_permissions')
             .insert({ role, modulo, permiso });
           if (error) throw error;
         } else if (!shouldHave && existing) {
-          // Remove permission
           const { error } = await supabase
             .from('role_permissions')
             .delete()
@@ -154,12 +184,35 @@ export default function Roles() {
         }
       }
 
-      toast.success('Permisos actualizados correctamente');
+      // Save discount limit changes
+      for (const [role, limit] of Object.entries(pendingDiscountChanges)) {
+        const { data: existing } = await supabase
+          .from('configuracion_descuentos')
+          .select('id')
+          .eq('role', role)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase
+            .from('configuracion_descuentos')
+            .update({ descuento_maximo_global: limit })
+            .eq('role', role);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('configuracion_descuentos')
+            .insert({ role, descuento_maximo_global: limit });
+          if (error) throw error;
+        }
+      }
+
+      toast.success('Cambios guardados correctamente');
       setPendingChanges(new Map());
-      await fetchPermissions();
+      setPendingDiscountChanges({});
+      await fetchData();
     } catch (error) {
-      console.error('Error saving permissions:', error);
-      toast.error('Error al guardar los permisos');
+      console.error('Error saving changes:', error);
+      toast.error('Error al guardar los cambios');
     } finally {
       setSaving(false);
     }
@@ -198,11 +251,11 @@ export default function Roles() {
 
   return (
     <MainLayout>
-      <PageHeader title="Roles y Permisos" description="Gestión de permisos por rol">
-        {pendingChanges.size > 0 && (
+      <PageHeader title="Roles y Permisos" description="Gestión de permisos y descuentos por rol">
+        {(pendingChanges.size > 0 || Object.keys(pendingDiscountChanges).length > 0) && (
           <Button onClick={handleSaveChanges} disabled={saving}>
             <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Guardando...' : `Guardar (${pendingChanges.size} cambios)`}
+            {saving ? 'Guardando...' : `Guardar (${pendingChanges.size + Object.keys(pendingDiscountChanges).length} cambios)`}
           </Button>
         )}
       </PageHeader>
@@ -223,6 +276,7 @@ export default function Roles() {
 
           {allRoles.filter(r => r !== 'admin').map((role) => (
             <TabsContent key={role} value={role}>
+              {/* Card de configuración del rol */}
               <Card className="mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -230,6 +284,30 @@ export default function Roles() {
                   </CardTitle>
                   <CardDescription>{roleDescriptions[role]}</CardDescription>
                 </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Percent className="h-4 w-4 text-muted-foreground" />
+                      <Label htmlFor={`discount-${role}`} className="text-sm font-medium">
+                        Descuento máximo permitido:
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id={`discount-${role}`}
+                        type="text"
+                        inputMode="decimal"
+                        className="w-20 text-center"
+                        value={pendingDiscountChanges[role] !== undefined ? pendingDiscountChanges[role].toString() : (discountLimits[role]?.toString() ?? '0')}
+                        onChange={(e) => handleDiscountLimitChange(role, e.target.value)}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    {pendingDiscountChanges[role] !== undefined && (
+                      <Badge variant="secondary" className="text-xs">Modificado</Badge>
+                    )}
+                  </div>
+                </CardContent>
               </Card>
 
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
