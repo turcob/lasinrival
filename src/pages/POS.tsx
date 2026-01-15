@@ -595,6 +595,7 @@ export default function POS() {
       
       toast.success('Venta procesada correctamente');
       fetchData(); // Refresh stock
+      fetchPedidos(); // Refresh pending orders list
     } catch (error) {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
