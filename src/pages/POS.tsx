@@ -18,7 +18,8 @@ import {
   FileText,
   ClipboardList,
   Edit,
-  Check
+  Check,
+  Scale
 } from 'lucide-react';
 import {
   Dialog,
@@ -163,6 +164,11 @@ export default function POS() {
   const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
   const [guardandoPedido, setGuardandoPedido] = useState(false);
+  
+  // Peso para productos por KG
+  const [pesoDialogOpen, setPesoDialogOpen] = useState(false);
+  const [editingPesoItem, setEditingPesoItem] = useState<string | null>(null);
+  const [pesoInput, setPesoInput] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -261,6 +267,12 @@ export default function POS() {
     return costo; // Sin margen si no hay configuración
   };
 
+  // Función para verificar si un producto es por peso
+  const isProductoPorPeso = (producto: Producto) => {
+    const unidad = (producto.unidad_medida || '').toUpperCase().replace('.', '').trim();
+    return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
+  };
+
   const addToCart = (producto: Producto) => {
     const precio = getProductoPrice(producto);
     
@@ -272,15 +284,66 @@ export default function POS() {
     setCart((prev) => {
       const existing = prev.find((item) => item.producto.id === producto.id);
       if (existing) {
+        // Para productos por peso, abrir diálogo en lugar de sumar 1
+        if (isProductoPorPeso(producto)) {
+          setEditingPesoItem(producto.id);
+          setPesoInput(existing.cantidad.toString().replace('.', ','));
+          setPesoDialogOpen(true);
+          return prev;
+        }
         return prev.map((item) =>
           item.producto.id === producto.id
             ? { ...item, cantidad: item.cantidad + 1, subtotal: (item.cantidad + 1) * item.precio }
             : item
         );
       }
+      // Para productos por peso, agregamos con cantidad 1 y abrimos diálogo para ajustar
+      if (isProductoPorPeso(producto)) {
+        const newCart = [...prev, { producto, cantidad: 1, precio, subtotal: precio }];
+        // Programamos la apertura del diálogo para después de actualizar el estado
+        setTimeout(() => {
+          setEditingPesoItem(producto.id);
+          setPesoInput('1');
+          setPesoDialogOpen(true);
+        }, 0);
+        return newCart;
+      }
       return [...prev, { producto, cantidad: 1, precio, subtotal: precio }];
     });
     setSearchTerm('');
+  };
+
+  const updateCantidadDirecta = (productoId: string, nuevaCantidad: number) => {
+    if (nuevaCantidad <= 0) {
+      removeFromCart(productoId);
+      return;
+    }
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.producto.id === productoId) {
+          return { ...item, cantidad: nuevaCantidad, subtotal: nuevaCantidad * item.precio };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleGuardarPeso = () => {
+    if (!editingPesoItem) return;
+    
+    // Permitir coma o punto como separador decimal
+    const pesoNormalizado = pesoInput.replace(',', '.');
+    const peso = parseFloat(pesoNormalizado);
+    
+    if (isNaN(peso) || peso <= 0) {
+      toast.error('Ingrese un peso válido');
+      return;
+    }
+    
+    updateCantidadDirecta(editingPesoItem, peso);
+    setPesoDialogOpen(false);
+    setEditingPesoItem(null);
+    setPesoInput('');
   };
 
   const updateQuantity = (productoId: string, delta: number) => {
@@ -951,49 +1014,78 @@ export default function POS() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {cart.map((item) => (
-                      <div
-                        key={item.producto.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium">{item.producto.descripcion}</p>
-                          <p className="text-sm text-muted-foreground">
-                            ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })} x {item.cantidad}
-                          </p>
+                    {cart.map((item) => {
+                      const esPorPeso = isProductoPorPeso(item.producto);
+                      return (
+                        <div
+                          key={item.producto.id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{item.producto.descripcion}</p>
+                              {esPorPeso && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Scale className="h-3 w-3 mr-1" />
+                                  KG
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })} x {esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) + ' kg' : item.cantidad}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {esPorPeso ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3"
+                                onClick={() => {
+                                  setEditingPesoItem(item.producto.id);
+                                  setPesoInput(item.cantidad.toString().replace('.', ','));
+                                  setPesoDialogOpen(true);
+                                }}
+                              >
+                                <Scale className="h-4 w-4 mr-1" />
+                                {item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 })} kg
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-8 w-8"
+                                  onClick={() => updateQuantity(item.producto.id, -1)}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="w-8 text-center font-medium">{item.cantidad}</span>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-8 w-8"
+                                  onClick={() => updateQuantity(item.producto.id, 1)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            <span className="w-24 text-right font-bold">
+                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => removeFromCart(item.producto.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(item.producto.id, -1)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-8 text-center font-medium">{item.cantidad}</span>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(item.producto.id, 1)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-24 text-right font-bold">
-                            ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => removeFromCart(item.producto.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </ScrollArea>
@@ -1626,6 +1718,81 @@ export default function POS() {
               </div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog para ingresar peso */}
+      <Dialog open={pesoDialogOpen} onOpenChange={setPesoDialogOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5" />
+              Ingresar Peso
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editingPesoItem && (
+              <p className="text-sm text-muted-foreground">
+                {cart.find(i => i.producto.id === editingPesoItem)?.producto.descripcion}
+              </p>
+            )}
+            <div>
+              <Label htmlFor="peso">Peso en kilogramos</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  id="peso"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ej: 2,345"
+                  value={pesoInput}
+                  onChange={(e) => setPesoInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGuardarPeso();
+                    }
+                  }}
+                  autoFocus
+                  className="text-lg"
+                />
+                <span className="text-muted-foreground font-medium">kg</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use coma o punto como separador decimal
+              </p>
+            </div>
+            {editingPesoItem && pesoInput && (
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Precio por kg:</span>
+                  <span>${cart.find(i => i.producto.id === editingPesoItem)?.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between font-bold mt-1">
+                  <span>Subtotal:</span>
+                  <span>
+                    ${(
+                      (cart.find(i => i.producto.id === editingPesoItem)?.precio || 0) * 
+                      parseFloat(pesoInput.replace(',', '.') || '0')
+                    ).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setPesoDialogOpen(false);
+                  setEditingPesoItem(null);
+                  setPesoInput('');
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleGuardarPeso}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </MainLayout>
