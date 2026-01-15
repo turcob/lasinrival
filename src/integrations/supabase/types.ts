@@ -673,7 +673,9 @@ export type Database = {
           codigo_articulo: string
           codigo_barra: string | null
           created_at: string | null
+          desactivado_por: string | null
           descripcion: string
+          fecha_desactivacion: string | null
           id: string
           marca_id: string | null
           precio_costo: number
@@ -691,7 +693,9 @@ export type Database = {
           codigo_articulo: string
           codigo_barra?: string | null
           created_at?: string | null
+          desactivado_por?: string | null
           descripcion: string
+          fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
           precio_costo?: number
@@ -709,7 +713,9 @@ export type Database = {
           codigo_articulo?: string
           codigo_barra?: string | null
           created_at?: string | null
+          desactivado_por?: string | null
           descripcion?: string
+          fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
           precio_costo?: number
