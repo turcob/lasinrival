@@ -292,6 +292,10 @@ export default function ListasPrecios() {
       
       const nuevoPorcentajes = Array.from(porcentajesMap.values());
       
+      console.log('Columnas activas:', columnasActivas);
+      console.log('Listas:', listas);
+      console.log('Datos a insertar:', nuevoPorcentajes);
+      
       if (nuevoPorcentajes.length > 0) {
         const { error } = await supabase.from('lista_precio_porcentajes').insert(nuevoPorcentajes);
         if (error) throw error;
