@@ -80,7 +80,7 @@ export default function Tarjetas() {
   
   const [cuotaFormData, setCuotaFormData] = useState({
     cuotas: 1,
-    coeficiente: 1,
+    interes: 0, // Porcentaje de interés (ej: 5 para 5%)
   });
 
   const isAdmin = hasRole('admin');
@@ -126,11 +126,11 @@ export default function Tarjetas() {
       setEditingCuota(cuota);
       setCuotaFormData({
         cuotas: cuota.cuotas,
-        coeficiente: cuota.coeficiente,
+        interes: (cuota.coeficiente - 1) * 100, // Convertir coeficiente a porcentaje
       });
     } else {
       setEditingCuota(null);
-      setCuotaFormData({ cuotas: 1, coeficiente: 1 });
+      setCuotaFormData({ cuotas: 1, interes: 0 });
     }
     setCuotaDialogOpen(true);
   };
@@ -170,10 +170,13 @@ export default function Tarjetas() {
       toast.error('Las cuotas deben ser al menos 1');
       return;
     }
-    if (cuotaFormData.coeficiente < 1) {
-      toast.error('El coeficiente debe ser al menos 1');
+    if (cuotaFormData.interes < 0) {
+      toast.error('El interés no puede ser negativo');
       return;
     }
+
+    // Convertir porcentaje a coeficiente (5% -> 1.05)
+    const coeficiente = 1 + (cuotaFormData.interes / 100);
 
     try {
       if (editingCuota) {
@@ -181,21 +184,21 @@ export default function Tarjetas() {
           .from('tarjeta_cuotas')
           .update({ 
             cuotas: cuotaFormData.cuotas, 
-            coeficiente: cuotaFormData.coeficiente 
+            coeficiente: coeficiente 
           })
           .eq('id', editingCuota.id);
         if (error) throw error;
-        toast.success('Cuota actualizada');
+        toast.success('Configuración actualizada');
       } else {
         const { error } = await supabase
           .from('tarjeta_cuotas')
           .insert({ 
             tarjeta_id: selectedTarjetaId,
             cuotas: cuotaFormData.cuotas, 
-            coeficiente: cuotaFormData.coeficiente 
+            coeficiente: coeficiente 
           });
         if (error) throw error;
-        toast.success('Cuota creada');
+        toast.success('Configuración creada');
       }
       setCuotaDialogOpen(false);
       fetchData();
@@ -577,18 +580,19 @@ export default function Tarjetas() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="coeficiente">Coeficiente</Label>
+              <Label htmlFor="interes">Interés (%)</Label>
               <Input
-                id="coeficiente"
+                id="interes"
                 type="number"
-                step="0.01"
-                min={1}
-                value={cuotaFormData.coeficiente}
-                onChange={(e) => setCuotaFormData({ ...cuotaFormData, coeficiente: parseFloat(e.target.value) || 1 })}
+                step="0.1"
+                min={0}
+                value={cuotaFormData.interes}
+                onChange={(e) => setCuotaFormData({ ...cuotaFormData, interes: parseFloat(e.target.value) || 0 })}
+                placeholder="Ej: 5 para 5%"
               />
               <p className="text-xs text-muted-foreground">
-                Interés: {((cuotaFormData.coeficiente - 1) * 100).toFixed(1)}% 
-                {cuotaFormData.coeficiente > 1 && ` (Ej: $1000 → $${(1000 * cuotaFormData.coeficiente).toFixed(0)})`}
+                Coeficiente: {(1 + cuotaFormData.interes / 100).toFixed(4)}
+                {cuotaFormData.interes > 0 && ` (Ej: $1000 → $${(1000 * (1 + cuotaFormData.interes / 100)).toFixed(0)})`}
               </p>
             </div>
           </div>
