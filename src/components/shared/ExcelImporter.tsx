@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 interface ImportResult {
   success: number;
+  updated: number;
   errors: { row: number; message: string }[];
 }
 
@@ -27,6 +28,8 @@ export function ExcelImporter() {
     categorias: ImportResult;
     subcategorias: ImportResult;
     productos: ImportResult;
+    marcas: ImportResult;
+    tiposProducto: ImportResult;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,9 +46,11 @@ export function ExcelImporter() {
       const workbook = XLSX.read(data, { type: 'array' });
 
       const importResults = {
-        categorias: { success: 0, errors: [] as { row: number; message: string }[] },
-        subcategorias: { success: 0, errors: [] as { row: number; message: string }[] },
-        productos: { success: 0, errors: [] as { row: number; message: string }[] },
+        categorias: { success: 0, updated: 0, errors: [] as { row: number; message: string }[] },
+        subcategorias: { success: 0, updated: 0, errors: [] as { row: number; message: string }[] },
+        productos: { success: 0, updated: 0, errors: [] as { row: number; message: string }[] },
+        marcas: { success: 0, updated: 0, errors: [] as { row: number; message: string }[] },
+        tiposProducto: { success: 0, updated: 0, errors: [] as { row: number; message: string }[] },
       };
 
       // Find sheet (try different names)
@@ -62,17 +67,89 @@ export function ExcelImporter() {
       const totalRows = rows.length;
       const categoriasMap = new Map<string, string>();
       const subcategoriasMap = new Map<string, string>();
+      const marcasMap = new Map<string, string>();
+      const tiposProductoMap = new Map<string, string>();
 
       // Fetch existing data
-      const { data: existingCategorias } = await supabase.from('categorias').select('id, codigo_familia');
-      const { data: existingSubcategorias } = await supabase.from('subcategorias').select('id, codigo_grupo, categoria_id');
-      const { data: existingProductos } = await supabase.from('productos').select('id, codigo_articulo');
+      const [existingCategorias, existingSubcategorias, existingProductos, existingMarcas, existingTipos] = await Promise.all([
+        supabase.from('categorias').select('id, codigo_familia'),
+        supabase.from('subcategorias').select('id, codigo_grupo, categoria_id'),
+        supabase.from('productos').select('id, codigo_articulo'),
+        supabase.from('marcas').select('id, nombre'),
+        supabase.from('tipos_producto').select('id, nombre'),
+      ]);
 
-      existingCategorias?.forEach((c) => categoriasMap.set(c.codigo_familia, c.id));
-      existingSubcategorias?.forEach((s) => subcategoriasMap.set(`${s.categoria_id}-${s.codigo_grupo}`, s.id));
+      existingCategorias.data?.forEach((c) => categoriasMap.set(c.codigo_familia, c.id));
+      existingSubcategorias.data?.forEach((s) => subcategoriasMap.set(`${s.categoria_id}-${s.codigo_grupo}`, s.id));
+      existingMarcas.data?.forEach((m) => marcasMap.set(m.nombre.toUpperCase(), m.id));
+      existingTipos.data?.forEach((t) => tiposProductoMap.set(t.nombre.toUpperCase(), t.id));
 
       const productosMap = new Map<string, string>();
-      existingProductos?.forEach((p) => productosMap.set(p.codigo_articulo, p.id));
+      existingProductos.data?.forEach((p) => productosMap.set(p.codigo_articulo, p.id));
+
+      // First pass: collect unique marcas and tipos from Excel
+      const uniqueMarcas = new Set<string>();
+      const uniqueTipos = new Set<string>();
+
+      for (const row of rows) {
+        const marcaNombre = String(row['MARCA ID'] || row.MARCA || row.marca || '').trim().toUpperCase();
+        const tipoNombre = String(row.ID || row.TIPO || row.tipo_producto || '').trim().toUpperCase();
+        
+        if (marcaNombre && !marcasMap.has(marcaNombre)) {
+          uniqueMarcas.add(marcaNombre);
+        }
+        if (tipoNombre && !tiposProductoMap.has(tipoNombre)) {
+          uniqueTipos.add(tipoNombre);
+        }
+      }
+
+      // Create new marcas
+      for (const marcaNombre of uniqueMarcas) {
+        try {
+          const { data, error } = await supabase
+            .from('marcas')
+            .insert([{ nombre: marcaNombre }])
+            .select()
+            .single();
+
+          if (error) {
+            if (!error.message?.includes('duplicate')) {
+              importResults.marcas.errors.push({ row: 0, message: `Marca ${marcaNombre}: ${error.message}` });
+            }
+          } else {
+            marcasMap.set(marcaNombre, data.id);
+            importResults.marcas.success++;
+          }
+        } catch (error: any) {
+          if (!error.message?.includes('duplicate')) {
+            importResults.marcas.errors.push({ row: 0, message: error.message });
+          }
+        }
+      }
+
+      // Create new tipos de producto
+      for (const tipoNombre of uniqueTipos) {
+        try {
+          const { data, error } = await supabase
+            .from('tipos_producto')
+            .insert([{ nombre: tipoNombre }])
+            .select()
+            .single();
+
+          if (error) {
+            if (!error.message?.includes('duplicate')) {
+              importResults.tiposProducto.errors.push({ row: 0, message: `Tipo ${tipoNombre}: ${error.message}` });
+            }
+          } else {
+            tiposProductoMap.set(tipoNombre, data.id);
+            importResults.tiposProducto.success++;
+          }
+        } catch (error: any) {
+          if (!error.message?.includes('duplicate')) {
+            importResults.tiposProducto.errors.push({ row: 0, message: error.message });
+          }
+        }
+      }
 
       // Process rows
       for (let i = 0; i < rows.length; i++) {
@@ -87,8 +164,12 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        // PRECIO_1 es el precio de costo en el Excel de Las Inrival
         const precioCosto = parseFloat(row.PRECIO_1 || row.PRECIO_COSTO || row.precio_costo || row.COSTO || 0);
+        
+        // New columns
+        const marcaNombre = String(row['MARCA ID'] || row.MARCA || row.marca || '').trim().toUpperCase();
+        const tipoNombre = String(row.ID || row.TIPO || row.tipo_producto || '').trim().toUpperCase();
+        const cantidadPorEmpaque = parseInt(row['CANTIDAD POR EMPAQUE'] || row.CANT_EMPAQUE || row.cantidad_empaque || 1) || 1;
 
         // Import categoria
         if (codigoFamilia && nombreFamilia && !categoriasMap.has(codigoFamilia)) {
@@ -136,11 +217,16 @@ export function ExcelImporter() {
           }
         }
 
-        // Import producto
+        // Get marca_id and tipo_producto_id
+        const marcaId = marcaNombre ? marcasMap.get(marcaNombre) : null;
+        const tipoProductoId = tipoNombre ? tiposProductoMap.get(tipoNombre) : null;
+
+        // Import or update producto
         if (codigoArticulo && descripcion) {
           const subcategoriaId = categoriaId ? subcategoriasMap.get(`${categoriaId}-${codigoGrupo}`) : null;
 
           if (!productosMap.has(codigoArticulo)) {
+            // Create new product
             try {
               const { data, error } = await supabase
                 .from('productos')
@@ -151,6 +237,9 @@ export function ExcelImporter() {
                   categoria_id: categoriaId || null,
                   subcategoria_id: subcategoriaId || null,
                   precio_costo: precioCosto,
+                  marca_id: marcaId || null,
+                  tipo_producto_id: tipoProductoId || null,
+                  cantidad_por_empaque: cantidadPorEmpaque,
                 }])
                 .select()
                 .single();
@@ -164,13 +253,25 @@ export function ExcelImporter() {
               }
             }
           } else {
-            // Update existing product with precio_costo if provided
-            if (precioCosto > 0) {
-              const productoId = productosMap.get(codigoArticulo)!;
-              await supabase
-                .from('productos')
-                .update({ precio_costo: precioCosto })
-                .eq('id', productoId);
+            // Update existing product
+            const productoId = productosMap.get(codigoArticulo)!;
+            const updateData: any = {};
+            
+            if (precioCosto > 0) updateData.precio_costo = precioCosto;
+            if (marcaId) updateData.marca_id = marcaId;
+            if (tipoProductoId) updateData.tipo_producto_id = tipoProductoId;
+            if (cantidadPorEmpaque > 1) updateData.cantidad_por_empaque = cantidadPorEmpaque;
+
+            if (Object.keys(updateData).length > 0) {
+              try {
+                await supabase
+                  .from('productos')
+                  .update(updateData)
+                  .eq('id', productoId);
+                importResults.productos.updated++;
+              } catch (error: any) {
+                importResults.productos.errors.push({ row: i + 2, message: `Update error: ${error.message}` });
+              }
             }
           }
         }
@@ -190,11 +291,17 @@ export function ExcelImporter() {
   };
 
   const totalSuccess = results
-    ? results.categorias.success + results.subcategorias.success + results.productos.success
+    ? results.categorias.success + results.subcategorias.success + results.productos.success + 
+      results.marcas.success + results.tiposProducto.success
+    : 0;
+
+  const totalUpdated = results
+    ? results.productos.updated
     : 0;
 
   const totalErrors = results
-    ? results.categorias.errors.length + results.subcategorias.errors.length + results.productos.errors.length
+    ? results.categorias.errors.length + results.subcategorias.errors.length + 
+      results.productos.errors.length + results.marcas.errors.length + results.tiposProducto.errors.length
     : 0;
 
   return (
@@ -220,7 +327,7 @@ export function ExcelImporter() {
               Importar desde Excel
             </DialogTitle>
             <DialogDescription>
-              Importe categorías, subcategorías y productos desde un archivo Excel.
+              Importe categorías, subcategorías, marcas, tipos y productos desde un archivo Excel.
             </DialogDescription>
           </DialogHeader>
 
@@ -232,11 +339,14 @@ export function ExcelImporter() {
                   <p className="text-sm text-muted-foreground mb-4">
                     El archivo debe contener las siguientes columnas:
                   </p>
-                  <div className="text-xs text-left bg-muted p-3 rounded font-mono">
+                  <div className="text-xs text-left bg-muted p-3 rounded font-mono space-y-1">
                     <p>FAMILIA, NOM_FAM (categorías)</p>
                     <p>GRUPO, NOM_GRU (subcategorías)</p>
                     <p>COD_ARTIC, DESCRIP, UNIDAD_MED (productos)</p>
-                    <p>PRECIO_COSTO o COSTO (precio de costo)</p>
+                    <p>PRECIO_1 o PRECIO_COSTO (precio de costo)</p>
+                    <p className="text-primary font-semibold">MARCA ID (marca del producto)</p>
+                    <p className="text-primary font-semibold">ID (tipo de producto)</p>
+                    <p className="text-primary font-semibold">CANTIDAD POR EMPAQUE</p>
                   </div>
                 </div>
                 
@@ -264,11 +374,18 @@ export function ExcelImporter() {
               <div className="space-y-4">
                 <div className="flex items-center justify-center gap-4">
                   <div className="text-center">
-                    <div className="flex items-center gap-1 text-success">
+                    <div className="flex items-center gap-1 text-green-600">
                       <CheckCircle className="h-5 w-5" />
                       <span className="text-2xl font-bold">{totalSuccess}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">Importados</p>
+                    <p className="text-xs text-muted-foreground">Creados</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-blue-600">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="text-2xl font-bold">{totalUpdated}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Actualizados</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center gap-1 text-destructive">
@@ -280,29 +397,50 @@ export function ExcelImporter() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="p-3 bg-muted rounded">
-                    <p className="text-sm font-medium">Categorías</p>
+                  <div className="p-2 bg-muted rounded text-center">
+                    <p className="text-sm font-medium">Marcas</p>
                     <p className="text-xs text-muted-foreground">
-                      {results.categorias.success} importadas
+                      {results.marcas.success} nuevas
                     </p>
                   </div>
-                  <div className="p-3 bg-muted rounded">
-                    <p className="text-sm font-medium">Subcategorías</p>
+                  <div className="p-2 bg-muted rounded text-center">
+                    <p className="text-sm font-medium">Tipos</p>
                     <p className="text-xs text-muted-foreground">
-                      {results.subcategorias.success} importadas
+                      {results.tiposProducto.success} nuevos
                     </p>
                   </div>
-                  <div className="p-3 bg-muted rounded">
+                  <div className="p-2 bg-muted rounded text-center">
                     <p className="text-sm font-medium">Productos</p>
                     <p className="text-xs text-muted-foreground">
-                      {results.productos.success} importados
+                      {results.productos.success} nuevos, {results.productos.updated} actualizados
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-muted rounded text-center">
+                    <p className="text-sm font-medium">Categorías</p>
+                    <p className="text-xs text-muted-foreground">
+                      {results.categorias.success} nuevas
+                    </p>
+                  </div>
+                  <div className="p-2 bg-muted rounded text-center">
+                    <p className="text-sm font-medium">Subcategorías</p>
+                    <p className="text-xs text-muted-foreground">
+                      {results.subcategorias.success} nuevas
                     </p>
                   </div>
                 </div>
 
                 {totalErrors > 0 && (
                   <ScrollArea className="h-32 border rounded p-2">
-                    {[...results.categorias.errors, ...results.subcategorias.errors, ...results.productos.errors].map((error, idx) => (
+                    {[
+                      ...results.marcas.errors,
+                      ...results.tiposProducto.errors,
+                      ...results.categorias.errors, 
+                      ...results.subcategorias.errors, 
+                      ...results.productos.errors
+                    ].map((error, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs py-1">
                         <AlertCircle className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
                         <span>

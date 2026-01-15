@@ -40,6 +40,8 @@ const mainNavItems: NavItem[] = [
 const catalogNavItems: NavItem[] = [
   { title: 'Productos', href: '/productos', icon: Package, module: 'productos' },
   { title: 'Listas de Precios', href: '/listas-precios', icon: DollarSign, module: 'precios' },
+  { title: 'Marcas', href: '/marcas', icon: Tags, module: 'productos' },
+  { title: 'Tipos de Producto', href: '/tipos-producto', icon: Layers, module: 'productos' },
   { title: 'Categorías', href: '/categorias', icon: Tags, module: 'categorias' },
   { title: 'Subcategorías', href: '/subcategorias', icon: Layers, module: 'subcategorias' },
   { title: 'Clientes', href: '/clientes', icon: Users, module: 'clientes' },

@@ -426,22 +426,70 @@ export type Database = {
           activo: boolean | null
           created_at: string | null
           id: string
+          marca_id: string | null
+          nivel: string | null
           nombre: string
           porcentaje: number
+          prioridad: number | null
+          tipo_producto_id: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          marca_id?: string | null
+          nivel?: string | null
+          nombre: string
+          porcentaje?: number
+          prioridad?: number | null
+          tipo_producto_id?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          marca_id?: string | null
+          nivel?: string | null
+          nombre?: string
+          porcentaje?: number
+          prioridad?: number | null
+          tipo_producto_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listas_precios_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "marcas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listas_precios_tipo_producto_id_fkey"
+            columns: ["tipo_producto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_producto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marcas: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
         }
         Insert: {
           activo?: boolean | null
           created_at?: string | null
           id?: string
           nombre: string
-          porcentaje?: number
         }
         Update: {
           activo?: boolean | null
           created_at?: string | null
           id?: string
           nombre?: string
-          porcentaje?: number
         }
         Relationships: []
       }
@@ -550,46 +598,55 @@ export type Database = {
       productos: {
         Row: {
           activo: boolean | null
+          cantidad_por_empaque: number | null
           categoria_id: string | null
           codigo_articulo: string
           codigo_barra: string | null
           created_at: string | null
           descripcion: string
           id: string
+          marca_id: string | null
           precio_costo: number
           stock_actual: number | null
           stock_minimo: number | null
           subcategoria_id: string | null
+          tipo_producto_id: string | null
           unidad_medida: string | null
           updated_at: string | null
         }
         Insert: {
           activo?: boolean | null
+          cantidad_por_empaque?: number | null
           categoria_id?: string | null
           codigo_articulo: string
           codigo_barra?: string | null
           created_at?: string | null
           descripcion: string
           id?: string
+          marca_id?: string | null
           precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
           subcategoria_id?: string | null
+          tipo_producto_id?: string | null
           unidad_medida?: string | null
           updated_at?: string | null
         }
         Update: {
           activo?: boolean | null
+          cantidad_por_empaque?: number | null
           categoria_id?: string | null
           codigo_articulo?: string
           codigo_barra?: string | null
           created_at?: string | null
           descripcion?: string
           id?: string
+          marca_id?: string | null
           precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
           subcategoria_id?: string | null
+          tipo_producto_id?: string | null
           unidad_medida?: string | null
           updated_at?: string | null
         }
@@ -602,10 +659,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "productos_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "marcas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "productos_subcategoria_id_fkey"
             columns: ["subcategoria_id"]
             isOneToOne: false
             referencedRelation: "subcategorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_tipo_producto_id_fkey"
+            columns: ["tipo_producto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_producto"
             referencedColumns: ["id"]
           },
         ]
@@ -698,6 +769,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tipos_producto: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
