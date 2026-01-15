@@ -421,56 +421,126 @@ export type Database = {
         }
         Relationships: []
       }
-      listas_precios: {
+      lista_precio_excepciones: {
         Row: {
-          activo: boolean | null
           created_at: string | null
+          descripcion: string | null
           id: string
-          marca_id: string | null
-          nivel: string | null
-          nombre: string
+          lista_precio_id: string | null
           porcentaje: number
-          prioridad: number | null
+          producto_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          porcentaje?: number
+          producto_id: string
+        }
+        Update: {
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          porcentaje?: number
+          producto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lista_precio_excepciones_lista_precio_id_fkey"
+            columns: ["lista_precio_id"]
+            isOneToOne: false
+            referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lista_precio_excepciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lista_precio_porcentajes: {
+        Row: {
+          created_at: string | null
+          es_general: boolean | null
+          id: string
+          lista_precio_id: string
+          marca_id: string | null
+          porcentaje: number
           tipo_producto_id: string | null
         }
         Insert: {
-          activo?: boolean | null
           created_at?: string | null
+          es_general?: boolean | null
           id?: string
+          lista_precio_id: string
           marca_id?: string | null
-          nivel?: string | null
-          nombre: string
           porcentaje?: number
-          prioridad?: number | null
           tipo_producto_id?: string | null
         }
         Update: {
-          activo?: boolean | null
           created_at?: string | null
+          es_general?: boolean | null
           id?: string
+          lista_precio_id?: string
           marca_id?: string | null
-          nivel?: string | null
-          nombre?: string
           porcentaje?: number
-          prioridad?: number | null
           tipo_producto_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "listas_precios_marca_id_fkey"
+            foreignKeyName: "lista_precio_porcentajes_lista_precio_id_fkey"
+            columns: ["lista_precio_id"]
+            isOneToOne: false
+            referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lista_precio_porcentajes_marca_id_fkey"
             columns: ["marca_id"]
             isOneToOne: false
             referencedRelation: "marcas"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "listas_precios_tipo_producto_id_fkey"
+            foreignKeyName: "lista_precio_porcentajes_tipo_producto_id_fkey"
             columns: ["tipo_producto_id"]
             isOneToOne: false
             referencedRelation: "tipos_producto"
             referencedColumns: ["id"]
           },
         ]
+      }
+      listas_precios: {
+        Row: {
+          activo: boolean | null
+          codigo: string | null
+          created_at: string | null
+          id: string
+          nombre: string
+          orden: number | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo?: string | null
+          created_at?: string | null
+          id?: string
+          nombre: string
+          orden?: number | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string | null
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          orden?: number | null
+        }
+        Relationships: []
       }
       marcas: {
         Row: {
