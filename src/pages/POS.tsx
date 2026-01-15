@@ -19,7 +19,10 @@ import {
   ClipboardList,
   Edit,
   Check,
-  Scale
+  Scale,
+  Percent,
+  ChevronDown,
+  Package
 } from 'lucide-react';
 import {
   Dialog,
@@ -46,6 +49,11 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface Producto {
   id: string;
@@ -94,16 +102,40 @@ interface FormaPago {
   nombre: string;
 }
 
+interface Tarjeta {
+  id: string;
+  nombre: string;
+  tipo: 'credito' | 'debito';
+  activo: boolean;
+}
+
+interface TarjetaCuota {
+  id: string;
+  tarjeta_id: string;
+  cuotas: number;
+  coeficiente: number;
+}
+
 interface CartItem {
-  producto: Producto;
+  id: string; // unique ID for cart item
+  producto?: Producto;
   cantidad: number;
   precio: number;
   subtotal: number;
+  descuento_porcentaje: number;
+  // Producto temporal
+  es_temporal?: boolean;
+  nombre_temporal?: string;
 }
 
 interface Pago {
   forma_pago_id: string;
   monto: number;
+  tarjeta_id?: string;
+  cuotas?: number;
+  coeficiente?: number;
+  efectivo_entregado?: number;
+  vuelto?: number;
 }
 
 const TIPOS_COMPROBANTE = [
@@ -126,7 +158,7 @@ const CONDICIONES_IVA = [
 ];
 
 export default function POS() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
@@ -134,9 +166,13 @@ export default function POS() {
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
+  const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>([]);
+  const [configDescuentos, setConfigDescuentos] = useState<{role: string; descuento_maximo_global: number}[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAllResults, setShowAllResults] = useState(false);
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
@@ -151,10 +187,10 @@ export default function POS() {
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [emitirFactura, setEmitirFactura] = useState(false);
   const [facturaData, setFacturaData] = useState({
-    tipo_comprobante: 6, // Factura B default
+    tipo_comprobante: 6,
     doc_tipo: 99,
     doc_nro: "",
-    condicion_iva_receptor: 5, // Consumidor Final
+    condicion_iva_receptor: 5,
   });
   const [emitiendo, setEmitiendo] = useState(false);
   
@@ -169,6 +205,32 @@ export default function POS() {
   const [pesoDialogOpen, setPesoDialogOpen] = useState(false);
   const [editingPesoItem, setEditingPesoItem] = useState<string | null>(null);
   const [pesoInput, setPesoInput] = useState('');
+  
+  // Edición manual de cantidad
+  const [editingCantidadItem, setEditingCantidadItem] = useState<string | null>(null);
+  const [cantidadInput, setCantidadInput] = useState('');
+  
+  // Descuento por item
+  const [descuentoDialogOpen, setDescuentoDialogOpen] = useState(false);
+  const [editingDescuentoItem, setEditingDescuentoItem] = useState<string | null>(null);
+  const [descuentoInput, setDescuentoInput] = useState('');
+  
+  // Producto temporal
+  const [productoTemporalDialogOpen, setProductoTemporalDialogOpen] = useState(false);
+  const [productoTemporal, setProductoTemporal] = useState({ nombre: '', precio: '', cantidad: '1' });
+  
+  // Pago con tarjeta
+  const [tarjetaDialogOpen, setTarjetaDialogOpen] = useState(false);
+  const [selectedFormaPago, setSelectedFormaPago] = useState<string | null>(null);
+  const [selectedTarjeta, setSelectedTarjeta] = useState<string | null>(null);
+  const [selectedCuotas, setSelectedCuotas] = useState<number>(1);
+  const [montoTarjeta, setMontoTarjeta] = useState('');
+  
+  // Pago efectivo
+  const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
+  const [efectivoEntregado, setEfectivoEntregado] = useState('');
+
+  const isAdmin = hasRole('admin');
 
   useEffect(() => {
     fetchData();
@@ -178,7 +240,7 @@ export default function POS() {
     if (!user) return;
     setLoading(true);
     try {
-      const [productosRes, clientesRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes] = await Promise.all([
+      const [productosRes, clientesRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
@@ -186,11 +248,17 @@ export default function POS() {
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje'),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
+        supabase.from('tarjetas').select('*').eq('activo', true).order('tipo').order('nombre'),
+        supabase.from('tarjeta_cuotas').select('*').eq('activo', true).order('cuotas'),
+        supabase.from('configuracion_descuentos').select('role, descuento_maximo_global'),
       ]);
 
       if (productosRes.data) setProductos(productosRes.data);
       if (clientesRes.data) setClientes(clientesRes.data as Cliente[]);
       if (formasPagoRes.data) setFormasPago(formasPagoRes.data);
+      if (tarjetasRes.data) setTarjetas(tarjetasRes.data as Tarjeta[]);
+      if (cuotasRes.data) setTarjetaCuotas(cuotasRes.data as TarjetaCuota[]);
+      if (descuentosRes.data) setConfigDescuentos(descuentosRes.data);
       if (porcentajesRes.data) setMatrizPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
       if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
       if (listasRes.data) {
@@ -208,23 +276,45 @@ export default function POS() {
     }
   };
 
+  // Obtener descuento máximo permitido para el usuario actual
+  const getDescuentoMaximo = (): number => {
+    if (isAdmin) return 100;
+    // Por ahora usamos el rol más alto del usuario
+    const roles = ['encargado', 'cajero', 'vendedor', 'deposito'];
+    for (const rol of roles) {
+      if (hasRole(rol as any)) {
+        const config = configDescuentos.find(c => c.role === rol);
+        if (config) return config.descuento_maximo_global;
+      }
+    }
+    return 0;
+  };
+
   const filteredProductos = useMemo(() => {
     if (!searchTerm) return [];
+    const term = searchTerm.toLowerCase();
+    const results = productos.filter(
+      (p) =>
+        p.codigo_articulo.toLowerCase().includes(term) ||
+        p.descripcion.toLowerCase().includes(term)
+    );
+    return showAllResults ? results : results.slice(0, 8);
+  }, [productos, searchTerm, showAllResults]);
+
+  const totalResults = useMemo(() => {
+    if (!searchTerm) return 0;
     const term = searchTerm.toLowerCase();
     return productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term)
-    ).slice(0, 10);
+    ).length;
   }, [productos, searchTerm]);
 
-  // Calcular precio de venta usando el nuevo sistema matricial
-  // Prioridad: Excepción > Marca > Tipo de Producto > General
   const getProductoPrice = (producto: Producto): number => {
     if (!selectedLista) return 0;
     const costo = producto.precio_costo || 0;
     
-    // 1. Buscar excepción específica del producto
     const excepcion = excepciones.find(e => 
       e.producto_id === producto.id && 
       (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null)
@@ -233,7 +323,6 @@ export default function POS() {
       return costo * (1 + excepcion.porcentaje / 100);
     }
     
-    // 2. Buscar por MARCA del producto (PRIORIDAD ALTA)
     if (producto.marca_id) {
       const porMarca = matrizPorcentajes.find(p => 
         p.lista_precio_id === selectedLista.id && 
@@ -244,7 +333,6 @@ export default function POS() {
       }
     }
     
-    // 3. Buscar por TIPO DE PRODUCTO (PRIORIDAD MEDIA)
     if (producto.tipo_producto_id) {
       const porTipo = matrizPorcentajes.find(p => 
         p.lista_precio_id === selectedLista.id && 
@@ -255,7 +343,6 @@ export default function POS() {
       }
     }
     
-    // 4. Usar porcentaje GENERAL (FALLBACK)
     const general = matrizPorcentajes.find(p => 
       p.lista_precio_id === selectedLista.id && 
       p.es_general === true
@@ -264,10 +351,9 @@ export default function POS() {
       return costo * (1 + general.porcentaje / 100);
     }
     
-    return costo; // Sin margen si no hay configuración
+    return costo;
   };
 
-  // Función para verificar si un producto es por peso
   const isProductoPorPeso = (producto: Producto) => {
     const unidad = (producto.unidad_medida || '').toUpperCase().replace('.', '').trim();
     return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
@@ -282,46 +368,61 @@ export default function POS() {
     }
 
     setCart((prev) => {
-      const existing = prev.find((item) => item.producto.id === producto.id);
+      const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
       if (existing) {
-        // Para productos por peso, abrir diálogo en lugar de sumar 1
         if (isProductoPorPeso(producto)) {
-          setEditingPesoItem(producto.id);
+          setEditingPesoItem(existing.id);
           setPesoInput(existing.cantidad.toString().replace('.', ','));
           setPesoDialogOpen(true);
           return prev;
         }
         return prev.map((item) =>
-          item.producto.id === producto.id
-            ? { ...item, cantidad: item.cantidad + 1, subtotal: (item.cantidad + 1) * item.precio }
+          item.id === existing.id
+            ? { ...item, cantidad: item.cantidad + 1, subtotal: calcSubtotal(item.cantidad + 1, item.precio, item.descuento_porcentaje) }
             : item
         );
       }
-      // Para productos por peso, agregamos con cantidad 1 y abrimos diálogo para ajustar
+      const newId = crypto.randomUUID();
       if (isProductoPorPeso(producto)) {
-        const newCart = [...prev, { producto, cantidad: 1, precio, subtotal: precio }];
-        // Programamos la apertura del diálogo para después de actualizar el estado
+        const newCart = [...prev, { id: newId, producto, cantidad: 1, precio, subtotal: precio, descuento_porcentaje: 0 }];
         setTimeout(() => {
-          setEditingPesoItem(producto.id);
+          setEditingPesoItem(newId);
           setPesoInput('1');
           setPesoDialogOpen(true);
         }, 0);
         return newCart;
       }
-      return [...prev, { producto, cantidad: 1, precio, subtotal: precio }];
+      return [...prev, { id: newId, producto, cantidad: 1, precio, subtotal: precio, descuento_porcentaje: 0 }];
     });
     setSearchTerm('');
+    setShowAllResults(false);
   };
 
-  const updateCantidadDirecta = (productoId: string, nuevaCantidad: number) => {
+  const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
+    const subtotalBruto = cantidad * precio;
+    return subtotalBruto * (1 - descuentoPorcentaje / 100);
+  };
+
+  const updateCantidadDirecta = (itemId: string, nuevaCantidad: number) => {
     if (nuevaCantidad <= 0) {
-      removeFromCart(productoId);
+      removeFromCart(itemId);
       return;
     }
     setCart((prev) =>
       prev.map((item) => {
-        if (item.producto.id === productoId) {
-          return { ...item, cantidad: nuevaCantidad, subtotal: nuevaCantidad * item.precio };
+        if (item.id === itemId) {
+          return { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const updateDescuento = (itemId: string, descuento: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          return { ...item, descuento_porcentaje: descuento, subtotal: calcSubtotal(item.cantidad, item.precio, descuento) };
         }
         return item;
       })
@@ -331,7 +432,6 @@ export default function POS() {
   const handleGuardarPeso = () => {
     if (!editingPesoItem) return;
     
-    // Permitir coma o punto como separador decimal
     const pesoNormalizado = pesoInput.replace(',', '.');
     const peso = parseFloat(pesoNormalizado);
     
@@ -346,14 +446,75 @@ export default function POS() {
     setPesoInput('');
   };
 
-  const updateQuantity = (productoId: string, delta: number) => {
+  const handleGuardarCantidad = () => {
+    if (!editingCantidadItem) return;
+    const cantidad = parseInt(cantidadInput);
+    if (isNaN(cantidad) || cantidad < 1) {
+      toast.error('Ingrese una cantidad válida');
+      return;
+    }
+    updateCantidadDirecta(editingCantidadItem, cantidad);
+    setEditingCantidadItem(null);
+    setCantidadInput('');
+  };
+
+  const handleGuardarDescuento = () => {
+    if (!editingDescuentoItem) return;
+    const descuento = parseFloat(descuentoInput.replace(',', '.'));
+    const maxDescuento = getDescuentoMaximo();
+    
+    if (isNaN(descuento) || descuento < 0) {
+      toast.error('Ingrese un descuento válido');
+      return;
+    }
+    if (descuento > maxDescuento) {
+      toast.error(`El descuento máximo permitido es ${maxDescuento}%`);
+      return;
+    }
+    
+    updateDescuento(editingDescuentoItem, descuento);
+    setDescuentoDialogOpen(false);
+    setEditingDescuentoItem(null);
+    setDescuentoInput('');
+    toast.success(`Descuento del ${descuento}% aplicado`);
+  };
+
+  const handleAgregarProductoTemporal = () => {
+    if (!productoTemporal.nombre.trim()) {
+      toast.error('Ingrese un nombre para el producto');
+      return;
+    }
+    const precio = parseFloat(productoTemporal.precio.replace(',', '.'));
+    if (isNaN(precio) || precio <= 0) {
+      toast.error('Ingrese un precio válido');
+      return;
+    }
+    const cantidad = parseInt(productoTemporal.cantidad) || 1;
+    
+    const newItem: CartItem = {
+      id: crypto.randomUUID(),
+      cantidad,
+      precio,
+      subtotal: precio * cantidad,
+      descuento_porcentaje: 0,
+      es_temporal: true,
+      nombre_temporal: productoTemporal.nombre.trim(),
+    };
+    
+    setCart(prev => [...prev, newItem]);
+    setProductoTemporalDialogOpen(false);
+    setProductoTemporal({ nombre: '', precio: '', cantidad: '1' });
+    toast.success('Producto agregado al carrito');
+  };
+
+  const updateQuantity = (itemId: string, delta: number) => {
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.producto.id === productoId) {
+          if (item.id === itemId) {
             const newCantidad = item.cantidad + delta;
             if (newCantidad <= 0) return null;
-            return { ...item, cantidad: newCantidad, subtotal: newCantidad * item.precio };
+            return { ...item, cantidad: newCantidad, subtotal: calcSubtotal(newCantidad, item.precio, item.descuento_porcentaje) };
           }
           return item;
         })
@@ -361,19 +522,18 @@ export default function POS() {
     );
   };
 
-  const removeFromCart = (productoId: string) => {
-    setCart((prev) => prev.filter((item) => item.producto.id !== productoId));
+  const removeFromCart = (itemId: string) => {
+    setCart((prev) => prev.filter((item) => item.id !== itemId));
   };
 
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio), 0), [cart]);
+  const totalDescuentos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
   const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
-
   const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
 
-  // Abrir diálogo de facturación antes de procesar
   const handleOpenFacturaDialog = () => {
-    // Pre-fill data from selected cliente
     if (selectedCliente) {
-      const docTipo = selectedCliente.dni_cuit?.length === 11 ? 80 : 96; // CUIT o DNI
+      const docTipo = selectedCliente.dni_cuit?.length === 11 ? 80 : 96;
       setFacturaData({
         tipo_comprobante: 6,
         doc_tipo: docTipo,
@@ -390,6 +550,115 @@ export default function POS() {
     }
     setEmitirFactura(false);
     setFacturaDialogOpen(true);
+  };
+
+  // Agregar pago con tarjeta
+  const handleAddPagoTarjeta = () => {
+    if (!selectedTarjeta || !selectedFormaPago) return;
+    
+    const monto = parseFloat(montoTarjeta.replace(',', '.'));
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('Ingrese un monto válido');
+      return;
+    }
+    
+    const tarjeta = tarjetas.find(t => t.id === selectedTarjeta);
+    const cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta && c.cuotas === selectedCuotas);
+    const coeficiente = cuotaConfig?.coeficiente || 1;
+    const montoConInteres = monto * coeficiente;
+    
+    setPagos(prev => [...prev, {
+      forma_pago_id: selectedFormaPago,
+      monto: montoConInteres,
+      tarjeta_id: selectedTarjeta,
+      cuotas: selectedCuotas,
+      coeficiente,
+    }]);
+    
+    setTarjetaDialogOpen(false);
+    setSelectedTarjeta(null);
+    setSelectedCuotas(1);
+    setMontoTarjeta('');
+    
+    if (tarjeta?.tipo === 'credito' && coeficiente > 1) {
+      toast.success(`Tarjeta agregada con ${selectedCuotas} cuotas (${((coeficiente - 1) * 100).toFixed(1)}% interés)`);
+    } else {
+      toast.success('Pago con tarjeta agregado');
+    }
+  };
+
+  // Agregar pago en efectivo
+  const handleAddPagoEfectivo = () => {
+    const entregado = parseFloat(efectivoEntregado.replace(',', '.'));
+    const pendiente = total - totalPagado;
+    
+    if (isNaN(entregado) || entregado <= 0) {
+      toast.error('Ingrese un monto válido');
+      return;
+    }
+    
+    const montoAplicado = Math.min(entregado, pendiente);
+    const vuelto = entregado > pendiente ? entregado - pendiente : 0;
+    
+    const efectivoFP = formasPago.find(fp => fp.nombre.toLowerCase().includes('efectivo'));
+    if (!efectivoFP) {
+      toast.error('No se encontró la forma de pago Efectivo');
+      return;
+    }
+    
+    setPagos(prev => [...prev, {
+      forma_pago_id: efectivoFP.id,
+      monto: montoAplicado,
+      efectivo_entregado: entregado,
+      vuelto,
+    }]);
+    
+    setEfectivoDialogOpen(false);
+    setEfectivoEntregado('');
+    
+    if (vuelto > 0) {
+      toast.success(`Vuelto: $${vuelto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
+    }
+  };
+
+  const addPago = (formaPagoId: string) => {
+    const fp = formasPago.find(f => f.id === formaPagoId);
+    const fpNombre = fp?.nombre.toLowerCase() || '';
+    
+    // Si es efectivo, abrir diálogo de efectivo
+    if (fpNombre.includes('efectivo')) {
+      setEfectivoDialogOpen(true);
+      return;
+    }
+    
+    // Si es débito o crédito, abrir diálogo de tarjeta
+    if (fpNombre.includes('débito') || fpNombre.includes('debito') || fpNombre.includes('crédito') || fpNombre.includes('credito') || fpNombre.includes('tarjeta')) {
+      setSelectedFormaPago(formaPagoId);
+      const pendiente = total - totalPagado;
+      setMontoTarjeta(pendiente.toString());
+      setTarjetaDialogOpen(true);
+      return;
+    }
+    
+    // Otros métodos de pago
+    const pendiente = total - totalPagado;
+    if (pendiente <= 0) return;
+
+    setPagos((prev) => {
+      const existing = prev.find((p) => p.forma_pago_id === formaPagoId);
+      if (existing) {
+        return prev.map((p) =>
+          p.forma_pago_id === formaPagoId
+            ? { ...p, monto: p.monto + pendiente }
+            : p
+        );
+      }
+      return [...prev, { forma_pago_id: formaPagoId, monto: pendiente }];
+    });
+  };
+
+  const removePago = (index: number) => {
+    setPagos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleProcesarVenta = async () => {
@@ -413,7 +682,6 @@ export default function POS() {
     setEmitiendo(true);
 
     try {
-      // Get open cash register
       const { data: caja } = await supabase
         .from('cajas')
         .select('id')
@@ -430,13 +698,13 @@ export default function POS() {
       let venta: any;
 
       if (editingPedidoId) {
-        // Actualizar pedido existente a venta confirmada
         const { error: updateError } = await supabase
           .from('ventas')
           .update({
             cliente_id: selectedCliente?.id || null,
             caja_id: caja.id,
-            subtotal: total,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
             total: total,
             estado: 'confirmada',
           })
@@ -444,7 +712,6 @@ export default function POS() {
 
         if (updateError) throw updateError;
         
-        // Fetch the updated venta
         const { data: updatedVenta, error: fetchError } = await supabase
           .from('ventas')
           .select('*')
@@ -454,20 +721,21 @@ export default function POS() {
         if (fetchError) throw fetchError;
         venta = updatedVenta;
 
-        // Eliminar detalles anteriores
         await supabase
           .from('venta_detalles')
           .delete()
           .eq('venta_id', editingPedidoId);
 
-        // Crear nuevos detalles
         const detalles = cart.map((item) => ({
           venta_id: venta.id,
-          producto_id: item.producto.id,
+          producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
-          descuento: 0,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
           subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
 
         const { error: detallesError } = await supabase
@@ -476,15 +744,14 @@ export default function POS() {
 
         if (detallesError) throw detallesError;
       } else {
-        // Create new venta
         const { data: newVenta, error: ventaError } = await supabase
           .from('ventas')
           .insert([{
             usuario_id: user.id,
             cliente_id: selectedCliente?.id || null,
             caja_id: caja.id,
-            subtotal: total,
-            descuento: 0,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
             total: total,
             estado: 'confirmada',
           }])
@@ -494,14 +761,16 @@ export default function POS() {
         if (ventaError) throw ventaError;
         venta = newVenta;
 
-        // Create venta_detalles
         const detalles = cart.map((item) => ({
           venta_id: venta.id,
-          producto_id: item.producto.id,
+          producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
-          descuento: 0,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
           subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
 
         const { error: detallesError } = await supabase
@@ -511,11 +780,16 @@ export default function POS() {
         if (detallesError) throw detallesError;
       }
 
-      // Create venta_pagos
+      // Create venta_pagos with tarjeta info
       const ventaPagos = pagos.map((p) => ({
         venta_id: venta.id,
         forma_pago_id: p.forma_pago_id,
         monto: p.monto,
+        tarjeta_id: p.tarjeta_id || null,
+        cuotas: p.cuotas || null,
+        coeficiente: p.coeficiente || null,
+        efectivo_entregado: p.efectivo_entregado || null,
+        vuelto: p.vuelto || null,
       }));
 
       const { error: pagosError } = await supabase
@@ -524,27 +798,27 @@ export default function POS() {
 
       if (pagosError) throw pagosError;
 
-      // Update stock
+      // Update stock (only for real products)
       for (const item of cart) {
-        await supabase
-          .from('productos')
-          .update({ stock_actual: item.producto.stock_actual - item.cantidad })
-          .eq('id', item.producto.id);
+        if (item.producto && !item.es_temporal) {
+          await supabase
+            .from('productos')
+            .update({ stock_actual: item.producto.stock_actual - item.cantidad })
+            .eq('id', item.producto.id);
 
-        // Register inventory movement
-        await supabase.from('movimientos_inventario').insert([{
-          producto_id: item.producto.id,
-          tipo: 'salida',
-          cantidad: item.cantidad,
-          stock_anterior: item.producto.stock_actual,
-          stock_nuevo: item.producto.stock_actual - item.cantidad,
-          motivo: 'Venta',
-          usuario_id: user.id,
-          venta_id: venta.id,
-        }]);
+          await supabase.from('movimientos_inventario').insert([{
+            producto_id: item.producto.id,
+            tipo: 'salida',
+            cantidad: item.cantidad,
+            stock_anterior: item.producto.stock_actual,
+            stock_nuevo: item.producto.stock_actual - item.cantidad,
+            motivo: 'Venta',
+            usuario_id: user.id,
+            venta_id: venta.id,
+          }]);
+        }
       }
 
-      // Register cash movement
       await supabase.from('movimientos_caja').insert([{
         caja_id: caja.id,
         usuario_id: user.id,
@@ -554,7 +828,6 @@ export default function POS() {
         venta_id: venta.id,
       }]);
 
-      // Update caja total
       const { data: cajaData } = await supabase
         .from('cajas')
         .select('total_ventas')
@@ -566,11 +839,9 @@ export default function POS() {
         .update({ total_ventas: (cajaData?.total_ventas || 0) + total })
         .eq('id', caja.id);
 
-      // Emit AFIP invoice if requested
       let facturaInfo = null;
       if (emitirFactura) {
         try {
-          // Calculate IVA (21% assumed)
           const netoSinIva = total / 1.21;
           const ivaAmount = total - netoSinIva;
 
@@ -588,10 +859,10 @@ export default function POS() {
                 importe_neto: parseFloat(netoSinIva.toFixed(2)),
                 importe_iva: parseFloat(ivaAmount.toFixed(2)),
                 items: cart.map(item => ({
-                  descripcion: item.producto.descripcion,
+                  descripcion: item.es_temporal ? item.nombre_temporal : item.producto?.descripcion,
                   cantidad: item.cantidad,
-                  precio_unitario: item.precio / 1.21, // Precio sin IVA
-                  iva_id: 5, // 21%
+                  precio_unitario: item.precio / 1.21,
+                  iva_id: 5,
                 })),
                 venta_id: venta.id,
               },
@@ -599,15 +870,12 @@ export default function POS() {
           );
 
           if (facturaError) {
-            console.error('Error AFIP:', facturaError);
             toast.error('Error al emitir factura AFIP: ' + facturaError.message);
           } else if (facturaResult?.error) {
-            console.error('Error AFIP:', facturaResult.error);
             toast.error('Error AFIP: ' + facturaResult.error);
           } else {
             facturaInfo = facturaResult;
             
-            // Guardar comprobante en la base de datos para que aparezca en Facturación
             const formatFechaAfip = (fecha: string): string => {
               if (fecha && fecha.length === 8) {
                 return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
@@ -615,7 +883,7 @@ export default function POS() {
               return fecha || new Date().toISOString().split('T')[0];
             };
             
-            const { error: insertComprobanteError } = await supabase
+            await supabase
               .from('comprobantes_afip')
               .insert({
                 tipo_comprobante: facturaData.tipo_comprobante,
@@ -633,21 +901,15 @@ export default function POS() {
                 venta_id: venta.id,
               });
             
-            if (insertComprobanteError) {
-              console.error('Error guardando comprobante:', insertComprobanteError);
-            }
-            
             toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
           }
         } catch (facturaErr: any) {
-          console.error('Error emitting factura:', facturaErr);
           toast.error('Error al emitir factura: ' + facturaErr.message);
         }
       }
 
       setLastVenta({ ...venta, detalles: cart, pagos, cliente: selectedCliente, factura: facturaInfo });
       
-      // Clear cart and show ticket
       setCart([]);
       setPagos([]);
       setSelectedCliente(null);
@@ -657,8 +919,8 @@ export default function POS() {
       setTicketDialogOpen(true);
       
       toast.success('Venta procesada correctamente');
-      fetchData(); // Refresh stock
-      fetchPedidos(); // Refresh pending orders list
+      fetchData();
+      fetchPedidos();
     } catch (error) {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
@@ -667,28 +929,6 @@ export default function POS() {
     }
   };
 
-  const addPago = (formaPagoId: string) => {
-    const pendiente = total - totalPagado;
-    if (pendiente <= 0) return;
-
-    setPagos((prev) => {
-      const existing = prev.find((p) => p.forma_pago_id === formaPagoId);
-      if (existing) {
-        return prev.map((p) =>
-          p.forma_pago_id === formaPagoId
-            ? { ...p, monto: p.monto + pendiente }
-            : p
-        );
-      }
-      return [...prev, { forma_pago_id: formaPagoId, monto: pendiente }];
-    });
-  };
-
-  const removePago = (formaPagoId: string) => {
-    setPagos((prev) => prev.filter((p) => p.forma_pago_id !== formaPagoId));
-  };
-
-  // Cargar pedidos pendientes
   const fetchPedidos = async () => {
     if (!user) return;
     setLoadingPedidos(true);
@@ -707,14 +947,12 @@ export default function POS() {
       if (error) throw error;
       setPedidos(data || []);
     } catch (error) {
-      console.error('Error fetching pedidos:', error);
       toast.error('Error al cargar los pedidos');
     } finally {
       setLoadingPedidos(false);
     }
   };
 
-  // Guardar como pedido
   const handleGuardarPedido = async () => {
     if (!user) return;
     if (cart.length === 0) {
@@ -726,32 +964,33 @@ export default function POS() {
 
     try {
       if (editingPedidoId) {
-        // Actualizar pedido existente
         const { error: updateError } = await supabase
           .from('ventas')
           .update({
             cliente_id: selectedCliente?.id || null,
-            subtotal: total,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
             total: total,
           })
           .eq('id', editingPedidoId);
 
         if (updateError) throw updateError;
 
-        // Eliminar detalles anteriores
         await supabase
           .from('venta_detalles')
           .delete()
           .eq('venta_id', editingPedidoId);
 
-        // Insertar nuevos detalles
         const detalles = cart.map((item) => ({
           venta_id: editingPedidoId,
-          producto_id: item.producto.id,
+          producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
-          descuento: 0,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
           subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
 
         const { error: detallesError } = await supabase
@@ -763,14 +1002,13 @@ export default function POS() {
         toast.success('Pedido actualizado correctamente');
         setEditingPedidoId(null);
       } else {
-        // Crear nuevo pedido
         const { data: pedido, error: pedidoError } = await supabase
           .from('ventas')
           .insert([{
             usuario_id: user.id,
             cliente_id: selectedCliente?.id || null,
-            subtotal: total,
-            descuento: 0,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
             total: total,
             estado: 'pedido',
           }])
@@ -779,14 +1017,16 @@ export default function POS() {
 
         if (pedidoError) throw pedidoError;
 
-        // Crear detalles
         const detalles = cart.map((item) => ({
           venta_id: pedido.id,
-          producto_id: item.producto.id,
+          producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
-          descuento: 0,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
           subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
 
         const { error: detallesError } = await supabase
@@ -798,20 +1038,16 @@ export default function POS() {
         toast.success(`Pedido #${pedido.numero_comprobante} guardado correctamente`);
       }
 
-      // Limpiar carrito
       setCart([]);
       setSelectedCliente(null);
     } catch (error) {
-      console.error('Error saving pedido:', error);
       toast.error('Error al guardar el pedido');
     } finally {
       setGuardandoPedido(false);
     }
   };
 
-  // Cargar pedido para editar
   const handleCargarPedido = (pedido: any) => {
-    // Cargar cliente
     if (pedido.clientes) {
       setSelectedCliente({
         id: pedido.clientes.id,
@@ -823,20 +1059,34 @@ export default function POS() {
       setSelectedCliente(null);
     }
 
-    // Cargar items al carrito
-    const cartItems: CartItem[] = pedido.venta_detalles.map((detalle: any) => ({
-      producto: {
-        id: detalle.productos.id,
-        codigo_articulo: detalle.productos.codigo_articulo,
-        descripcion: detalle.productos.descripcion,
-        stock_actual: detalle.productos.stock_actual,
-        unidad_medida: detalle.productos.unidad_medida,
-        precio_costo: detalle.productos.precio_costo,
-      },
-      cantidad: detalle.cantidad,
-      precio: detalle.precio_unitario,
-      subtotal: detalle.subtotal,
-    }));
+    const cartItems: CartItem[] = pedido.venta_detalles.map((detalle: any) => {
+      if (detalle.producto_temporal_nombre) {
+        return {
+          id: crypto.randomUUID(),
+          cantidad: detalle.cantidad,
+          precio: detalle.producto_temporal_precio || detalle.precio_unitario,
+          subtotal: detalle.subtotal,
+          descuento_porcentaje: detalle.descuento_porcentaje || 0,
+          es_temporal: true,
+          nombre_temporal: detalle.producto_temporal_nombre,
+        };
+      }
+      return {
+        id: crypto.randomUUID(),
+        producto: {
+          id: detalle.productos.id,
+          codigo_articulo: detalle.productos.codigo_articulo,
+          descripcion: detalle.productos.descripcion,
+          stock_actual: detalle.productos.stock_actual,
+          unidad_medida: detalle.productos.unidad_medida,
+          precio_costo: detalle.productos.precio_costo,
+        },
+        cantidad: detalle.cantidad,
+        precio: detalle.precio_unitario,
+        subtotal: detalle.subtotal,
+        descuento_porcentaje: detalle.descuento_porcentaje || 0,
+      };
+    });
 
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
@@ -844,16 +1094,13 @@ export default function POS() {
     toast.info(`Pedido #${pedido.numero_comprobante} cargado para edición`);
   };
 
-  // Eliminar pedido
   const handleEliminarPedido = async (pedidoId: string) => {
     try {
-      // Primero eliminar detalles
       await supabase
         .from('venta_detalles')
         .delete()
         .eq('venta_id', pedidoId);
 
-      // Luego eliminar el pedido (marcar como anulado ya que no se puede DELETE)
       await supabase
         .from('ventas')
         .update({ anulada: true, motivo_anulacion: 'Pedido cancelado' })
@@ -862,12 +1109,10 @@ export default function POS() {
       toast.success('Pedido eliminado');
       fetchPedidos();
     } catch (error) {
-      console.error('Error deleting pedido:', error);
       toast.error('Error al eliminar el pedido');
     }
   };
 
-  // Imprimir pedido
   const handleImprimirPedido = (pedido: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -896,7 +1141,7 @@ export default function POS() {
         <hr>
         ${pedido.venta_detalles.map((d: any) => `
           <div class="item">
-            <span>${d.cantidad}x ${d.productos?.descripcion?.substring(0, 20) || 'Producto'}</span>
+            <span>${d.cantidad}x ${d.producto_temporal_nombre || d.productos?.descripcion?.substring(0, 20) || 'Producto'}</span>
             <span>$${d.subtotal.toLocaleString('es-AR')}</span>
           </div>
         `).join('')}
@@ -906,7 +1151,6 @@ export default function POS() {
         </div>
         <div class="footer">
           <p>*** PEDIDO PENDIENTE ***</p>
-          <p>Verificar stock antes de facturar</p>
         </div>
         <script>window.print(); window.close();</script>
       </body>
@@ -917,6 +1161,16 @@ export default function POS() {
     printWindow.document.close();
   };
 
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="h-[calc(100vh-2rem)] flex gap-4">
@@ -926,24 +1180,34 @@ export default function POS() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle>Punto de Venta</CardTitle>
-                <Select 
-                  value={selectedLista?.id || ''} 
-                  onValueChange={(id) => {
-                    const lista = listasPrecios.find(l => l.id === id);
-                    setSelectedLista(lista || null);
-                  }}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Lista de precios" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {listasPrecios.map((lista) => (
-                      <SelectItem key={lista.id} value={lista.id}>
-                        {lista.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProductoTemporalDialogOpen(true)}
+                  >
+                    <Package className="h-4 w-4 mr-1" />
+                    Producto Libre
+                  </Button>
+                  <Select 
+                    value={selectedLista?.id || ''} 
+                    onValueChange={(id) => {
+                      const lista = listasPrecios.find(l => l.id === id);
+                      setSelectedLista(lista || null);
+                    }}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Lista de precios" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listasPrecios.map((lista) => (
+                        <SelectItem key={lista.id} value={lista.id}>
+                          {lista.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -953,14 +1217,17 @@ export default function POS() {
                   className="pl-10"
                   placeholder="Buscar producto por código o descripción..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowAllResults(false);
+                  }}
                 />
               </div>
               
               {/* Search Results */}
               {filteredProductos.length > 0 && (
                 <Card className="absolute z-10 mt-1 w-full max-w-xl shadow-lg">
-                  <ScrollArea className="max-h-64">
+                  <ScrollArea className="max-h-80">
                     {filteredProductos.map((producto) => (
                       <div
                         key={producto.id}
@@ -983,6 +1250,15 @@ export default function POS() {
                         </div>
                       </div>
                     ))}
+                    {totalResults > 8 && !showAllResults && (
+                      <div 
+                        className="p-3 text-center text-primary hover:bg-muted cursor-pointer"
+                        onClick={() => setShowAllResults(true)}
+                      >
+                        <ChevronDown className="h-4 w-4 inline mr-1" />
+                        Ver {totalResults - 8} resultados más
+                      </div>
+                    )}
                   </ScrollArea>
                 </Card>
               )}
@@ -1015,19 +1291,29 @@ export default function POS() {
                 ) : (
                   <div className="space-y-2">
                     {cart.map((item) => {
-                      const esPorPeso = isProductoPorPeso(item.producto);
+                      const esPorPeso = item.producto && isProductoPorPeso(item.producto);
+                      const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
+                      
                       return (
                         <div
-                          key={item.producto.id}
+                          key={item.id}
                           className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="font-medium">{item.producto.descripcion}</p>
+                              <p className="font-medium">{nombreProducto}</p>
+                              {item.es_temporal && (
+                                <Badge variant="secondary" className="text-xs">Libre</Badge>
+                              )}
                               {esPorPeso && (
                                 <Badge variant="outline" className="text-xs">
                                   <Scale className="h-3 w-3 mr-1" />
                                   KG
+                                </Badge>
+                              )}
+                              {item.descuento_porcentaje > 0 && (
+                                <Badge variant="destructive" className="text-xs">
+                                  -{item.descuento_porcentaje}%
                                 </Badge>
                               )}
                             </div>
@@ -1036,13 +1322,29 @@ export default function POS() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
+                            {/* Botón descuento */}
+                            {getDescuentoMaximo() > 0 && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setEditingDescuentoItem(item.id);
+                                  setDescuentoInput(item.descuento_porcentaje.toString());
+                                  setDescuentoDialogOpen(true);
+                                }}
+                              >
+                                <Percent className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
                             {esPorPeso ? (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-8 px-3"
                                 onClick={() => {
-                                  setEditingPesoItem(item.producto.id);
+                                  setEditingPesoItem(item.id);
                                   setPesoInput(item.cantidad.toString().replace('.', ','));
                                   setPesoDialogOpen(true);
                                 }}
@@ -1056,16 +1358,39 @@ export default function POS() {
                                   size="icon"
                                   variant="outline"
                                   className="h-8 w-8"
-                                  onClick={() => updateQuantity(item.producto.id, -1)}
+                                  onClick={() => updateQuantity(item.id, -1)}
                                 >
                                   <Minus className="h-4 w-4" />
                                 </Button>
-                                <span className="w-8 text-center font-medium">{item.cantidad}</span>
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 w-12 px-0 font-medium"
+                                  onClick={() => {
+                                    setEditingCantidadItem(item.id);
+                                    setCantidadInput(item.cantidad.toString());
+                                  }}
+                                >
+                                  {editingCantidadItem === item.id ? (
+                                    <Input
+                                      className="h-6 w-10 text-center p-0"
+                                      value={cantidadInput}
+                                      onChange={(e) => setCantidadInput(e.target.value)}
+                                      onBlur={handleGuardarCantidad}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleGuardarCantidad();
+                                        if (e.key === 'Escape') setEditingCantidadItem(null);
+                                      }}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    item.cantidad
+                                  )}
+                                </Button>
                                 <Button
                                   size="icon"
                                   variant="outline"
                                   className="h-8 w-8"
-                                  onClick={() => updateQuantity(item.producto.id, 1)}
+                                  onClick={() => updateQuantity(item.id, 1)}
                                 >
                                   <Plus className="h-4 w-4" />
                                 </Button>
@@ -1078,7 +1403,7 @@ export default function POS() {
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 text-destructive"
-                              onClick={() => removeFromCart(item.producto.id)}
+                              onClick={() => removeFromCart(item.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1129,12 +1454,14 @@ export default function POS() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
-                  <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Descuento</span>
-                  <span>$0.00</span>
-                </div>
+                {totalDescuentos > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Descuentos</span>
+                    <span>-${totalDescuentos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>TOTAL</span>
@@ -1255,7 +1582,7 @@ export default function POS() {
 
       {/* Payment Dialog */}
       <Dialog open={pagoDialogOpen} onOpenChange={setPagoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Forma de Pago</DialogTitle>
           </DialogHeader>
@@ -1271,6 +1598,7 @@ export default function POS() {
                   key={fp.id}
                   variant="outline"
                   onClick={() => addPago(fp.id)}
+                  disabled={totalPagado >= total}
                 >
                   {fp.nombre}
                 </Button>
@@ -1280,20 +1608,35 @@ export default function POS() {
             {pagos.length > 0 && (
               <div className="space-y-2">
                 <Separator />
-                {pagos.map((pago) => {
+                {pagos.map((pago, index) => {
                   const fp = formasPago.find((f) => f.id === pago.forma_pago_id);
+                  const tarjeta = tarjetas.find(t => t.id === pago.tarjeta_id);
                   return (
-                    <div key={pago.forma_pago_id} className="flex items-center justify-between">
-                      <span>{fp?.nombre}</span>
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                      <div>
+                        <span className="font-medium">{fp?.nombre}</span>
+                        {tarjeta && (
+                          <span className="text-sm text-muted-foreground ml-2">
+                            ({tarjeta.nombre}
+                            {pago.cuotas && pago.cuotas > 1 && ` - ${pago.cuotas} cuotas`}
+                            )
+                          </span>
+                        )}
+                        {pago.vuelto && pago.vuelto > 0 && (
+                          <p className="text-sm text-success">
+                            Entregó: ${pago.efectivo_entregado?.toLocaleString('es-AR')} | Vuelto: ${pago.vuelto.toLocaleString('es-AR')}
+                          </p>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">
+                        <span className="font-bold">
                           ${pago.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </span>
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-6 w-6"
-                          onClick={() => removePago(pago.forma_pago_id)}
+                          onClick={() => removePago(index)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -1306,10 +1649,10 @@ export default function POS() {
                   <span>Total pagado:</span>
                   <span>${totalPagado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                {totalPagado >= total && (
-                  <div className="flex justify-between text-success">
-                    <span>Vuelto:</span>
-                    <span>${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                {totalPagado < total && (
+                  <div className="flex justify-between text-destructive">
+                    <span>Pendiente:</span>
+                    <span>${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -1327,6 +1670,263 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
+      {/* Tarjeta Dialog */}
+      <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pago con Tarjeta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Seleccionar Tarjeta</Label>
+              <Select value={selectedTarjeta || ''} onValueChange={setSelectedTarjeta}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione una tarjeta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tarjetas.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.nombre} ({t.tipo === 'credito' ? 'Crédito' : 'Débito'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedTarjeta && tarjetas.find(t => t.id === selectedTarjeta)?.tipo === 'credito' && (
+              <div>
+                <Label>Cuotas</Label>
+                <Select value={selectedCuotas.toString()} onValueChange={(v) => setSelectedCuotas(parseInt(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tarjetaCuotas
+                      .filter(c => c.tarjeta_id === selectedTarjeta)
+                      .map((c) => (
+                        <SelectItem key={c.cuotas} value={c.cuotas.toString()}>
+                          {c.cuotas} cuota{c.cuotas > 1 ? 's' : ''} 
+                          {c.coeficiente > 1 && ` (+${((c.coeficiente - 1) * 100).toFixed(1)}%)`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <Label>Monto</Label>
+              <Input
+                type="text"
+                value={montoTarjeta}
+                onChange={(e) => setMontoTarjeta(e.target.value)}
+                placeholder="0.00"
+              />
+              {selectedTarjeta && selectedCuotas > 1 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {(() => {
+                    const cuotaConfig = tarjetaCuotas.find(c => c.tarjeta_id === selectedTarjeta && c.cuotas === selectedCuotas);
+                    const monto = parseFloat(montoTarjeta.replace(',', '.')) || 0;
+                    if (cuotaConfig && cuotaConfig.coeficiente > 1) {
+                      return `Total con interés: $${(monto * cuotaConfig.coeficiente).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+                    }
+                    return null;
+                  })()}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setTarjetaDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleAddPagoTarjeta} disabled={!selectedTarjeta}>
+                Agregar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Efectivo Dialog */}
+      <Dialog open={efectivoDialogOpen} onOpenChange={setEfectivoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pago en Efectivo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex justify-between">
+                <span>Pendiente de cobro:</span>
+                <span className="font-bold">${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label>Monto entregado por el cliente</Label>
+              <Input
+                type="text"
+                value={efectivoEntregado}
+                onChange={(e) => setEfectivoEntregado(e.target.value)}
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+
+            {efectivoEntregado && (
+              <div className="p-3 bg-muted rounded-lg">
+                {(() => {
+                  const entregado = parseFloat(efectivoEntregado.replace(',', '.')) || 0;
+                  const pendiente = total - totalPagado;
+                  const vuelto = entregado > pendiente ? entregado - pendiente : 0;
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span>Entregado:</span>
+                        <span>${entregado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {vuelto > 0 && (
+                        <div className="flex justify-between font-bold text-lg text-success mt-2">
+                          <span>Vuelto:</span>
+                          <span>${vuelto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setEfectivoDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleAddPagoEfectivo}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Descuento Dialog */}
+      <Dialog open={descuentoDialogOpen} onOpenChange={setDescuentoDialogOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Percent className="h-5 w-5" />
+              Aplicar Descuento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editingDescuentoItem && (
+              <p className="text-sm text-muted-foreground">
+                {cart.find(i => i.id === editingDescuentoItem)?.producto?.descripcion || 
+                 cart.find(i => i.id === editingDescuentoItem)?.nombre_temporal}
+              </p>
+            )}
+            <div>
+              <Label>Porcentaje de descuento</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={descuentoInput}
+                  onChange={(e) => setDescuentoInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleGuardarDescuento();
+                  }}
+                  autoFocus
+                />
+                <span className="text-muted-foreground font-medium">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Máximo permitido: {getDescuentoMaximo()}%
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setDescuentoDialogOpen(false);
+                  setEditingDescuentoItem(null);
+                  setDescuentoInput('');
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleGuardarDescuento}>
+                Aplicar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Producto Temporal Dialog */}
+      <Dialog open={productoTemporalDialogOpen} onOpenChange={setProductoTemporalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Producto Libre
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Agregue un producto que no está en el inventario. No se guardará en la base de datos.
+            </p>
+            <div>
+              <Label>Nombre / Descripción</Label>
+              <Input
+                value={productoTemporal.nombre}
+                onChange={(e) => setProductoTemporal({ ...productoTemporal, nombre: e.target.value })}
+                placeholder="Ej: Producto especial"
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Precio</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={productoTemporal.precio}
+                  onChange={(e) => setProductoTemporal({ ...productoTemporal, precio: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label>Cantidad</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={productoTemporal.cantidad}
+                  onChange={(e) => setProductoTemporal({ ...productoTemporal, cantidad: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setProductoTemporalDialogOpen(false);
+                  setProductoTemporal({ nombre: '', precio: '', cantidad: '1' });
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button className="flex-1" onClick={handleAgregarProductoTemporal}>
+                Agregar al Carrito
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Ticket/Factura Dialog */}
       <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
         <DialogContent className={lastVenta?.factura ? "max-w-2xl" : ""}>
@@ -1337,170 +1937,65 @@ export default function POS() {
             </DialogTitle>
           </DialogHeader>
           {lastVenta && (
-            <div id="printable-invoice" className="space-y-4">
-              {lastVenta.factura ? (
-                // FACTURA FORMAL
-                <div className="border rounded-lg p-6 text-sm">
-                  {/* Header */}
-                  <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                    <div>
-                      <p className="font-bold text-lg">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
-                      <p className="text-muted-foreground">{comercioConfig?.razon_social || 'Razón Social'}</p>
-                      <p className="text-muted-foreground text-xs mt-1">{comercioConfig?.direccion || 'Dirección'}</p>
-                      <p className="text-xs text-muted-foreground">CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
-                      <p className="text-xs text-muted-foreground">{comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
-                        <p className="font-bold text-2xl">
-                          {lastVenta.factura.tipo_comprobante === 1 ? 'A' : 
-                           lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
-                        </p>
-                      </div>
-                      <p className="font-bold">
-                        FACTURA {lastVenta.factura.tipo_comprobante === 1 ? 'A' : 
-                                 lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
-                      </p>
-                      <p className="text-lg font-mono">
-                        Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-
-                        {String(lastVenta.factura.numero_comprobante).padStart(8, '0')}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Fecha: {new Date(lastVenta.fecha).toLocaleDateString('es-AR')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Customer Info */}
-                  <div className="py-3 border-b">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Cliente:</p>
-                        <p className="font-medium">{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">CUIT/DNI:</p>
-                        <p>{lastVenta.cliente?.dni_cuit || 'S/D'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground">Condición IVA:</p>
-                      <p>{CONDICIONES_IVA.find(c => c.value === facturaData.condicion_iva_receptor)?.label || 'Consumidor Final'}</p>
-                    </div>
-                  </div>
-
-                  {/* Items */}
-                  <div className="py-3 border-b">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-1">Cant.</th>
-                          <th className="text-left py-1">Descripción</th>
-                          <th className="text-right py-1">P. Unit.</th>
-                          <th className="text-right py-1">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                          <tr key={idx} className="border-b border-dashed">
-                            <td className="py-1">{item.cantidad}</td>
-                            <td className="py-1">{item.producto.descripcion}</td>
-                            <td className="text-right py-1">
-                              ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="text-right py-1">
-                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Totals */}
-                  <div className="py-3 border-b">
-                    <div className="flex justify-end">
-                      <div className="w-64 space-y-1">
-                        <div className="flex justify-between">
-                          <span>Subtotal Neto:</span>
-                          <span>${(lastVenta.total / 1.21).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>IVA 21%:</span>
-                          <span>${(lastVenta.total - lastVenta.total / 1.21).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg border-t pt-1">
-                          <span>TOTAL:</span>
-                          <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CAE Info */}
-                  <div className="pt-3 bg-muted/50 rounded p-3 mt-3">
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <p className="font-bold">CAE Nº: {lastVenta.factura.cae}</p>
-                        <p>Fecha Vto. CAE: {lastVenta.factura.cae_vencimiento}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-muted-foreground">Comprobante Autorizado</p>
-                        <p className="text-muted-foreground">AFIP - Factura Electrónica</p>
-                      </div>
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              <div className="font-mono text-sm space-y-4">
+                <div className="text-center">
+                  <p className="font-bold text-lg">{lastVenta.factura ? 'FACTURA' : 'TICKET'}</p>
+                  <p>Comprobante #{lastVenta.numero_comprobante}</p>
+                  <p className="text-muted-foreground">
+                    {new Date(lastVenta.fecha).toLocaleString('es-AR')}
+                  </p>
                 </div>
-              ) : (
-                // TICKET SIMPLE
-                <div className="font-mono text-sm space-y-4">
-                  <div className="text-center">
-                    <p className="font-bold text-lg">TICKET</p>
-                    <p>Comprobante #{lastVenta.numero_comprobante}</p>
-                    <p className="text-muted-foreground">
-                      {new Date(lastVenta.fecha).toLocaleString('es-AR')}
-                    </p>
-                  </div>
 
-                  <Separator />
+                <Separator />
 
-                  <div>
-                    <p className="font-medium">Cliente:</p>
-                    <p>{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                      <div key={idx} className="flex justify-between">
-                        <span>{item.cantidad}x {item.producto.descripcion.substring(0, 25)}</span>
-                        <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>TOTAL</span>
-                    <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-
-                  <div className="text-center text-muted-foreground">
-                    <p>¡Gracias por su compra!</p>
-                  </div>
+                <div>
+                  <p className="font-medium">Cliente:</p>
+                  <p>{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
                 </div>
-              )}
+
+                <Separator />
+
+                <div>
+                  {lastVenta.detalles.map((item: CartItem, idx: number) => (
+                    <div key={idx} className="flex justify-between">
+                      <span>
+                        {item.cantidad}x {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion?.substring(0, 25)}
+                      </span>
+                      <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between font-bold text-lg">
+                  <span>TOTAL</span>
+                  <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                {lastVenta.factura && (
+                  <div className="p-3 bg-muted rounded">
+                    <p className="text-xs">CAE: {lastVenta.factura.cae}</p>
+                    <p className="text-xs">Vto CAE: {lastVenta.factura.cae_vencimiento}</p>
+                  </div>
+                )}
+
+                <div className="text-center text-muted-foreground">
+                  <p>¡Gracias por su compra!</p>
+                </div>
+              </div>
 
               <Button className="w-full" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" />
-                {lastVenta.factura ? 'Imprimir Factura' : 'Imprimir Ticket'}
+                Imprimir
               </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Factura Dialog */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1655,9 +2150,6 @@ export default function POS() {
                           <p className="text-sm mt-1">
                             Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            {pedido.venta_detalles?.length || 0} productos
-                          </p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">
@@ -1668,7 +2160,6 @@ export default function POS() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleImprimirPedido(pedido)}
-                              title="Imprimir pedido"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1676,7 +2167,6 @@ export default function POS() {
                               size="sm"
                               variant="default"
                               onClick={() => handleCargarPedido(pedido)}
-                              title="Cargar para editar/facturar"
                             >
                               <Edit className="h-4 w-4 mr-1" />
                               Editar
@@ -1684,32 +2174,12 @@ export default function POS() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-destructive hover:text-destructive"
+                              className="text-destructive"
                               onClick={() => handleEliminarPedido(pedido.id)}
-                              title="Eliminar pedido"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        </div>
-                      </div>
-                      {/* Detalle expandido */}
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">Productos:</p>
-                        <div className="space-y-1">
-                          {pedido.venta_detalles?.slice(0, 3).map((d: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span className="truncate max-w-[200px]">
-                                {d.cantidad}x {d.productos?.descripcion || 'Producto'}
-                              </span>
-                              <span>${d.subtotal.toLocaleString('es-AR')}</span>
-                            </div>
-                          ))}
-                          {pedido.venta_detalles?.length > 3 && (
-                            <p className="text-xs text-muted-foreground">
-                              +{pedido.venta_detalles.length - 3} productos más...
-                            </p>
-                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -1720,6 +2190,7 @@ export default function POS() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
       {/* Dialog para ingresar peso */}
       <Dialog open={pesoDialogOpen} onOpenChange={setPesoDialogOpen}>
         <DialogContent className="sm:max-w-[350px]">
@@ -1732,7 +2203,7 @@ export default function POS() {
           <div className="space-y-4">
             {editingPesoItem && (
               <p className="text-sm text-muted-foreground">
-                {cart.find(i => i.producto.id === editingPesoItem)?.producto.descripcion}
+                {cart.find(i => i.id === editingPesoItem)?.producto?.descripcion}
               </p>
             )}
             <div>
@@ -1746,30 +2217,25 @@ export default function POS() {
                   value={pesoInput}
                   onChange={(e) => setPesoInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleGuardarPeso();
-                    }
+                    if (e.key === 'Enter') handleGuardarPeso();
                   }}
                   autoFocus
                   className="text-lg"
                 />
                 <span className="text-muted-foreground font-medium">kg</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Use coma o punto como separador decimal
-              </p>
             </div>
             {editingPesoItem && pesoInput && (
               <div className="p-3 bg-muted rounded-lg">
                 <div className="flex justify-between text-sm">
                   <span>Precio por kg:</span>
-                  <span>${cart.find(i => i.producto.id === editingPesoItem)?.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>${cart.find(i => i.id === editingPesoItem)?.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between font-bold mt-1">
                   <span>Subtotal:</span>
                   <span>
                     ${(
-                      (cart.find(i => i.producto.id === editingPesoItem)?.precio || 0) * 
+                      (cart.find(i => i.id === editingPesoItem)?.precio || 0) * 
                       parseFloat(pesoInput.replace(',', '.') || '0')
                     ).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </span>
