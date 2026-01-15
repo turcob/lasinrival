@@ -379,9 +379,10 @@ export default function POS() {
           })
           .eq('id', editingPedidoId)
           .select()
-          .single();
+          .maybeSingle();
 
         if (updateError) throw updateError;
+        if (!updatedVenta) throw new Error('No se pudo actualizar la venta');
         venta = updatedVenta;
 
         // Eliminar detalles anteriores
@@ -419,9 +420,10 @@ export default function POS() {
             estado: 'confirmada',
           }])
           .select()
-          .single();
+          .maybeSingle();
 
         if (ventaError) throw ventaError;
+        if (!newVenta) throw new Error('No se pudo crear la venta');
         venta = newVenta;
 
         // Create venta_detalles
@@ -489,7 +491,7 @@ export default function POS() {
         .from('cajas')
         .select('total_ventas')
         .eq('id', caja.id)
-        .single();
+        .maybeSingle();
 
       await supabase
         .from('cajas')
