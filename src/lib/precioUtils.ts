@@ -1,17 +1,32 @@
-// Utilidades para cálculo de precios con sistema de prioridad
+// Utilidades para cálculo de precios con sistema matricial
+// Prioridad: Excepción > Marca > Tipo de Producto > General
 
-export interface ListaPrecioConNivel {
+export interface ListaPrecio {
   id: string;
   nombre: string;
-  porcentaje: number;
+  codigo: string | null;
+  orden: number;
   activo: boolean;
-  nivel: 'global' | 'marca' | 'tipo_producto';
-  prioridad: number;
-  marca_id: string | null;
-  tipo_producto_id: string | null;
 }
 
-export interface ProductoConRelaciones {
+export interface PorcentajeMatriz {
+  id: string;
+  lista_precio_id: string;
+  marca_id: string | null;
+  tipo_producto_id: string | null;
+  es_general: boolean;
+  porcentaje: number;
+}
+
+export interface ExcepcionProducto {
+  id: string;
+  lista_precio_id: string | null; // null = aplica a todas las listas
+  producto_id: string;
+  porcentaje: number;
+  descripcion: string | null;
+}
+
+export interface ProductoParaCalculo {
   id: string;
   precio_costo: number;
   marca_id: string | null;
@@ -19,50 +34,84 @@ export interface ProductoConRelaciones {
 }
 
 /**
- * Calcula el porcentaje de ganancia aplicable a un producto
- * basándose en la jerarquía de prioridad:
- * 1. Lista por Marca (prioridad más alta)
- * 2. Lista por Tipo de Producto
- * 3. Lista Global (prioridad más baja)
+ * Calcula el porcentaje de ganancia para un producto en una lista específica
+ * Jerarquía de prioridad:
+ * 1. Excepción por producto específico (mayor prioridad)
+ * 2. Porcentaje por Marca del producto
+ * 3. Porcentaje por Tipo de Producto
+ * 4. Porcentaje General (menor prioridad)
  */
 export function calcularPorcentajeProducto(
-  producto: ProductoConRelaciones,
-  listasPrecios: ListaPrecioConNivel[]
-): { porcentaje: number; listaAplicada: ListaPrecioConNivel | null } {
-  // Filtrar solo listas activas
-  const listasActivas = listasPrecios.filter(l => l.activo);
+  producto: ProductoParaCalculo,
+  listaId: string,
+  matrizPorcentajes: PorcentajeMatriz[],
+  excepciones: ExcepcionProducto[]
+): { porcentaje: number; origen: 'excepcion' | 'marca' | 'tipo' | 'general' | 'ninguno'; descripcion: string } {
   
-  // Ordenar por prioridad descendente (mayor prioridad primero)
-  const listasOrdenadas = [...listasActivas].sort((a, b) => b.prioridad - a.prioridad);
+  // 1. Buscar excepción específica del producto
+  const excepcion = excepciones.find(e => 
+    e.producto_id === producto.id && 
+    (e.lista_precio_id === listaId || e.lista_precio_id === null)
+  );
+  if (excepcion) {
+    return { 
+      porcentaje: excepcion.porcentaje, 
+      origen: 'excepcion',
+      descripcion: excepcion.descripcion || 'Excepción'
+    };
+  }
   
-  // 1. Buscar lista por marca del producto (prioridad más alta)
+  // 2. Buscar por MARCA del producto (PRIORIDAD ALTA)
   if (producto.marca_id) {
-    const listaMarca = listasOrdenadas.find(l => 
-      l.nivel === 'marca' && l.marca_id === producto.marca_id
+    const porMarca = matrizPorcentajes.find(p => 
+      p.lista_precio_id === listaId && 
+      p.marca_id === producto.marca_id &&
+      !p.es_general
     );
-    if (listaMarca) {
-      return { porcentaje: listaMarca.porcentaje, listaAplicada: listaMarca };
+    if (porMarca) {
+      return { 
+        porcentaje: porMarca.porcentaje, 
+        origen: 'marca',
+        descripcion: 'Por marca'
+      };
     }
   }
   
-  // 2. Buscar lista por tipo de producto
+  // 3. Buscar por TIPO DE PRODUCTO (PRIORIDAD MEDIA)
   if (producto.tipo_producto_id) {
-    const listaTipo = listasOrdenadas.find(l => 
-      l.nivel === 'tipo_producto' && l.tipo_producto_id === producto.tipo_producto_id
+    const porTipo = matrizPorcentajes.find(p => 
+      p.lista_precio_id === listaId && 
+      p.tipo_producto_id === producto.tipo_producto_id &&
+      !p.es_general
     );
-    if (listaTipo) {
-      return { porcentaje: listaTipo.porcentaje, listaAplicada: listaTipo };
+    if (porTipo) {
+      return { 
+        porcentaje: porTipo.porcentaje, 
+        origen: 'tipo',
+        descripcion: 'Por tipo'
+      };
     }
   }
   
-  // 3. Buscar lista global (o la primera disponible)
-  const listaGlobal = listasOrdenadas.find(l => l.nivel === 'global');
-  if (listaGlobal) {
-    return { porcentaje: listaGlobal.porcentaje, listaAplicada: listaGlobal };
+  // 4. Usar porcentaje GENERAL (FALLBACK)
+  const general = matrizPorcentajes.find(p => 
+    p.lista_precio_id === listaId && 
+    p.es_general === true
+  );
+  if (general) {
+    return { 
+      porcentaje: general.porcentaje, 
+      origen: 'general',
+      descripcion: 'General'
+    };
   }
   
-  // Si no hay ninguna lista, retornar 0
-  return { porcentaje: 0, listaAplicada: null };
+  // Si no hay ningún porcentaje definido
+  return { 
+    porcentaje: 0, 
+    origen: 'ninguno',
+    descripcion: 'Sin precio definido'
+  };
 }
 
 /**
@@ -77,29 +126,21 @@ export function calcularPrecioVenta(
 
 /**
  * Obtiene el precio de venta final de un producto
- * considerando el sistema de prioridad de listas de precios
+ * considerando el sistema de prioridad matricial
  */
 export function obtenerPrecioVentaProducto(
-  producto: ProductoConRelaciones,
-  listasPrecios: ListaPrecioConNivel[]
-): { precioVenta: number; porcentaje: number; listaAplicada: ListaPrecioConNivel | null } {
-  const { porcentaje, listaAplicada } = calcularPorcentajeProducto(producto, listasPrecios);
-  const precioVenta = calcularPrecioVenta(producto.precio_costo, porcentaje);
+  producto: ProductoParaCalculo,
+  listaId: string,
+  matrizPorcentajes: PorcentajeMatriz[],
+  excepciones: ExcepcionProducto[]
+): { precioVenta: number; porcentaje: number; origen: string; descripcion: string } {
+  const resultado = calcularPorcentajeProducto(producto, listaId, matrizPorcentajes, excepciones);
+  const precioVenta = calcularPrecioVenta(producto.precio_costo, resultado.porcentaje);
   
-  return { precioVenta, porcentaje, listaAplicada };
-}
-
-/**
- * Obtiene la prioridad por defecto según el nivel
- */
-export function getPrioridadPorNivel(nivel: string): number {
-  switch (nivel) {
-    case 'marca':
-      return 3;
-    case 'tipo_producto':
-      return 2;
-    case 'global':
-    default:
-      return 1;
-  }
+  return { 
+    precioVenta, 
+    porcentaje: resultado.porcentaje, 
+    origen: resultado.origen,
+    descripcion: resultado.descripcion
+  };
 }

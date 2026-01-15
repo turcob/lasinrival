@@ -53,11 +53,31 @@ interface Producto {
   stock_actual: number;
   unidad_medida: string;
   precio_costo: number;
+  marca_id?: string | null;
+  tipo_producto_id?: string | null;
 }
 
 interface ListaPrecio {
   id: string;
   nombre: string;
+  codigo?: string | null;
+  orden?: number;
+  activo?: boolean;
+}
+
+interface PorcentajeMatriz {
+  id: string;
+  lista_precio_id: string;
+  marca_id: string | null;
+  tipo_producto_id: string | null;
+  es_general: boolean;
+  porcentaje: number;
+}
+
+interface ExcepcionProducto {
+  id: string;
+  lista_precio_id: string | null;
+  producto_id: string;
   porcentaje: number;
 }
 
@@ -109,6 +129,8 @@ export default function POS() {
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
+  const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
+  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,17 +172,21 @@ export default function POS() {
     if (!user) return;
     setLoading(true);
     try {
-      const [productosRes, clientesRes, formasPagoRes, listasRes, cajasRes] = await Promise.all([
-        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo').eq('activo', true).order('descripcion'),
-        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva').eq('activo', true).order('nombre'),
+      const [productosRes, clientesRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes] = await Promise.all([
+        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
-        supabase.from('listas_precios').select('id, nombre, porcentaje').eq('activo', true),
+        supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).order('orden'),
+        supabase.from('lista_precio_porcentajes').select('*'),
+        supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje'),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
       ]);
 
       if (productosRes.data) setProductos(productosRes.data);
-      if (clientesRes.data) setClientes(clientesRes.data);
+      if (clientesRes.data) setClientes(clientesRes.data as Cliente[]);
       if (formasPagoRes.data) setFormasPago(formasPagoRes.data);
+      if (porcentajesRes.data) setMatrizPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
+      if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
       if (listasRes.data) {
         setListasPrecios(listasRes.data);
         if (listasRes.data.length > 0 && !selectedLista) {
@@ -186,12 +212,53 @@ export default function POS() {
     ).slice(0, 10);
   }, [productos, searchTerm]);
 
-  // Calcular precio de venta: costo + (costo * porcentaje / 100)
-  const getProductoPrice = (producto: Producto) => {
+  // Calcular precio de venta usando el nuevo sistema matricial
+  // Prioridad: Excepción > Marca > Tipo de Producto > General
+  const getProductoPrice = (producto: Producto): number => {
     if (!selectedLista) return 0;
     const costo = producto.precio_costo || 0;
-    const porcentaje = selectedLista.porcentaje || 0;
-    return costo + (costo * porcentaje / 100);
+    
+    // 1. Buscar excepción específica del producto
+    const excepcion = excepciones.find(e => 
+      e.producto_id === producto.id && 
+      (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null)
+    );
+    if (excepcion) {
+      return costo * (1 + excepcion.porcentaje / 100);
+    }
+    
+    // 2. Buscar por MARCA del producto (PRIORIDAD ALTA)
+    if (producto.marca_id) {
+      const porMarca = matrizPorcentajes.find(p => 
+        p.lista_precio_id === selectedLista.id && 
+        p.marca_id === producto.marca_id
+      );
+      if (porMarca) {
+        return costo * (1 + porMarca.porcentaje / 100);
+      }
+    }
+    
+    // 3. Buscar por TIPO DE PRODUCTO (PRIORIDAD MEDIA)
+    if (producto.tipo_producto_id) {
+      const porTipo = matrizPorcentajes.find(p => 
+        p.lista_precio_id === selectedLista.id && 
+        p.tipo_producto_id === producto.tipo_producto_id
+      );
+      if (porTipo) {
+        return costo * (1 + porTipo.porcentaje / 100);
+      }
+    }
+    
+    // 4. Usar porcentaje GENERAL (FALLBACK)
+    const general = matrizPorcentajes.find(p => 
+      p.lista_precio_id === selectedLista.id && 
+      p.es_general === true
+    );
+    if (general) {
+      return costo * (1 + general.porcentaje / 100);
+    }
+    
+    return costo; // Sin margen si no hay configuración
   };
 
   const addToCart = (producto: Producto) => {

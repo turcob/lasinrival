@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Percent, Info } from 'lucide-react';
+import { Plus, Edit2, Trash2, Info, Save, X, Search, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +32,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
-import { getPrioridadPorNivel } from '@/lib/precioUtils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Marca {
   id: string;
@@ -47,42 +56,83 @@ interface TipoProducto {
   nombre: string;
 }
 
+interface Producto {
+  id: string;
+  codigo_articulo: string;
+  descripcion: string;
+  marca_id?: string | null;
+  tipo_producto_id?: string | null;
+}
+
 interface ListaPrecio {
   id: string;
   nombre: string;
-  porcentaje: number;
+  codigo: string | null;
+  orden: number;
   activo: boolean;
-  nivel: 'global' | 'marca' | 'tipo_producto';
-  prioridad: number;
-  marca_id: string | null;
-  tipo_producto_id: string | null;
-  created_at: string;
-  marca?: Marca | null;
-  tipo_producto?: TipoProducto | null;
 }
 
-const NIVELES = [
-  { value: 'global', label: 'Global', description: 'Aplica a todos los productos', prioridad: 1 },
-  { value: 'tipo_producto', label: 'Por Tipo de Producto', description: 'Aplica a productos de un tipo específico', prioridad: 2 },
-  { value: 'marca', label: 'Por Marca', description: 'Aplica a productos de una marca específica (mayor prioridad)', prioridad: 3 },
-];
+interface Porcentaje {
+  id?: string;
+  lista_precio_id: string;
+  marca_id: string | null;
+  tipo_producto_id: string | null;
+  es_general: boolean;
+  porcentaje: number;
+}
+
+interface Excepcion {
+  id?: string;
+  lista_precio_id: string | null;
+  producto_id: string;
+  porcentaje: number;
+  descripcion: string | null;
+  producto?: Producto;
+}
+
+// Columna en la matriz (marca o tipo)
+interface ColumnaMatriz {
+  id: string;
+  nombre: string;
+  tipo: 'general' | 'marca' | 'tipo_producto';
+  referencia_id: string | null;
+}
 
 export default function ListasPrecios() {
   const [listas, setListas] = useState<ListaPrecio[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [tiposProducto, setTiposProducto] = useState<TipoProducto[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [porcentajes, setPorcentajes] = useState<Porcentaje[]>([]);
+  const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  // Columnas activas en la matriz
+  const [columnasActivas, setColumnasActivas] = useState<ColumnaMatriz[]>([
+    { id: 'general', nombre: 'MERCADERÍA', tipo: 'general', referencia_id: null }
+  ]);
+  
+  // Dialogs
+  const [listaDialogOpen, setListaDialogOpen] = useState(false);
+  const [deleteListaDialogOpen, setDeleteListaDialogOpen] = useState(false);
+  const [columnaDialogOpen, setColumnaDialogOpen] = useState(false);
+  const [excepcionDialogOpen, setExcepcionDialogOpen] = useState(false);
+  const [deleteExcepcionDialogOpen, setDeleteExcepcionDialogOpen] = useState(false);
+  
+  // Selected items
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
-  const [formData, setFormData] = useState({
-    nombre: '',
-    porcentaje: 0,
-    activo: true,
-    nivel: 'global' as 'global' | 'marca' | 'tipo_producto',
-    marca_id: null as string | null,
-    tipo_producto_id: null as string | null,
-  });
+  const [selectedExcepcion, setSelectedExcepcion] = useState<Excepcion | null>(null);
+  
+  // Form data
+  const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true });
+  const [columnaFormData, setColumnaFormData] = useState<{ tipo: 'marca' | 'tipo_producto', id: string }>({ tipo: 'marca', id: '' });
+  const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '' });
+  const [productoSearch, setProductoSearch] = useState('');
+  
+  // Matriz de porcentajes editables (temporal antes de guardar)
+  const [matrizTemp, setMatrizTemp] = useState<Record<string, Record<string, number>>>({});
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -91,19 +141,74 @@ export default function ListasPrecios() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [listasRes, marcasRes, tiposRes] = await Promise.all([
-        supabase
-          .from('listas_precios')
-          .select('*, marca:marcas(id, nombre), tipo_producto:tipos_producto(id, nombre)')
-          .order('prioridad', { ascending: false }),
+      const [listasRes, marcasRes, tiposRes, porcentajesRes, excepcionesRes, productosRes] = await Promise.all([
+        supabase.from('listas_precios').select('*').order('orden'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('tipos_producto').select('id, nombre').eq('activo', true).order('nombre'),
+        supabase.from('lista_precio_porcentajes').select('*'),
+        supabase.from('lista_precio_excepciones').select('*, producto:productos(id, codigo_articulo, descripcion, marca_id, tipo_producto_id)'),
+        supabase.from('productos').select('id, codigo_articulo, descripcion, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
       ]);
 
       if (listasRes.error) throw listasRes.error;
-      setListas((listasRes.data || []) as ListaPrecio[]);
+      
+      const listasData = listasRes.data || [];
+      const porcentajesData = porcentajesRes.data || [];
+      
+      setListas(listasData);
       setMarcas(marcasRes.data || []);
       setTiposProducto(tiposRes.data || []);
+      setPorcentajes(porcentajesData);
+      setExcepciones((excepcionesRes.data || []) as Excepcion[]);
+      setProductos(productosRes.data || []);
+      
+      // Construir columnas desde los porcentajes existentes
+      const columnas: ColumnaMatriz[] = [
+        { id: 'general', nombre: 'MERCADERÍA', tipo: 'general', referencia_id: null }
+      ];
+      
+      const marcasEnUso = new Set<string>();
+      const tiposEnUso = new Set<string>();
+      
+      porcentajesData.forEach(p => {
+        if (p.marca_id) marcasEnUso.add(p.marca_id);
+        if (p.tipo_producto_id) tiposEnUso.add(p.tipo_producto_id);
+      });
+      
+      marcasEnUso.forEach(marcaId => {
+        const marca = marcasRes.data?.find(m => m.id === marcaId);
+        if (marca) {
+          columnas.push({ id: `marca_${marcaId}`, nombre: marca.nombre, tipo: 'marca', referencia_id: marcaId });
+        }
+      });
+      
+      tiposEnUso.forEach(tipoId => {
+        const tipo = tiposRes.data?.find(t => t.id === tipoId);
+        if (tipo) {
+          columnas.push({ id: `tipo_${tipoId}`, nombre: tipo.nombre, tipo: 'tipo_producto', referencia_id: tipoId });
+        }
+      });
+      
+      setColumnasActivas(columnas);
+      
+      // Construir matriz temporal
+      const matriz: Record<string, Record<string, number>> = {};
+      listasData.forEach(lista => {
+        matriz[lista.id] = {};
+        columnas.forEach(col => {
+          const porcentaje = porcentajesData.find(p => {
+            if (p.lista_precio_id !== lista.id) return false;
+            if (col.tipo === 'general') return p.es_general;
+            if (col.tipo === 'marca') return p.marca_id === col.referencia_id;
+            if (col.tipo === 'tipo_producto') return p.tipo_producto_id === col.referencia_id;
+            return false;
+          });
+          matriz[lista.id][col.id] = porcentaje?.porcentaje ?? 0;
+        });
+      });
+      setMatrizTemp(matriz);
+      setHasChanges(false);
+      
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Error al cargar los datos');
@@ -112,372 +217,679 @@ export default function ListasPrecios() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Filtrar productos para búsqueda
+  const filteredProductos = useMemo(() => {
+    if (!productoSearch) return [];
+    const term = productoSearch.toLowerCase();
+    return productos.filter(p => 
+      p.codigo_articulo.toLowerCase().includes(term) ||
+      p.descripcion.toLowerCase().includes(term)
+    ).slice(0, 10);
+  }, [productos, productoSearch]);
 
-    if (formData.porcentaje < 0) {
-      toast.error('El porcentaje debe ser mayor o igual a 0');
-      return;
-    }
+  // Actualizar celda de la matriz
+  const updateMatrizCell = (listaId: string, columnaId: string, value: number) => {
+    setMatrizTemp(prev => ({
+      ...prev,
+      [listaId]: {
+        ...prev[listaId],
+        [columnaId]: value
+      }
+    }));
+    setHasChanges(true);
+  };
 
-    if (formData.nivel === 'marca' && !formData.marca_id) {
-      toast.error('Debe seleccionar una marca');
-      return;
-    }
-
-    if (formData.nivel === 'tipo_producto' && !formData.tipo_producto_id) {
-      toast.error('Debe seleccionar un tipo de producto');
-      return;
-    }
-
-    const prioridad = getPrioridadPorNivel(formData.nivel);
-
-    const dataToSave = {
-      nombre: formData.nombre,
-      porcentaje: formData.porcentaje,
-      activo: formData.activo,
-      nivel: formData.nivel,
-      prioridad,
-      marca_id: formData.nivel === 'marca' ? formData.marca_id : null,
-      tipo_producto_id: formData.nivel === 'tipo_producto' ? formData.tipo_producto_id : null,
-    };
-
+  // Guardar toda la matriz
+  const handleSaveMatriz = async () => {
+    setSaving(true);
     try {
-      if (selectedLista) {
-        const { error } = await supabase
-          .from('listas_precios')
-          .update(dataToSave)
-          .eq('id', selectedLista.id);
-
+      // Eliminar todos los porcentajes existentes y recrearlos
+      await supabase.from('lista_precio_porcentajes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      const nuevoPorcentajes: Omit<Porcentaje, 'id'>[] = [];
+      
+      Object.entries(matrizTemp).forEach(([listaId, columnas]) => {
+        Object.entries(columnas).forEach(([columnaId, porcentaje]) => {
+          const columna = columnasActivas.find(c => c.id === columnaId);
+          if (!columna) return;
+          
+          nuevoPorcentajes.push({
+            lista_precio_id: listaId,
+            marca_id: columna.tipo === 'marca' ? columna.referencia_id : null,
+            tipo_producto_id: columna.tipo === 'tipo_producto' ? columna.referencia_id : null,
+            es_general: columna.tipo === 'general',
+            porcentaje: porcentaje || 0,
+          });
+        });
+      });
+      
+      if (nuevoPorcentajes.length > 0) {
+        const { error } = await supabase.from('lista_precio_porcentajes').insert(nuevoPorcentajes);
         if (error) throw error;
-        toast.success('Lista de precios actualizada correctamente');
-      } else {
-        const { error } = await supabase.from('listas_precios').insert([dataToSave]);
-        if (error) throw error;
-        toast.success('Lista de precios creada correctamente');
       }
-
-      setDialogOpen(false);
-      resetForm();
+      
+      toast.success('Matriz de precios guardada correctamente');
+      setHasChanges(false);
       fetchData();
-    } catch (error: any) {
-      console.error('Error saving lista:', error);
-      if (error.code === '23505') {
-        toast.error('Ya existe una lista con ese nombre');
-      } else {
-        toast.error('Error al guardar la lista de precios');
-      }
+    } catch (error) {
+      console.error('Error saving matriz:', error);
+      toast.error('Error al guardar la matriz');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedLista) return;
-
+  // CRUD Listas
+  const handleSubmitLista = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      const { error } = await supabase
-        .from('listas_precios')
-        .delete()
-        .eq('id', selectedLista.id);
+      const dataToSave = {
+        nombre: listaFormData.nombre,
+        codigo: listaFormData.codigo || null,
+        orden: listaFormData.orden,
+        activo: listaFormData.activo,
+      };
+      
+      if (selectedLista) {
+        const { error } = await supabase.from('listas_precios').update(dataToSave).eq('id', selectedLista.id);
+        if (error) throw error;
+        toast.success('Lista actualizada');
+      } else {
+        const { error } = await supabase.from('listas_precios').insert([dataToSave]);
+        if (error) throw error;
+        toast.success('Lista creada');
+      }
+      
+      setListaDialogOpen(false);
+      resetListaForm();
+      fetchData();
+    } catch (error: any) {
+      console.error('Error saving lista:', error);
+      toast.error('Error al guardar');
+    }
+  };
 
+  const handleDeleteLista = async () => {
+    if (!selectedLista) return;
+    try {
+      const { error } = await supabase.from('listas_precios').delete().eq('id', selectedLista.id);
       if (error) throw error;
-      toast.success('Lista de precios eliminada correctamente');
-      setDeleteDialogOpen(false);
+      toast.success('Lista eliminada');
+      setDeleteListaDialogOpen(false);
       setSelectedLista(null);
       fetchData();
     } catch (error) {
       console.error('Error deleting lista:', error);
-      toast.error('Error al eliminar la lista de precios');
+      toast.error('Error al eliminar');
     }
   };
 
-  const openEditDialog = (lista: ListaPrecio) => {
+  const openEditListaDialog = (lista: ListaPrecio) => {
     setSelectedLista(lista);
-    setFormData({
-      nombre: lista.nombre,
-      porcentaje: lista.porcentaje,
-      activo: lista.activo,
-      nivel: lista.nivel || 'global',
-      marca_id: lista.marca_id,
-      tipo_producto_id: lista.tipo_producto_id,
-    });
-    setDialogOpen(true);
+    setListaFormData({ nombre: lista.nombre, codigo: lista.codigo || '', orden: lista.orden, activo: lista.activo });
+    setListaDialogOpen(true);
   };
 
-  const resetForm = () => {
+  const resetListaForm = () => {
     setSelectedLista(null);
-    setFormData({
-      nombre: '',
-      porcentaje: 0,
-      activo: true,
-      nivel: 'global',
-      marca_id: null,
-      tipo_producto_id: null,
-    });
+    setListaFormData({ nombre: '', codigo: '', orden: listas.length, activo: true });
   };
 
-  const getNivelBadge = (lista: ListaPrecio) => {
-    const nivel = NIVELES.find(n => n.value === lista.nivel) || NIVELES[0];
-    let label = nivel.label;
-    
-    if (lista.nivel === 'marca' && lista.marca) {
-      label = `Marca: ${lista.marca.nombre}`;
-    } else if (lista.nivel === 'tipo_producto' && lista.tipo_producto) {
-      label = `Tipo: ${lista.tipo_producto.nombre}`;
+  // Agregar columna
+  const handleAddColumna = () => {
+    const { tipo, id } = columnaFormData;
+    if (!id) {
+      toast.error('Seleccione un elemento');
+      return;
     }
-
-    const variant = lista.nivel === 'marca' ? 'default' : 
-                    lista.nivel === 'tipo_producto' ? 'secondary' : 
-                    'outline';
-
-    return <Badge variant={variant}>{label}</Badge>;
+    
+    const exists = columnasActivas.some(c => 
+      (tipo === 'marca' && c.referencia_id === id && c.tipo === 'marca') ||
+      (tipo === 'tipo_producto' && c.referencia_id === id && c.tipo === 'tipo_producto')
+    );
+    
+    if (exists) {
+      toast.error('Esta columna ya existe');
+      return;
+    }
+    
+    let nombre = '';
+    if (tipo === 'marca') {
+      nombre = marcas.find(m => m.id === id)?.nombre || '';
+    } else {
+      nombre = tiposProducto.find(t => t.id === id)?.nombre || '';
+    }
+    
+    const nuevaColumna: ColumnaMatriz = {
+      id: `${tipo}_${id}`,
+      nombre,
+      tipo,
+      referencia_id: id
+    };
+    
+    setColumnasActivas(prev => [...prev, nuevaColumna]);
+    
+    // Inicializar celdas en 0
+    setMatrizTemp(prev => {
+      const nuevo = { ...prev };
+      Object.keys(nuevo).forEach(listaId => {
+        nuevo[listaId][nuevaColumna.id] = 0;
+      });
+      return nuevo;
+    });
+    
+    setHasChanges(true);
+    setColumnaDialogOpen(false);
+    setColumnaFormData({ tipo: 'marca', id: '' });
   };
 
-  const columns = [
-    { key: 'nombre', header: 'Nombre' },
-    {
-      key: 'nivel',
-      header: 'Nivel / Aplica a',
-      render: (item: ListaPrecio) => getNivelBadge(item),
-    },
-    {
-      key: 'porcentaje',
-      header: 'Porcentaje',
-      render: (item: ListaPrecio) => (
-        <div className="flex items-center gap-1">
-          <span className="font-medium text-primary">{item.porcentaje}%</span>
+  const handleRemoveColumna = (columnaId: string) => {
+    if (columnaId === 'general') {
+      toast.error('No se puede eliminar la columna general');
+      return;
+    }
+    
+    setColumnasActivas(prev => prev.filter(c => c.id !== columnaId));
+    setMatrizTemp(prev => {
+      const nuevo = { ...prev };
+      Object.keys(nuevo).forEach(listaId => {
+        delete nuevo[listaId][columnaId];
+      });
+      return nuevo;
+    });
+    setHasChanges(true);
+  };
+
+  // CRUD Excepciones
+  const handleSubmitExcepcion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const dataToSave = {
+        producto_id: excepcionFormData.producto_id,
+        lista_precio_id: excepcionFormData.lista_precio_id || null,
+        porcentaje: excepcionFormData.porcentaje,
+        descripcion: excepcionFormData.descripcion || null,
+      };
+      
+      if (selectedExcepcion?.id) {
+        const { error } = await supabase.from('lista_precio_excepciones').update(dataToSave).eq('id', selectedExcepcion.id);
+        if (error) throw error;
+        toast.success('Excepción actualizada');
+      } else {
+        const { error } = await supabase.from('lista_precio_excepciones').insert([dataToSave]);
+        if (error) throw error;
+        toast.success('Excepción creada');
+      }
+      
+      setExcepcionDialogOpen(false);
+      resetExcepcionForm();
+      fetchData();
+    } catch (error: any) {
+      console.error('Error saving excepcion:', error);
+      if (error.code === '23505') {
+        toast.error('Ya existe una excepción para este producto en esta lista');
+      } else {
+        toast.error('Error al guardar');
+      }
+    }
+  };
+
+  const handleDeleteExcepcion = async () => {
+    if (!selectedExcepcion?.id) return;
+    try {
+      const { error } = await supabase.from('lista_precio_excepciones').delete().eq('id', selectedExcepcion.id);
+      if (error) throw error;
+      toast.success('Excepción eliminada');
+      setDeleteExcepcionDialogOpen(false);
+      setSelectedExcepcion(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting excepcion:', error);
+      toast.error('Error al eliminar');
+    }
+  };
+
+  const openEditExcepcionDialog = (exc: Excepcion) => {
+    setSelectedExcepcion(exc);
+    setExcepcionFormData({
+      producto_id: exc.producto_id,
+      lista_precio_id: exc.lista_precio_id || '',
+      porcentaje: exc.porcentaje,
+      descripcion: exc.descripcion || '',
+    });
+    setExcepcionDialogOpen(true);
+  };
+
+  const resetExcepcionForm = () => {
+    setSelectedExcepcion(null);
+    setExcepcionFormData({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '' });
+    setProductoSearch('');
+  };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageHeader title="Listas de Precios" description="Cargando..." />
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
-      ),
-    },
-    {
-      key: 'prioridad',
-      header: 'Prioridad',
-      render: (item: ListaPrecio) => (
-        <Badge variant="outline" className="font-mono">
-          {item.prioridad}
-        </Badge>
-      ),
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      render: (item: ListaPrecio) => <StatusBadge status={item.activo} />,
-    },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      render: (item: ListaPrecio) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSelectedLista(item);
-              setDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <PageHeader
         title="Listas de Precios"
-        description="Gestión de listas de precios con sistema de prioridad (Marca > Tipo > Global)"
+        description="Gestión matricial de precios por marca/tipo con excepciones"
       >
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Lista
+        <div className="flex gap-2">
+          {hasChanges && (
+            <Button onClick={handleSaveMatriz} disabled={saving}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedLista ? 'Editar Lista de Precios' : 'Nueva Lista de Precios'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre *</Label>
-                <Input
-                  id="nombre"
-                  placeholder="Ej: Manfrey 18%, Quesos 20%..."
-                  value={formData.nombre}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nombre: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="nivel">Nivel de Aplicación *</Label>
-                <Select
-                  value={formData.nivel}
-                  onValueChange={(value: 'global' | 'marca' | 'tipo_producto') => {
-                    setFormData({
-                      ...formData,
-                      nivel: value,
-                      marca_id: null,
-                      tipo_producto_id: null,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NIVELES.map((nivel) => (
-                      <SelectItem key={nivel.value} value={nivel.value}>
-                        <div className="flex items-center gap-2">
-                          <span>{nivel.label}</span>
-                          <Badge variant="outline" className="text-xs">P{nivel.prioridad}</Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  {NIVELES.find(n => n.value === formData.nivel)?.description}
-                </p>
-              </div>
-
-              {formData.nivel === 'marca' && (
-                <div className="space-y-2">
-                  <Label htmlFor="marca">Marca *</Label>
-                  <Select
-                    value={formData.marca_id || ''}
-                    onValueChange={(value) => setFormData({ ...formData, marca_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar marca..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {marcas.map((marca) => (
-                        <SelectItem key={marca.id} value={marca.id}>
-                          {marca.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          )}
+          <Dialog open={listaDialogOpen} onOpenChange={setListaDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" onClick={resetListaForm}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Lista
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{selectedLista ? 'Editar Lista' : 'Nueva Lista'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmitLista} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nombre *</Label>
+                    <Input
+                      value={listaFormData.nombre}
+                      onChange={(e) => setListaFormData({ ...listaFormData, nombre: e.target.value })}
+                      placeholder="Ej: MINORISTA"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código</Label>
+                    <Input
+                      value={listaFormData.codigo}
+                      onChange={(e) => setListaFormData({ ...listaFormData, codigo: e.target.value })}
+                      placeholder="Ej: 1"
+                    />
+                  </div>
                 </div>
-              )}
-
-              {formData.nivel === 'tipo_producto' && (
-                <div className="space-y-2">
-                  <Label htmlFor="tipo">Tipo de Producto *</Label>
-                  <Select
-                    value={formData.tipo_producto_id || ''}
-                    onValueChange={(value) => setFormData({ ...formData, tipo_producto_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tiposProducto.map((tipo) => (
-                        <SelectItem key={tipo.id} value={tipo.id}>
-                          {tipo.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Orden</Label>
+                    <Input
+                      type="number"
+                      value={listaFormData.orden}
+                      onChange={(e) => setListaFormData({ ...listaFormData, orden: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Switch
+                      checked={listaFormData.activo}
+                      onCheckedChange={(checked) => setListaFormData({ ...listaFormData, activo: checked })}
+                    />
+                    <Label>Activa</Label>
+                  </div>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="porcentaje">Porcentaje de Ganancia *</Label>
-                <div className="relative">
-                  <Input
-                    id="porcentaje"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Ej: 30 para 30%"
-                    value={formData.porcentaje}
-                    onChange={(e) =>
-                      setFormData({ ...formData, porcentaje: Number(e.target.value) })
-                    }
-                    required
-                  />
-                  <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setListaDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit">{selectedLista ? 'Guardar' : 'Crear'}</Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Precio venta = Costo × (1 + {formData.porcentaje}%)
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="activo"
-                  checked={formData.activo}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, activo: checked })
-                  }
-                />
-                <Label htmlFor="activo">Lista activa</Label>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {selectedLista ? 'Guardar Cambios' : 'Crear Lista'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </PageHeader>
 
-      {/* Info card */}
-      <div className="mb-4 p-4 bg-muted/50 rounded-lg border">
-        <h4 className="font-medium mb-2 flex items-center gap-2">
-          <Info className="h-4 w-4" />
-          Sistema de Prioridad
-        </h4>
-        <p className="text-sm text-muted-foreground">
-          Al calcular el precio de un producto, se aplica la lista con <strong>mayor prioridad</strong>:
-        </p>
-        <div className="flex gap-4 mt-2">
-          <Badge variant="default">Marca (P3) - Mayor prioridad</Badge>
-          <Badge variant="secondary">Tipo Producto (P2)</Badge>
-          <Badge variant="outline">Global (P1) - Menor prioridad</Badge>
-        </div>
-      </div>
+      <Tabs defaultValue="matriz" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="matriz">Matriz de Precios</TabsTrigger>
+          <TabsTrigger value="excepciones">Excepciones por Producto</TabsTrigger>
+        </TabsList>
 
-      <DataTable
-        data={listas}
-        columns={columns}
-        searchPlaceholder="Buscar listas..."
-        searchKeys={['nombre']}
-        loading={loading}
-      />
+        <TabsContent value="matriz">
+          {/* Info card */}
+          <Card className="mb-4 bg-muted/50">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div className="text-sm text-muted-foreground">
+                  <p><strong>Prioridad de cálculo:</strong> Excepción &gt; Marca &gt; Tipo de Producto &gt; General (MERCADERÍA)</p>
+                  <p className="mt-1">Ejemplo: Si un producto es "Paladini" tipo "Queso", se usa el % de Paladini (marca tiene prioridad).</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          {/* Botón agregar columna */}
+          <div className="flex justify-end mb-4">
+            <Dialog open={columnaDialogOpen} onOpenChange={setColumnaDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Columna
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Columna</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={columnaFormData.tipo}
+                      onValueChange={(v: 'marca' | 'tipo_producto') => setColumnaFormData({ tipo: v, id: '' })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="marca">Marca</SelectItem>
+                        <SelectItem value="tipo_producto">Tipo de Producto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{columnaFormData.tipo === 'marca' ? 'Marca' : 'Tipo de Producto'}</Label>
+                    <Select value={columnaFormData.id} onValueChange={(v) => setColumnaFormData({ ...columnaFormData, id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                      <SelectContent>
+                        {columnaFormData.tipo === 'marca' 
+                          ? marcas.map(m => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)
+                          : tiposProducto.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setColumnaDialogOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleAddColumna}>Agregar</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Matriz */}
+          <Card>
+            <ScrollArea className="w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px] sticky left-0 bg-background z-10">Lista</TableHead>
+                    {columnasActivas.map(col => (
+                      <TableHead key={col.id} className="min-w-[120px] text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="font-medium">{col.nombre}</span>
+                          <Badge variant={col.tipo === 'marca' ? 'default' : col.tipo === 'tipo_producto' ? 'secondary' : 'outline'} className="text-xs">
+                            {col.tipo === 'marca' ? 'Marca' : col.tipo === 'tipo_producto' ? 'Tipo' : 'General'}
+                          </Badge>
+                          {col.tipo !== 'general' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => handleRemoveColumna(col.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableHead>
+                    ))}
+                    <TableHead className="w-[100px]">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {listas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={columnasActivas.length + 2} className="text-center py-8 text-muted-foreground">
+                        No hay listas de precios. Cree una nueva para comenzar.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    listas.map(lista => (
+                      <TableRow key={lista.id}>
+                        <TableCell className="font-medium sticky left-0 bg-background">
+                          <div className="flex items-center gap-2">
+                            {lista.codigo && <Badge variant="outline" className="font-mono">{lista.codigo}</Badge>}
+                            <span>{lista.nombre}</span>
+                            {!lista.activo && <Badge variant="secondary">Inactiva</Badge>}
+                          </div>
+                        </TableCell>
+                        {columnasActivas.map(col => (
+                          <TableCell key={col.id} className="text-center">
+                            <div className="flex items-center justify-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="w-20 text-center"
+                                value={matrizTemp[lista.id]?.[col.id] ?? 0}
+                                onChange={(e) => updateMatrizCell(lista.id, col.id, parseFloat(e.target.value) || 0)}
+                              />
+                              <span className="ml-1 text-muted-foreground">%</span>
+                            </div>
+                          </TableCell>
+                        ))}
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditListaDialog(lista)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => { setSelectedLista(lista); setDeleteListaDialogOpen(true); }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="excepciones">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Excepciones por Producto
+              </CardTitle>
+              <Dialog open={excepcionDialogOpen} onOpenChange={setExcepcionDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={resetExcepcionForm}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Excepción
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{selectedExcepcion ? 'Editar Excepción' : 'Nueva Excepción'}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmitExcepcion} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Producto *</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar producto..."
+                          value={productoSearch}
+                          onChange={(e) => setProductoSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                      {filteredProductos.length > 0 && (
+                        <ScrollArea className="h-32 border rounded-md">
+                          {filteredProductos.map(p => (
+                            <div
+                              key={p.id}
+                              className="p-2 hover:bg-muted cursor-pointer"
+                              onClick={() => {
+                                setExcepcionFormData({ ...excepcionFormData, producto_id: p.id });
+                                setProductoSearch(p.descripcion);
+                              }}
+                            >
+                              <span className="font-mono text-xs">{p.codigo_articulo}</span> - {p.descripcion}
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      )}
+                      {excepcionFormData.producto_id && (
+                        <p className="text-sm text-muted-foreground">
+                          Seleccionado: {productos.find(p => p.id === excepcionFormData.producto_id)?.descripcion}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Aplica a Lista</Label>
+                      <Select
+                        value={excepcionFormData.lista_precio_id || 'todas'}
+                        onValueChange={(v) => setExcepcionFormData({ ...excepcionFormData, lista_precio_id: v === 'todas' ? '' : v })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas las listas</SelectItem>
+                          {listas.map(l => <SelectItem key={l.id} value={l.id}>{l.nombre}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Porcentaje *</Label>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={excepcionFormData.porcentaje}
+                            onChange={(e) => setExcepcionFormData({ ...excepcionFormData, porcentaje: parseFloat(e.target.value) || 0 })}
+                            required
+                          />
+                          <span>%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Descripción</Label>
+                        <Input
+                          value={excepcionFormData.descripcion}
+                          onChange={(e) => setExcepcionFormData({ ...excepcionFormData, descripcion: e.target.value })}
+                          placeholder="Ej: Producto especial"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <Button type="button" variant="outline" onClick={() => setExcepcionDialogOpen(false)}>Cancelar</Button>
+                      <Button type="submit" disabled={!excepcionFormData.producto_id}>
+                        {selectedExcepcion ? 'Guardar' : 'Crear'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {excepciones.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  No hay excepciones definidas. Las excepciones permiten asignar un % específico a productos individuales.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Lista</TableHead>
+                      <TableHead className="text-center">Porcentaje</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead className="w-[100px]">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {excepciones.map(exc => (
+                      <TableRow key={exc.id}>
+                        <TableCell>
+                          <div>
+                            <span className="font-mono text-xs">{exc.producto?.codigo_articulo}</span>
+                            <p className="text-sm">{exc.producto?.descripcion}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {exc.lista_precio_id 
+                            ? listas.find(l => l.id === exc.lista_precio_id)?.nombre 
+                            : <Badge variant="outline">Todas las listas</Badge>
+                          }
+                        </TableCell>
+                        <TableCell className="text-center font-medium">{exc.porcentaje}%</TableCell>
+                        <TableCell className="text-muted-foreground">{exc.descripcion || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditExcepcionDialog(exc)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => { setSelectedExcepcion(exc); setDeleteExcepcionDialogOpen(true); }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Delete Lista Dialog */}
+      <AlertDialog open={deleteListaDialogOpen} onOpenChange={setDeleteListaDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar lista de precios?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la lista
-              "{selectedLista?.nombre}".
+              Esta acción eliminará la lista "{selectedLista?.nombre}" y todos sus porcentajes asociados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground"
-            >
+            <AlertDialogAction onClick={handleDeleteLista} className="bg-destructive text-destructive-foreground">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Excepcion Dialog */}
+      <AlertDialog open={deleteExcepcionDialogOpen} onOpenChange={setDeleteExcepcionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar excepción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la excepción para el producto "{selectedExcepcion?.producto?.descripcion}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExcepcion} className="bg-destructive text-destructive-foreground">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
