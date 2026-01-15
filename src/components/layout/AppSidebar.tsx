@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 
 interface NavItem {
   title: string;
@@ -64,9 +64,12 @@ export function AppSidebar() {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const location = useLocation();
   const { profile, signOut, hasRole, hasPermission } = useAuth();
+  const { config } = useConfiguracionComercio();
 
   const isAdmin = hasRole('admin');
   const isEncargado = hasRole('encargado');
+  
+  const nombreSistema = config?.nombre_sistema || 'GestiónPro';
 
   // Load permissions for all modules on mount
   useEffect(() => {
@@ -161,7 +164,7 @@ export function AppSidebar() {
               <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
                 <Package className="h-5 w-5 text-sidebar-primary-foreground" />
               </div>
-              <span className="font-semibold text-sidebar-foreground">GestiónPro</span>
+              <span className="font-semibold text-sidebar-foreground">{nombreSistema}</span>
             </div>
           )}
           <Button

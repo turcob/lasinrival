@@ -15,6 +15,8 @@ interface ConfiguracionComercio {
   condicion_iva: string;
   inicio_actividades: string | null;
   punto_venta: number;
+  nombre_sistema: string | null;
+  texto_login_footer: string | null;
 }
 
 export function useConfiguracionComercio() {

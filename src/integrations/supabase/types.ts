@@ -350,10 +350,12 @@ export type Database = {
           inicio_actividades: string | null
           localidad: string | null
           nombre_fantasia: string | null
+          nombre_sistema: string | null
           provincia: string | null
           punto_venta: number
           razon_social: string
           telefono: string | null
+          texto_login_footer: string | null
           updated_at: string
         }
         Insert: {
@@ -368,10 +370,12 @@ export type Database = {
           inicio_actividades?: string | null
           localidad?: string | null
           nombre_fantasia?: string | null
+          nombre_sistema?: string | null
           provincia?: string | null
           punto_venta?: number
           razon_social: string
           telefono?: string | null
+          texto_login_footer?: string | null
           updated_at?: string
         }
         Update: {
@@ -386,10 +390,12 @@ export type Database = {
           inicio_actividades?: string | null
           localidad?: string | null
           nombre_fantasia?: string | null
+          nombre_sistema?: string | null
           provincia?: string | null
           punto_venta?: number
           razon_social?: string
           telefono?: string | null
+          texto_login_footer?: string | null
           updated_at?: string
         }
         Relationships: []
