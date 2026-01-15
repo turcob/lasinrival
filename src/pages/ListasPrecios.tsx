@@ -243,8 +243,19 @@ export default function ListasPrecios() {
   const handleSaveMatriz = async () => {
     setSaving(true);
     try {
-      // Eliminar todos los porcentajes existentes y recrearlos
-      await supabase.from('lista_precio_porcentajes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      // Primero obtener los IDs de las listas activas para borrar sus porcentajes
+      const listaIds = listas.map(l => l.id);
+      
+      // Eliminar porcentajes existentes de las listas que estamos editando
+      const { error: deleteError } = await supabase
+        .from('lista_precio_porcentajes')
+        .delete()
+        .in('lista_precio_id', listaIds);
+      
+      if (deleteError) {
+        console.error('Error deleting:', deleteError);
+        throw deleteError;
+      }
       
       const nuevoPorcentajes: Omit<Porcentaje, 'id'>[] = [];
       
