@@ -1465,7 +1465,7 @@ export default function POS() {
                                 >
                                   {editingCantidadItem === item.id ? (
                                     <Input
-                                      className="h-6 w-10 text-center p-0"
+                                      className="h-6 w-10 text-center p-0 text-foreground"
                                       value={cantidadInput}
                                       onChange={(e) => setCantidadInput(e.target.value)}
                                       onBlur={handleGuardarCantidad}
