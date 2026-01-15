@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { useSidebarContext } from '@/contexts/SidebarContext';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -61,7 +62,7 @@ const adminNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggleCollapsed } = useSidebarContext();
   const [modulePermissions, setModulePermissions] = useState<Record<string, boolean>>({});
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const location = useLocation();
@@ -172,7 +173,7 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={toggleCollapsed}
             className="text-sidebar-foreground hover:bg-sidebar-accent"
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
