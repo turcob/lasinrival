@@ -5,7 +5,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw } from 'lucide-react';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import {
   Dialog,
@@ -34,7 +34,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Producto {
   id: string;
@@ -48,8 +52,11 @@ interface Producto {
   stock_actual: number;
   stock_minimo: number;
   precio_costo: number;
+  desactivado_por: string | null;
+  fecha_desactivacion: string | null;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
+  desactivado_por_profile?: { nombre: string; email: string } | null;
 }
 
 interface Categoria {
@@ -64,6 +71,7 @@ interface Subcategoria {
 }
 
 export default function Productos() {
+  const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
@@ -71,6 +79,7 @@ export default function Productos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
+  const [activeTab, setActiveTab] = useState('activos');
   const [formData, setFormData] = useState({
     codigo_articulo: '',
     descripcion: '',
@@ -100,7 +109,23 @@ export default function Productos() {
         supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
       ]);
 
-      if (productosRes.data) setProductos(productosRes.data);
+      if (productosRes.data) {
+        // Obtener información de usuarios que desactivaron productos
+        const productosConUsuarios = await Promise.all(
+          productosRes.data.map(async (producto) => {
+            if (producto.desactivado_por) {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('nombre, email')
+                .eq('id', producto.desactivado_por)
+                .maybeSingle();
+              return { ...producto, desactivado_por_profile: profileData };
+            }
+            return { ...producto, desactivado_por_profile: null };
+          })
+        );
+        setProductos(productosConUsuarios);
+      }
       if (categoriasRes.data) setCategorias(categoriasRes.data);
       if (subcategoriasRes.data) setSubcategorias(subcategoriasRes.data);
     } catch (error) {
@@ -115,12 +140,33 @@ export default function Productos() {
     e.preventDefault();
     
     try {
-      const data = {
-        ...formData,
+      const wasActive = selectedProducto?.activo ?? true;
+      const isNowActive = formData.activo;
+      
+      const data: any = {
+        codigo_articulo: formData.codigo_articulo,
+        descripcion: formData.descripcion,
+        unidad_medida: formData.unidad_medida,
         categoria_id: formData.categoria_id || null,
         subcategoria_id: formData.subcategoria_id || null,
         codigo_barra: formData.codigo_barra || null,
+        activo: formData.activo,
+        stock_actual: formData.stock_actual,
+        stock_minimo: formData.stock_minimo,
+        precio_costo: formData.precio_costo,
       };
+
+      // Si se está desactivando el producto, registrar quién y cuándo
+      if (wasActive && !isNowActive && user) {
+        data.desactivado_por = user.id;
+        data.fecha_desactivacion = new Date().toISOString();
+      }
+      
+      // Si se está reactivando, limpiar los campos de desactivación
+      if (!wasActive && isNowActive) {
+        data.desactivado_por = null;
+        data.fecha_desactivacion = null;
+      }
 
       if (selectedProducto) {
         const { error } = await supabase
@@ -146,6 +192,26 @@ export default function Productos() {
       } else {
         toast.error('Error al guardar el producto');
       }
+    }
+  };
+
+  const handleReactivar = async (producto: Producto) => {
+    try {
+      const { error } = await supabase
+        .from('productos')
+        .update({
+          activo: true,
+          desactivado_por: null,
+          fecha_desactivacion: null,
+        })
+        .eq('id', producto.id);
+
+      if (error) throw error;
+      toast.success('Producto reactivado correctamente');
+      fetchData();
+    } catch (error) {
+      console.error('Error reactivating producto:', error);
+      toast.error('Error al reactivar el producto');
     }
   };
 
@@ -206,7 +272,10 @@ export default function Productos() {
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
   );
 
-  const columns = [
+  const productosActivos = productos.filter((p) => p.activo);
+  const productosDesactivados = productos.filter((p) => !p.activo);
+
+  const columnsActivos = [
     { key: 'codigo_articulo', header: 'Código' },
     { key: 'descripcion', header: 'Descripción' },
     { key: 'unidad_medida', header: 'Unidad' },
@@ -248,6 +317,82 @@ export default function Productos() {
       header: 'Acciones',
       render: (item: Producto) => (
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSelectedProducto(item);
+              setDeleteDialogOpen(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const columnsDesactivados = [
+    { key: 'codigo_articulo', header: 'Código' },
+    { key: 'descripcion', header: 'Descripción' },
+    {
+      key: 'categorias.nombre',
+      header: 'Categoría',
+      render: (item: Producto) => item.categorias?.nombre || '-',
+    },
+    {
+      key: 'precio_costo',
+      header: 'Costo',
+      render: (item: Producto) => (
+        <span className="font-medium">
+          ${item.precio_costo?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0.00'}
+        </span>
+      ),
+    },
+    {
+      key: 'desactivado_por',
+      header: 'Desactivado por',
+      render: (item: Producto) => (
+        <div className="text-sm">
+          {item.desactivado_por_profile ? (
+            <div>
+              <span className="font-medium">{item.desactivado_por_profile.nombre}</span>
+              <br />
+              <span className="text-muted-foreground text-xs">{item.desactivado_por_profile.email}</span>
+            </div>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'fecha_desactivacion',
+      header: 'Fecha',
+      render: (item: Producto) => (
+        <span className="text-sm text-muted-foreground">
+          {item.fecha_desactivacion
+            ? format(new Date(item.fecha_desactivacion), 'dd/MM/yyyy HH:mm', { locale: es })
+            : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      render: (item: Producto) => (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleReactivar(item)}
+            title="Reactivar producto"
+          >
+            <RotateCcw className="h-4 w-4 text-primary" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
             <Edit2 className="h-4 w-4" />
           </Button>
@@ -447,13 +592,36 @@ export default function Productos() {
         </Dialog>
       </PageHeader>
 
-      <DataTable
-        data={productos}
-        columns={columns}
-        searchPlaceholder="Buscar productos..."
-        searchKeys={['codigo_articulo', 'descripcion', 'codigo_barra']}
-        loading={loading}
-      />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="activos">
+            Activos ({productosActivos.length})
+          </TabsTrigger>
+          <TabsTrigger value="desactivados">
+            Desactivados ({productosDesactivados.length})
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="activos">
+          <DataTable
+            data={productosActivos}
+            columns={columnsActivos}
+            searchPlaceholder="Buscar productos..."
+            searchKeys={['codigo_articulo', 'descripcion', 'codigo_barra']}
+            loading={loading}
+          />
+        </TabsContent>
+        
+        <TabsContent value="desactivados">
+          <DataTable
+            data={productosDesactivados}
+            columns={columnsDesactivados}
+            searchPlaceholder="Buscar productos desactivados..."
+            searchKeys={['codigo_articulo', 'descripcion', 'codigo_barra']}
+            loading={loading}
+          />
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
