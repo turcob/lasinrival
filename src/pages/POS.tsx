@@ -1382,18 +1382,21 @@ export default function POS() {
                     <p className="text-sm">Busque productos para agregar</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {cart.map((item) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
+                      const totalSinDescuento = item.cantidad * item.precio;
+                      const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
                       
                       return (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          className="p-3 bg-muted/50 rounded-lg border"
                         >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                          {/* Header: Nombre y badges */}
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium">{nombreProducto}</p>
                               {item.es_temporal && (
                                 <Badge variant="secondary" className="text-xs">Libre</Badge>
@@ -1404,30 +1407,63 @@ export default function POS() {
                                   KG
                                 </Badge>
                               )}
-                              {item.descuento_porcentaje > 0 && (
-                                <Badge variant="destructive" className="text-xs">
-                                  -{item.descuento_porcentaje}%
-                                </Badge>
-                              )}
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })} x {esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) + ' kg' : item.cantidad}
-                            </p>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-destructive shrink-0"
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <div className="flex items-center gap-2">
+                          
+                          {/* Detalles del item */}
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Precio unit.:</span>
+                              <span>${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Cantidad:</span>
+                              <span>{esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) + ' kg' : item.cantidad}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Subtotal:</span>
+                              <span>${totalSinDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            {item.descuento_porcentaje > 0 && (
+                              <div className="flex justify-between text-destructive">
+                                <span>Desc. ({item.descuento_porcentaje}%):</span>
+                                <span>-${montoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Total final del item */}
+                          <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                            <span className="font-medium text-sm">Total:</span>
+                            <span className="font-bold text-primary">
+                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          
+                          {/* Controles */}
+                          <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-border/50">
                             {/* Botón descuento */}
                             {getDescuentoMaximo() > 0 && (
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8"
+                                size="sm"
+                                variant={item.descuento_porcentaje > 0 ? "secondary" : "outline"}
+                                className="h-7 text-xs"
                                 onClick={() => {
                                   setEditingDescuentoItem(item.id);
                                   setDescuentoInput(item.descuento_porcentaje.toString());
                                   setDescuentoDialogOpen(true);
                                 }}
                               >
-                                <Percent className="h-4 w-4" />
+                                <Percent className="h-3 w-3 mr-1" />
+                                {item.descuento_porcentaje > 0 ? `${item.descuento_porcentaje}%` : 'Descuento'}
                               </Button>
                             )}
                             
@@ -1435,29 +1471,29 @@ export default function POS() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 px-3"
+                                className="h-7 text-xs"
                                 onClick={() => {
                                   setEditingPesoItem(item.id);
                                   setPesoInput(item.cantidad.toString().replace('.', ','));
                                   setPesoDialogOpen(true);
                                 }}
                               >
-                                <Scale className="h-4 w-4 mr-1" />
-                                {item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 })} kg
+                                <Scale className="h-3 w-3 mr-1" />
+                                Cambiar peso
                               </Button>
                             ) : (
-                              <>
+                              <div className="flex items-center gap-1">
                                 <Button
                                   size="icon"
                                   variant="outline"
-                                  className="h-8 w-8"
+                                  className="h-7 w-7"
                                   onClick={() => updateQuantity(item.id, -1)}
                                 >
-                                  <Minus className="h-4 w-4" />
+                                  <Minus className="h-3 w-3" />
                                 </Button>
                                 <Button
                                   variant="ghost"
-                                  className="h-8 w-12 px-0 font-medium"
+                                  className="h-7 w-10 px-0 font-medium text-sm"
                                   onClick={() => {
                                     setEditingCantidadItem(item.id);
                                     setCantidadInput(item.cantidad.toString());
@@ -1465,7 +1501,7 @@ export default function POS() {
                                 >
                                   {editingCantidadItem === item.id ? (
                                     <Input
-                                      className="h-6 w-10 text-center p-0 text-foreground"
+                                      className="h-5 w-8 text-center p-0 text-foreground text-sm"
                                       value={cantidadInput}
                                       onChange={(e) => setCantidadInput(e.target.value)}
                                       onBlur={handleGuardarCantidad}
@@ -1482,24 +1518,13 @@ export default function POS() {
                                 <Button
                                   size="icon"
                                   variant="outline"
-                                  className="h-8 w-8"
+                                  className="h-7 w-7"
                                   onClick={() => updateQuantity(item.id, 1)}
                                 >
-                                  <Plus className="h-4 w-4" />
+                                  <Plus className="h-3 w-3" />
                                 </Button>
-                              </>
+                              </div>
                             )}
-                            <span className="w-24 text-right font-bold">
-                              ${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => removeFromCart(item.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                       );
