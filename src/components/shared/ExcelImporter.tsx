@@ -304,14 +304,15 @@ export function ExcelImporter() {
             if (subcategoriaId) updateData.subcategoria_id = subcategoriaId;
 
             if (Object.keys(updateData).length > 0) {
-              try {
-                await supabase
-                  .from('productos')
-                  .update(updateData)
-                  .eq('id', productoId);
+              const { error: updateError } = await supabase
+                .from('productos')
+                .update(updateData)
+                .eq('id', productoId);
+              
+              if (updateError) {
+                importResults.productos.errors.push({ row: i + 2, message: `Update error: ${updateError.message}` });
+              } else {
                 importResults.productos.updated++;
-              } catch (error: any) {
-                importResults.productos.errors.push({ row: i + 2, message: `Update error: ${error.message}` });
               }
             }
           }
