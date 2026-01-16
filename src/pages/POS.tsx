@@ -2147,246 +2147,145 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Ticket/Factura Dialog */}
+      {/* Ticket/Factura Dialog - Optimizado para impresora térmica 80mm */}
       <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
-        <DialogContent className={lastVenta?.factura ? "max-w-2xl" : ""}>
-          <DialogHeader>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="no-print">
             <DialogTitle className="flex items-center gap-2">
               {lastVenta?.factura ? <FileText className="h-5 w-5" /> : <Printer className="h-5 w-5" />}
               {lastVenta?.factura ? 'Factura Electrónica' : 'Ticket de Venta'}
             </DialogTitle>
           </DialogHeader>
           {lastVenta && (
-            lastVenta.factura ? (
-              // Diseño formal de factura electrónica
-              <div id="printable-invoice" className="space-y-4">
-                <div className="border-2 border-foreground rounded-lg text-sm bg-background">
-                  {/* Header Principal - Formato AFIP */}
-                  <div className="grid grid-cols-[1fr,auto,1fr] border-b-2 border-foreground">
-                    {/* Datos Emisor */}
-                    <div className="p-4 border-r-2 border-foreground">
-                      <p className="font-bold text-xl">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
-                      <p className="text-muted-foreground text-sm">{comercioConfig?.razon_social}</p>
-                      <p className="text-xs mt-2">{comercioConfig?.direccion}</p>
+            <div className="space-y-4">
+              {/* Preview del comprobante */}
+              <div id="printable-invoice" className="font-mono text-xs border rounded-lg p-4 bg-white text-black max-h-[60vh] overflow-y-auto">
+                {lastVenta.factura ? (
+                  // Factura electrónica formato térmico
+                  <>
+                    <div className="thermal-header text-center border-b border-dashed border-black pb-2 mb-2">
+                      <p className="font-bold text-sm">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
+                      <p className="text-[10px]">{comercioConfig?.razon_social}</p>
+                      <p className="text-[9px]">{comercioConfig?.direccion}</p>
                       {comercioConfig?.localidad && (
-                        <p className="text-xs">{comercioConfig.localidad}{comercioConfig.provincia ? `, ${comercioConfig.provincia}` : ''}{comercioConfig.codigo_postal ? ` (${comercioConfig.codigo_postal})` : ''}</p>
+                        <p className="text-[9px]">{comercioConfig.localidad}{comercioConfig.provincia ? `, ${comercioConfig.provincia}` : ''}</p>
                       )}
-                      {comercioConfig?.telefono && <p className="text-xs">Tel: {comercioConfig.telefono}</p>}
-                      {comercioConfig?.email && <p className="text-xs">Email: {comercioConfig.email}</p>}
-                    </div>
-                    
-                    {/* Letra del Comprobante */}
-                    <div className="flex flex-col items-center justify-center px-6 border-r-2 border-foreground">
-                      <div className="border-2 border-foreground w-16 h-16 flex items-center justify-center">
-                        <span className="font-bold text-4xl">
+                      <p className="text-[9px]">CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
+                      <p className="text-[9px]">{comercioConfig?.condicion_iva || 'IVA Resp. Inscripto'}</p>
+                      
+                      <div className="my-2 py-1 border border-black inline-block px-4">
+                        <span className="font-bold text-lg">
                           {lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
                         </span>
                       </div>
-                      <p className="text-xs mt-1 font-medium">COD. {String(lastVenta.factura.tipo_comprobante).padStart(2, '0')}</p>
+                      
+                      <p className="font-bold">FACTURA {lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}</p>
+                      <p className="font-bold">Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-{String(lastVenta.factura.numero_comprobante).padStart(8, '0')}</p>
+                      <p className="text-[9px]">Fecha: {new Date(lastVenta.fecha).toLocaleString('es-AR')}</p>
                     </div>
-                    
-                    {/* Datos Comprobante */}
-                    <div className="p-4">
-                      <p className="font-bold text-lg">
-                        FACTURA {lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
-                      </p>
-                      <p className="text-xl font-mono font-bold">
-                        Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-{String(lastVenta.factura.numero_comprobante).padStart(8, '0')}
-                      </p>
-                      <p className="text-sm mt-2">
-                        <span className="font-medium">Fecha de Emisión:</span> {new Date(lastVenta.fecha).toLocaleDateString('es-AR')}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-medium">CUIT:</span> {formatCuit(comercioConfig?.cuit || '')}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-medium">Condición IVA:</span> {comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}
-                      </p>
-                      {comercioConfig?.inicio_actividades && (
-                        <p className="text-sm">
-                          <span className="font-medium">Inicio Act.:</span> {new Date(comercioConfig.inicio_actividades).toLocaleDateString('es-AR')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Datos del Receptor */}
-                  <div className="p-4 border-b-2 border-foreground bg-muted/30">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">CUIT/CUIL/DNI del Receptor:</p>
-                        <p className="font-medium">{lastVenta.cliente?.dni_cuit || '0 - Sin identificar'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Condición frente al IVA:</p>
-                        <p className="font-medium">{CONDICIONES_IVA.find(c => c.value === (lastVenta.cliente?.condicion_iva || 5))?.label || 'Consumidor Final'}</p>
-                      </div>
+                    <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-[9px]">
+                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                      <p><strong>CUIT/DNI:</strong> {lastVenta.cliente?.dni_cuit || 'Sin identificar'}</p>
+                      <p><strong>IVA:</strong> {CONDICIONES_IVA.find(c => c.value === (lastVenta.cliente?.condicion_iva || 5))?.label || 'Cons. Final'}</p>
+                      {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
+                      <p><strong>Cond. Venta:</strong> Contado</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Apellido y Nombre / Razón Social:</p>
-                        <p className="font-medium">{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Domicilio:</p>
-                        <p className="font-medium">{lastVenta.cliente?.direccion || '-'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground">Condición de Venta:</p>
-                      <p className="font-medium">Contado</p>
-                    </div>
-                  </div>
 
-                  {/* Detalle de Items */}
-                  <div className="p-4 border-b-2 border-foreground">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b-2 border-foreground">
-                          <th className="text-left py-2 font-bold">Código</th>
-                          <th className="text-left py-2 font-bold">Descripción</th>
-                          <th className="text-center py-2 font-bold">Cantidad</th>
-                          <th className="text-center py-2 font-bold">U. Med.</th>
-                          <th className="text-right py-2 font-bold">Precio Unit.</th>
-                          {lastVenta.factura.tipo_comprobante === 1 && (
-                            <>
-                              <th className="text-right py-2 font-bold">% IVA</th>
-                              <th className="text-right py-2 font-bold">Subtotal</th>
-                            </>
-                          )}
-                          {lastVenta.factura.tipo_comprobante !== 1 && (
-                            <th className="text-right py-2 font-bold">Subtotal</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                          <tr key={idx} className="border-b border-muted">
-                            <td className="py-2 text-xs">{item.producto?.codigo_articulo || '-'}</td>
-                            <td className="py-2">{item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}</td>
-                            <td className="text-center py-2">{item.cantidad}</td>
-                            <td className="text-center py-2">{item.producto?.unidad_medida || 'UN'}</td>
-                            <td className="text-right py-2">${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                            {lastVenta.factura.tipo_comprobante === 1 && (
-                              <>
-                                <td className="text-right py-2">21%</td>
-                                <td className="text-right py-2">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                              </>
-                            )}
-                            {lastVenta.factura.tipo_comprobante !== 1 && (
-                              <td className="text-right py-2">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Totales */}
-                  <div className="p-4 border-b-2 border-foreground">
-                    <div className="flex justify-end">
-                      <div className="w-80 space-y-1">
-                        {lastVenta.factura.tipo_comprobante === 1 ? (
-                          <>
-                            <div className="flex justify-between">
-                              <span>Importe Neto Gravado:</span>
-                              <span>${lastVenta.factura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>IVA 21%:</span>
-                              <span>${lastVenta.factura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Importe Otros Tributos:</span>
-                              <span>$0,00</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex justify-between">
-                            <span>Subtotal:</span>
-                            <span>${lastVenta.factura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
+                      <p className="font-bold text-center mb-1">DETALLE</p>
+                      {lastVenta.detalles.map((item: CartItem, idx: number) => (
+                        <div key={idx} className="thermal-item mb-2">
+                          <p className="thermal-item-name font-medium break-words">
+                            {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}
+                          </p>
+                          <div className="thermal-item-details flex justify-between text-[9px]">
+                            <span>{item.cantidad} x ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                           </div>
-                        )}
-                        <div className="flex justify-between font-bold text-lg border-t-2 border-foreground pt-2 mt-2">
-                          <span>IMPORTE TOTAL:</span>
-                          <span>${lastVenta.factura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                          {item.descuento_porcentaje > 0 && (
+                            <p className="text-[8px] text-right">Desc: {item.descuento_porcentaje}%</p>
+                          )}
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  </div>
 
-                  {/* CAE y Datos AFIP */}
-                  <div className="p-4 bg-muted/30">
-                    <div className="grid grid-cols-[1fr,auto] gap-4">
-                      <div>
-                        <p className="font-bold text-sm">CAE Nº: {lastVenta.factura.cae}</p>
-                        <p className="text-sm">Fecha de Vto. de CAE: {lastVenta.factura.cae_vencimiento}</p>
-                      </div>
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>Comprobante Autorizado</p>
-                        <p>AFIP - Factura Electrónica</p>
-                        <p className="mt-1">Consulte validez en:</p>
-                        <p>www.afip.gob.ar/fe/qr/</p>
-                      </div>
+                    <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-right text-[10px]">
+                      {lastVenta.factura.tipo_comprobante === 1 ? (
+                        <>
+                          <p>Neto Gravado: ${lastVenta.factura.importe_neto?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
+                          <p>IVA 21%: ${lastVenta.factura.importe_iva?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
+                        </>
+                      ) : (
+                        <p>Subtotal: ${lastVenta.factura.importe_total?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                      )}
+                      <p className="thermal-total font-bold text-sm border-t border-black pt-1 mt-1">
+                        TOTAL: ${lastVenta.factura.importe_total?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </p>
                     </div>
-                  </div>
-                </div>
 
-                <Button className="w-full" onClick={() => window.print()}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Imprimir Factura
-                </Button>
-              </div>
-            ) : (
-              // Diseño simple de ticket
-              <div id="printable-invoice" className="space-y-4">
-                <div className="font-mono text-sm space-y-4">
-                  <div className="text-center">
-                    <p className="font-bold text-lg">TICKET</p>
-                    <p>Comprobante #{lastVenta.numero_comprobante}</p>
-                    <p className="text-muted-foreground">
-                      {new Date(lastVenta.fecha).toLocaleString('es-AR')}
-                    </p>
-                  </div>
+                    <div className="thermal-footer text-center text-[8px]">
+                      <p className="font-bold">CAE: {lastVenta.factura.cae}</p>
+                      <p>Vto. CAE: {lastVenta.factura.cae_vencimiento}</p>
+                      <p className="mt-1">Comprobante Autorizado - AFIP</p>
+                      <p>www.afip.gob.ar/fe/qr/</p>
+                      <p className="mt-2">¡Gracias por su compra!</p>
+                    </div>
+                  </>
+                ) : (
+                  // Ticket simple formato térmico
+                  <>
+                    <div className="thermal-header text-center border-b border-dashed border-black pb-2 mb-2">
+                      <p className="font-bold text-sm">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'TICKET'}</p>
+                      {comercioConfig?.direccion && <p className="text-[9px]">{comercioConfig.direccion}</p>}
+                      {comercioConfig?.telefono && <p className="text-[9px]">Tel: {comercioConfig.telefono}</p>}
+                      <p className="font-bold mt-1">TICKET #{lastVenta.numero_comprobante}</p>
+                      <p className="text-[9px]">{new Date(lastVenta.fecha).toLocaleString('es-AR')}</p>
+                    </div>
 
-                  <Separator />
+                    <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-[9px]">
+                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                    </div>
 
-                  <div>
-                    <p className="font-medium">Cliente:</p>
-                    <p>{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-                  </div>
+                    <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
+                      {lastVenta.detalles.map((item: CartItem, idx: number) => (
+                        <div key={idx} className="thermal-item mb-2">
+                          <p className="thermal-item-name break-words">
+                            {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}
+                          </p>
+                          <div className="thermal-item-details flex justify-between text-[9px]">
+                            <span>{item.cantidad} x ${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          {item.descuento_porcentaje > 0 && (
+                            <p className="text-[8px] text-right">Desc: {item.descuento_porcentaje}%</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
 
-                  <Separator />
-
-                  <div className="space-y-1">
-                    {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                      <div key={idx} className="flex justify-between gap-2">
-                        <span className="flex-1">
-                          {item.cantidad}x {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}
-                        </span>
-                        <span className="shrink-0">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    {lastVenta.descuento > 0 && (
+                      <div className="text-right text-[9px] mb-1">
+                        <p>Descuento: -${lastVenta.descuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  <Separator />
+                    <div className="thermal-total text-center font-bold text-sm border-t-2 border-black pt-2">
+                      <p>TOTAL: ${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                    </div>
 
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>TOTAL</span>
-                    <span>${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-
-                  <div className="text-center text-muted-foreground">
-                    <p>¡Gracias por su compra!</p>
-                  </div>
-                </div>
-
-                <Button className="w-full" onClick={() => window.print()}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Imprimir
-                </Button>
+                    <div className="thermal-footer text-center text-[8px] mt-2">
+                      <p>¡Gracias por su compra!</p>
+                    </div>
+                  </>
+                )}
               </div>
-            )
+
+              <Button className="w-full no-print" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>
