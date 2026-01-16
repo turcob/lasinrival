@@ -955,8 +955,6 @@ export default function POS() {
           } else if (facturaResult?.error) {
             toast.error('Error AFIP: ' + facturaResult.error);
           } else {
-            facturaInfo = facturaResult;
-            
             const formatFechaAfip = (fecha: string): string => {
               if (fecha && fecha.length === 8) {
                 return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
@@ -964,20 +962,29 @@ export default function POS() {
               return fecha || new Date().toISOString().split('T')[0];
             };
             
+            // Combinar datos de AFIP con los importes calculados
+            facturaInfo = {
+              ...facturaResult,
+              cae_vencimiento: formatFechaAfip(facturaResult.cae_vencimiento),
+              importe_total: totalFacturar,
+              importe_neto: parseFloat(netoSinIva.toFixed(2)),
+              importe_iva: parseFloat(ivaAmount.toFixed(2)),
+            };
+            
             await supabase
               .from('comprobantes_afip')
               .insert({
                 tipo_comprobante: facturaData.tipo_comprobante,
-                punto_venta: facturaResult.punto_venta,
-                numero_comprobante: facturaResult.numero_comprobante,
-                cae: facturaResult.cae,
-                cae_vencimiento: formatFechaAfip(facturaResult.cae_vencimiento),
+                punto_venta: facturaInfo.punto_venta,
+                numero_comprobante: facturaInfo.numero_comprobante,
+                cae: facturaInfo.cae,
+                cae_vencimiento: facturaInfo.cae_vencimiento,
                 cuit_emisor: comercioConfig?.cuit?.replace(/\D/g, '') || '',
                 doc_tipo: facturaData.doc_tipo,
                 doc_nro: parseInt(facturaData.doc_nro) || 0,
-                importe_total: total,
-                importe_neto: parseFloat(netoSinIva.toFixed(2)),
-                importe_iva: parseFloat(ivaAmount.toFixed(2)),
+                importe_total: facturaInfo.importe_total,
+                importe_neto: facturaInfo.importe_neto,
+                importe_iva: facturaInfo.importe_iva,
                 usuario_id: user.id,
                 venta_id: venta.id,
               });
