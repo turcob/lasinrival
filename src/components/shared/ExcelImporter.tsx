@@ -208,8 +208,17 @@ export function ExcelImporter() {
         
         // Debug logging for specific products
         if (codigoArticulo === '03006005' || codigoArticulo === '03001033') {
-          console.log(`[DEBUG] Producto ${codigoArticulo}: codigoFamilia="${codigoFamilia}", nombreFamilia="${nombreFamilia}", codigoGrupo="${codigoGrupo}", nombreGrupo="${nombreGrupo}"`);
-          console.log(`[DEBUG] Row keys:`, Object.keys(normalizedRow));
+          const categoriaIdDebug = categoriasMap.get(codigoFamilia);
+          const subKey = categoriaIdDebug ? `${categoriaIdDebug}-${codigoGrupo}` : 'NO_CATEGORIA';
+          const subcategoriaIdDebug = categoriaIdDebug ? subcategoriasMap.get(subKey) : null;
+          console.log(`[DEBUG] Producto ${codigoArticulo}:`);
+          console.log(`  - codigoFamilia="${codigoFamilia}", nombreFamilia="${nombreFamilia}"`);
+          console.log(`  - codigoGrupo="${codigoGrupo}", nombreGrupo="${nombreGrupo}"`);
+          console.log(`  - categoriaId from map: ${categoriaIdDebug}`);
+          console.log(`  - subKey buscado: ${subKey}`);
+          console.log(`  - subcategoriaId from map: ${subcategoriaIdDebug}`);
+          console.log(`  - Row keys:`, Object.keys(normalizedRow));
+          console.log(`  - Subcategorias map entries:`, Array.from(subcategoriasMap.entries()).slice(0, 10));
         }
         
         // New columns - using normalizedRow
