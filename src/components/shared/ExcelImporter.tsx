@@ -164,36 +164,45 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        // Helper function to parse price with currency format (e.g., "$ 835.00", "$ 6,764.00", "12,999.60")
+        // Helper function to parse price with currency format
         const parsePrice = (value: any): number => {
           if (typeof value === 'number') return value;
-          if (!value) return 0;
+          if (value === null || value === undefined || value === '') return 0;
           
-          const originalStr = String(value).trim();
-          // Remove $ symbol and spaces
-          let priceStr = originalStr.replace(/\$/g, '').replace(/\s/g, '').trim();
+          let priceStr = String(value).trim();
           
-          // Check if format is US-style with comma as thousand separator: 12,999.60
-          // Pattern: digits, comma, 3 digits, dot, 2 digits
-          if (priceStr.match(/^\d{1,3}(,\d{3})*\.\d{2}$/)) {
-            // Remove commas (thousand separators) and parse
-            return parseFloat(priceStr.replace(/,/g, '')) || 0;
-          }
+          // Remove currency symbols, spaces, and other non-numeric chars except . and ,
+          priceStr = priceStr.replace(/[^\d.,\-]/g, '').trim();
           
-          // Check if it's simple decimal format (e.g., "835.00" or "6764.00") - no commas
-          if (priceStr.match(/^\d+\.\d{2}$/) && !priceStr.includes(',')) {
-            return parseFloat(priceStr) || 0;
-          }
+          if (!priceStr) return 0;
           
-          // Handle Spanish format: 6.764,00 (dot as thousand, comma as decimal)
-          if (priceStr.includes(',')) {
+          // Detect format based on last separator
+          const lastComma = priceStr.lastIndexOf(',');
+          const lastDot = priceStr.lastIndexOf('.');
+          
+          if (lastComma > lastDot) {
+            // Spanish/European format: comma is decimal separator (e.g., "1.234,56" or "1234,56")
             priceStr = priceStr.replace(/\./g, '').replace(',', '.');
+          } else if (lastDot > lastComma) {
+            // US/English format: dot is decimal separator (e.g., "1,234.56" or "1234.56")
+            priceStr = priceStr.replace(/,/g, '');
+          } else if (lastComma === -1 && lastDot === -1) {
+            // No separator, just digits
+            // priceStr stays as is
           }
           
-          return parseFloat(priceStr) || 0;
+          const result = parseFloat(priceStr);
+          return isNaN(result) ? 0 : result;
         };
         
-        const precioCosto = parsePrice(row.PRECIO_1 || row.PRECIO_COSTO || row.precio_costo || row.COSTO);
+        // Try multiple column names for price
+        const priceValue = row.PRECIO_1 ?? row.PRECIO ?? row.PRECIO_COSTO ?? row.precio_costo ?? row.COSTO ?? row.Precio ?? row.precio ?? 0;
+        const precioCosto = parsePrice(priceValue);
+        
+        // Debug logging for specific products
+        if (codigoArticulo === '03006005' || codigoArticulo === '0300100') {
+          console.log(`[DEBUG] Producto ${codigoArticulo}: priceValue=${JSON.stringify(priceValue)}, precioCosto=${precioCosto}, row keys:`, Object.keys(row));
+        }
         
         // New columns
         const marcaNombre = String(row['MARCA ID'] || row.MARCA || row.marca || '').trim().toUpperCase();
