@@ -164,7 +164,7 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        // Helper function to parse price with currency format (e.g., "$ 835.00", "$ 6,764.00")
+        // Helper function to parse price with currency format (e.g., "$ 835.00", "$ 6,764.00", "12,999.60")
         const parsePrice = (value: any): number => {
           if (typeof value === 'number') return value;
           if (!value) return 0;
@@ -173,10 +173,15 @@ export function ExcelImporter() {
           // Remove $ symbol and spaces
           let priceStr = originalStr.replace(/\$/g, '').replace(/\s/g, '').trim();
           
-          // Check if it's using dot as decimal separator (e.g., "835.00" or "6764.00")
-          // This is the case when there's a dot followed by exactly 2 digits at the end
-          if (priceStr.match(/\.\d{2}$/) && !priceStr.includes(',')) {
-            // Format: 835.00 or 6764.00 - dot is decimal
+          // Check if format is US-style with comma as thousand separator: 12,999.60
+          // Pattern: digits, comma, 3 digits, dot, 2 digits
+          if (priceStr.match(/^\d{1,3}(,\d{3})*\.\d{2}$/)) {
+            // Remove commas (thousand separators) and parse
+            return parseFloat(priceStr.replace(/,/g, '')) || 0;
+          }
+          
+          // Check if it's simple decimal format (e.g., "835.00" or "6764.00") - no commas
+          if (priceStr.match(/^\d+\.\d{2}$/) && !priceStr.includes(',')) {
             return parseFloat(priceStr) || 0;
           }
           
