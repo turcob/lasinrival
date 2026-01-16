@@ -156,14 +156,21 @@ export function ExcelImporter() {
         const row = rows[i];
         setProgress(Math.round(((i + 1) / totalRows) * 100));
 
-        // Get column values (support different column names)
-        const codigoFamilia = String(row.FAMILIA || row.COD_FAM || row.codigo_familia || '').trim();
-        const nombreFamilia = String(row.NOM_FAM || row.nombre_familia || row.FAMILIA_NOMBRE || '').trim();
-        const codigoGrupo = String(row.GRUPO || row.COD_GRU || row.codigo_grupo || '').trim();
-        const nombreGrupo = String(row.NOM_GRU || row.nombre_grupo || row.GRUPO_NOMBRE || '').trim();
-        const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
-        const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
-        const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
+        // Normalize row keys by trimming spaces FIRST
+        const normalizedRow: Record<string, any> = {};
+        for (const key of Object.keys(row)) {
+          normalizedRow[key.trim()] = row[key];
+        }
+
+        // Get column values (support different column names) - using normalizedRow
+        const codigoFamilia = String(normalizedRow.FAMILIA || normalizedRow.COD_FAM || normalizedRow.codigo_familia || '').trim();
+        const nombreFamilia = String(normalizedRow.NOM_FAM || normalizedRow.nombre_familia || normalizedRow.FAMILIA_NOMBRE || '').trim();
+        const codigoGrupo = String(normalizedRow.GRUPO || normalizedRow.COD_GRU || normalizedRow.codigo_grupo || '').trim();
+        const nombreGrupo = String(normalizedRow.NOM_GRU || normalizedRow.nombre_grupo || normalizedRow.GRUPO_NOMBRE || '').trim();
+        const codigoArticulo = String(normalizedRow.COD_ARTIC || normalizedRow.codigo_articulo || normalizedRow.CODIGO || '').trim();
+        const descripcion = String(normalizedRow.DESCRIP || normalizedRow.descripcion || normalizedRow.DESCRIPCION || '').trim();
+        const unidadMedida = String(normalizedRow.UNIDAD_MED || normalizedRow.unidad_medida || normalizedRow.UNIDAD || 'UN').trim();
+        
         // Helper function to parse price with currency format
         const parsePrice = (value: any): number => {
           if (typeof value === 'number') return value;
@@ -195,25 +202,20 @@ export function ExcelImporter() {
           return isNaN(result) ? 0 : result;
         };
         
-        // Normalize row keys by trimming spaces
-        const normalizedRow: Record<string, any> = {};
-        for (const key of Object.keys(row)) {
-          normalizedRow[key.trim()] = row[key];
-        }
-        
         // Try multiple column names for price using normalized keys
         const priceValue = normalizedRow.PRECIO_1 ?? normalizedRow.PRECIO ?? normalizedRow.PRECIO_COSTO ?? normalizedRow.precio_costo ?? normalizedRow.COSTO ?? normalizedRow.Precio ?? normalizedRow.precio ?? 0;
         const precioCosto = parsePrice(priceValue);
         
         // Debug logging for specific products
-        if (codigoArticulo === '03006005' || codigoArticulo === '0300100') {
-          console.log(`[DEBUG] Producto ${codigoArticulo}: priceValue=${JSON.stringify(priceValue)}, precioCosto=${precioCosto}, row keys:`, Object.keys(row));
+        if (codigoArticulo === '03006005' || codigoArticulo === '03001033') {
+          console.log(`[DEBUG] Producto ${codigoArticulo}: codigoFamilia="${codigoFamilia}", nombreFamilia="${nombreFamilia}", codigoGrupo="${codigoGrupo}", nombreGrupo="${nombreGrupo}"`);
+          console.log(`[DEBUG] Row keys:`, Object.keys(normalizedRow));
         }
         
-        // New columns
-        const marcaNombre = String(row['MARCA ID'] || row.MARCA || row.marca || '').trim().toUpperCase();
-        const tipoNombre = String(row.ID || row.TIPO || row.tipo_producto || '').trim().toUpperCase();
-        const cantidadPorEmpaque = parseInt(row['CANTIDAD POR EMPAQUE'] || row.CANT_EMPAQUE || row.cantidad_empaque || 1) || 1;
+        // New columns - using normalizedRow
+        const marcaNombre = String(normalizedRow['MARCA ID'] || normalizedRow.MARCA || normalizedRow.marca || '').trim().toUpperCase();
+        const tipoNombre = String(normalizedRow.ID || normalizedRow.TIPO || normalizedRow.tipo_producto || '').trim().toUpperCase();
+        const cantidadPorEmpaque = parseInt(normalizedRow['CANTIDAD POR EMPAQUE'] || normalizedRow.CANT_EMPAQUE || normalizedRow.cantidad_empaque || 1) || 1;
 
         // Import categoria
         if (codigoFamilia && nombreFamilia && !categoriasMap.has(codigoFamilia)) {
