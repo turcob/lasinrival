@@ -2219,9 +2219,9 @@ export default function POS() {
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-[9px]">
-                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
-                      <p><strong>CUIT/DNI:</strong> {lastVenta.cliente?.dni_cuit || 'Sin identificar'}</p>
-                      <p><strong>IVA:</strong> {CONDICIONES_IVA.find(c => c.value === (lastVenta.cliente?.condicion_iva || 5))?.label || 'Cons. Final'}</p>
+                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || (lastVenta.factura?.tipo_comprobante === 1 && lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Consumidor Final')}</p>
+                      <p><strong>CUIT/DNI:</strong> {lastVenta.cliente?.dni_cuit || (lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Sin identificar')}</p>
+                      <p><strong>IVA:</strong> {lastVenta.cliente ? (CONDICIONES_IVA.find(c => c.value === lastVenta.cliente.condicion_iva)?.label || 'Cons. Final') : (lastVenta.factura?.tipo_comprobante === 1 ? 'Responsable Inscripto' : 'Cons. Final')}</p>
                       {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
                       <p><strong>Cond. Venta:</strong> Contado</p>
                     </div>
