@@ -1221,12 +1221,45 @@ export default function POS() {
       <head>
         <title>Pedido #${pedido.numero_comprobante}</title>
         <style>
-          body { font-family: monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .item { display: flex; justify-content: space-between; margin: 5px 0; }
-          .total { font-weight: bold; margin-top: 10px; border-top: 1px dashed #000; padding-top: 10px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; }
-          @media print { body { margin: 0; } }
+          @page { size: 80mm auto; margin: 0; }
+          body { 
+            font-family: 'Courier New', monospace; 
+            font-size: 10px;
+            line-height: 1.3;
+            width: 72mm; 
+            margin: 0 auto; 
+            padding: 2mm;
+          }
+          .header { text-align: center; margin-bottom: 8px; }
+          .header h2 { margin: 0; font-size: 14px; }
+          .header p { margin: 2px 0; }
+          .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; }
+          .item { 
+            margin: 4px 0; 
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 4px;
+          }
+          .item-name { 
+            word-wrap: break-word; 
+            display: block;
+          }
+          .item-price { 
+            text-align: right; 
+            display: block;
+          }
+          .total { 
+            font-weight: bold; 
+            margin-top: 8px; 
+            border-top: 1px dashed #000; 
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .footer { text-align: center; margin-top: 8px; font-size: 10px; }
+          @media print { 
+            body { margin: 0; } 
+            html, body { width: 80mm; }
+          }
         </style>
       </head>
       <body>
@@ -1235,17 +1268,18 @@ export default function POS() {
           <p>#${String(pedido.numero_comprobante).padStart(8, '0')}</p>
           <p>${new Date(pedido.fecha).toLocaleString('es-AR')}</p>
         </div>
-        <p><strong>Cliente:</strong> ${pedido.clientes?.nombre || 'Consumidor Final'}</p>
-        <hr>
+        <div class="section">
+          <strong>Cliente:</strong> ${pedido.clientes?.nombre || 'Consumidor Final'}
+        </div>
         ${pedido.venta_detalles.map((d: any) => `
           <div class="item">
-            <span>${d.cantidad}x ${d.producto_temporal_nombre || d.productos?.descripcion?.substring(0, 20) || 'Producto'}</span>
-            <span>$${d.subtotal.toLocaleString('es-AR')}</span>
+            <span class="item-name">${d.cantidad}x ${d.producto_temporal_nombre || d.productos?.descripcion || 'Producto'}</span>
+            <span class="item-price">$${d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
           </div>
         `).join('')}
-        <div class="item total">
+        <div class="total">
           <span>TOTAL</span>
-          <span>$${pedido.total.toLocaleString('es-AR')}</span>
+          <span>$${pedido.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
         </div>
         <div class="footer">
           <p>*** PEDIDO PENDIENTE ***</p>
