@@ -247,7 +247,7 @@
   }
 }
 
-/* Print styles for invoices */
+/* Print styles for thermal printer Epson TMT900FA (80mm) */
 @media print {
   body * {
     visibility: hidden;
@@ -262,18 +262,66 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
-    padding: 20px;
+    width: 72mm; /* 80mm paper - margins */
+    max-width: 72mm;
+    padding: 2mm;
     background: white !important;
     color: black !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+  }
+
+  #printable-invoice .thermal-header {
+    text-align: center;
+    border-bottom: 1px dashed black;
+    padding-bottom: 4mm;
+    margin-bottom: 2mm;
+  }
+
+  #printable-invoice .thermal-section {
+    border-bottom: 1px dashed black;
+    padding: 2mm 0;
+    margin-bottom: 2mm;
+  }
+
+  #printable-invoice .thermal-item {
+    margin-bottom: 2mm;
+  }
+
+  #printable-invoice .thermal-item-name {
+    display: block;
+    word-wrap: break-word;
+    white-space: normal;
+  }
+
+  #printable-invoice .thermal-item-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+  }
+
+  #printable-invoice .thermal-total {
+    font-weight: bold;
+    font-size: 12px !important;
+    border-top: 2px solid black;
+    padding-top: 2mm;
+    margin-top: 2mm;
+  }
+
+  #printable-invoice .thermal-footer {
+    text-align: center;
+    margin-top: 4mm;
+    font-size: 8px !important;
   }
   
-  #printable-invoice button {
+  #printable-invoice button,
+  #printable-invoice .no-print {
     display: none !important;
   }
   
   @page {
-    size: A4;
-    margin: 15mm;
+    size: 80mm auto;
+    margin: 0;
   }
 }
