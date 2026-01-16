@@ -4,7 +4,22 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Package, Scale, X } from 'lucide-react';
+import { Search, Package, Scale, X, Eye } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from '@/components/ui/table';
 
 interface Producto {
   id: string;
@@ -33,6 +48,7 @@ export function ProductSearchModal({
   onSelectProduct,
 }: ProductSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
 
   const filteredProductos = useMemo(() => {
     if (!searchTerm) return productos;
@@ -96,10 +112,21 @@ export function ProductSearchModal({
               return (
                 <div
                   key={producto.id}
-                  className="border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col"
+                  className="border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col relative group"
                   onClick={() => handleSelectProduct(producto)}
                 >
-                  <div className="flex items-start justify-between gap-1 mb-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewingProduct(producto);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-start justify-between gap-1 mb-2 pr-6">
                     <p className="text-xs text-muted-foreground font-mono">
                       {producto.codigo_articulo}
                     </p>
@@ -141,6 +168,67 @@ export function ProductSearchModal({
           </Button>
         </div>
       </DialogContent>
+
+      {/* Modal de detalle del producto */}
+      <AlertDialog open={!!viewingProduct} onOpenChange={() => setViewingProduct(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Detalle del Producto
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="pt-4">
+                {viewingProduct && (
+                  <Table>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium text-foreground">Código</TableCell>
+                        <TableCell className="font-mono">{viewingProduct.codigo_articulo}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-foreground">Descripción</TableCell>
+                        <TableCell>{viewingProduct.descripcion}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-foreground">Precio de Venta</TableCell>
+                        <TableCell className="font-bold text-primary">
+                          ${getProductoPrice(viewingProduct).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-foreground">Stock Disponible</TableCell>
+                        <TableCell>
+                          <Badge variant={viewingProduct.stock_actual > 0 ? 'default' : 'destructive'}>
+                            {viewingProduct.stock_actual} {viewingProduct.unidad_medida || 'unidades'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-foreground">Unidad de Medida</TableCell>
+                        <TableCell>{viewingProduct.unidad_medida || 'Unidad'}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-2 sm:justify-between">
+            <AlertDialogCancel>Cerrar</AlertDialogCancel>
+            <Button
+              onClick={() => {
+                if (viewingProduct) {
+                  handleSelectProduct(viewingProduct);
+                  setViewingProduct(null);
+                }
+              }}
+            >
+              Agregar al carrito
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
