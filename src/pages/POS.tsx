@@ -2245,14 +2245,8 @@ export default function POS() {
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-right text-[10px]">
-                      {lastVenta.factura.tipo_comprobante === 1 ? (
-                        <>
-                          <p>Neto Gravado: ${lastVenta.factura.importe_neto?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
-                          <p>IVA 21%: ${lastVenta.factura.importe_iva?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
-                        </>
-                      ) : (
-                        <p>Subtotal: ${lastVenta.factura.importe_total?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
-                      )}
+                      <p>Neto Gravado: ${lastVenta.factura.importe_neto?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
+                      <p>IVA 21%: ${lastVenta.factura.importe_iva?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
                       <p className="thermal-total font-bold text-sm border-t border-black pt-1 mt-1">
                         TOTAL: ${lastVenta.factura.importe_total?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                       </p>
@@ -2355,7 +2349,20 @@ export default function POS() {
                     <Label>Tipo Comprobante</Label>
                     <Select
                       value={facturaData.tipo_comprobante.toString()}
-                      onValueChange={(v) => setFacturaData({ ...facturaData, tipo_comprobante: parseInt(v) })}
+                      onValueChange={(v) => {
+                        const tipoComp = parseInt(v);
+                        // Si es Factura A, forzar Responsable Inscripto y CUIT
+                        if (tipoComp === 1) {
+                          setFacturaData({ 
+                            ...facturaData, 
+                            tipo_comprobante: tipoComp,
+                            condicion_iva_receptor: 1, // IVA Responsable Inscripto
+                            doc_tipo: 80 // CUIT
+                          });
+                        } else {
+                          setFacturaData({ ...facturaData, tipo_comprobante: tipoComp });
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -2375,18 +2382,26 @@ export default function POS() {
                     <Select
                       value={facturaData.condicion_iva_receptor.toString()}
                       onValueChange={(v) => setFacturaData({ ...facturaData, condicion_iva_receptor: parseInt(v) })}
+                      disabled={facturaData.tipo_comprobante === 1}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CONDICIONES_IVA.map((cond) => (
-                          <SelectItem key={cond.value} value={cond.value.toString()}>
-                            {cond.label}
-                          </SelectItem>
-                        ))}
+                        {CONDICIONES_IVA
+                          .filter(cond => facturaData.tipo_comprobante === 1 ? cond.value === 1 : true)
+                          .map((cond) => (
+                            <SelectItem key={cond.value} value={cond.value.toString()}>
+                              {cond.label}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
+                    {facturaData.tipo_comprobante === 1 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Factura A requiere Resp. Inscripto
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -2396,27 +2411,40 @@ export default function POS() {
                     <Select
                       value={facturaData.doc_tipo.toString()}
                       onValueChange={(v) => setFacturaData({ ...facturaData, doc_tipo: parseInt(v) })}
+                      disabled={facturaData.tipo_comprobante === 1}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {TIPOS_DOCUMENTO.map((doc) => (
-                          <SelectItem key={doc.value} value={doc.value.toString()}>
-                            {doc.label}
-                          </SelectItem>
-                        ))}
+                        {TIPOS_DOCUMENTO
+                          .filter(doc => facturaData.tipo_comprobante === 1 ? doc.value === 80 : true)
+                          .map((doc) => (
+                            <SelectItem key={doc.value} value={doc.value.toString()}>
+                              {doc.label}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
+                    {facturaData.tipo_comprobante === 1 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Factura A requiere CUIT
+                      </p>
+                    )}
                   </div>
 
                   <div>
-                    <Label>Nro Documento</Label>
+                    <Label>Nro Documento {facturaData.tipo_comprobante === 1 && <span className="text-destructive">*</span>}</Label>
                     <Input
                       value={facturaData.doc_nro}
                       onChange={(e) => setFacturaData({ ...facturaData, doc_nro: e.target.value })}
-                      placeholder="20123456789"
+                      placeholder={facturaData.tipo_comprobante === 1 ? "20123456789 (11 dígitos)" : "20123456789"}
                     />
+                    {facturaData.tipo_comprobante === 1 && facturaData.doc_nro.length > 0 && facturaData.doc_nro.length !== 11 && (
+                      <p className="text-xs text-destructive mt-1">
+                        El CUIT debe tener 11 dígitos
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
