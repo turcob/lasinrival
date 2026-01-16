@@ -2358,13 +2358,13 @@ export default function POS() {
 
                   <Separator />
 
-                  <div>
+                  <div className="space-y-1">
                     {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                      <div key={idx} className="flex justify-between">
-                        <span>
-                          {item.cantidad}x {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion?.substring(0, 25)}
+                      <div key={idx} className="flex justify-between gap-2">
+                        <span className="flex-1">
+                          {item.cantidad}x {item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}
                         </span>
-                        <span>${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        <span className="shrink-0">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                       </div>
                     ))}
                   </div>
