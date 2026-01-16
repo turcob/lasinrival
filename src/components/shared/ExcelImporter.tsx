@@ -69,18 +69,26 @@ export function ExcelImporter() {
       const subcategoriasMap = new Map<string, string>();
       const marcasMap = new Map<string, string>();
       const tiposProductoMap = new Map<string, string>();
+      // Fallback map: subcategory name -> { id, categoria_id }
+      const subcategoriasByNameMap = new Map<string, { id: string; categoria_id: string }>();
 
       // Fetch existing data
       const [existingCategorias, existingSubcategorias, existingProductos, existingMarcas, existingTipos] = await Promise.all([
         supabase.from('categorias').select('id, codigo_familia'),
-        supabase.from('subcategorias').select('id, codigo_grupo, categoria_id'),
+        supabase.from('subcategorias').select('id, codigo_grupo, categoria_id, nombre'),
         supabase.from('productos').select('id, codigo_articulo'),
         supabase.from('marcas').select('id, nombre'),
         supabase.from('tipos_producto').select('id, nombre'),
       ]);
 
       existingCategorias.data?.forEach((c) => categoriasMap.set(c.codigo_familia, c.id));
-      existingSubcategorias.data?.forEach((s) => subcategoriasMap.set(`${s.categoria_id}-${s.codigo_grupo}`, s.id));
+      existingSubcategorias.data?.forEach((s) => {
+        subcategoriasMap.set(`${s.categoria_id}-${s.codigo_grupo}`, s.id);
+        // Also map by uppercase name for fallback lookup
+        if (s.nombre) {
+          subcategoriasByNameMap.set(s.nombre.toUpperCase(), { id: s.id, categoria_id: s.categoria_id });
+        }
+      });
       existingMarcas.data?.forEach((m) => marcasMap.set(m.nombre.toUpperCase(), m.id));
       existingTipos.data?.forEach((t) => tiposProductoMap.set(t.nombre.toUpperCase(), t.id));
 
@@ -278,7 +286,18 @@ export function ExcelImporter() {
 
         // Import or update producto
         if (codigoArticulo && descripcion) {
-          const subcategoriaId = categoriaId ? subcategoriasMap.get(`${categoriaId}-${codigoGrupo}`) : null;
+          // Try to get subcategoria by code first, then fallback to name lookup
+          let finalCategoriaId = categoriaId;
+          let finalSubcategoriaId = categoriaId ? subcategoriasMap.get(`${categoriaId}-${codigoGrupo}`) : null;
+          
+          // Fallback: if no category/subcategory found by code, try finding subcategory by name
+          if (!finalSubcategoriaId && nombreGrupo) {
+            const subcatByName = subcategoriasByNameMap.get(nombreGrupo.toUpperCase());
+            if (subcatByName) {
+              finalSubcategoriaId = subcatByName.id;
+              finalCategoriaId = subcatByName.categoria_id;
+            }
+          }
 
           if (!productosMap.has(codigoArticulo)) {
             // Create new product
@@ -289,8 +308,8 @@ export function ExcelImporter() {
                   codigo_articulo: codigoArticulo,
                   descripcion: descripcion,
                   unidad_medida: unidadMedida || 'UN',
-                  categoria_id: categoriaId || null,
-                  subcategoria_id: subcategoriaId || null,
+                  categoria_id: finalCategoriaId || null,
+                  subcategoria_id: finalSubcategoriaId || null,
                   precio_costo: precioCosto,
                   marca_id: marcaId || null,
                   tipo_producto_id: tipoProductoId || null,
@@ -310,7 +329,6 @@ export function ExcelImporter() {
           } else {
             // Update existing product - now updates all fields including description
             const productoId = productosMap.get(codigoArticulo)!;
-            const subcategoriaId = categoriaId ? subcategoriasMap.get(`${categoriaId}-${codigoGrupo}`) : null;
             const updateData: any = {};
             
             // Always update description if provided
@@ -325,9 +343,9 @@ export function ExcelImporter() {
             if (tipoProductoId) updateData.tipo_producto_id = tipoProductoId;
             // Update quantity per package
             if (cantidadPorEmpaque > 1) updateData.cantidad_por_empaque = cantidadPorEmpaque;
-            // Update category/subcategory if provided
-            if (categoriaId) updateData.categoria_id = categoriaId;
-            if (subcategoriaId) updateData.subcategoria_id = subcategoriaId;
+            // Update category/subcategory if provided (from code or name fallback)
+            if (finalCategoriaId) updateData.categoria_id = finalCategoriaId;
+            if (finalSubcategoriaId) updateData.subcategoria_id = finalSubcategoriaId;
 
             if (Object.keys(updateData).length > 0) {
               const { error: updateError } = await supabase
