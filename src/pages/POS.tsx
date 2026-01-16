@@ -217,6 +217,11 @@ export default function POS() {
   const [editingDescuentoItem, setEditingDescuentoItem] = useState<string | null>(null);
   const [descuentoInput, setDescuentoInput] = useState('');
   
+  // Descuento global
+  const [descuentoGlobal, setDescuentoGlobal] = useState<number>(0);
+  const [editingDescuentoGlobal, setEditingDescuentoGlobal] = useState(false);
+  const [descuentoGlobalInput, setDescuentoGlobalInput] = useState('');
+  
   // Producto temporal
   const [productoTemporalDialogOpen, setProductoTemporalDialogOpen] = useState(false);
   const [productoTemporal, setProductoTemporal] = useState({ nombre: '', precio: '', cantidad: '1' });
@@ -566,8 +571,11 @@ export default function POS() {
   };
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio), 0), [cart]);
-  const totalDescuentos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
-  const total = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
+  const totalDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
+  const subtotalConDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
+  const montoDescuentoGlobal = useMemo(() => subtotalConDescuentosProductos * (descuentoGlobal / 100), [subtotalConDescuentosProductos, descuentoGlobal]);
+  const totalDescuentos = useMemo(() => totalDescuentosProductos + montoDescuentoGlobal, [totalDescuentosProductos, montoDescuentoGlobal]);
+  const total = useMemo(() => subtotalConDescuentosProductos - montoDescuentoGlobal, [subtotalConDescuentosProductos, montoDescuentoGlobal]);
   const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
   // Total a facturar: si hay pagos con intereses, usar totalPagado; sino usar total de productos
   const totalFacturar = useMemo(() => totalPagado > 0 ? totalPagado : total, [totalPagado, total]);
@@ -1002,6 +1010,7 @@ export default function POS() {
       setPagos([]);
       setSelectedCliente(null);
       setEditingPedidoId(null);
+      setDescuentoGlobal(0);
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
       setTicketDialogOpen(true);
@@ -1128,6 +1137,7 @@ export default function POS() {
 
       setCart([]);
       setSelectedCliente(null);
+      setDescuentoGlobal(0);
     } catch (error) {
       toast.error('Error al guardar el pedido');
     } finally {
@@ -1374,7 +1384,7 @@ export default function POS() {
                   Carrito ({cart.length} items)
                 </CardTitle>
                 {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setCart([])}>
+                  <Button variant="ghost" size="sm" onClick={() => { setCart([]); setDescuentoGlobal(0); }}>
                     Vaciar
                   </Button>
                 )}
@@ -1580,12 +1590,68 @@ export default function POS() {
                   <span>Subtotal</span>
                   <span>${subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                {totalDescuentos > 0 && (
+                {totalDescuentosProductos > 0 && (
                   <div className="flex justify-between text-sm text-destructive">
-                    <span>Descuentos</span>
-                    <span>-${totalDescuentos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    <span>Desc. productos</span>
+                    <span>-${totalDescuentosProductos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
+                
+                {/* Descuento Global */}
+                {getDescuentoMaximo() > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Desc. global %</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="h-7 w-16 text-center text-xs p-1"
+                        value={editingDescuentoGlobal ? descuentoGlobalInput : descuentoGlobal.toString()}
+                        onFocus={() => {
+                          setEditingDescuentoGlobal(true);
+                          setDescuentoGlobalInput(descuentoGlobal.toString());
+                        }}
+                        onChange={(e) => setDescuentoGlobalInput(e.target.value)}
+                        onBlur={() => {
+                          const descuento = parseFloat(descuentoGlobalInput.replace(',', '.'));
+                          const maxDescuento = getDescuentoMaximo();
+                          if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
+                            setDescuentoGlobal(descuento);
+                          } else if (descuento > maxDescuento) {
+                            toast.error(`Máximo permitido: ${maxDescuento}%`);
+                          }
+                          setEditingDescuentoGlobal(false);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const descuento = parseFloat(descuentoGlobalInput.replace(',', '.'));
+                            const maxDescuento = getDescuentoMaximo();
+                            if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
+                              setDescuentoGlobal(descuento);
+                            } else if (descuento > maxDescuento) {
+                              toast.error(`Máximo permitido: ${maxDescuento}%`);
+                            }
+                            setEditingDescuentoGlobal(false);
+                            (e.target as HTMLInputElement).blur();
+                          }
+                          if (e.key === 'Escape') {
+                            setEditingDescuentoGlobal(false);
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                      <span>%</span>
+                    </div>
+                  </div>
+                )}
+                
+                {montoDescuentoGlobal > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Desc. global</span>
+                    <span>-${montoDescuentoGlobal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>TOTAL</span>
@@ -1653,6 +1719,7 @@ export default function POS() {
                     setEditingPedidoId(null);
                     setCart([]);
                     setSelectedCliente(null);
+                    setDescuentoGlobal(0);
                   }}
                 >
                   <X className="h-3 w-3" />
