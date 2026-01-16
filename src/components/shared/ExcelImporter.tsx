@@ -195,8 +195,14 @@ export function ExcelImporter() {
           return isNaN(result) ? 0 : result;
         };
         
-        // Try multiple column names for price
-        const priceValue = row.PRECIO_1 ?? row.PRECIO ?? row.PRECIO_COSTO ?? row.precio_costo ?? row.COSTO ?? row.Precio ?? row.precio ?? 0;
+        // Normalize row keys by trimming spaces
+        const normalizedRow: Record<string, any> = {};
+        for (const key of Object.keys(row)) {
+          normalizedRow[key.trim()] = row[key];
+        }
+        
+        // Try multiple column names for price using normalized keys
+        const priceValue = normalizedRow.PRECIO_1 ?? normalizedRow.PRECIO ?? normalizedRow.PRECIO_COSTO ?? normalizedRow.precio_costo ?? normalizedRow.COSTO ?? normalizedRow.Precio ?? normalizedRow.precio ?? 0;
         const precioCosto = parsePrice(priceValue);
         
         // Debug logging for specific products
