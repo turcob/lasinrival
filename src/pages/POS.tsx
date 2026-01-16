@@ -2086,109 +2086,173 @@ export default function POS() {
             lastVenta.factura ? (
               // Diseño formal de factura electrónica
               <div id="printable-invoice" className="space-y-4">
-                <div className="border rounded-lg p-6 text-sm">
-                  {/* Header */}
-                  <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                    <div>
-                      <p className="font-bold text-lg">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
-                      <p className="text-muted-foreground">{comercioConfig?.razon_social || 'Razón Social'}</p>
-                      <p className="text-muted-foreground text-xs mt-1">{comercioConfig?.direccion || 'Dirección'}</p>
-                      <p className="text-xs text-muted-foreground">CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
-                      <p className="text-xs text-muted-foreground">{comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}</p>
+                <div className="border-2 border-foreground rounded-lg text-sm bg-background">
+                  {/* Header Principal - Formato AFIP */}
+                  <div className="grid grid-cols-[1fr,auto,1fr] border-b-2 border-foreground">
+                    {/* Datos Emisor */}
+                    <div className="p-4 border-r-2 border-foreground">
+                      <p className="font-bold text-xl">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
+                      <p className="text-muted-foreground text-sm">{comercioConfig?.razon_social}</p>
+                      <p className="text-xs mt-2">{comercioConfig?.direccion}</p>
+                      {comercioConfig?.localidad && (
+                        <p className="text-xs">{comercioConfig.localidad}{comercioConfig.provincia ? `, ${comercioConfig.provincia}` : ''}{comercioConfig.codigo_postal ? ` (${comercioConfig.codigo_postal})` : ''}</p>
+                      )}
+                      {comercioConfig?.telefono && <p className="text-xs">Tel: {comercioConfig.telefono}</p>}
+                      {comercioConfig?.email && <p className="text-xs">Email: {comercioConfig.email}</p>}
                     </div>
-                    <div className="text-right">
-                      <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
-                        <p className="font-bold text-2xl">
+                    
+                    {/* Letra del Comprobante */}
+                    <div className="flex flex-col items-center justify-center px-6 border-r-2 border-foreground">
+                      <div className="border-2 border-foreground w-16 h-16 flex items-center justify-center">
+                        <span className="font-bold text-4xl">
                           {lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
-                        </p>
+                        </span>
                       </div>
-                      <p className="font-bold">
+                      <p className="text-xs mt-1 font-medium">COD. {String(lastVenta.factura.tipo_comprobante).padStart(2, '0')}</p>
+                    </div>
+                    
+                    {/* Datos Comprobante */}
+                    <div className="p-4">
+                      <p className="font-bold text-lg">
                         FACTURA {lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C'}
                       </p>
-                      <p className="text-lg font-mono">
-                        Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-
-                        {String(lastVenta.factura.numero_comprobante).padStart(8, '0')}
+                      <p className="text-xl font-mono font-bold">
+                        Nº {String(lastVenta.factura.punto_venta).padStart(4, '0')}-{String(lastVenta.factura.numero_comprobante).padStart(8, '0')}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Fecha: {new Date(lastVenta.fecha).toLocaleDateString('es-AR')}
+                      <p className="text-sm mt-2">
+                        <span className="font-medium">Fecha de Emisión:</span> {new Date(lastVenta.fecha).toLocaleDateString('es-AR')}
                       </p>
+                      <p className="text-sm">
+                        <span className="font-medium">CUIT:</span> {formatCuit(comercioConfig?.cuit || '')}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Condición IVA:</span> {comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}
+                      </p>
+                      {comercioConfig?.inicio_actividades && (
+                        <p className="text-sm">
+                          <span className="font-medium">Inicio Act.:</span> {new Date(comercioConfig.inicio_actividades).toLocaleDateString('es-AR')}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Customer Info */}
-                  <div className="py-3 border-b">
+                  {/* Datos del Receptor */}
+                  <div className="p-4 border-b-2 border-foreground bg-muted/30">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-xs text-muted-foreground">Cliente:</p>
+                        <p className="text-xs text-muted-foreground">CUIT/CUIL/DNI del Receptor:</p>
+                        <p className="font-medium">{lastVenta.cliente?.dni_cuit || '0 - Sin identificar'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Condición frente al IVA:</p>
+                        <p className="font-medium">{CONDICIONES_IVA.find(c => c.value === (lastVenta.cliente?.condicion_iva || 5))?.label || 'Consumidor Final'}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Apellido y Nombre / Razón Social:</p>
                         <p className="font-medium">{lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">CUIT/DNI:</p>
-                        <p>{lastVenta.cliente?.dni_cuit || 'S/D'}</p>
+                        <p className="text-xs text-muted-foreground">Domicilio:</p>
+                        <p className="font-medium">{lastVenta.cliente?.direccion || '-'}</p>
                       </div>
                     </div>
                     <div className="mt-2">
-                      <p className="text-xs text-muted-foreground">Condición IVA:</p>
-                      <p>{CONDICIONES_IVA.find(c => c.value === (lastVenta.cliente?.condicion_iva || 5))?.label || 'Consumidor Final'}</p>
+                      <p className="text-xs text-muted-foreground">Condición de Venta:</p>
+                      <p className="font-medium">Contado</p>
                     </div>
                   </div>
 
-                  {/* Items */}
-                  <div className="py-3 border-b">
-                    <table className="w-full text-xs">
+                  {/* Detalle de Items */}
+                  <div className="p-4 border-b-2 border-foreground">
+                    <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-1">Descripción</th>
-                          <th className="text-center py-1">Cant.</th>
-                          <th className="text-right py-1">P. Unit.</th>
-                          <th className="text-right py-1">Subtotal</th>
+                        <tr className="border-b-2 border-foreground">
+                          <th className="text-left py-2 font-bold">Código</th>
+                          <th className="text-left py-2 font-bold">Descripción</th>
+                          <th className="text-center py-2 font-bold">Cantidad</th>
+                          <th className="text-center py-2 font-bold">U. Med.</th>
+                          <th className="text-right py-2 font-bold">Precio Unit.</th>
+                          {lastVenta.factura.tipo_comprobante === 1 && (
+                            <>
+                              <th className="text-right py-2 font-bold">% IVA</th>
+                              <th className="text-right py-2 font-bold">Subtotal</th>
+                            </>
+                          )}
+                          {lastVenta.factura.tipo_comprobante !== 1 && (
+                            <th className="text-right py-2 font-bold">Subtotal</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
                         {lastVenta.detalles.map((item: CartItem, idx: number) => (
-                          <tr key={idx}>
-                            <td className="py-1">{item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}</td>
-                            <td className="text-center py-1">{item.cantidad}</td>
-                            <td className="text-right py-1">${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                            <td className="text-right py-1">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                          <tr key={idx} className="border-b border-muted">
+                            <td className="py-2 text-xs">{item.producto?.codigo_articulo || '-'}</td>
+                            <td className="py-2">{item.es_temporal ? item.nombre_temporal : item.producto?.descripcion}</td>
+                            <td className="text-center py-2">{item.cantidad}</td>
+                            <td className="text-center py-2">{item.producto?.unidad_medida || 'UN'}</td>
+                            <td className="text-right py-2">${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            {lastVenta.factura.tipo_comprobante === 1 && (
+                              <>
+                                <td className="text-right py-2">21%</td>
+                                <td className="text-right py-2">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                              </>
+                            )}
+                            {lastVenta.factura.tipo_comprobante !== 1 && (
+                              <td className="text-right py-2">${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Totals */}
-                  <div className="py-3 border-b">
+                  {/* Totales */}
+                  <div className="p-4 border-b-2 border-foreground">
                     <div className="flex justify-end">
-                      <div className="w-64 space-y-1">
-                        <div className="flex justify-between">
-                          <span>Subtotal Neto:</span>
-                          <span>${lastVenta.factura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        {lastVenta.factura.importe_iva > 0 && (
+                      <div className="w-80 space-y-1">
+                        {lastVenta.factura.tipo_comprobante === 1 ? (
+                          <>
+                            <div className="flex justify-between">
+                              <span>Importe Neto Gravado:</span>
+                              <span>${lastVenta.factura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>IVA 21%:</span>
+                              <span>${lastVenta.factura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Importe Otros Tributos:</span>
+                              <span>$0,00</span>
+                            </div>
+                          </>
+                        ) : (
                           <div className="flex justify-between">
-                            <span>IVA 21%:</span>
-                            <span>${lastVenta.factura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                            <span>Subtotal:</span>
+                            <span>${lastVenta.factura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                           </div>
                         )}
-                        <div className="flex justify-between font-bold text-lg border-t pt-1">
-                          <span>TOTAL:</span>
+                        <div className="flex justify-between font-bold text-lg border-t-2 border-foreground pt-2 mt-2">
+                          <span>IMPORTE TOTAL:</span>
                           <span>${lastVenta.factura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* CAE Info */}
-                  <div className="pt-3 bg-muted/50 rounded p-3 mt-3">
-                    <div className="grid grid-cols-2 gap-4 text-xs">
+                  {/* CAE y Datos AFIP */}
+                  <div className="p-4 bg-muted/30">
+                    <div className="grid grid-cols-[1fr,auto] gap-4">
                       <div>
-                        <p className="font-bold">CAE Nº: {lastVenta.factura.cae}</p>
-                        <p>Fecha Vto. CAE: {lastVenta.factura.cae_vencimiento}</p>
+                        <p className="font-bold text-sm">CAE Nº: {lastVenta.factura.cae}</p>
+                        <p className="text-sm">Fecha de Vto. de CAE: {lastVenta.factura.cae_vencimiento}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-muted-foreground">Comprobante Autorizado</p>
-                        <p className="text-muted-foreground">AFIP - Factura Electrónica</p>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <p>Comprobante Autorizado</p>
+                        <p>AFIP - Factura Electrónica</p>
+                        <p className="mt-1">Consulte validez en:</p>
+                        <p>www.afip.gob.ar/fe/qr/</p>
                       </div>
                     </div>
                   </div>
