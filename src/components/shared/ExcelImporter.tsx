@@ -164,7 +164,31 @@ export function ExcelImporter() {
         const codigoArticulo = String(row.COD_ARTIC || row.codigo_articulo || row.CODIGO || '').trim();
         const descripcion = String(row.DESCRIP || row.descripcion || row.DESCRIPCION || '').trim();
         const unidadMedida = String(row.UNIDAD_MED || row.unidad_medida || row.UNIDAD || 'UN').trim();
-        const precioCosto = parseFloat(row.PRECIO_1 || row.PRECIO_COSTO || row.precio_costo || row.COSTO || 0);
+        // Helper function to parse price with currency format (e.g., "$ 835.00", "$ 6,764.00")
+        const parsePrice = (value: any): number => {
+          if (typeof value === 'number') return value;
+          if (!value) return 0;
+          
+          const originalStr = String(value).trim();
+          // Remove $ symbol and spaces
+          let priceStr = originalStr.replace(/\$/g, '').replace(/\s/g, '').trim();
+          
+          // Check if it's using dot as decimal separator (e.g., "835.00" or "6764.00")
+          // This is the case when there's a dot followed by exactly 2 digits at the end
+          if (priceStr.match(/\.\d{2}$/) && !priceStr.includes(',')) {
+            // Format: 835.00 or 6764.00 - dot is decimal
+            return parseFloat(priceStr) || 0;
+          }
+          
+          // Handle Spanish format: 6.764,00 (dot as thousand, comma as decimal)
+          if (priceStr.includes(',')) {
+            priceStr = priceStr.replace(/\./g, '').replace(',', '.');
+          }
+          
+          return parseFloat(priceStr) || 0;
+        };
+        
+        const precioCosto = parsePrice(row.PRECIO_1 || row.PRECIO_COSTO || row.precio_costo || row.COSTO);
         
         // New columns
         const marcaNombre = String(row['MARCA ID'] || row.MARCA || row.marca || '').trim().toUpperCase();
