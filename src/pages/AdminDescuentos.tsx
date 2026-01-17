@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
 import { TokenDisplay } from '@/components/admin/TokenDisplay';
-import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing, Send, Home } from 'lucide-react';
+import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminDescuentos() {
-  const navigate = useNavigate();
   const { user, hasRole, loading: authLoading } = useAuth();
   const { solicitudes, loading, error, aprobarSolicitud, rechazarSolicitud, refetch } = useSolicitudesDescuento();
   const { 
@@ -237,14 +236,6 @@ export default function AdminDescuentos() {
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/dashboard')}
-              title="Ir al Dashboard"
-            >
-              <Home className="h-5 w-5" />
-            </Button>
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary" />
             </div>
