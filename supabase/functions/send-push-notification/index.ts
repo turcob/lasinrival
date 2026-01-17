@@ -446,13 +446,15 @@ serve(async (req) => {
       );
     }
 
-    // Create the notification payload
+    // Create the notification payload - simplified for iOS compatibility
     const notificationPayload = {
-      title,
-      body,
+      title: title || 'Nueva Notificación',
+      body: body || 'Tienes una nueva notificación',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       tag: `notification-${Date.now()}`,
+      renotify: true,
+      requireInteraction: true,
       data: data || {}
     };
 

@@ -71,39 +71,49 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push event - handle incoming push notifications
+// Push event - handle incoming push notifications (iOS compatible)
 self.addEventListener('push', (event) => {
-  console.log('Push event received:', event);
+  console.log('[SW] Push event received');
   
-  let data = {
+  // Default notification data
+  let notificationData = {
     title: 'Nueva Notificación',
-    body: 'Tienes una nueva notificación',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png'
+    body: 'Tienes una nueva notificación'
   };
 
+  // Try to parse the push payload
   if (event.data) {
     try {
-      data = { ...data, ...event.data.json() };
+      const payload = event.data.json();
+      console.log('[SW] Push payload:', JSON.stringify(payload));
+      notificationData = {
+        title: payload.title || notificationData.title,
+        body: payload.body || notificationData.body,
+        tag: payload.tag,
+        data: payload.data
+      };
     } catch (e) {
-      console.log('Error parsing push data:', e);
-      data.body = event.data.text();
+      console.log('[SW] Error parsing push data, using text:', e);
+      try {
+        notificationData.body = event.data.text();
+      } catch (textError) {
+        console.log('[SW] Could not get text either:', textError);
+      }
     }
   }
 
-  const options = {
-    body: data.body,
-    icon: data.icon || '/icons/icon-192.png',
-    badge: data.badge || '/icons/icon-192.png',
-    tag: data.tag || 'default',
+  // Show notification with iOS-compatible options
+  const showPromise = self.registration.showNotification(notificationData.title, {
+    body: notificationData.body,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: notificationData.tag || 'notification-' + Date.now(),
     requireInteraction: true,
-    vibrate: [200, 100, 200],
-    data: data.data || {}
-  };
+    silent: false,
+    data: notificationData.data || {}
+  });
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(showPromise);
 });
 
 // Notification click event
