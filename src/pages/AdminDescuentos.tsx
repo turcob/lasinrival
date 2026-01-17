@@ -2,15 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
 import { TokenDisplay } from '@/components/admin/TokenDisplay';
-import { Shield, Inbox, RefreshCw } from 'lucide-react';
+import { Shield, Inbox, RefreshCw, Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 export default function AdminDescuentos() {
   const { user, hasRole, loading: authLoading } = useAuth();
   const { solicitudes, loading, error, aprobarSolicitud, rechazarSolicitud, refetch } = useSolicitudesDescuento();
+  const { permission, isSupported, requestPermission, showNotification, isGranted, isDenied } = usePushNotifications();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [tokenData, setTokenData] = useState<{ token: string; expiraEn: string } | null>(null);
   const prevCountRef = useRef(solicitudes.length);
@@ -18,9 +20,26 @@ export default function AdminDescuentos() {
   // Check admin role
   const isAdmin = hasRole('admin');
 
-  // Play sound and vibrate on new request
+  // Request notification permission on mount if not already granted
+  useEffect(() => {
+    if (isSupported && permission === 'default') {
+      // Auto-request after a short delay to give context
+      const timer = setTimeout(() => {
+        requestPermission().then((granted) => {
+          if (granted) {
+            toast.success('Notificaciones activadas');
+          }
+        });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSupported, permission, requestPermission]);
+
+  // Play sound, vibrate and show push notification on new request
   useEffect(() => {
     if (solicitudes.length > prevCountRef.current) {
+      const newCount = solicitudes.length - prevCountRef.current;
+      
       // Vibrate if supported
       if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200]);
@@ -48,10 +67,31 @@ export default function AdminDescuentos() {
         console.log('Audio not available');
       }
 
-      toast.info('Nueva solicitud de descuento');
+      // Show push notification (works even when app is in background)
+      if (isGranted) {
+        const latestSolicitud = solicitudes[0];
+        showNotification({
+          title: '🔔 Nueva Solicitud de Descuento',
+          body: `${latestSolicitud?.vendedor_nombre || 'Vendedor'} solicita ${latestSolicitud?.porcentaje_solicitado}% de descuento`,
+          tag: 'nueva-solicitud-' + latestSolicitud?.id,
+          requireInteraction: true,
+          vibrate: [200, 100, 200, 100, 200],
+        });
+      }
+
+      toast.info(`${newCount} nueva${newCount > 1 ? 's' : ''} solicitud${newCount > 1 ? 'es' : ''} de descuento`);
     }
     prevCountRef.current = solicitudes.length;
-  }, [solicitudes.length]);
+  }, [solicitudes, isGranted, showNotification]);
+
+  const handleRequestNotifications = async () => {
+    const granted = await requestPermission();
+    if (granted) {
+      toast.success('Notificaciones activadas');
+    } else {
+      toast.error('Permiso de notificaciones denegado');
+    }
+  };
 
   const handleAprobar = async (id: string) => {
     setProcessingId(id);
@@ -130,6 +170,23 @@ export default function AdminDescuentos() {
               <p className="text-xs text-muted-foreground">Descuentos</p>
             </div>
           </div>
+          {/* Notification permission button */}
+          {isSupported && !isGranted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRequestNotifications}
+              className={isDenied ? 'text-destructive' : 'text-warning'}
+              title={isDenied ? 'Notificaciones bloqueadas' : 'Activar notificaciones'}
+            >
+              <BellOff className="h-5 w-5" />
+            </Button>
+          )}
+          {isGranted && (
+            <div className="h-10 w-10 flex items-center justify-center text-primary" title="Notificaciones activas">
+              <Bell className="h-5 w-5" />
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
