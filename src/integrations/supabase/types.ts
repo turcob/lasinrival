@@ -1285,6 +1285,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_expire_solicitudes: { Args: never; Returns: number }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_permission: {
         Args: {
