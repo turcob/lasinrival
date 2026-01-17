@@ -5,9 +5,10 @@ import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
 import { TokenDisplay } from '@/components/admin/TokenDisplay';
-import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing } from 'lucide-react';
+import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminDescuentos() {
   const { user, hasRole, loading: authLoading } = useAuth();
@@ -141,6 +142,31 @@ export default function AdminDescuentos() {
     setIsSettingUp(false);
   };
 
+  const handleTestPush = async () => {
+    try {
+      toast.info('Enviando notificación de prueba...');
+      
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: {
+          title: '🧪 Prueba de Push',
+          body: 'Si ves esto, las notificaciones funcionan correctamente!',
+          target_role: 'admin'
+        }
+      });
+      
+      if (error) {
+        console.error('Error enviando push de prueba:', error);
+        toast.error('Error: ' + error.message);
+      } else {
+        console.log('Push de prueba enviado:', data);
+        toast.success(`Notificación enviada a ${data?.sent || 0} dispositivo(s)`);
+      }
+    } catch (e) {
+      console.error('Error:', e);
+      toast.error('Error al enviar notificación de prueba');
+    }
+  };
+
   const handleAprobar = async (id: string) => {
     setProcessingId(id);
     const result = await aprobarSolicitud(id);
@@ -245,9 +271,20 @@ export default function AdminDescuentos() {
               </Button>
             )}
             {isGranted && isSubscribed && (
-              <div className="h-10 w-10 flex items-center justify-center text-primary" title="Notificaciones push activas">
-                <BellRing className="h-5 w-5" />
-              </div>
+              <>
+                <div className="h-10 w-10 flex items-center justify-center text-primary" title="Notificaciones push activas">
+                  <BellRing className="h-5 w-5" />
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleTestPush}
+                  title="Enviar notificación de prueba"
+                  className="border-primary/50 hover:bg-primary/10"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
