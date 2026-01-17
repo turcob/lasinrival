@@ -5,35 +5,67 @@ import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
 import { TokenDisplay } from '@/components/admin/TokenDisplay';
-import { Shield, Inbox, RefreshCw, Bell, BellOff } from 'lucide-react';
+import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 export default function AdminDescuentos() {
   const { user, hasRole, loading: authLoading } = useAuth();
   const { solicitudes, loading, error, aprobarSolicitud, rechazarSolicitud, refetch } = useSolicitudesDescuento();
-  const { permission, isSupported, requestPermission, showNotification, isGranted, isDenied } = usePushNotifications();
+  const { 
+    permission, 
+    isSupported, 
+    isSubscribed,
+    requestPermission, 
+    subscribeToPush,
+    showNotification, 
+    sendBackgroundNotification,
+    isGranted, 
+    isDenied 
+  } = usePushNotifications();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [tokenData, setTokenData] = useState<{ token: string; expiraEn: string } | null>(null);
   const prevCountRef = useRef(solicitudes.length);
+  const [isSettingUp, setIsSettingUp] = useState(false);
 
   // Check admin role
   const isAdmin = hasRole('admin');
 
+  // Request notification permission and subscribe on mount if not already subscribed
+  useEffect(() => {
+    if (isSupported && isGranted && !isSubscribed && user && isAdmin) {
+      const setupPush = async () => {
+        setIsSettingUp(true);
+        try {
+          const subscribed = await subscribeToPush();
+          if (subscribed) {
+            console.log('Push subscription set up successfully');
+          }
+        } catch (e) {
+          console.error('Error setting up push:', e);
+        }
+        setIsSettingUp(false);
+      };
+      
+      // Delay to ensure everything is loaded
+      const timer = setTimeout(setupPush, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSupported, isGranted, isSubscribed, user, isAdmin, subscribeToPush]);
+
   // Request notification permission on mount if not already granted
   useEffect(() => {
-    if (isSupported && permission === 'default') {
-      // Auto-request after a short delay to give context
+    if (isSupported && permission === 'default' && user && isAdmin) {
       const timer = setTimeout(() => {
         requestPermission().then((granted) => {
           if (granted) {
             toast.success('Notificaciones activadas');
           }
         });
-      }, 2000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [isSupported, permission, requestPermission]);
+  }, [isSupported, permission, requestPermission, user, isAdmin]);
 
   // Play sound, vibrate and show push notification on new request
   useEffect(() => {
@@ -47,7 +79,7 @@ export default function AdminDescuentos() {
       
       // Play notification sound
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
@@ -67,30 +99,46 @@ export default function AdminDescuentos() {
         console.log('Audio not available');
       }
 
-      // Show push notification (works even when app is in background)
+      // Show notification (works in foreground and background)
       if (isGranted) {
         const latestSolicitud = solicitudes[0];
-        showNotification({
+        // Try background notification first (works when app is minimized)
+        sendBackgroundNotification({
           title: '🔔 Nueva Solicitud de Descuento',
           body: `${latestSolicitud?.vendedor_nombre || 'Vendedor'} solicita ${latestSolicitud?.porcentaje_solicitado}% de descuento`,
-          tag: 'nueva-solicitud-' + latestSolicitud?.id,
-          requireInteraction: true,
-          vibrate: [200, 100, 200, 100, 200],
+          data: { solicitud_id: latestSolicitud?.id, type: 'nueva_solicitud' },
+        }).catch(() => {
+          // Fallback to regular notification
+          showNotification({
+            title: '🔔 Nueva Solicitud de Descuento',
+            body: `${latestSolicitud?.vendedor_nombre || 'Vendedor'} solicita ${latestSolicitud?.porcentaje_solicitado}% de descuento`,
+            tag: 'nueva-solicitud-' + latestSolicitud?.id,
+            requireInteraction: true,
+          });
         });
       }
 
       toast.info(`${newCount} nueva${newCount > 1 ? 's' : ''} solicitud${newCount > 1 ? 'es' : ''} de descuento`);
     }
     prevCountRef.current = solicitudes.length;
-  }, [solicitudes, isGranted, showNotification]);
+  }, [solicitudes, isGranted, showNotification, sendBackgroundNotification]);
 
   const handleRequestNotifications = async () => {
+    setIsSettingUp(true);
     const granted = await requestPermission();
     if (granted) {
-      toast.success('Notificaciones activadas');
+      toast.success('Permiso concedido');
+      // Now subscribe to push
+      const subscribed = await subscribeToPush();
+      if (subscribed) {
+        toast.success('Notificaciones push activadas');
+      } else {
+        toast.error('Error al activar notificaciones push');
+      }
     } else {
       toast.error('Permiso de notificaciones denegado');
     }
+    setIsSettingUp(false);
   };
 
   const handleAprobar = async (id: string) => {
@@ -170,31 +218,46 @@ export default function AdminDescuentos() {
               <p className="text-xs text-muted-foreground">Descuentos</p>
             </div>
           </div>
-          {/* Notification permission button */}
-          {isSupported && !isGranted && (
+          <div className="flex items-center gap-2">
+            {/* Notification status button */}
+            {isSupported && !isGranted && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRequestNotifications}
+                disabled={isSettingUp}
+                className={isDenied ? 'text-destructive' : 'text-warning'}
+                title={isDenied ? 'Notificaciones bloqueadas' : 'Activar notificaciones'}
+              >
+                <BellOff className="h-5 w-5" />
+              </Button>
+            )}
+            {isGranted && !isSubscribed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRequestNotifications}
+                disabled={isSettingUp}
+                className="text-warning"
+                title="Activar notificaciones push"
+              >
+                <Bell className="h-5 w-5" />
+              </Button>
+            )}
+            {isGranted && isSubscribed && (
+              <div className="h-10 w-10 flex items-center justify-center text-primary" title="Notificaciones push activas">
+                <BellRing className="h-5 w-5" />
+              </div>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleRequestNotifications}
-              className={isDenied ? 'text-destructive' : 'text-warning'}
-              title={isDenied ? 'Notificaciones bloqueadas' : 'Activar notificaciones'}
+              onClick={refetch}
+              disabled={loading}
             >
-              <BellOff className="h-5 w-5" />
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-          )}
-          {isGranted && (
-            <div className="h-10 w-10 flex items-center justify-center text-primary" title="Notificaciones activas">
-              <Bell className="h-5 w-5" />
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={refetch}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -217,6 +280,11 @@ export default function AdminDescuentos() {
             <p className="text-sm text-muted-foreground/70 mt-1">
               Las solicitudes de descuento aparecerán aquí
             </p>
+            {isGranted && isSubscribed && (
+              <p className="text-xs text-primary mt-4">
+                🔔 Recibirás una notificación cuando llegue una solicitud
+              </p>
+            )}
           </div>
         ) : (
           solicitudes.map((solicitud) => (

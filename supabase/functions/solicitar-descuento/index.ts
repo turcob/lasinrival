@@ -97,6 +97,22 @@ serve(async (req) => {
     console.log(`Solicitud creada: ${solicitud.id} por vendedor ${vendedorProfile?.nombre || user.id}`);
     console.log(`Token generado: ${token}, expira: ${expiraEn}`);
 
+    // Send push notification to admins
+    try {
+      await supabaseAdmin.functions.invoke('send-push-notification', {
+        body: {
+          title: '🔔 Nueva Solicitud de Descuento',
+          body: `${vendedorProfile?.nombre || 'Vendedor'} solicita ${porcentaje_solicitado}% de descuento`,
+          data: { solicitud_id: solicitud.id, type: 'nueva_solicitud' },
+          target_role: 'admin'
+        }
+      });
+      console.log('Push notification sent to admins');
+    } catch (pushError) {
+      console.error('Error sending push notification:', pushError);
+      // Don't fail the request if push fails
+    }
+
     // Return success (token is NOT returned to vendedor - only admins can see it)
     return new Response(
       JSON.stringify({
