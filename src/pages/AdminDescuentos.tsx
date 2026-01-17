@@ -5,7 +5,7 @@ import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
 import { TokenDisplay } from '@/components/admin/TokenDisplay';
-import { Shield, Inbox, RefreshCw, Bell, BellOff, BellRing, Send } from 'lucide-react';
+import { Shield, Inbox, Bell, BellOff, BellRing, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,6 +67,15 @@ export default function AdminDescuentos() {
       return () => clearTimeout(timer);
     }
   }, [isSupported, permission, requestPermission, user, isAdmin]);
+
+  // Auto-refresh every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   // Play sound, vibrate and show push notification on new request
   useEffect(() => {
@@ -286,14 +295,6 @@ export default function AdminDescuentos() {
                 </Button>
               </>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={refetch}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
           </div>
         </div>
       </div>
