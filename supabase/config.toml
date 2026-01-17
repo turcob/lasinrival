@@ -2,3 +2,12 @@ project_id = "zipqraqiztulxyuzhtjo"
 
 [functions.afip-facturacion]
 verify_jwt = false
+
+[functions.solicitar-descuento]
+verify_jwt = false
+
+[functions.validar-token-descuento]
+verify_jwt = false
+
+[functions.aprobar-descuento]
+verify_jwt = false
