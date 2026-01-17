@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_tokens: {
+        Row: {
+          admin_id: string
+          created_at: string
+          expira_en: string
+          id: string
+          token: string
+          usado: boolean
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          expira_en: string
+          id?: string
+          token: string
+          usado?: boolean
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          expira_en?: string
+          id?: string
+          token?: string
+          usado?: boolean
+        }
+        Relationships: []
+      }
       afip_tokens: {
         Row: {
           created_at: string

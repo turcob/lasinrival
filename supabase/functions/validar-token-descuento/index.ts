@@ -7,6 +7,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('[validar-token-descuento] Request received');
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -48,49 +50,79 @@ serve(async (req) => {
     // Use service role for validation
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find the request by token (case insensitive)
+    // NEW FLOW: Find admin token that matches (case insensitive)
+    const { data: adminToken, error: adminTokenError } = await supabaseAdmin
+      .from('admin_tokens')
+      .select('*')
+      .ilike('token', token.toUpperCase())
+      .eq('usado', false)
+      .maybeSingle();
+
+    if (adminTokenError) {
+      console.error('[validar-token-descuento] Error buscando admin token:', adminTokenError);
+    }
+
+    if (!adminToken) {
+      console.log('[validar-token-descuento] Token no encontrado o ya usado:', token);
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Token inválido o ya utilizado' 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if admin token expired
+    const now = new Date();
+    const expiraEn = new Date(adminToken.expira_en);
+    if (now > expiraEn) {
+      console.log('[validar-token-descuento] Token expirado:', token, 'Expiró:', expiraEn);
+      
+      // Mark as used
+      await supabaseAdmin
+        .from('admin_tokens')
+        .update({ usado: true })
+        .eq('id', adminToken.id);
+
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          error: 'Token expirado. Pida un nuevo token al administrador.' 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Find the pending request for this seller
     let query = supabaseAdmin
       .from('solicitudes_descuento')
       .select('*')
-      .ilike('token', token.toUpperCase())
-      .eq('vendedor_id', user.id);
+      .eq('vendedor_id', user.id)
+      .eq('estado', 'pendiente');
     
     if (solicitud_id) {
       query = query.eq('id', solicitud_id);
     }
 
-    const { data: solicitud, error: fetchError } = await query.single();
+    const { data: solicitud, error: fetchError } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
 
     if (fetchError || !solicitud) {
-      console.log('Token no encontrado:', token);
+      console.log('[validar-token-descuento] No hay solicitud pendiente para el vendedor:', user.id);
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          error: 'Token inválido o no encontrado' 
+          error: 'No hay solicitud de descuento pendiente' 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check if token was already used
-    if (solicitud.token_usado) {
-      console.log('Token ya usado:', token);
-      return new Response(
-        JSON.stringify({ 
-          valid: false, 
-          error: 'Este token ya fue utilizado' 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if token expired
-    const now = new Date();
-    const expiraEn = new Date(solicitud.expira_en);
-    if (now > expiraEn) {
-      console.log('Token expirado:', token, 'Expiró:', expiraEn);
+    // Check if the seller's request expired
+    const solicitudExpira = new Date(solicitud.expira_en);
+    if (now > solicitudExpira) {
+      console.log('[validar-token-descuento] Solicitud expirada:', solicitud.id);
       
-      // Mark as expired
       await supabaseAdmin
         .from('solicitudes_descuento')
         .update({ estado: 'expirada' })
@@ -99,48 +131,37 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          error: 'Token expirado. Solicite uno nuevo.' 
+          error: 'Su solicitud de descuento ha expirado. Solicite uno nuevo.' 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check if request was approved
-    if (solicitud.estado !== 'aprobada') {
-      if (solicitud.estado === 'pendiente') {
-        return new Response(
-          JSON.stringify({ 
-            valid: false, 
-            error: 'Solicitud aún pendiente de aprobación' 
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (solicitud.estado === 'rechazada') {
-        return new Response(
-          JSON.stringify({ 
-            valid: false, 
-            error: 'Solicitud rechazada por el administrador' 
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    // Mark admin token as used
+    const { error: updateTokenError } = await supabaseAdmin
+      .from('admin_tokens')
+      .update({ usado: true })
+      .eq('id', adminToken.id);
+
+    if (updateTokenError) {
+      console.error('[validar-token-descuento] Error marking admin token as used:', updateTokenError);
     }
 
-    // Mark token as used
-    const { error: updateError } = await supabaseAdmin
+    // Mark solicitud as approved and used
+    const { error: updateSolicitudError } = await supabaseAdmin
       .from('solicitudes_descuento')
       .update({ 
         token_usado: true,
-        estado: 'usada'
+        estado: 'usada',
+        aprobado_por: adminToken.admin_id
       })
       .eq('id', solicitud.id);
 
-    if (updateError) {
-      console.error('Error marking token as used:', updateError);
+    if (updateSolicitudError) {
+      console.error('[validar-token-descuento] Error updating solicitud:', updateSolicitudError);
     }
 
-    console.log('Token válido y usado:', token, 'Solicitud:', solicitud.id);
+    console.log('[validar-token-descuento] Token válido y usado:', token, 'Solicitud:', solicitud.id, 'Admin:', adminToken.admin_id);
 
     return new Response(
       JSON.stringify({ 
@@ -153,7 +174,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error en validar-token-descuento:', error);
+    console.error('[validar-token-descuento] Error:', error);
     return new Response(
       JSON.stringify({ error: 'Error interno del servidor' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

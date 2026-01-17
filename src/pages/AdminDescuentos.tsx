@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
-import { TokenDisplay } from '@/components/admin/TokenDisplay';
+import { AdminTokenDisplay } from '@/components/admin/AdminTokenDisplay';
 import { Shield, Inbox, Bell, BellOff, BellRing, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminDescuentos() {
   const { user, hasRole, loading: authLoading } = useAuth();
-  const { solicitudes, loading, error, aprobarSolicitud, rechazarSolicitud, refetch } = useSolicitudesDescuento();
+  const { solicitudes, loading, error, rechazarSolicitud, refetch } = useSolicitudesDescuento();
   const { 
     permission, 
     isSupported, 
@@ -25,7 +25,6 @@ export default function AdminDescuentos() {
     isDenied 
   } = usePushNotifications();
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [tokenData, setTokenData] = useState<{ token: string; expiraEn: string } | null>(null);
   const prevCountRef = useRef(solicitudes.length);
   const [isSettingUp, setIsSettingUp] = useState(false);
 
@@ -176,20 +175,6 @@ export default function AdminDescuentos() {
     }
   };
 
-  const handleAprobar = async (id: string) => {
-    setProcessingId(id);
-    const result = await aprobarSolicitud(id);
-    
-    if (result.success && result.token && result.expira_en) {
-      setTokenData({ token: result.token, expiraEn: result.expira_en });
-      toast.success('Solicitud aprobada');
-    } else {
-      toast.error(result.error || 'Error al aprobar');
-    }
-    
-    setProcessingId(null);
-  };
-
   const handleRechazar = async (id: string) => {
     setProcessingId(id);
     const result = await rechazarSolicitud(id);
@@ -201,6 +186,11 @@ export default function AdminDescuentos() {
     }
     
     setProcessingId(null);
+  };
+
+  const handleTokenUsed = () => {
+    // Refetch solicitudes when a token is used
+    refetch();
   };
 
   // Loading state
@@ -225,17 +215,6 @@ export default function AdminDescuentos() {
         <h1 className="text-2xl font-bold text-foreground mb-2">Acceso Denegado</h1>
         <p className="text-muted-foreground">Esta página es solo para administradores.</p>
       </div>
-    );
-  }
-
-  // Token display overlay
-  if (tokenData) {
-    return (
-      <TokenDisplay
-        token={tokenData.token}
-        expiraEn={tokenData.expiraEn}
-        onClose={() => setTokenData(null)}
-      />
     );
   }
 
@@ -301,6 +280,9 @@ export default function AdminDescuentos() {
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Admin Token Display - Always visible */}
+        <AdminTokenDisplay onTokenUsed={handleTokenUsed} />
+
         {error && (
           <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-center">
             {error}
@@ -329,7 +311,6 @@ export default function AdminDescuentos() {
             <SolicitudCard
               key={solicitud.id}
               solicitud={solicitud}
-              onAprobar={handleAprobar}
               onRechazar={handleRechazar}
               isProcessing={processingId === solicitud.id}
             />

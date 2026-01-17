@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.manage-push-subscription]
 verify_jwt = false
+
+[functions.generar-token-admin]
+verify_jwt = false
