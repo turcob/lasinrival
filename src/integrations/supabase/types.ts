@@ -864,6 +864,69 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitudes_descuento: {
+        Row: {
+          aprobado_por: string | null
+          caja_id: string | null
+          created_at: string
+          estado: Database["public"]["Enums"]["solicitud_descuento_estado"]
+          expira_en: string
+          id: string
+          monto_venta: number
+          porcentaje_solicitado: number
+          producto_id: string | null
+          token: string
+          token_usado: boolean
+          updated_at: string
+          vendedor_id: string
+        }
+        Insert: {
+          aprobado_por?: string | null
+          caja_id?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["solicitud_descuento_estado"]
+          expira_en: string
+          id?: string
+          monto_venta?: number
+          porcentaje_solicitado: number
+          producto_id?: string | null
+          token: string
+          token_usado?: boolean
+          updated_at?: string
+          vendedor_id: string
+        }
+        Update: {
+          aprobado_por?: string | null
+          caja_id?: string | null
+          created_at?: string
+          estado?: Database["public"]["Enums"]["solicitud_descuento_estado"]
+          expira_en?: string
+          id?: string
+          monto_venta?: number
+          porcentaje_solicitado?: number
+          producto_id?: string | null
+          token?: string
+          token_usado?: boolean
+          updated_at?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitudes_descuento_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_descuento_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subcategorias: {
         Row: {
           activo: boolean | null
@@ -1219,6 +1282,12 @@ export type Database = {
         | "exportar"
       app_role: "admin" | "encargado" | "cajero" | "vendedor" | "deposito"
       cash_register_status: "abierta" | "cerrada"
+      solicitud_descuento_estado:
+        | "pendiente"
+        | "aprobada"
+        | "rechazada"
+        | "expirada"
+        | "usada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1356,6 +1425,13 @@ export const Constants = {
       ],
       app_role: ["admin", "encargado", "cajero", "vendedor", "deposito"],
       cash_register_status: ["abierta", "cerrada"],
+      solicitud_descuento_estado: [
+        "pendiente",
+        "aprobada",
+        "rechazada",
+        "expirada",
+        "usada",
+      ],
     },
   },
 } as const

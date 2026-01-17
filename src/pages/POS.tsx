@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/collapsible';
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
+import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
 
 interface Producto {
   id: string;
@@ -242,6 +243,16 @@ export default function POS() {
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
   const [selectedProductForQuantity, setSelectedProductForQuantity] = useState<Producto | null>(null);
+
+  // Modal de autorización de descuento
+  const [descuentoAuthModalOpen, setDescuentoAuthModalOpen] = useState(false);
+  const [pendingDescuento, setPendingDescuento] = useState<{
+    type: 'item' | 'global';
+    itemId?: string;
+    porcentaje: number;
+    descripcion?: string;
+    productoId?: string;
+  } | null>(null);
 
   const isAdmin = hasRole('admin');
 
@@ -471,6 +482,78 @@ export default function POS() {
         return item;
       })
     );
+  };
+
+  // Función para solicitar autorización de descuento
+  const solicitarAutorizacionDescuento = (
+    type: 'item' | 'global',
+    porcentaje: number,
+    itemId?: string,
+    descripcion?: string,
+    productoId?: string
+  ) => {
+    setPendingDescuento({
+      type,
+      itemId,
+      porcentaje,
+      descripcion,
+      productoId,
+    });
+    setDescuentoAuthModalOpen(true);
+  };
+
+  // Cuando el descuento es autorizado
+  const handleDescuentoAutorizado = (porcentajeAutorizado: number) => {
+    if (!pendingDescuento) return;
+
+    if (pendingDescuento.type === 'item' && pendingDescuento.itemId) {
+      updateDescuento(pendingDescuento.itemId, porcentajeAutorizado);
+      toast.success(`Descuento del ${porcentajeAutorizado}% aplicado al producto`);
+    } else if (pendingDescuento.type === 'global') {
+      setDescuentoGlobal(porcentajeAutorizado);
+      toast.success(`Descuento global del ${porcentajeAutorizado}% aplicado`);
+    }
+
+    setDescuentoAuthModalOpen(false);
+    setPendingDescuento(null);
+  };
+
+  // Intentar aplicar descuento (verifica si necesita autorización)
+  const tryApplyDescuentoItem = (itemId: string, descuento: number) => {
+    const maxDescuento = getDescuentoMaximo();
+    const item = cart.find(i => i.id === itemId);
+    
+    if (descuento <= maxDescuento) {
+      // Dentro del límite permitido, aplicar directamente
+      updateDescuento(itemId, descuento);
+      toast.success(`Descuento del ${descuento}% aplicado`);
+    } else {
+      // Excede el límite, solicitar autorización
+      const nombreProducto = item?.es_temporal 
+        ? item.nombre_temporal 
+        : item?.producto?.descripcion;
+      solicitarAutorizacionDescuento(
+        'item',
+        descuento,
+        itemId,
+        nombreProducto,
+        item?.producto?.id
+      );
+    }
+  };
+
+  // Intentar aplicar descuento global (verifica si necesita autorización)
+  const tryApplyDescuentoGlobal = (descuento: number) => {
+    const maxDescuento = getDescuentoMaximo();
+    
+    if (descuento <= maxDescuento) {
+      // Dentro del límite permitido, aplicar directamente
+      setDescuentoGlobal(descuento);
+      if (descuento > 0) toast.success(`Descuento global del ${descuento}% aplicado`);
+    } else {
+      // Excede el límite, solicitar autorización
+      solicitarAutorizacionDescuento('global', descuento);
+    }
   };
 
   const handleGuardarPeso = () => {
@@ -1526,48 +1609,40 @@ export default function POS() {
                               ${totalSinDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </div>
                             <div className="text-center py-1">
-                              {maxDescuento > 0 ? (
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  className="h-6 w-full text-center text-xs p-1 text-foreground"
-                                  value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
-                                  onFocus={() => {
-                                    setEditingDescuentoItem(item.id);
-                                    setDescuentoInput(item.descuento_porcentaje.toString());
-                                  }}
-                                  onChange={(e) => setDescuentoInput(e.target.value)}
-                                  onBlur={() => {
-                                    if (editingDescuentoItem === item.id) {
-                                      const descuento = parseFloat(descuentoInput.replace(',', '.'));
-                                      if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
-                                        updateDescuento(item.id, descuento);
-                                      } else if (descuento > maxDescuento) {
-                                        toast.error(`Máximo permitido: ${maxDescuento}%`);
-                                      }
-                                      setEditingDescuentoItem(null);
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                className="h-6 w-full text-center text-xs p-1 text-foreground"
+                                value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
+                                onFocus={() => {
+                                  setEditingDescuentoItem(item.id);
+                                  setDescuentoInput(item.descuento_porcentaje.toString());
+                                }}
+                                onChange={(e) => setDescuentoInput(e.target.value)}
+                                onBlur={() => {
+                                  if (editingDescuentoItem === item.id) {
+                                    const descuento = parseFloat(descuentoInput.replace(',', '.'));
+                                    if (!isNaN(descuento) && descuento >= 0) {
+                                      tryApplyDescuentoItem(item.id, descuento);
                                     }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const descuento = parseFloat(descuentoInput.replace(',', '.'));
-                                      if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
-                                        updateDescuento(item.id, descuento);
-                                      } else if (descuento > maxDescuento) {
-                                        toast.error(`Máximo permitido: ${maxDescuento}%`);
-                                      }
-                                      setEditingDescuentoItem(null);
-                                      (e.target as HTMLInputElement).blur();
+                                    setEditingDescuentoItem(null);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const descuento = parseFloat(descuentoInput.replace(',', '.'));
+                                    if (!isNaN(descuento) && descuento >= 0) {
+                                      tryApplyDescuentoItem(item.id, descuento);
                                     }
-                                    if (e.key === 'Escape') {
-                                      setEditingDescuentoItem(null);
-                                      (e.target as HTMLInputElement).blur();
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
+                                    setEditingDescuentoItem(null);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingDescuentoItem(null);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                              />
                             </div>
                             <div className="text-center py-1 text-destructive">
                               {montoDescuento > 0 ? `-$${montoDescuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
@@ -1632,52 +1707,44 @@ export default function POS() {
                 )}
                 
                 {/* Descuento Global */}
-                {getDescuentoMaximo() > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Desc. global %</span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="h-7 w-16 text-center text-xs p-1"
-                        value={editingDescuentoGlobal ? descuentoGlobalInput : descuentoGlobal.toString()}
-                        onFocus={() => {
-                          setEditingDescuentoGlobal(true);
-                          setDescuentoGlobalInput(descuentoGlobal.toString());
-                        }}
-                        onChange={(e) => setDescuentoGlobalInput(e.target.value)}
-                        onBlur={() => {
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Desc. global %</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      className="h-7 w-16 text-center text-xs p-1"
+                      value={editingDescuentoGlobal ? descuentoGlobalInput : descuentoGlobal.toString()}
+                      onFocus={() => {
+                        setEditingDescuentoGlobal(true);
+                        setDescuentoGlobalInput(descuentoGlobal.toString());
+                      }}
+                      onChange={(e) => setDescuentoGlobalInput(e.target.value)}
+                      onBlur={() => {
+                        const descuento = parseFloat(descuentoGlobalInput.replace(',', '.'));
+                        if (!isNaN(descuento) && descuento >= 0) {
+                          tryApplyDescuentoGlobal(descuento);
+                        }
+                        setEditingDescuentoGlobal(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
                           const descuento = parseFloat(descuentoGlobalInput.replace(',', '.'));
-                          const maxDescuento = getDescuentoMaximo();
-                          if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
-                            setDescuentoGlobal(descuento);
-                          } else if (descuento > maxDescuento) {
-                            toast.error(`Máximo permitido: ${maxDescuento}%`);
+                          if (!isNaN(descuento) && descuento >= 0) {
+                            tryApplyDescuentoGlobal(descuento);
                           }
                           setEditingDescuentoGlobal(false);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const descuento = parseFloat(descuentoGlobalInput.replace(',', '.'));
-                            const maxDescuento = getDescuentoMaximo();
-                            if (!isNaN(descuento) && descuento >= 0 && descuento <= maxDescuento) {
-                              setDescuentoGlobal(descuento);
-                            } else if (descuento > maxDescuento) {
-                              toast.error(`Máximo permitido: ${maxDescuento}%`);
-                            }
-                            setEditingDescuentoGlobal(false);
-                            (e.target as HTMLInputElement).blur();
-                          }
-                          if (e.key === 'Escape') {
-                            setEditingDescuentoGlobal(false);
-                            (e.target as HTMLInputElement).blur();
-                          }
-                        }}
-                      />
-                      <span>%</span>
-                    </div>
+                          (e.target as HTMLInputElement).blur();
+                        }
+                        if (e.key === 'Escape') {
+                          setEditingDescuentoGlobal(false);
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                    <span>%</span>
                   </div>
-                )}
+                </div>
                 
                 {montoDescuentoGlobal > 0 && (
                   <div className="flex justify-between text-sm text-destructive">
@@ -2649,6 +2716,20 @@ export default function POS() {
         producto={selectedProductForQuantity}
         precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}
         onConfirm={handleConfirmProductQuantity}
+      />
+
+      {/* Modal de Autorización de Descuento */}
+      <SolicitarDescuentoModal
+        open={descuentoAuthModalOpen}
+        onClose={() => {
+          setDescuentoAuthModalOpen(false);
+          setPendingDescuento(null);
+        }}
+        onAuthorized={handleDescuentoAutorizado}
+        porcentajeSolicitado={pendingDescuento?.porcentaje || 0}
+        montoVenta={total}
+        productoId={pendingDescuento?.productoId}
+        descripcionProducto={pendingDescuento?.descripcion}
       />
     </MainLayout>
   );
