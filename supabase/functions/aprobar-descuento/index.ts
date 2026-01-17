@@ -7,16 +7,27 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('[aprobar-descuento] Request received:', req.method);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[aprobar-descuento] Missing env vars');
+      return new Response(
+        JSON.stringify({ error: 'Configuración del servidor incorrecta' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const authHeader = req.headers.get('Authorization');
+    console.log('[aprobar-descuento] Auth header present:', !!authHeader);
+    
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
@@ -24,29 +35,32 @@ serve(async (req) => {
       );
     }
 
-    // Create client with user's token
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    // Use service role client for all operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Extract and verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
+    console.log('[aprobar-descuento] User lookup result:', user?.id, userError?.message);
+    
     if (userError || !user) {
+      console.error('[aprobar-descuento] User auth failed:', userError);
       return new Response(
         JSON.stringify({ error: 'Usuario no autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use service role for admin operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
     // Check if user is admin
-    const { data: userRole } = await supabaseAdmin
+    const { data: userRole, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
-      .single();
+      .maybeSingle();
+
+    console.log('[aprobar-descuento] Role check:', userRole, roleError?.message);
 
     if (!userRole) {
       return new Response(
@@ -55,7 +69,10 @@ serve(async (req) => {
       );
     }
 
-    const { solicitud_id, aprobar } = await req.json();
+    const body = await req.json();
+    const { solicitud_id, aprobar } = body;
+    
+    console.log('[aprobar-descuento] Request body:', { solicitud_id, aprobar });
 
     if (!solicitud_id) {
       return new Response(
@@ -69,7 +86,9 @@ serve(async (req) => {
       .from('solicitudes_descuento')
       .select('*')
       .eq('id', solicitud_id)
-      .single();
+      .maybeSingle();
+
+    console.log('[aprobar-descuento] Solicitud fetch:', solicitud?.id, fetchError?.message);
 
     if (fetchError || !solicitud) {
       return new Response(
@@ -111,17 +130,17 @@ serve(async (req) => {
       .eq('id', solicitud_id);
 
     if (updateError) {
-      console.error('Error updating solicitud:', updateError);
+      console.error('[aprobar-descuento] Error updating:', updateError);
       return new Response(
         JSON.stringify({ error: 'Error al actualizar solicitud' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Solicitud ${solicitud_id} ${nuevoEstado} por admin ${user.id}`);
+    console.log(`[aprobar-descuento] Solicitud ${solicitud_id} ${nuevoEstado} por admin ${user.id}`);
 
     // If approved, return the token
-    const response: any = {
+    const response: Record<string, unknown> = {
       success: true,
       estado: nuevoEstado,
       mensaje: aprobar ? 'Solicitud aprobada' : 'Solicitud rechazada'
@@ -138,7 +157,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error en aprobar-descuento:', error);
+    console.error('[aprobar-descuento] Unhandled error:', error);
     return new Response(
       JSON.stringify({ error: 'Error interno del servidor' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
