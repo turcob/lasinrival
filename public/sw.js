@@ -1,6 +1,7 @@
-const CACHE_NAME = 'descuentos-pwa-v1';
+const CACHE_NAME = 'descuentos-pwa-v2';
 const urlsToCache = [
   '/admin-descuentos',
+  '/auth',
   '/manifest.json'
 ];
 

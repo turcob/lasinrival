@@ -89,9 +89,9 @@ export default function AdminDescuentos() {
     );
   }
 
-  // Not logged in
+  // Not logged in - redirect to auth with return URL
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth?redirect=/admin-descuentos" replace />;
   }
 
   // Not admin

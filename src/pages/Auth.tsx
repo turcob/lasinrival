@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,11 @@ interface ConfiguracionPublica {
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading, signIn } = useAuth();
+  
+  // Get redirect URL from query params (for PWA isolation)
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +43,9 @@ export default function Auth() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      navigate('/dashboard');
+      navigate(redirectTo);
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, redirectTo]);
 
   const fetchConfig = async () => {
     try {
