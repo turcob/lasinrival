@@ -446,17 +446,14 @@ serve(async (req) => {
       );
     }
 
-    // Create the notification payload - simplified for iOS compatibility
+    // iOS Safari requires a MINIMAL payload - only title and body
+    // Complex payloads can cause the push to be silently dropped
     const notificationPayload = {
-      title: title || 'Nueva Notificación',
-      body: body || 'Tienes una nueva notificación',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      tag: `notification-${Date.now()}`,
-      renotify: true,
-      requireInteraction: true,
-      data: data || {}
+      title: title || 'Nueva Solicitud de Descuento',
+      body: body || 'Tienes una nueva solicitud pendiente'
     };
+    
+    console.log('Sending minimal iOS-compatible payload:', JSON.stringify(notificationPayload));
 
     let sent = 0;
     const failed: string[] = [];
