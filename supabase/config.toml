@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.aprobar-descuento]
 verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.manage-push-subscription]
+verify_jwt = false
