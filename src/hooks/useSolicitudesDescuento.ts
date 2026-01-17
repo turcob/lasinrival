@@ -19,6 +19,7 @@ export function useSolicitudesDescuento() {
         .from('solicitudes_descuento')
         .select('*')
         .eq('estado', 'pendiente')
+        .gt('expira_en', new Date().toISOString())
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
