@@ -55,28 +55,39 @@ serve(async (req) => {
         );
       }
 
-      // Upsert the subscription
-      const { error: upsertError } = await supabaseAdmin
+      // FIRST: Delete ALL previous subscriptions for this user to avoid stale endpoints
+      const { error: deleteError } = await supabaseAdmin
         .from('push_subscriptions')
-        .upsert({
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        console.error('Error deleting old subscriptions:', deleteError);
+        // Continue anyway - we still want to save the new subscription
+      } else {
+        console.log(`Deleted old subscriptions for user ${user.id}`);
+      }
+
+      // THEN: Insert the new subscription (fresh, no conflicts)
+      const { error: insertError } = await supabaseAdmin
+        .from('push_subscriptions')
+        .insert({
           user_id: user.id,
           endpoint: subscription.endpoint,
           p256dh: subscription.keys.p256dh,
           auth: subscription.keys.auth,
           updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,endpoint'
         });
 
-      if (upsertError) {
-        console.error('Error upserting subscription:', upsertError);
+      if (insertError) {
+        console.error('Error inserting subscription:', insertError);
         return new Response(
-          JSON.stringify({ error: 'Error saving subscription', details: upsertError.message }),
+          JSON.stringify({ error: 'Error saving subscription', details: insertError.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`Push subscription saved for user ${user.id}`);
+      console.log(`Push subscription saved for user ${user.id}, endpoint: ${subscription.endpoint.substring(0, 50)}...`);
 
       return new Response(
         JSON.stringify({ success: true, message: 'Subscription saved' }),
