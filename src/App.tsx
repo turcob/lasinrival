@@ -26,7 +26,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, redirectPath }: { children: React.ReactNode; redirectPath?: string }) {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -38,7 +38,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    const authPath = redirectPath ? `/auth?redirect=${encodeURIComponent(redirectPath)}` : '/auth';
+    return <Navigate to={authPath} replace />;
   }
   
   return <>{children}</>;
@@ -67,7 +68,7 @@ function AppRoutes() {
       <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
-      <Route path="/admin-descuentos" element={<ProtectedRoute><AdminDescuentos /></ProtectedRoute>} />
+      <Route path="/admin-descuentos" element={<ProtectedRoute redirectPath="/admin-descuentos"><AdminDescuentos /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

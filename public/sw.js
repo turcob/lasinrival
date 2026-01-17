@@ -1,4 +1,4 @@
-const CACHE_NAME = 'descuentos-pwa-v2';
+const CACHE_NAME = 'descuentos-pwa-v3';
 const urlsToCache = [
   '/admin-descuentos',
   '/auth',
