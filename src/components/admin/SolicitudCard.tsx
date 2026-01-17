@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, User, Percent, DollarSign, Clock } from 'lucide-react';
+import { X, User, Percent, DollarSign, Clock } from 'lucide-react';
 import type { SolicitudConVendedor } from '@/hooks/useSolicitudesDescuento';
 
 interface SolicitudCardProps {
   solicitud: SolicitudConVendedor;
-  onAprobar: (id: string) => Promise<void>;
   onRechazar: (id: string) => Promise<void>;
   isProcessing: boolean;
 }
@@ -32,7 +31,7 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function SolicitudCard({ solicitud, onAprobar, onRechazar, isProcessing }: SolicitudCardProps) {
+export function SolicitudCard({ solicitud, onRechazar, isProcessing }: SolicitudCardProps) {
   const [timeRemaining, setTimeRemaining] = useState(formatTimeRemaining(solicitud.expira_en));
   const [isExpired, setIsExpired] = useState(false);
 
@@ -97,26 +96,23 @@ export function SolicitudCard({ solicitud, onAprobar, onRechazar, isProcessing }
           </span>
         </div>
 
-        {/* Botones */}
-        <div className="flex gap-3">
-          <Button
-            onClick={() => onAprobar(solicitud.id)}
-            disabled={isProcessing}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Aprobar
-          </Button>
-          <Button
-            onClick={() => onRechazar(solicitud.id)}
-            disabled={isProcessing}
-            variant="destructive"
-            className="flex-1"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Rechazar
-          </Button>
+        {/* Info message */}
+        <div className="text-center p-2 rounded-lg bg-primary/10 border border-primary/20">
+          <p className="text-xs text-primary">
+            Dicte el token de arriba al vendedor para autorizar
+          </p>
         </div>
+
+        {/* Botón Rechazar */}
+        <Button
+          onClick={() => onRechazar(solicitud.id)}
+          disabled={isProcessing}
+          variant="destructive"
+          className="w-full"
+        >
+          <X className="h-4 w-4 mr-2" />
+          Rechazar
+        </Button>
       </CardContent>
     </Card>
   );
