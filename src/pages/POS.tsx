@@ -1011,7 +1011,7 @@ export default function POS() {
         ...venta,
         detalles: cart.map(item => ({
           cantidad: item.cantidad,
-          precio_unitario: item.precio,
+          precio: item.precio,
           subtotal: item.subtotal,
           descuento_porcentaje: item.descuento_porcentaje,
           producto: item.producto,
