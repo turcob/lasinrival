@@ -603,6 +603,7 @@ export type Database = {
           fecha_ingreso: string | null
           id: string
           nombre: string
+          sucursal_id: string | null
           sueldo_base: number | null
           telefono: string | null
           updated_at: string | null
@@ -619,6 +620,7 @@ export type Database = {
           fecha_ingreso?: string | null
           id?: string
           nombre: string
+          sucursal_id?: string | null
           sueldo_base?: number | null
           telefono?: string | null
           updated_at?: string | null
@@ -635,11 +637,20 @@ export type Database = {
           fecha_ingreso?: string | null
           id?: string
           nombre?: string
+          sucursal_id?: string | null
           sueldo_base?: number | null
           telefono?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "empleados_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       formas_pago: {
         Row: {
@@ -1179,6 +1190,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sucursales: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          direccion: string | null
+          id: string
+          nombre: string
+          telefono: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          nombre: string
+          telefono?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          nombre?: string
+          telefono?: string | null
+        }
+        Relationships: []
       }
       tarjeta_cuotas: {
         Row: {
