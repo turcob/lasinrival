@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Download, CheckCircle, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { PagarLiquidacionDialog } from './PagarLiquidacionDialog';
 
 interface Empleado {
   id: string;
@@ -70,6 +71,14 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  
+  // Payment dialog state
+  const [pagarDialogOpen, setPagarDialogOpen] = useState(false);
+  const [liquidacionAPagar, setLiquidacionAPagar] = useState<{
+    id: string;
+    empleadoNombre: string;
+    monto: number;
+  } | null>(null);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -194,20 +203,20 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     }
   };
 
-  const marcarPagada = async (liquidacionId: string) => {
-    try {
-      const { error } = await supabase
-        .from('empleado_liquidaciones')
-        .update({ estado: 'pagada', fecha_pago: new Date().toISOString().split('T')[0] })
-        .eq('id', liquidacionId);
+  const abrirDialogoPago = (liq: LiquidacionData) => {
+    if (!liq.liquidacion_existente) return;
+    
+    setLiquidacionAPagar({
+      id: liq.liquidacion_existente.id,
+      empleadoNombre: liq.empleado.nombre,
+      monto: liq.neto_a_pagar,
+    });
+    setPagarDialogOpen(true);
+  };
 
-      if (error) throw error;
-      toast.success('Liquidación marcada como pagada');
-      calcularLiquidaciones();
-    } catch (error) {
-      console.error('Error updating liquidacion:', error);
-      toast.error('Error al actualizar la liquidación');
-    }
+  const handlePagoSuccess = () => {
+    calcularLiquidaciones();
+    onRefresh();
   };
 
   const exportarExcel = () => {
@@ -335,10 +344,10 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => marcarPagada(liq.liquidacion_existente!.id)}
+                          onClick={() => abrirDialogoPago(liq)}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
-                          Marcar Pagada
+                          Pagar
                         </Button>
                       ) : (
                         <span className="text-sm text-muted-foreground">✓ Completada</span>
@@ -359,6 +368,21 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           </>
         )}
       </CardContent>
+
+      {/* Payment Dialog */}
+      {liquidacionAPagar && user && (
+        <PagarLiquidacionDialog
+          open={pagarDialogOpen}
+          onOpenChange={setPagarDialogOpen}
+          liquidacionId={liquidacionAPagar.id}
+          empleadoNombre={liquidacionAPagar.empleadoNombre}
+          monto={liquidacionAPagar.monto}
+          mes={selectedMes}
+          anio={selectedAnio}
+          onSuccess={handlePagoSuccess}
+          userId={user.id}
+        />
+      )}
     </Card>
   );
 }

@@ -486,10 +486,12 @@ export type Database = {
       empleado_liquidaciones: {
         Row: {
           anio: number
+          caja_id: string | null
           created_at: string | null
           empleado_id: string
           estado: string | null
           fecha_pago: string | null
+          forma_pago_id: string | null
           id: string
           mes: number
           neto_a_pagar: number
@@ -501,10 +503,12 @@ export type Database = {
         }
         Insert: {
           anio: number
+          caja_id?: string | null
           created_at?: string | null
           empleado_id: string
           estado?: string | null
           fecha_pago?: string | null
+          forma_pago_id?: string | null
           id?: string
           mes: number
           neto_a_pagar: number
@@ -516,10 +520,12 @@ export type Database = {
         }
         Update: {
           anio?: number
+          caja_id?: string | null
           created_at?: string | null
           empleado_id?: string
           estado?: string | null
           fecha_pago?: string | null
+          forma_pago_id?: string | null
           id?: string
           mes?: number
           neto_a_pagar?: number
@@ -531,10 +537,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "empleado_liquidaciones_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "empleado_liquidaciones_empleado_id_fkey"
             columns: ["empleado_id"]
             isOneToOne: false
             referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleado_liquidaciones_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
             referencedColumns: ["id"]
           },
         ]
