@@ -20,9 +20,11 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, CheckCircle, FileText } from 'lucide-react';
+import { Download, CheckCircle, FileText, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PagarLiquidacionDialog } from './PagarLiquidacionDialog';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirReciboLiquidacion } from '@/lib/imprimirReciboLiquidacion';
 
 interface Empleado {
   id: string;
@@ -66,6 +68,7 @@ const MESES = [
 
 export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionProps) {
   const { user } = useAuth();
+  const { config } = useConfiguracionComercio();
   const [selectedMes, setSelectedMes] = useState(new Date().getMonth() + 1);
   const [selectedAnio, setSelectedAnio] = useState(new Date().getFullYear());
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionData[]>([]);
@@ -225,6 +228,31 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     onRefresh();
   };
 
+  const handleReimprimirRecibo = (liq: LiquidacionData) => {
+    const success = imprimirReciboLiquidacion({
+      empleadoNombre: liq.empleado.nombre,
+      mes: selectedMes,
+      anio: selectedAnio,
+      sueldoBase: liq.sueldo_base,
+      totalComisiones: liq.total_comisiones,
+      totalDescuentos: liq.total_compras + liq.total_adelantos,
+      netoAPagar: liq.neto_a_pagar,
+      comercio: config ? {
+        razonSocial: config.razon_social,
+        nombreFantasia: config.nombre_fantasia,
+        cuit: config.cuit,
+        direccion: config.direccion,
+        localidad: config.localidad,
+        provincia: config.provincia,
+        telefono: config.telefono,
+      } : undefined,
+    });
+    
+    if (!success) {
+      toast.error('No se pudo abrir la ventana de impresión. Verifique que no estén bloqueados los popups.');
+    }
+  };
+
   const exportarExcel = () => {
     const data = liquidaciones.map(l => ({
       'Empleado': l.empleado.nombre,
@@ -356,7 +384,15 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                           Pagar
                         </Button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">✓ Completada</span>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleReimprimirRecibo(liq)}
+                          title="Reimprimir recibo"
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Recibo
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
