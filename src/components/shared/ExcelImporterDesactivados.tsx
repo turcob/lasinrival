@@ -95,9 +95,10 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
       const totalRows = rows.length;
 
       // Fetch existing data
-      const [existingProductos, existingSubcategorias] = await Promise.all([
+      const [existingProductos, existingSubcategorias, existingCategorias] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, activo'),
         supabase.from('subcategorias').select('id, nombre'),
+        supabase.from('categorias').select('id, nombre'),
       ]);
 
       const productosMap = new Map<string, { id: string; activo: boolean }>();
@@ -110,6 +111,14 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
       existingSubcategorias.data?.forEach((s) => {
         if (s.nombre) {
           subcategoriasByNameMap.set(s.nombre.toUpperCase().trim(), s.id);
+        }
+      });
+
+      // Map categories by normalized name for lookup
+      const categoriasByNameMap = new Map<string, string>();
+      existingCategorias.data?.forEach((c) => {
+        if (c.nombre) {
+          categoriasByNameMap.set(c.nombre.toUpperCase().trim(), c.id);
         }
       });
 
@@ -139,6 +148,13 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
           normalizedRow['DESCRIPCION'] || 
           ''
         ).trim();
+
+        const categoriaNombre = String(
+          normalizedRow['Familia'] || 
+          normalizedRow['FAMILIA'] || 
+          normalizedRow['CATEGORIA'] || 
+          ''
+        ).trim().toUpperCase();
 
         const subcategoriaNombre = String(
           normalizedRow['Desc. agrupación'] || 
@@ -171,7 +187,8 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
           continue;
         }
 
-        // Look up subcategoria by name
+        // Look up categoria and subcategoria by name
+        const categoriaId = categoriaNombre ? categoriasByNameMap.get(categoriaNombre) : null;
         const subcategoriaId = subcategoriaNombre ? subcategoriasByNameMap.get(subcategoriaNombre) : null;
 
         const existingProduct = productosMap.get(codigoArticulo);
@@ -184,6 +201,7 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
               descripcion: descripcion,
               codigo_barra: codigoBarra,
               precio_costo: precioCosto,
+              categoria_id: categoriaId || null,
               subcategoria_id: subcategoriaId || null,
               activo: false,
               desactivado_por: user?.id || null,
@@ -207,6 +225,10 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
 
             if (codigoBarra) {
               updateData.codigo_barra = codigoBarra;
+            }
+
+            if (categoriaId) {
+              updateData.categoria_id = categoriaId;
             }
 
             if (subcategoriaId) {
@@ -289,6 +311,7 @@ export function ExcelImporterDesactivados({ onImportComplete }: { onImportComple
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• <strong>Cód. Artículo</strong> - Código del producto (requerido)</li>
                   <li>• <strong>Descripción</strong> - Nombre del producto (requerido)</li>
+                  <li>• <strong>Familia</strong> - Categoría (por nombre)</li>
                   <li>• <strong>Desc. agrupación</strong> - Subcategoría (por nombre)</li>
                   <li>• <strong>Código de Barras</strong> - Código EAN/UPC (opcional)</li>
                   <li>• <strong>Costo</strong> - Precio de costo (0 si es "elimin")</li>
