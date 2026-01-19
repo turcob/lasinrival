@@ -847,6 +847,205 @@ export default function POS() {
     setPagos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Nueva función para procesar venta a empleado directo a cuenta corriente
+  const handleProcesarVentaEmpleado = async () => {
+    if (!user) return;
+
+    if (!cajaAbierta) {
+      toast.error('Debe abrir una caja antes de realizar ventas');
+      return;
+    }
+
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+
+    if (!selectedEmpleado) {
+      toast.error('Seleccione un empleado para la venta');
+      return;
+    }
+
+    setEmitiendo(true);
+
+    try {
+      const { data: caja } = await supabase
+        .from('cajas')
+        .select('id')
+        .eq('usuario_id', user.id)
+        .eq('estado', 'abierta')
+        .single();
+
+      if (!caja) {
+        toast.error('No tiene una caja abierta');
+        setEmitiendo(false);
+        return;
+      }
+
+      let venta: any;
+
+      if (editingPedidoId) {
+        // Actualizar pedido existente
+        const { error: updateError } = await supabase
+          .from('ventas')
+          .update({
+            cliente_id: null,
+            empleado_id: selectedEmpleado.id,
+            caja_id: caja.id,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
+            total: total,
+            estado: 'confirmada',
+          })
+          .eq('id', editingPedidoId);
+
+        if (updateError) throw updateError;
+        
+        const { data: updatedVenta, error: fetchError } = await supabase
+          .from('ventas')
+          .select('*')
+          .eq('id', editingPedidoId)
+          .single();
+          
+        if (fetchError) throw fetchError;
+        venta = updatedVenta;
+
+        await supabase
+          .from('venta_detalles')
+          .delete()
+          .eq('venta_id', editingPedidoId);
+
+        const detalles = cart.map((item) => ({
+          venta_id: venta.id,
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        }));
+
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
+
+        if (detallesError) throw detallesError;
+      } else {
+        // Crear nueva venta
+        const { data: newVenta, error: ventaError } = await supabase
+          .from('ventas')
+          .insert([{
+            usuario_id: user.id,
+            cliente_id: null,
+            empleado_id: selectedEmpleado.id,
+            caja_id: caja.id,
+            subtotal: subtotal,
+            descuento: totalDescuentos,
+            total: total,
+            estado: 'confirmada',
+          }])
+          .select()
+          .single();
+
+        if (ventaError) throw ventaError;
+        venta = newVenta;
+
+        const detalles = cart.map((item) => ({
+          venta_id: venta.id,
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        }));
+
+        const { error: detallesError } = await supabase
+          .from('venta_detalles')
+          .insert(detalles);
+
+        if (detallesError) throw detallesError;
+      }
+
+      // NO crear venta_pagos - no hay pago
+
+      // Actualizar stock (solo para productos reales)
+      for (const item of cart) {
+        if (item.producto && !item.es_temporal) {
+          await supabase
+            .from('productos')
+            .update({ stock_actual: item.producto.stock_actual - item.cantidad })
+            .eq('id', item.producto.id);
+
+          await supabase.from('movimientos_inventario').insert([{
+            producto_id: item.producto.id,
+            tipo: 'salida',
+            cantidad: item.cantidad,
+            stock_anterior: item.producto.stock_actual,
+            stock_nuevo: item.producto.stock_actual - item.cantidad,
+            motivo: 'Venta a Empleado',
+            usuario_id: user.id,
+            venta_id: venta.id,
+          }]);
+        }
+      }
+
+      // Registrar movimiento en cuenta corriente del empleado
+      await supabase.from('empleado_movimientos').insert([{
+        empleado_id: selectedEmpleado.id,
+        tipo: 'compra',
+        monto: total,
+        concepto: `Compra - Venta #${venta.numero_comprobante}`,
+        venta_id: venta.id,
+        usuario_registro_id: user.id,
+      }]);
+
+      // NO registrar movimiento de caja - no entra dinero
+
+      // Guardar venta para el ticket
+      setLastVenta({
+        ...venta,
+        detalles: cart.map(item => ({
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          subtotal: item.subtotal,
+          descuento_porcentaje: item.descuento_porcentaje,
+          producto: item.producto,
+          es_temporal: item.es_temporal,
+          nombre_temporal: item.nombre_temporal,
+        })),
+        pagos: [], // Sin pagos
+        cliente: null,
+        empleado: selectedEmpleado,
+        descuento_global: descuentoGlobal,
+      });
+
+      toast.success(`Venta #${venta.numero_comprobante} cargada a cuenta corriente de ${selectedEmpleado.nombre}`);
+      
+      // Limpiar todo
+      setCart([]);
+      setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
+      setDescuentoGlobal(0);
+      setEditingPedidoId(null);
+      
+      // Mostrar ticket
+      setTicketDialogOpen(true);
+
+      fetchData();
+    } catch (error) {
+      console.error('Error al procesar venta a empleado:', error);
+      toast.error('Error al procesar la venta');
+    } finally {
+      setEmitiendo(false);
+    }
+  };
+
   const handleProcesarVenta = async () => {
     if (!user) return;
 
@@ -1879,18 +2078,33 @@ export default function POS() {
             <Button
               size="lg"
               className="w-full"
-              disabled={cart.length === 0 || !cajaAbierta || (isVentaEmpleado && !selectedEmpleado)}
+              disabled={cart.length === 0 || !cajaAbierta || (isVentaEmpleado && !selectedEmpleado) || emitiendo}
               onClick={() => {
-                if (isVentaEmpleado && !selectedEmpleado) {
-                  toast.error('Seleccione un empleado para la venta');
-                  return;
+                if (isVentaEmpleado) {
+                  if (!selectedEmpleado) {
+                    toast.error('Seleccione un empleado para la venta');
+                    return;
+                  }
+                  // Procesar directo a cuenta corriente
+                  handleProcesarVentaEmpleado();
+                } else {
+                  // Flujo normal de pago
+                  setPagos([]);
+                  setPagoDialogOpen(true);
                 }
-                setPagos([]);
-                setPagoDialogOpen(true);
               }}
             >
-              <CreditCard className="mr-2 h-5 w-5" />
-              Cobrar ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              {isVentaEmpleado ? (
+                <>
+                  <UserCheck className="mr-2 h-5 w-5" />
+                  {emitiendo ? 'Procesando...' : `Cargar a CC $${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  Cobrar ${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </>
+              )}
             </Button>
 
             <div className="grid grid-cols-2 gap-2">
