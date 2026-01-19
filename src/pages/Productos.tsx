@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit2, Trash2, RotateCcw } from 'lucide-react';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
+import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
 import {
   Dialog,
   DialogContent,
@@ -415,6 +416,7 @@ export default function Productos() {
     <MainLayout>
       <PageHeader title="Productos" description="Gestión del catálogo de productos">
         <ExcelImporter />
+        <ExcelImporterDesactivados onImportComplete={fetchData} />
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
