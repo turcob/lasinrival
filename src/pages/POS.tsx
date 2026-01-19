@@ -191,6 +191,7 @@ export default function POS() {
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
   const [isVentaEmpleado, setIsVentaEmpleado] = useState(false);
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
+  const [clienteSearchTerm, setClienteSearchTerm] = useState('');
   const [empleadoDialogOpen, setEmpleadoDialogOpen] = useState(false);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
@@ -2168,36 +2169,71 @@ export default function POS() {
       </div>
 
       {/* Client Selection Dialog */}
-      <Dialog open={clienteDialogOpen} onOpenChange={setClienteDialogOpen}>
+      <Dialog open={clienteDialogOpen} onOpenChange={(open) => {
+        setClienteDialogOpen(open);
+        if (!open) setClienteSearchTerm('');
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Seleccionar Cliente</DialogTitle>
           </DialogHeader>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o DNI/CUIT..."
+              value={clienteSearchTerm}
+              onChange={(e) => setClienteSearchTerm(e.target.value)}
+              className="pl-9"
+              autoFocus
+            />
+          </div>
           <ScrollArea className="max-h-80">
-            <div
-              className="p-3 hover:bg-muted cursor-pointer rounded"
-              onClick={() => {
-                setSelectedCliente(null);
-                setClienteDialogOpen(false);
-              }}
-            >
-              <p className="font-medium">Consumidor Final</p>
-            </div>
-            {clientes.map((cliente) => (
+            {!clienteSearchTerm && (
               <div
-                key={cliente.id}
-                className="p-3 hover:bg-muted cursor-pointer rounded border-t"
+                className="p-3 hover:bg-muted cursor-pointer rounded"
                 onClick={() => {
-                  setSelectedCliente(cliente);
+                  setSelectedCliente(null);
                   setClienteDialogOpen(false);
+                  setClienteSearchTerm('');
                 }}
               >
-                <p className="font-medium">{cliente.nombre}</p>
-                {cliente.dni_cuit && (
-                  <p className="text-sm text-muted-foreground">{cliente.dni_cuit}</p>
-                )}
+                <p className="font-medium">Consumidor Final</p>
               </div>
-            ))}
+            )}
+            {clientes
+              .filter((cliente) => {
+                if (!clienteSearchTerm) return true;
+                const term = clienteSearchTerm.toLowerCase();
+                return (
+                  cliente.nombre.toLowerCase().includes(term) ||
+                  (cliente.dni_cuit && cliente.dni_cuit.toLowerCase().includes(term))
+                );
+              })
+              .slice(0, 50)
+              .map((cliente) => (
+                <div
+                  key={cliente.id}
+                  className="p-3 hover:bg-muted cursor-pointer rounded border-t"
+                  onClick={() => {
+                    setSelectedCliente(cliente);
+                    setClienteDialogOpen(false);
+                    setClienteSearchTerm('');
+                  }}
+                >
+                  <p className="font-medium">{cliente.nombre}</p>
+                  {cliente.dni_cuit && (
+                    <p className="text-sm text-muted-foreground">{cliente.dni_cuit}</p>
+                  )}
+                </div>
+              ))}
+            {clienteSearchTerm && clientes.filter((c) => {
+              const term = clienteSearchTerm.toLowerCase();
+              return c.nombre.toLowerCase().includes(term) || (c.dni_cuit && c.dni_cuit.toLowerCase().includes(term));
+            }).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No se encontraron clientes
+              </p>
+            )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
