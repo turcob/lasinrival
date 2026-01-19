@@ -483,6 +483,164 @@ export type Database = {
           },
         ]
       }
+      empleado_liquidaciones: {
+        Row: {
+          anio: number
+          created_at: string | null
+          empleado_id: string
+          estado: string | null
+          fecha_pago: string | null
+          id: string
+          mes: number
+          neto_a_pagar: number
+          observaciones: string | null
+          sueldo_base: number
+          total_comisiones: number | null
+          total_descuentos: number | null
+          usuario_id: string
+        }
+        Insert: {
+          anio: number
+          created_at?: string | null
+          empleado_id: string
+          estado?: string | null
+          fecha_pago?: string | null
+          id?: string
+          mes: number
+          neto_a_pagar: number
+          observaciones?: string | null
+          sueldo_base: number
+          total_comisiones?: number | null
+          total_descuentos?: number | null
+          usuario_id: string
+        }
+        Update: {
+          anio?: number
+          created_at?: string | null
+          empleado_id?: string
+          estado?: string | null
+          fecha_pago?: string | null
+          id?: string
+          mes?: number
+          neto_a_pagar?: number
+          observaciones?: string | null
+          sueldo_base?: number
+          total_comisiones?: number | null
+          total_descuentos?: number | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleado_liquidaciones_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empleado_movimientos: {
+        Row: {
+          concepto: string | null
+          created_at: string | null
+          empleado_id: string
+          fecha: string | null
+          id: string
+          monto: number
+          tipo: string
+          usuario_registro_id: string
+          venta_id: string | null
+        }
+        Insert: {
+          concepto?: string | null
+          created_at?: string | null
+          empleado_id: string
+          fecha?: string | null
+          id?: string
+          monto: number
+          tipo: string
+          usuario_registro_id: string
+          venta_id?: string | null
+        }
+        Update: {
+          concepto?: string | null
+          created_at?: string | null
+          empleado_id?: string
+          fecha?: string | null
+          id?: string
+          monto?: number
+          tipo?: string
+          usuario_registro_id?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleado_movimientos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleado_movimientos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empleados: {
+        Row: {
+          activo: boolean | null
+          cargo: string | null
+          cbu_cuenta: string | null
+          created_at: string | null
+          direccion: string | null
+          dni: string | null
+          email: string | null
+          estado_civil: string | null
+          fecha_ingreso: string | null
+          id: string
+          nombre: string
+          sueldo_base: number | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          cargo?: string | null
+          cbu_cuenta?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          dni?: string | null
+          email?: string | null
+          estado_civil?: string | null
+          fecha_ingreso?: string | null
+          id?: string
+          nombre: string
+          sueldo_base?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          cargo?: string | null
+          cbu_cuenta?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          dni?: string | null
+          email?: string | null
+          estado_civil?: string | null
+          fecha_ingreso?: string | null
+          id?: string
+          nombre?: string
+          sueldo_base?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       formas_pago: {
         Row: {
           activo: boolean | null
@@ -1246,6 +1404,7 @@ export type Database = {
           cliente_id: string | null
           created_at: string | null
           descuento: number | null
+          empleado_id: string | null
           estado: string
           fecha: string | null
           fecha_anulacion: string | null
@@ -1263,6 +1422,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string | null
           descuento?: number | null
+          empleado_id?: string | null
           estado?: string
           fecha?: string | null
           fecha_anulacion?: string | null
@@ -1280,6 +1440,7 @@ export type Database = {
           cliente_id?: string | null
           created_at?: string | null
           descuento?: number | null
+          empleado_id?: string | null
           estado?: string
           fecha?: string | null
           fecha_anulacion?: string | null
@@ -1305,11 +1466,35 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ventas_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      empleado_saldos: {
+        Row: {
+          empleado_id: string | null
+          saldo_actual: number | null
+          total_comisiones: number | null
+          total_deuda: number | null
+          total_pagado: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empleado_movimientos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
