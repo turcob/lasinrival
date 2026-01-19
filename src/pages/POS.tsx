@@ -22,7 +22,8 @@ import {
   Scale,
   Percent,
   ChevronDown,
-  Package
+  Package,
+  UserCheck
 } from 'lucide-react';
 import {
   Dialog,
@@ -100,6 +101,13 @@ interface Cliente {
   condicion_iva?: number;
 }
 
+interface Empleado {
+  id: string;
+  nombre: string;
+  dni: string | null;
+  activo: boolean;
+}
+
 interface FormaPago {
   id: string;
   nombre: string;
@@ -168,6 +176,7 @@ export default function POS() {
   const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
   const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>([]);
@@ -179,7 +188,10 @@ export default function POS() {
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
+  const [isVentaEmpleado, setIsVentaEmpleado] = useState(false);
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
+  const [empleadoDialogOpen, setEmpleadoDialogOpen] = useState(false);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -264,9 +276,10 @@ export default function POS() {
     if (!user) return;
     setLoading(true);
     try {
-      const [productosRes, clientesRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
+      const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id').eq('activo', true).order('nombre'),
+        supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
@@ -279,6 +292,7 @@ export default function POS() {
 
       if (productosRes.data) setProductos(productosRes.data);
       if (clientesRes.data) setClientes(clientesRes.data as Cliente[]);
+      if (empleadosRes.data) setEmpleados(empleadosRes.data as Empleado[]);
       if (formasPagoRes.data) setFormasPago(formasPagoRes.data);
       if (tarjetasRes.data) setTarjetas(tarjetasRes.data as Tarjeta[]);
       if (cuotasRes.data) setTarjetaCuotas(cuotasRes.data as TarjetaCuota[]);
@@ -873,7 +887,8 @@ export default function POS() {
         const { error: updateError } = await supabase
           .from('ventas')
           .update({
-            cliente_id: selectedCliente?.id || null,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
             caja_id: caja.id,
             subtotal: subtotal,
             descuento: totalDescuentos,
@@ -920,7 +935,8 @@ export default function POS() {
           .from('ventas')
           .insert([{
             usuario_id: user.id,
-            cliente_id: selectedCliente?.id || null,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
             caja_id: caja.id,
             subtotal: subtotal,
             descuento: totalDescuentos,
@@ -989,6 +1005,18 @@ export default function POS() {
             venta_id: venta.id,
           }]);
         }
+      }
+
+      // If this is an employee sale, register the movement in their account
+      if (isVentaEmpleado && selectedEmpleado) {
+        await supabase.from('empleado_movimientos').insert([{
+          empleado_id: selectedEmpleado.id,
+          tipo: 'compra',
+          monto: totalFacturar,
+          concepto: `Compra - Venta #${venta.numero_comprobante}`,
+          venta_id: venta.id,
+          usuario_registro_id: user.id,
+        }]);
       }
 
       await supabase.from('movimientos_caja').insert([{
@@ -1087,11 +1115,20 @@ export default function POS() {
         }
       }
 
-      setLastVenta({ ...venta, detalles: cart, pagos, cliente: selectedCliente, factura: facturaInfo });
+      setLastVenta({ 
+        ...venta, 
+        detalles: cart, 
+        pagos, 
+        cliente: isVentaEmpleado ? null : selectedCliente, 
+        empleado: isVentaEmpleado ? selectedEmpleado : null,
+        factura: facturaInfo 
+      });
       
       setCart([]);
       setPagos([]);
       setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
       setEditingPedidoId(null);
       setDescuentoGlobal(0);
       setPagoDialogOpen(false);
@@ -1118,6 +1155,7 @@ export default function POS() {
         .select(`
           *,
           clientes(id, nombre, dni_cuit, condicion_iva),
+          empleados(id, nombre, dni),
           venta_detalles(*, productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo))
         `)
         .eq('estado', 'pedido')
@@ -1147,7 +1185,8 @@ export default function POS() {
         const { error: updateError } = await supabase
           .from('ventas')
           .update({
-            cliente_id: selectedCliente?.id || null,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
             subtotal: subtotal,
             descuento: totalDescuentos,
             total: total,
@@ -1186,7 +1225,8 @@ export default function POS() {
           .from('ventas')
           .insert([{
             usuario_id: user.id,
-            cliente_id: selectedCliente?.id || null,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
             subtotal: subtotal,
             descuento: totalDescuentos,
             total: total,
@@ -1220,6 +1260,8 @@ export default function POS() {
 
       setCart([]);
       setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
     } catch (error) {
       toast.error('Error al guardar el pedido');
@@ -1229,15 +1271,29 @@ export default function POS() {
   };
 
   const handleCargarPedido = (pedido: any) => {
-    if (pedido.clientes) {
+    // Handle employee or client
+    if (pedido.empleados) {
+      setSelectedEmpleado({
+        id: pedido.empleados.id,
+        nombre: pedido.empleados.nombre,
+        dni: pedido.empleados.dni,
+        activo: true,
+      });
+      setSelectedCliente(null);
+      setIsVentaEmpleado(true);
+    } else if (pedido.clientes) {
       setSelectedCliente({
         id: pedido.clientes.id,
         nombre: pedido.clientes.nombre,
         dni_cuit: pedido.clientes.dni_cuit,
         condicion_iva: pedido.clientes.condicion_iva,
       });
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
     } else {
       setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
     }
 
     const cartItems: CartItem[] = pedido.venta_detalles.map((detalle: any) => {
@@ -1663,27 +1719,83 @@ export default function POS() {
 
         {/* Right Panel - Summary & Payment */}
         <div className="w-80 flex flex-col gap-4">
-          {/* Client Selection */}
+          {/* Client/Employee Selection */}
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-4 space-y-3">
+              {/* Toggle between client and employee sale */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span className="text-sm font-medium">Cliente</span>
+                  <Switch 
+                    id="venta-empleado" 
+                    checked={isVentaEmpleado}
+                    onCheckedChange={(checked) => {
+                      setIsVentaEmpleado(checked);
+                      if (checked) {
+                        setSelectedCliente(null);
+                      } else {
+                        setSelectedEmpleado(null);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="venta-empleado" className="text-sm font-medium cursor-pointer">
+                    Venta a Empleado
+                  </Label>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setClienteDialogOpen(true)}>
-                  {selectedCliente ? 'Cambiar' : 'Seleccionar'}
-                </Button>
+                {isVentaEmpleado && (
+                  <Badge variant="secondary" className="text-xs">
+                    <UserCheck className="h-3 w-3 mr-1" />
+                    CC
+                  </Badge>
+                )}
               </div>
-              {selectedCliente ? (
-                <div className="mt-2 p-2 bg-muted rounded">
-                  <p className="font-medium">{selectedCliente.nombre}</p>
-                  {selectedCliente.dni_cuit && (
-                    <p className="text-sm text-muted-foreground">{selectedCliente.dni_cuit}</p>
+
+              {isVentaEmpleado ? (
+                // Employee selection
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span className="text-sm font-medium">Empleado</span>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setEmpleadoDialogOpen(true)}>
+                      {selectedEmpleado ? 'Cambiar' : 'Seleccionar'}
+                    </Button>
+                  </div>
+                  {selectedEmpleado ? (
+                    <div className="p-2 bg-primary/10 border border-primary/30 rounded">
+                      <p className="font-medium">{selectedEmpleado.nombre}</p>
+                      {selectedEmpleado.dni && (
+                        <p className="text-sm text-muted-foreground">DNI: {selectedEmpleado.dni}</p>
+                      )}
+                      <p className="text-xs text-primary mt-1">Se cargará a cuenta corriente</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-destructive">Seleccione un empleado</p>
                   )}
-                </div>
+                </>
               ) : (
-                <p className="mt-2 text-sm text-muted-foreground">Consumidor Final</p>
+                // Client selection
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm font-medium">Cliente</span>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setClienteDialogOpen(true)}>
+                      {selectedCliente ? 'Cambiar' : 'Seleccionar'}
+                    </Button>
+                  </div>
+                  {selectedCliente ? (
+                    <div className="p-2 bg-muted rounded">
+                      <p className="font-medium">{selectedCliente.nombre}</p>
+                      {selectedCliente.dni_cuit && (
+                        <p className="text-sm text-muted-foreground">{selectedCliente.dni_cuit}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Consumidor Final</p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -1767,8 +1879,12 @@ export default function POS() {
             <Button
               size="lg"
               className="w-full"
-              disabled={cart.length === 0 || !cajaAbierta}
+              disabled={cart.length === 0 || !cajaAbierta || (isVentaEmpleado && !selectedEmpleado)}
               onClick={() => {
+                if (isVentaEmpleado && !selectedEmpleado) {
+                  toast.error('Seleccione un empleado para la venta');
+                  return;
+                }
                 setPagos([]);
                 setPagoDialogOpen(true);
               }}
@@ -1868,6 +1984,42 @@ export default function POS() {
                 )}
               </div>
             ))}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Selection Dialog */}
+      <Dialog open={empleadoDialogOpen} onOpenChange={setEmpleadoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              Seleccionar Empleado
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-80">
+            {empleados.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                <p>No hay empleados registrados</p>
+                <p className="text-sm">Agregue empleados desde el módulo de Empleados</p>
+              </div>
+            ) : (
+              empleados.map((empleado) => (
+                <div
+                  key={empleado.id}
+                  className="p-3 hover:bg-muted cursor-pointer rounded border-b last:border-0"
+                  onClick={() => {
+                    setSelectedEmpleado(empleado);
+                    setEmpleadoDialogOpen(false);
+                  }}
+                >
+                  <p className="font-medium">{empleado.nombre}</p>
+                  {empleado.dni && (
+                    <p className="text-sm text-muted-foreground">DNI: {empleado.dni}</p>
+                  )}
+                </div>
+              ))
+            )}
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -2286,11 +2438,21 @@ export default function POS() {
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-[9px]">
-                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || (lastVenta.factura?.tipo_comprobante === 1 && lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Consumidor Final')}</p>
-                      <p><strong>CUIT/DNI:</strong> {lastVenta.cliente?.dni_cuit || (lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Sin identificar')}</p>
-                      <p><strong>IVA:</strong> {lastVenta.cliente ? (CONDICIONES_IVA.find(c => c.value === lastVenta.cliente.condicion_iva)?.label || 'Cons. Final') : (lastVenta.factura?.tipo_comprobante === 1 ? 'Responsable Inscripto' : 'Cons. Final')}</p>
-                      {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
-                      <p><strong>Cond. Venta:</strong> Contado</p>
+                      {lastVenta.empleado ? (
+                        <>
+                          <p><strong>Empleado:</strong> {lastVenta.empleado.nombre}</p>
+                          {lastVenta.empleado.dni && <p><strong>DNI:</strong> {lastVenta.empleado.dni}</p>}
+                          <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || (lastVenta.factura?.tipo_comprobante === 1 && lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Consumidor Final')}</p>
+                          <p><strong>CUIT/DNI:</strong> {lastVenta.cliente?.dni_cuit || (lastVenta.factura?.doc_nro ? lastVenta.factura.doc_nro : 'Sin identificar')}</p>
+                          <p><strong>IVA:</strong> {lastVenta.cliente ? (CONDICIONES_IVA.find(c => c.value === lastVenta.cliente.condicion_iva)?.label || 'Cons. Final') : (lastVenta.factura?.tipo_comprobante === 1 ? 'Responsable Inscripto' : 'Cons. Final')}</p>
+                          {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
+                        </>
+                      )}
+                      <p><strong>Cond. Venta:</strong> {lastVenta.empleado ? 'Cuenta Corriente' : 'Contado'}</p>
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
@@ -2339,7 +2501,15 @@ export default function POS() {
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2 text-[9px]">
-                      <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                      {lastVenta.empleado ? (
+                        <>
+                          <p><strong>Empleado:</strong> {lastVenta.empleado.nombre}</p>
+                          {lastVenta.empleado.dni && <p><strong>DNI:</strong> {lastVenta.empleado.dni}</p>}
+                          <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                        </>
+                      ) : (
+                        <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+                      )}
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
