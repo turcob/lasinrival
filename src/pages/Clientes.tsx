@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import {
   Dialog,
   DialogContent,
@@ -218,13 +219,15 @@ export default function Clientes() {
   return (
     <MainLayout>
       <PageHeader title="Clientes" description="Gestión de clientes">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Cliente
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <ExcelImporterClientes onImportComplete={fetchData} />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Cliente
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
@@ -333,7 +336,8 @@ export default function Clientes() {
               </div>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </PageHeader>
 
       <DataTable
