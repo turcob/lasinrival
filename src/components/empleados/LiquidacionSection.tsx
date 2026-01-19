@@ -78,6 +78,9 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     id: string;
     empleadoNombre: string;
     monto: number;
+    sueldoBase: number;
+    totalComisiones: number;
+    totalDescuentos: number;
   } | null>(null);
 
   const currentYear = new Date().getFullYear();
@@ -210,6 +213,9 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
       id: liq.liquidacion_existente.id,
       empleadoNombre: liq.empleado.nombre,
       monto: liq.neto_a_pagar,
+      sueldoBase: liq.sueldo_base,
+      totalComisiones: liq.total_comisiones,
+      totalDescuentos: liq.total_compras + liq.total_adelantos,
     });
     setPagarDialogOpen(true);
   };
@@ -379,6 +385,9 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           monto={liquidacionAPagar.monto}
           mes={selectedMes}
           anio={selectedAnio}
+          sueldoBase={liquidacionAPagar.sueldoBase}
+          totalComisiones={liquidacionAPagar.totalComisiones}
+          totalDescuentos={liquidacionAPagar.totalDescuentos}
           onSuccess={handlePagoSuccess}
           userId={user.id}
         />
