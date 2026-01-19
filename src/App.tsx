@@ -22,6 +22,7 @@ import Facturacion from "./pages/Facturacion";
 import Configuracion from "./pages/Configuracion";
 import Tarjetas from "./pages/Tarjetas";
 import AdminDescuentos from "./pages/AdminDescuentos";
+import Empleados from "./pages/Empleados";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ function AppRoutes() {
       <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="/admin-descuentos" element={<ProtectedRoute redirectPath="/admin-descuentos"><AdminDescuentos /></ProtectedRoute>} />
+      <Route path="/empleados" element={<ProtectedRoute><Empleados /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -57,6 +57,7 @@ const operationsNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
+  { title: 'Empleados', href: '/empleados', icon: Users, module: 'empleados' },
   { title: 'Usuarios', href: '/usuarios', icon: UserCog, module: 'usuarios' },
   { title: 'Roles y Permisos', href: '/roles', icon: Shield, module: 'roles' },
   { title: 'Configuración', href: '/configuracion', icon: Settings },
