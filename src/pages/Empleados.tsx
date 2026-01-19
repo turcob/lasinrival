@@ -23,6 +23,11 @@ import { EmpleadoFormDialog } from '@/components/empleados/EmpleadoFormDialog';
 import { CuentaCorrienteDialog } from '@/components/empleados/CuentaCorrienteDialog';
 import { LiquidacionSection } from '@/components/empleados/LiquidacionSection';
 
+interface Sucursal {
+  id: string;
+  nombre: string;
+}
+
 interface Empleado {
   id: string;
   nombre: string;
@@ -37,6 +42,8 @@ interface Empleado {
   cbu_cuenta: string | null;
   activo: boolean;
   created_at: string;
+  sucursal_id: string | null;
+  sucursal?: Sucursal;
 }
 
 interface EmpleadoConSaldo extends Empleado {
@@ -47,6 +54,7 @@ interface EmpleadoConSaldo extends Empleado {
 export default function Empleados() {
   const { user } = useAuth();
   const [empleados, setEmpleados] = useState<EmpleadoConSaldo[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -55,15 +63,25 @@ export default function Empleados() {
 
   useEffect(() => {
     fetchEmpleados();
+    fetchSucursales();
   }, []);
+
+  const fetchSucursales = async () => {
+    const { data } = await supabase
+      .from('sucursales')
+      .select('id, nombre')
+      .eq('activo', true)
+      .order('nombre');
+    setSucursales(data || []);
+  };
 
   const fetchEmpleados = async () => {
     setLoading(true);
     try {
-      // Fetch empleados
+      // Fetch empleados with sucursal
       const { data: empleadosData, error: empleadosError } = await supabase
         .from('empleados')
-        .select('*')
+        .select('*, sucursal:sucursales(id, nombre)')
         .order('nombre');
 
       if (empleadosError) throw empleadosError;
@@ -126,6 +144,11 @@ export default function Empleados() {
     { key: 'nombre', header: 'Nombre Completo' },
     { key: 'dni', header: 'DNI', render: (item: EmpleadoConSaldo) => item.dni || '-' },
     { key: 'cargo', header: 'Cargo', render: (item: EmpleadoConSaldo) => item.cargo || '-' },
+    { 
+      key: 'sucursal', 
+      header: 'Sucursal', 
+      render: (item: EmpleadoConSaldo) => item.sucursal?.nombre || '-' 
+    },
     { 
       key: 'sueldo_base', 
       header: 'Sueldo Base', 
@@ -213,6 +236,7 @@ export default function Empleados() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         empleado={selectedEmpleado}
+        sucursales={sucursales}
         onSuccess={() => {
           setDialogOpen(false);
           setSelectedEmpleado(null);

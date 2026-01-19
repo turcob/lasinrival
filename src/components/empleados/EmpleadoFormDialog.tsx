@@ -19,6 +19,11 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 
+interface Sucursal {
+  id: string;
+  nombre: string;
+}
+
 interface Empleado {
   id: string;
   nombre: string;
@@ -32,12 +37,14 @@ interface Empleado {
   estado_civil: string | null;
   cbu_cuenta: string | null;
   activo: boolean;
+  sucursal_id: string | null;
 }
 
 interface EmpleadoFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   empleado: Empleado | null;
+  sucursales: Sucursal[];
   onSuccess: () => void;
 }
 
@@ -60,7 +67,7 @@ const ESTADOS_CIVILES = [
   'Unión de hecho',
 ];
 
-export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: EmpleadoFormDialogProps) {
+export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, onSuccess }: EmpleadoFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
@@ -73,6 +80,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: 
     cargo: '',
     estado_civil: '',
     cbu_cuenta: '',
+    sucursal_id: '',
     activo: true,
   });
 
@@ -89,6 +97,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: 
         cargo: empleado.cargo || '',
         estado_civil: empleado.estado_civil || '',
         cbu_cuenta: empleado.cbu_cuenta || '',
+        sucursal_id: empleado.sucursal_id || '',
         activo: empleado.activo,
       });
     } else {
@@ -103,6 +112,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: 
         cargo: '',
         estado_civil: '',
         cbu_cuenta: '',
+        sucursal_id: '',
         activo: true,
       });
     }
@@ -124,6 +134,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: 
         cargo: formData.cargo || null,
         estado_civil: formData.estado_civil || null,
         cbu_cuenta: formData.cbu_cuenta || null,
+        sucursal_id: formData.sucursal_id || null,
         activo: formData.activo,
       };
 
@@ -284,6 +295,25 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, onSuccess }: 
                 placeholder="CBU o número de cuenta"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sucursal_id">Sucursal</Label>
+            <Select
+              value={formData.sucursal_id}
+              onValueChange={(value) => setFormData({ ...formData, sucursal_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar sucursal" />
+              </SelectTrigger>
+              <SelectContent>
+                {sucursales.map((sucursal) => (
+                  <SelectItem key={sucursal.id} value={sucursal.id}>
+                    {sucursal.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
