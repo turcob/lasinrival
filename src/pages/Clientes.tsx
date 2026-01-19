@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import {
   Dialog,
@@ -34,6 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 
 interface Cliente {
@@ -70,29 +77,71 @@ export default function Clientes() {
     activo: true,
   });
 
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search
   useEffect(() => {
-    fetchData();
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    fetchListasPrecios();
   }, []);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    fetchClientes();
+  }, [currentPage, pageSize, debouncedSearch]);
+
+  const fetchListasPrecios = async () => {
+    const { data } = await supabase.from('listas_precios').select('id, nombre').eq('activo', true);
+    if (data) setListasPrecios(data);
+  };
+
+  const fetchClientes = useCallback(async () => {
     setLoading(true);
     try {
-      const [clientesRes, listasRes] = await Promise.all([
-        supabase
-          .from('clientes')
-          .select('*, listas_precios(nombre)')
-          .order('nombre'),
-        supabase.from('listas_precios').select('id, nombre').eq('activo', true),
-      ]);
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      if (clientesRes.data) setClientes(clientesRes.data);
-      if (listasRes.data) setListasPrecios(listasRes.data);
+      let query = supabase
+        .from('clientes')
+        .select('*, listas_precios(nombre)', { count: 'exact' });
+
+      // Apply search filter
+      if (debouncedSearch) {
+        query = query.or(
+          `nombre.ilike.%${debouncedSearch}%,dni_cuit.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefono.ilike.%${debouncedSearch}%`
+        );
+      }
+
+      const { data, count, error } = await query
+        .order('nombre')
+        .range(from, to);
+
+      if (error) throw error;
+      
+      setClientes(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Error al cargar los datos');
+      console.error('Error fetching clientes:', error);
+      toast.error('Error al cargar los clientes');
     } finally {
       setLoading(false);
     }
+  }, [currentPage, pageSize, debouncedSearch]);
+
+  const fetchData = () => {
+    fetchClientes();
+    fetchListasPrecios();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,43 +227,6 @@ export default function Clientes() {
     });
   };
 
-  const columns = [
-    { key: 'nombre', header: 'Nombre / Razón Social' },
-    { key: 'dni_cuit', header: 'DNI/CUIT', render: (item: Cliente) => item.dni_cuit || '-' },
-    { key: 'telefono', header: 'Teléfono', render: (item: Cliente) => item.telefono || '-' },
-    { key: 'email', header: 'Email', render: (item: Cliente) => item.email || '-' },
-    {
-      key: 'listas_precios.nombre',
-      header: 'Lista de Precio',
-      render: (item: Cliente) => item.listas_precios?.nombre || 'Por defecto',
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      render: (item: Cliente) => <StatusBadge status={item.activo} />,
-    },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      render: (item: Cliente) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSelectedCliente(item);
-              setDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
 
   return (
     <MainLayout>
@@ -340,13 +352,155 @@ export default function Clientes() {
         </div>
       </PageHeader>
 
-      <DataTable
-        data={clientes}
-        columns={columns}
-        searchPlaceholder="Buscar clientes..."
-        searchKeys={['nombre', 'dni_cuit', 'email', 'telefono']}
-        loading={loading}
-      />
+      {/* Custom server-side paginated table */}
+      <div className="space-y-4">
+        {/* Search and controls */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar clientes..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Mostrar</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">registros</span>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="font-semibold">Nombre / Razón Social</TableHead>
+                <TableHead className="font-semibold">DNI/CUIT</TableHead>
+                <TableHead className="font-semibold">Teléfono</TableHead>
+                <TableHead className="font-semibold">Email</TableHead>
+                <TableHead className="font-semibold">Lista de Precio</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="font-semibold">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center">
+                    <div className="flex items-center justify-center">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : clientes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    No se encontraron clientes
+                  </TableCell>
+                </TableRow>
+              ) : (
+                clientes.map((cliente) => (
+                  <TableRow key={cliente.id} className="table-row-hover">
+                    <TableCell>{cliente.nombre}</TableCell>
+                    <TableCell>{cliente.dni_cuit || '-'}</TableCell>
+                    <TableCell>{cliente.telefono || '-'}</TableCell>
+                    <TableCell>{cliente.email || '-'}</TableCell>
+                    <TableCell>{cliente.listas_precios?.nombre || 'Por defecto'}</TableCell>
+                    <TableCell><StatusBadge status={cliente.activo} /></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(cliente)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedCliente(cliente);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Pagination */}
+        {(() => {
+          const totalPages = Math.ceil(totalCount / pageSize);
+          const startIndex = (currentPage - 1) * pageSize;
+          return (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {totalCount === 0 ? 0 : startIndex + 1} a {Math.min(startIndex + pageSize, totalCount)} de{' '}
+                {totalCount} clientes
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-4 text-sm">
+                  Página {currentPage} de {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
