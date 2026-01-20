@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import {
   Dialog,
@@ -41,18 +41,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 interface Cliente {
   id: string;
+  codigo_cliente: string | null;
   nombre: string;
   dni_cuit: string | null;
   telefono: string | null;
   email: string | null;
   direccion: string | null;
   lista_precio_id: string | null;
+  zona_id: string | null;
+  vendedor_id: string | null;
   activo: boolean;
   listas_precios?: { nombre: string } | null;
+  zonas?: { codigo: string; nombre: string } | null;
+  vendedores?: { codigo: string; nombre: string } | null;
 }
 
 interface ListaPrecio {
@@ -60,22 +72,43 @@ interface ListaPrecio {
   nombre: string;
 }
 
+interface Zona {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
+interface Vendedor {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
 export default function Clientes() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
+  const [zonas, setZonas] = useState<Zona[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [formData, setFormData] = useState({
+    codigo_cliente: '',
     nombre: '',
     dni_cuit: '',
     telefono: '',
     email: '',
     direccion: '',
     lista_precio_id: '',
+    zona_id: '',
+    vendedor_id: '',
     activo: true,
   });
+
+  // Filters
+  const [filterZona, setFilterZona] = useState<string>('all');
+  const [filterVendedor, setFilterVendedor] = useState<string>('all');
 
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,16 +127,22 @@ export default function Clientes() {
   }, [search]);
 
   useEffect(() => {
-    fetchListasPrecios();
+    fetchCatalogs();
   }, []);
 
   useEffect(() => {
     fetchClientes();
-  }, [currentPage, pageSize, debouncedSearch]);
+  }, [currentPage, pageSize, debouncedSearch, filterZona, filterVendedor]);
 
-  const fetchListasPrecios = async () => {
-    const { data } = await supabase.from('listas_precios').select('id, nombre').eq('activo', true);
-    if (data) setListasPrecios(data);
+  const fetchCatalogs = async () => {
+    const [listasRes, zonasRes, vendedoresRes] = await Promise.all([
+      supabase.from('listas_precios').select('id, nombre').eq('activo', true),
+      supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
+      supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
+    ]);
+    if (listasRes.data) setListasPrecios(listasRes.data);
+    if (zonasRes.data) setZonas(zonasRes.data);
+    if (vendedoresRes.data) setVendedores(vendedoresRes.data);
   };
 
   const fetchClientes = useCallback(async () => {
@@ -114,13 +153,23 @@ export default function Clientes() {
 
       let query = supabase
         .from('clientes')
-        .select('*, listas_precios(nombre)', { count: 'exact' });
+        .select('*, listas_precios(nombre), zonas(codigo, nombre), vendedores(codigo, nombre)', { count: 'exact' });
 
       // Apply search filter
       if (debouncedSearch) {
         query = query.or(
-          `nombre.ilike.%${debouncedSearch}%,dni_cuit.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefono.ilike.%${debouncedSearch}%`
+          `nombre.ilike.%${debouncedSearch}%,dni_cuit.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefono.ilike.%${debouncedSearch}%,codigo_cliente.ilike.%${debouncedSearch}%`
         );
+      }
+
+      // Apply zone filter
+      if (filterZona && filterZona !== 'all') {
+        query = query.eq('zona_id', filterZona);
+      }
+
+      // Apply vendor filter
+      if (filterVendedor && filterVendedor !== 'all') {
+        query = query.eq('vendedor_id', filterVendedor);
       }
 
       const { data, count, error } = await query
@@ -137,11 +186,11 @@ export default function Clientes() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, debouncedSearch]);
+  }, [currentPage, pageSize, debouncedSearch, filterZona, filterVendedor]);
 
   const fetchData = () => {
     fetchClientes();
-    fetchListasPrecios();
+    fetchCatalogs();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,11 +199,14 @@ export default function Clientes() {
     try {
       const data = {
         ...formData,
+        codigo_cliente: formData.codigo_cliente || null,
         dni_cuit: formData.dni_cuit || null,
         telefono: formData.telefono || null,
         email: formData.email || null,
         direccion: formData.direccion || null,
         lista_precio_id: formData.lista_precio_id || null,
+        zona_id: formData.zona_id || null,
+        vendedor_id: formData.vendedor_id || null,
       };
 
       if (selectedCliente) {
@@ -203,12 +255,15 @@ export default function Clientes() {
   const openEditDialog = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setFormData({
+      codigo_cliente: cliente.codigo_cliente || '',
       nombre: cliente.nombre,
       dni_cuit: cliente.dni_cuit || '',
       telefono: cliente.telefono || '',
       email: cliente.email || '',
       direccion: cliente.direccion || '',
       lista_precio_id: cliente.lista_precio_id || '',
+      zona_id: cliente.zona_id || '',
+      vendedor_id: cliente.vendedor_id || '',
       activo: cliente.activo,
     });
     setDialogOpen(true);
@@ -217,16 +272,21 @@ export default function Clientes() {
   const resetForm = () => {
     setSelectedCliente(null);
     setFormData({
+      codigo_cliente: '',
       nombre: '',
       dni_cuit: '',
       telefono: '',
       email: '',
       direccion: '',
       lista_precio_id: '',
+      zona_id: '',
+      vendedor_id: '',
       activo: true,
     });
   };
 
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
 
   return (
     <MainLayout>
@@ -247,16 +307,29 @@ export default function Clientes() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre / Razón Social *</Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nombre: e.target.value })
-                  }
-                  required
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="codigo_cliente">Código de Cliente</Label>
+                  <Input
+                    id="codigo_cliente"
+                    value={formData.codigo_cliente}
+                    onChange={(e) =>
+                      setFormData({ ...formData, codigo_cliente: e.target.value })
+                    }
+                    placeholder="Ej: 000001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nombre">Nombre / Razón Social *</Label>
+                  <Input
+                    id="nombre"
+                    value={formData.nombre}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nombre: e.target.value })
+                    }
+                    required
+                  />
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -316,6 +389,49 @@ export default function Clientes() {
                 </div>
               </div>
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="zona">Zona</Label>
+                  <Select
+                    value={formData.zona_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, zona_id: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sin zona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {zonas.map((zona) => (
+                        <SelectItem key={zona.id} value={zona.id}>
+                          {zona.codigo} - {zona.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vendedor">Vendedor</Label>
+                  <Select
+                    value={formData.vendedor_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, vendedor_id: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sin vendedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendedores.map((vendedor) => (
+                        <SelectItem key={vendedor.id} value={vendedor.id}>
+                          {vendedor.codigo} - {vendedor.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="direccion">Dirección</Label>
                 <Input
@@ -354,16 +470,58 @@ export default function Clientes() {
 
       {/* Custom server-side paginated table */}
       <div className="space-y-4">
-        {/* Search and controls */}
+        {/* Search and filters */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar clientes..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar clientes..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select
+              value={filterZona}
+              onValueChange={(value) => {
+                setFilterZona(value);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-48">
+                <MapPin className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Todas las zonas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las zonas</SelectItem>
+                {zonas.map((zona) => (
+                  <SelectItem key={zona.id} value={zona.id}>
+                    {zona.codigo} - {zona.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filterVendedor}
+              onValueChange={(value) => {
+                setFilterVendedor(value);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-48">
+                <User className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Todos los vendedores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los vendedores</SelectItem>
+                {vendedores.map((vendedor) => (
+                  <SelectItem key={vendedor.id} value={vendedor.id}>
+                    {vendedor.codigo} - {vendedor.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Mostrar</span>
@@ -393,10 +551,12 @@ export default function Clientes() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
+                <TableHead className="font-semibold w-24">Código</TableHead>
                 <TableHead className="font-semibold">Nombre / Razón Social</TableHead>
                 <TableHead className="font-semibold">DNI/CUIT</TableHead>
                 <TableHead className="font-semibold">Teléfono</TableHead>
-                <TableHead className="font-semibold">Email</TableHead>
+                <TableHead className="font-semibold">Zona</TableHead>
+                <TableHead className="font-semibold">Vendedor</TableHead>
                 <TableHead className="font-semibold">Lista de Precio</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="font-semibold">Acciones</TableHead>
@@ -405,7 +565,7 @@ export default function Clientes() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
+                  <TableCell colSpan={9} className="h-32 text-center">
                     <div className="flex items-center justify-center">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     </div>
@@ -413,17 +573,53 @@ export default function Clientes() {
                 </TableRow>
               ) : clientes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                     No se encontraron clientes
                   </TableCell>
                 </TableRow>
               ) : (
                 clientes.map((cliente) => (
                   <TableRow key={cliente.id} className="table-row-hover">
-                    <TableCell>{cliente.nombre}</TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {cliente.codigo_cliente || '-'}
+                      </code>
+                    </TableCell>
+                    <TableCell className="font-medium">{cliente.nombre}</TableCell>
                     <TableCell>{cliente.dni_cuit || '-'}</TableCell>
                     <TableCell>{cliente.telefono || '-'}</TableCell>
-                    <TableCell>{cliente.email || '-'}</TableCell>
+                    <TableCell>
+                      {cliente.zonas ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge variant="outline" className="text-xs">
+                                {cliente.zonas.codigo}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {cliente.zonas.nombre}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {cliente.vendedores ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge variant="secondary" className="text-xs">
+                                {cliente.vendedores.codigo}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {cliente.vendedores.nombre}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>{cliente.listas_precios?.nombre || 'Por defecto'}</TableCell>
                     <TableCell><StatusBadge status={cliente.activo} /></TableCell>
                     <TableCell>
@@ -451,55 +647,49 @@ export default function Clientes() {
         </div>
 
         {/* Pagination */}
-        {(() => {
-          const totalPages = Math.ceil(totalCount / pageSize);
-          const startIndex = (currentPage - 1) * pageSize;
-          return (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                Mostrando {totalCount === 0 ? 0 : startIndex + 1} a {Math.min(startIndex + pageSize, totalCount)} de{' '}
-                {totalCount} clientes
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="px-4 text-sm">
-                  Página {currentPage} de {totalPages || 1}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage >= totalPages}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          );
-        })()}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {totalCount === 0 ? 0 : startIndex + 1} a {Math.min(startIndex + pageSize, totalCount)} de{' '}
+            {totalCount} clientes
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-4 text-sm">
+              Página {currentPage} de {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage >= totalPages}
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -508,12 +698,12 @@ export default function Clientes() {
             <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. Se eliminará permanentemente el cliente
-              "{selectedCliente?.nombre}".
+              {selectedCliente && ` "${selectedCliente.nombre}"`}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
