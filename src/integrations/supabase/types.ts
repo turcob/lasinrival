@@ -173,12 +173,16 @@ export type Database = {
       }
       cajas: {
         Row: {
+          arqueo_confirmado: boolean | null
+          arqueo_pendiente_revision: boolean | null
+          confirmado_por: string | null
           conteo_declarado: number | null
           created_at: string | null
           diferencia: number | null
           estado: Database["public"]["Enums"]["cash_register_status"] | null
           fecha_apertura: string | null
           fecha_cierre: string | null
+          fecha_confirmacion: string | null
           fondo_inicial: number
           id: string
           observaciones: string | null
@@ -187,12 +191,16 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          arqueo_confirmado?: boolean | null
+          arqueo_pendiente_revision?: boolean | null
+          confirmado_por?: string | null
           conteo_declarado?: number | null
           created_at?: string | null
           diferencia?: number | null
           estado?: Database["public"]["Enums"]["cash_register_status"] | null
           fecha_apertura?: string | null
           fecha_cierre?: string | null
+          fecha_confirmacion?: string | null
           fondo_inicial?: number
           id?: string
           observaciones?: string | null
@@ -201,12 +209,16 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          arqueo_confirmado?: boolean | null
+          arqueo_pendiente_revision?: boolean | null
+          confirmado_por?: string | null
           conteo_declarado?: number | null
           created_at?: string | null
           diferencia?: number | null
           estado?: Database["public"]["Enums"]["cash_register_status"] | null
           fecha_apertura?: string | null
           fecha_cierre?: string | null
+          fecha_confirmacion?: string | null
           fondo_inicial?: number
           id?: string
           observaciones?: string | null
