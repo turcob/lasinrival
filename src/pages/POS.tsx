@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,6 +192,8 @@ export default function POS() {
   const [isVentaEmpleado, setIsVentaEmpleado] = useState(false);
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
   const [clienteSearchTerm, setClienteSearchTerm] = useState('');
+  const [clienteSearchResults, setClienteSearchResults] = useState<Cliente[]>([]);
+  const [clienteSearchLoading, setClienteSearchLoading] = useState(false);
   const [empleadoDialogOpen, setEmpleadoDialogOpen] = useState(false);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
@@ -272,6 +274,36 @@ export default function POS() {
   useEffect(() => {
     fetchData();
   }, [user]);
+
+  // Server-side search for clients with debounce
+  useEffect(() => {
+    if (!clienteSearchTerm || clienteSearchTerm.length < 2) {
+      setClienteSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setClienteSearchLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('id, nombre, dni_cuit, condicion_iva, lista_precio_id')
+          .eq('activo', true)
+          .or(`nombre.ilike.%${clienteSearchTerm}%,dni_cuit.ilike.%${clienteSearchTerm}%`)
+          .order('nombre')
+          .limit(50);
+
+        if (error) throw error;
+        setClienteSearchResults(data as Cliente[]);
+      } catch (error) {
+        console.error('Error searching clients:', error);
+      } finally {
+        setClienteSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [clienteSearchTerm]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -2171,7 +2203,10 @@ export default function POS() {
       {/* Client Selection Dialog */}
       <Dialog open={clienteDialogOpen} onOpenChange={(open) => {
         setClienteDialogOpen(open);
-        if (!open) setClienteSearchTerm('');
+        if (!open) {
+          setClienteSearchTerm('');
+          setClienteSearchResults([]);
+        }
       }}>
         <DialogContent>
           <DialogHeader>
@@ -2180,7 +2215,7 @@ export default function POS() {
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre o DNI/CUIT..."
+              placeholder="Buscar por nombre o DNI/CUIT (mín. 2 caracteres)..."
               value={clienteSearchTerm}
               onChange={(e) => setClienteSearchTerm(e.target.value)}
               className="pl-9"
@@ -2200,40 +2235,38 @@ export default function POS() {
                 <p className="font-medium">Consumidor Final</p>
               </div>
             )}
-            {clientes
-              .filter((cliente) => {
-                if (!clienteSearchTerm) return true;
-                const term = clienteSearchTerm.toLowerCase();
-                return (
-                  cliente.nombre.toLowerCase().includes(term) ||
-                  (cliente.dni_cuit && cliente.dni_cuit.toLowerCase().includes(term))
-                );
-              })
-              .slice(0, 50)
-              .map((cliente) => (
-                <div
-                  key={cliente.id}
-                  className="p-3 hover:bg-muted cursor-pointer rounded border-t"
-                  onClick={() => {
-                    setSelectedCliente(cliente);
-                    setClienteDialogOpen(false);
-                    setClienteSearchTerm('');
-                  }}
-                >
-                  <p className="font-medium">{cliente.nombre}</p>
-                  {cliente.dni_cuit && (
-                    <p className="text-sm text-muted-foreground">{cliente.dni_cuit}</p>
-                  )}
-                </div>
-              ))}
-            {clienteSearchTerm && clientes.filter((c) => {
-              const term = clienteSearchTerm.toLowerCase();
-              return c.nombre.toLowerCase().includes(term) || (c.dni_cuit && c.dni_cuit.toLowerCase().includes(term));
-            }).length === 0 && (
+            {clienteSearchLoading && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Buscando...
+              </p>
+            )}
+            {!clienteSearchLoading && clienteSearchTerm && clienteSearchTerm.length >= 2 && clienteSearchResults.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No se encontraron clientes
               </p>
             )}
+            {!clienteSearchLoading && clienteSearchTerm && clienteSearchTerm.length < 2 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Ingrese al menos 2 caracteres para buscar
+              </p>
+            )}
+            {clienteSearchResults.map((cliente) => (
+              <div
+                key={cliente.id}
+                className="p-3 hover:bg-muted cursor-pointer rounded border-t"
+                onClick={() => {
+                  setSelectedCliente(cliente);
+                  setClienteDialogOpen(false);
+                  setClienteSearchTerm('');
+                  setClienteSearchResults([]);
+                }}
+              >
+                <p className="font-medium">{cliente.nombre}</p>
+                {cliente.dni_cuit && (
+                  <p className="text-sm text-muted-foreground">{cliente.dni_cuit}</p>
+                )}
+              </div>
+            ))}
           </ScrollArea>
         </DialogContent>
       </Dialog>
