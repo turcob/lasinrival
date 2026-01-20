@@ -1,5 +1,8 @@
 project_id = "zipqraqiztulxyuzhtjo"
 
+[functions.api-productos]
+verify_jwt = false
+
 [functions.afip-facturacion]
 verify_jwt = false
 
