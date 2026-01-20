@@ -3,7 +3,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Info, Save, X, Search, Package } from 'lucide-react';
+import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -87,6 +87,8 @@ interface Excepcion {
   producto_id: string;
   porcentaje: number;
   descripcion: string | null;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
   producto?: Producto;
 }
 
@@ -127,7 +129,7 @@ export default function ListasPrecios() {
   // Form data
   const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true });
   const [columnaFormData, setColumnaFormData] = useState<{ tipo: 'marca' | 'tipo_producto', id: string }>({ tipo: 'marca', id: '' });
-  const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '' });
+  const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
   const [productoSearch, setProductoSearch] = useState('');
   
   // Matriz de porcentajes editables (temporal antes de guardar)
@@ -444,6 +446,8 @@ export default function ListasPrecios() {
         lista_precio_id: excepcionFormData.lista_precio_id || null,
         porcentaje: excepcionFormData.porcentaje,
         descripcion: excepcionFormData.descripcion || null,
+        fecha_inicio: excepcionFormData.fecha_inicio || null,
+        fecha_fin: excepcionFormData.fecha_fin || null,
       };
       
       if (selectedExcepcion?.id) {
@@ -491,13 +495,15 @@ export default function ListasPrecios() {
       lista_precio_id: exc.lista_precio_id || '',
       porcentaje: exc.porcentaje,
       descripcion: exc.descripcion || '',
+      fecha_inicio: exc.fecha_inicio || '',
+      fecha_fin: exc.fecha_fin || '',
     });
     setExcepcionDialogOpen(true);
   };
 
   const resetExcepcionForm = () => {
     setSelectedExcepcion(null);
-    setExcepcionFormData({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '' });
+    setExcepcionFormData({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
     setProductoSearch('');
   };
 
@@ -826,6 +832,26 @@ export default function ListasPrecios() {
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Fecha Inicio</Label>
+                        <Input
+                          type="date"
+                          value={excepcionFormData.fecha_inicio}
+                          onChange={(e) => setExcepcionFormData({ ...excepcionFormData, fecha_inicio: e.target.value })}
+                        />
+                        <p className="text-xs text-muted-foreground">Vacío = sin límite de inicio</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fecha Fin</Label>
+                        <Input
+                          type="date"
+                          value={excepcionFormData.fecha_fin}
+                          onChange={(e) => setExcepcionFormData({ ...excepcionFormData, fecha_fin: e.target.value })}
+                        />
+                        <p className="text-xs text-muted-foreground">Vacío = sin límite de fin</p>
+                      </div>
+                    </div>
                     <div className="flex justify-end gap-3">
                       <Button type="button" variant="outline" onClick={() => setExcepcionDialogOpen(false)}>Cancelar</Button>
                       <Button type="submit" disabled={!excepcionFormData.producto_id}>
@@ -848,13 +874,18 @@ export default function ListasPrecios() {
                       <TableHead>Producto</TableHead>
                       <TableHead>Lista</TableHead>
                       <TableHead className="text-center">Porcentaje</TableHead>
+                      <TableHead>Vigencia</TableHead>
                       <TableHead>Descripción</TableHead>
                       <TableHead className="w-[100px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {excepciones.map(exc => (
-                      <TableRow key={exc.id}>
+                    {excepciones.map(exc => {
+                      const hoy = new Date().toISOString().split('T')[0];
+                      const vigente = (!exc.fecha_inicio || exc.fecha_inicio <= hoy) && 
+                                     (!exc.fecha_fin || exc.fecha_fin >= hoy);
+                      return (
+                      <TableRow key={exc.id} className={!vigente ? 'opacity-50' : ''}>
                         <TableCell>
                           <div>
                             <span className="font-mono text-xs">{exc.producto?.codigo_articulo}</span>
@@ -868,6 +899,18 @@ export default function ListasPrecios() {
                           }
                         </TableCell>
                         <TableCell className="text-center font-medium">{exc.porcentaje}%</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-xs">
+                            <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                            {exc.fecha_inicio || exc.fecha_fin ? (
+                              <span className={vigente ? 'text-green-600' : 'text-muted-foreground'}>
+                                {exc.fecha_inicio || '∞'} → {exc.fecha_fin || '∞'}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Permanente</span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{exc.descripcion || '-'}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -884,7 +927,8 @@ export default function ListasPrecios() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

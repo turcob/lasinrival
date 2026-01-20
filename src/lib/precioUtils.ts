@@ -24,6 +24,8 @@ export interface ExcepcionProducto {
   producto_id: string;
   porcentaje: number;
   descripcion: string | null;
+  fecha_inicio: string | null; // null = sin límite de inicio
+  fecha_fin: string | null; // null = sin límite de fin
 }
 
 export interface ProductoParaCalculo {
@@ -48,11 +50,16 @@ export function calcularPorcentajeProducto(
   excepciones: ExcepcionProducto[]
 ): { porcentaje: number; origen: 'excepcion' | 'marca' | 'tipo' | 'general' | 'ninguno'; descripcion: string } {
   
-  // 1. Buscar excepción específica del producto
-  const excepcion = excepciones.find(e => 
-    e.producto_id === producto.id && 
-    (e.lista_precio_id === listaId || e.lista_precio_id === null)
-  );
+  // 1. Buscar excepción específica del producto (considerando vigencia)
+  const hoy = new Date().toISOString().split('T')[0];
+  const excepcion = excepciones.find(e => {
+    if (e.producto_id !== producto.id) return false;
+    if (e.lista_precio_id !== listaId && e.lista_precio_id !== null) return false;
+    // Verificar vigencia por fechas
+    const inicioOk = !e.fecha_inicio || e.fecha_inicio <= hoy;
+    const finOk = !e.fecha_fin || e.fecha_fin >= hoy;
+    return inicioOk && finOk;
+  });
   if (excepcion) {
     return { 
       porcentaje: excepcion.porcentaje, 
