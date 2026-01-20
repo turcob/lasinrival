@@ -258,49 +258,101 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean | null
+          codigo_cliente: string | null
+          codigo_postal: string | null
           condicion_iva: number | null
+          condicion_venta_id: string | null
           created_at: string | null
           direccion: string | null
           dni_cuit: string | null
           email: string | null
+          fecha_alta: string | null
           id: string
           lista_precio_id: string | null
           nombre: string
+          provincia_id: string | null
           telefono: string | null
+          telefono_contacto: string | null
           updated_at: string | null
+          vendedor_id: string | null
+          zona_id: string | null
         }
         Insert: {
           activo?: boolean | null
+          codigo_cliente?: string | null
+          codigo_postal?: string | null
           condicion_iva?: number | null
+          condicion_venta_id?: string | null
           created_at?: string | null
           direccion?: string | null
           dni_cuit?: string | null
           email?: string | null
+          fecha_alta?: string | null
           id?: string
           lista_precio_id?: string | null
           nombre: string
+          provincia_id?: string | null
           telefono?: string | null
+          telefono_contacto?: string | null
           updated_at?: string | null
+          vendedor_id?: string | null
+          zona_id?: string | null
         }
         Update: {
           activo?: boolean | null
+          codigo_cliente?: string | null
+          codigo_postal?: string | null
           condicion_iva?: number | null
+          condicion_venta_id?: string | null
           created_at?: string | null
           direccion?: string | null
           dni_cuit?: string | null
           email?: string | null
+          fecha_alta?: string | null
           id?: string
           lista_precio_id?: string | null
           nombre?: string
+          provincia_id?: string | null
           telefono?: string | null
+          telefono_contacto?: string | null
           updated_at?: string | null
+          vendedor_id?: string | null
+          zona_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clientes_condicion_venta_id_fkey"
+            columns: ["condicion_venta_id"]
+            isOneToOne: false
+            referencedRelation: "condiciones_venta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clientes_lista_precio_id_fkey"
             columns: ["lista_precio_id"]
             isOneToOne: false
             referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_provincia_id_fkey"
+            columns: ["provincia_id"]
+            isOneToOne: false
+            referencedRelation: "provincias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_zona_id_fkey"
+            columns: ["zona_id"]
+            isOneToOne: false
+            referencedRelation: "zonas"
             referencedColumns: ["id"]
           },
         ]
@@ -375,6 +427,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      condiciones_venta: {
+        Row: {
+          activo: boolean | null
+          codigo: string
+          created_at: string | null
+          descripcion: string
+          id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          descripcion: string
+          id?: string
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          descripcion?: string
+          id?: string
+        }
+        Relationships: []
       }
       configuracion_comercio: {
         Row: {
@@ -1071,6 +1147,30 @@ export type Database = {
         }
         Relationships: []
       }
+      provincias: {
+        Row: {
+          activo: boolean | null
+          codigo: string
+          created_at: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -1348,6 +1448,44 @@ export type Database = {
         }
         Relationships: []
       }
+      vendedores: {
+        Row: {
+          activo: boolean | null
+          codigo: string
+          created_at: string | null
+          empleado_id: string | null
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          empleado_id?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          empleado_id?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venta_detalles: {
         Row: {
           cantidad: number
@@ -1544,6 +1682,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      zonas: {
+        Row: {
+          activo: boolean | null
+          codigo: string
+          created_at: string | null
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo: string
+          created_at?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string
+          created_at?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
