@@ -520,6 +520,7 @@ export type Database = {
           created_at: string | null
           descuento_maximo_global: number
           id: string
+          rol_codigo: string | null
           role: string
           updated_at: string | null
         }
@@ -527,6 +528,7 @@ export type Database = {
           created_at?: string | null
           descuento_maximo_global?: number
           id?: string
+          rol_codigo?: string | null
           role: string
           updated_at?: string | null
         }
@@ -534,6 +536,7 @@ export type Database = {
           created_at?: string | null
           descuento_maximo_global?: number
           id?: string
+          rol_codigo?: string | null
           role?: string
           updated_at?: string | null
         }
@@ -1212,19 +1215,61 @@ export type Database = {
           id: string
           modulo: string
           permiso: Database["public"]["Enums"]["app_permission"]
+          rol_codigo: string | null
           role: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
           id?: string
           modulo: string
           permiso: Database["public"]["Enums"]["app_permission"]
+          rol_codigo?: string | null
           role: Database["public"]["Enums"]["app_role"]
         }
         Update: {
           id?: string
           modulo?: string
           permiso?: Database["public"]["Enums"]["app_permission"]
+          rol_codigo?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          activo: boolean | null
+          codigo: string
+          color: string | null
+          created_at: string | null
+          descripcion: string | null
+          es_sistema: boolean | null
+          id: string
+          nombre: string
+          orden: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo: string
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          es_sistema?: boolean | null
+          id?: string
+          nombre: string
+          orden?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo?: string
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          es_sistema?: boolean | null
+          id?: string
+          nombre?: string
+          orden?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1439,16 +1484,19 @@ export type Database = {
       user_roles: {
         Row: {
           id: string
+          rol_codigo: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           id?: string
+          rol_codigo?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           id?: string
+          rol_codigo?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
