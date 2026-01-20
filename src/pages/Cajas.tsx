@@ -14,7 +14,11 @@ import {
   Eye,
   Calculator,
   Printer,
-  Users
+  Users,
+  Edit,
+  CheckCircle,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Select,
@@ -41,10 +45,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Database } from '@/integrations/supabase/types';
+import { EditarArqueoDialog } from '@/components/cajas/EditarArqueoDialog';
+import { ConfirmarArqueoDialog } from '@/components/cajas/ConfirmarArqueoDialog';
 
 type CashRegisterStatus = Database['public']['Enums']['cash_register_status'];
 
@@ -52,14 +59,18 @@ interface Caja {
   id: string;
   usuario_id: string;
   fondo_inicial: number;
-  total_ventas: number;
-  total_egresos: number;
+  total_ventas: number | null;
+  total_egresos: number | null;
   conteo_declarado: number | null;
   diferencia: number | null;
   estado: CashRegisterStatus;
   observaciones: string | null;
   fecha_apertura: string;
   fecha_cierre: string | null;
+  arqueo_confirmado?: boolean;
+  arqueo_pendiente_revision?: boolean;
+  confirmado_por?: string | null;
+  fecha_confirmacion?: string | null;
   profiles?: { nombre: string } | null;
 }
 
@@ -100,6 +111,8 @@ export default function Cajas() {
   const [selectedCaja, setSelectedCaja] = useState<Caja | null>(null);
   const [arqueoDetalles, setArqueoDetalles] = useState<ArqueoDetalle[]>([]);
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
+  const [editarArqueoDialogOpen, setEditarArqueoDialogOpen] = useState(false);
+  const [confirmarArqueoDialogOpen, setConfirmarArqueoDialogOpen] = useState(false);
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
@@ -564,11 +577,49 @@ export default function Cajas() {
     {
       key: 'estado',
       header: 'Estado',
-      render: (item: Caja) => (
-        <Badge variant={item.estado === 'abierta' ? 'default' : 'secondary'}>
-          {item.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
-        </Badge>
-      ),
+      render: (item: Caja) => {
+        if (item.estado === 'abierta') {
+          return <Badge variant="default">Abierta</Badge>;
+        }
+        // Caja cerrada - mostrar estado de confirmación
+        if (item.arqueo_confirmado) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Confirmada
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Arqueo confirmado por administrador</TooltipContent>
+            </Tooltip>
+          );
+        }
+        if (item.arqueo_pendiente_revision) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="gap-1 border-warning text-warning">
+                  <Clock className="h-3 w-3" />
+                  Pendiente
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Arqueo pendiente de confirmación</TooltipContent>
+            </Tooltip>
+          );
+        }
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Sin confirmar
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>El arqueo puede ser editado</TooltipContent>
+          </Tooltip>
+        );
+      },
     },
     {
       key: 'diferencia',
@@ -590,11 +641,63 @@ export default function Cajas() {
     {
       key: 'actions',
       header: 'Acciones',
-      render: (item: Caja) => (
-        <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)}>
-          <Eye className="h-4 w-4" />
-        </Button>
-      ),
+      render: (item: Caja) => {
+        const canEdit = item.estado === 'cerrada' && 
+                        !item.arqueo_confirmado && 
+                        !item.arqueo_pendiente_revision &&
+                        (item.usuario_id === user?.id || isAdmin);
+        const canConfirm = isAdmin && 
+                          item.estado === 'cerrada' && 
+                          item.arqueo_pendiente_revision;
+        
+        return (
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)}>
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ver detalle</TooltipContent>
+            </Tooltip>
+            {canEdit && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => {
+                      setSelectedCaja(item);
+                      setEditarArqueoDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Editar arqueo</TooltipContent>
+              </Tooltip>
+            )}
+            {canConfirm && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="text-success hover:text-success"
+                    onClick={() => {
+                      setSelectedCaja(item);
+                      setConfirmarArqueoDialogOpen(true);
+                    }}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Confirmar arqueo</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -1084,6 +1187,22 @@ export default function Cajas() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Editar Arqueo Dialog */}
+      <EditarArqueoDialog
+        open={editarArqueoDialogOpen}
+        onOpenChange={setEditarArqueoDialogOpen}
+        caja={selectedCaja}
+        onSuccess={fetchData}
+      />
+
+      {/* Confirmar Arqueo Dialog (solo admin) */}
+      <ConfirmarArqueoDialog
+        open={confirmarArqueoDialogOpen}
+        onOpenChange={setConfirmarArqueoDialogOpen}
+        caja={selectedCaja}
+        onSuccess={fetchData}
+      />
     </MainLayout>
   );
 }
