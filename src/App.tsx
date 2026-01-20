@@ -23,6 +23,8 @@ import Configuracion from "./pages/Configuracion";
 import Tarjetas from "./pages/Tarjetas";
 import AdminDescuentos from "./pages/AdminDescuentos";
 import Empleados from "./pages/Empleados";
+import Vendedores from "./pages/Vendedores";
+import Zonas from "./pages/Zonas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,6 +73,8 @@ function AppRoutes() {
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
       <Route path="/admin-descuentos" element={<ProtectedRoute redirectPath="/admin-descuentos"><AdminDescuentos /></ProtectedRoute>} />
       <Route path="/empleados" element={<ProtectedRoute><Empleados /></ProtectedRoute>} />
+      <Route path="/vendedores" element={<ProtectedRoute><Vendedores /></ProtectedRoute>} />
+      <Route path="/zonas" element={<ProtectedRoute><Zonas /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
