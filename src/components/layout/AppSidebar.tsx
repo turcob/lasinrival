@@ -16,7 +16,9 @@ import {
   Tags,
   Layers,
   UserCog,
-  Shield
+  Shield,
+  UserCheck,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +48,8 @@ const catalogNavItems: NavItem[] = [
   { title: 'Categorías', href: '/categorias', icon: Tags, module: 'categorias' },
   { title: 'Subcategorías', href: '/subcategorias', icon: Layers, module: 'subcategorias' },
   { title: 'Clientes', href: '/clientes', icon: Users, module: 'clientes' },
+  { title: 'Vendedores', href: '/vendedores', icon: UserCheck, module: 'clientes' },
+  { title: 'Zonas', href: '/zonas', icon: MapPin, module: 'clientes' },
 ];
 
 const operationsNavItems: NavItem[] = [
