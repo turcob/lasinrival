@@ -785,6 +785,8 @@ export type Database = {
         Row: {
           created_at: string | null
           descripcion: string | null
+          fecha_fin: string | null
+          fecha_inicio: string | null
           id: string
           lista_precio_id: string | null
           porcentaje: number
@@ -793,6 +795,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           descripcion?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           lista_precio_id?: string | null
           porcentaje?: number
@@ -801,6 +805,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           descripcion?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           lista_precio_id?: string | null
           porcentaje?: number
