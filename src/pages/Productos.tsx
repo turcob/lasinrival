@@ -103,30 +103,67 @@ export default function Productos() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [productosRes, categoriasRes, subcategoriasRes] = await Promise.all([
-        supabase
-          .from('productos')
-          .select('*, categorias(nombre), subcategorias(nombre)')
-          .order('descripcion'),
+      // Fetch all products in batches to overcome 1000 row limit
+      const fetchAllProductos = async () => {
+        let allProductos: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        
+        while (true) {
+          const { data, error } = await supabase
+            .from('productos')
+            .select('*, categorias(nombre), subcategorias(nombre)')
+            .order('descripcion')
+            .range(from, from + batchSize - 1);
+          
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          
+          allProductos = [...allProductos, ...data];
+          if (data.length < batchSize) break;
+          from += batchSize;
+        }
+        
+        return allProductos;
+      };
+
+      const [productosData, categoriasRes, subcategoriasRes] = await Promise.all([
+        fetchAllProductos(),
         supabase.from('categorias').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
       ]);
 
-      if (productosRes.data) {
-        // Obtener información de usuarios que desactivaron productos
-        const productosConUsuarios = await Promise.all(
-          productosRes.data.map(async (producto) => {
-            if (producto.desactivado_por) {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('nombre, email')
-                .eq('id', producto.desactivado_por)
-                .maybeSingle();
-              return { ...producto, desactivado_por_profile: profileData };
-            }
-            return { ...producto, desactivado_por_profile: null };
-          })
-        );
+      if (productosData && productosData.length > 0) {
+        // Obtener IDs únicos de usuarios que desactivaron productos
+        const desactivadosPorIds = [...new Set(
+          productosData
+            .filter(p => p.desactivado_por)
+            .map(p => p.desactivado_por)
+        )];
+        
+        // Fetch all profiles in one query
+        let profilesMap: Record<string, { nombre: string; email: string }> = {};
+        if (desactivadosPorIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, nombre, email')
+            .in('id', desactivadosPorIds);
+          
+          if (profilesData) {
+            profilesMap = profilesData.reduce((acc, p) => {
+              acc[p.id] = { nombre: p.nombre, email: p.email };
+              return acc;
+            }, {} as Record<string, { nombre: string; email: string }>);
+          }
+        }
+        
+        const productosConUsuarios = productosData.map((producto) => ({
+          ...producto,
+          desactivado_por_profile: producto.desactivado_por 
+            ? profilesMap[producto.desactivado_por] || null 
+            : null
+        }));
+        
         setProductos(productosConUsuarios);
       }
       if (categoriasRes.data) setCategorias(categoriasRes.data);
