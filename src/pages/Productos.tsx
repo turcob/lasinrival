@@ -49,6 +49,7 @@ interface Producto {
   unidad_medida: string;
   categoria_id: string | null;
   subcategoria_id: string | null;
+  marca_id: string | null;
   codigo_barra: string | null;
   activo: boolean;
   stock_actual: number;
@@ -58,6 +59,7 @@ interface Producto {
   fecha_desactivacion: string | null;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
+  marcas?: { nombre: string } | null;
   desactivado_por_profile?: { nombre: string; email: string } | null;
 }
 
@@ -72,11 +74,17 @@ interface Subcategoria {
   categoria_id: string;
 }
 
+interface Marca {
+  id: string;
+  nombre: string;
+}
+
 export default function Productos() {
   const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,6 +97,7 @@ export default function Productos() {
     unidad_medida: 'UN',
     categoria_id: '',
     subcategoria_id: '',
+    marca_id: '',
     codigo_barra: '',
     activo: true,
     stock_actual: 0,
@@ -112,7 +121,7 @@ export default function Productos() {
         while (true) {
           const { data, error } = await supabase
             .from('productos')
-            .select('*, categorias(nombre), subcategorias(nombre)')
+            .select('*, categorias(nombre), subcategorias(nombre), marcas(nombre)')
             .order('descripcion')
             .range(from, from + batchSize - 1);
           
@@ -127,10 +136,11 @@ export default function Productos() {
         return allProductos;
       };
 
-      const [productosData, categoriasRes, subcategoriasRes] = await Promise.all([
+      const [productosData, categoriasRes, subcategoriasRes, marcasRes] = await Promise.all([
         fetchAllProductos(),
         supabase.from('categorias').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
+        supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
       if (productosData && productosData.length > 0) {
@@ -168,6 +178,7 @@ export default function Productos() {
       }
       if (categoriasRes.data) setCategorias(categoriasRes.data);
       if (subcategoriasRes.data) setSubcategorias(subcategoriasRes.data);
+      if (marcasRes.data) setMarcas(marcasRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Error al cargar los datos');
@@ -189,6 +200,7 @@ export default function Productos() {
         unidad_medida: formData.unidad_medida,
         categoria_id: formData.categoria_id || null,
         subcategoria_id: formData.subcategoria_id || null,
+        marca_id: formData.marca_id || null,
         codigo_barra: formData.codigo_barra || null,
         activo: formData.activo,
         stock_actual: formData.stock_actual,
@@ -283,6 +295,7 @@ export default function Productos() {
       unidad_medida: producto.unidad_medida,
       categoria_id: producto.categoria_id || '',
       subcategoria_id: producto.subcategoria_id || '',
+      marca_id: producto.marca_id || '',
       codigo_barra: producto.codigo_barra || '',
       activo: producto.activo,
       stock_actual: producto.stock_actual,
@@ -300,6 +313,7 @@ export default function Productos() {
       unidad_medida: 'UN',
       categoria_id: '',
       subcategoria_id: '',
+      marca_id: '',
       codigo_barra: '',
       activo: true,
       stock_actual: 0,
@@ -572,6 +586,27 @@ export default function Productos() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="marca">Marca</Label>
+                <Select
+                  value={formData.marca_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, marca_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar marca..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {marcas.map((marca) => (
+                      <SelectItem key={marca.id} value={marca.id}>
+                        {marca.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
