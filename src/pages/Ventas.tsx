@@ -822,7 +822,7 @@ export default function Ventas() {
           </DialogHeader>
           
           {selectedVenta && selectedFactura && (
-            <div id="printable-factura" className="space-y-4">
+            <div id="printable-invoice" className="space-y-4">
               <div className="border rounded-lg p-6 text-sm">
                 {/* Header */}
                 <div className="grid grid-cols-2 gap-4 border-b pb-4">

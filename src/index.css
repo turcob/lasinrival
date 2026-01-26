@@ -347,45 +347,4 @@
   @page :first {
     margin-top: 0mm;
   }
-
-  /* Estilos para Factura A4 (desde página Ventas) */
-  #printable-factura,
-  #printable-factura * {
-    visibility: visible;
-  }
-  
-  #printable-factura {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    max-width: 210mm;
-    padding: 10mm;
-    margin: 0;
-    background: white !important;
-    color: black !important;
-    font-family: 'Arial', sans-serif !important;
-    font-size: 12px !important;
-    line-height: 1.5 !important;
-    box-sizing: border-box;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  #printable-factura .border {
-    border-color: black !important;
-  }
-
-  #printable-factura .text-muted-foreground {
-    color: #666 !important;
-  }
-
-  #printable-factura button {
-    display: none !important;
-  }
-
-  @page factura-a4 {
-    size: A4 portrait;
-    margin: 10mm;
-  }
 }
