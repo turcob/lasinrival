@@ -1664,6 +1664,194 @@ export default function POS() {
     printWindow.document.close();
   };
 
+  const handleImprimirTicket = () => {
+    if (!lastVenta) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('No se pudo abrir la ventana de impresión');
+      return;
+    }
+
+    const CONDICIONES_IVA_MAP: { [key: number]: string } = {
+      1: 'IVA Resp. Inscripto',
+      4: 'Exento',
+      5: 'Consumidor Final',
+      6: 'Monotributista'
+    };
+
+    const formatCuit = (cuit: string) => {
+      if (!cuit) return '';
+      const clean = cuit.replace(/\D/g, '');
+      if (clean.length === 11) {
+        return `${clean.slice(0, 2)}-${clean.slice(2, 10)}-${clean.slice(10)}`;
+      }
+      return cuit;
+    };
+
+    let detallesHtml = '';
+    lastVenta.detalles.forEach((item: CartItem) => {
+      const nombre = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
+      detallesHtml += `
+        <div class="item">
+          <span class="item-name">${nombre}</span>
+          <div class="item-details">
+            <span>${item.cantidad} x $${item.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            <span>$${item.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          ${item.descuento_porcentaje > 0 ? `<div class="item-discount">Desc: ${item.descuento_porcentaje}%</div>` : ''}
+        </div>
+      `;
+    });
+
+    let html = '';
+
+    if (lastVenta.factura) {
+      // Factura electrónica
+      const tipoLetra = lastVenta.factura.tipo_comprobante === 1 ? 'A' : lastVenta.factura.tipo_comprobante === 6 ? 'B' : 'C';
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Factura ${tipoLetra} ${String(lastVenta.factura.punto_venta).padStart(4, '0')}-${String(lastVenta.factura.numero_comprobante).padStart(8, '0')}</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 10px;
+              line-height: 1.3;
+              width: 72mm; 
+              margin: 0 auto; 
+              padding: 2mm;
+            }
+            .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 12px; }
+            .header p { margin: 1px 0; font-size: 9px; }
+            .tipo-box { border: 1px solid #000; display: inline-block; padding: 4px 12px; margin: 4px 0; font-size: 16px; font-weight: bold; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 9px; }
+            .item { margin: 4px 0; padding-bottom: 4px; }
+            .item-name { display: block; word-wrap: break-word; font-weight: bold; }
+            .item-details { display: flex; justify-content: space-between; font-size: 9px; }
+            .item-discount { text-align: right; font-size: 8px; }
+            .totals { text-align: right; font-size: 10px; margin-top: 4px; }
+            .total { font-weight: bold; font-size: 12px; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
+            .footer { text-align: center; margin-top: 8px; font-size: 8px; }
+            .cae { font-weight: bold; }
+            @media print { body { margin: 0; } html, body { width: 80mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>${comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</h2>
+            <p>${comercioConfig?.razon_social || ''}</p>
+            <p>${comercioConfig?.direccion || ''}</p>
+            ${comercioConfig?.localidad ? `<p>${comercioConfig.localidad}${comercioConfig.provincia ? `, ${comercioConfig.provincia}` : ''}</p>` : ''}
+            <p>CUIT: ${formatCuit(comercioConfig?.cuit || '')}</p>
+            <p>${comercioConfig?.condicion_iva || 'IVA Resp. Inscripto'}</p>
+            <div class="tipo-box">${tipoLetra}</div>
+            <p style="font-weight: bold; font-size: 11px;">FACTURA ${tipoLetra}</p>
+            <p style="font-weight: bold;">Nº ${String(lastVenta.factura.punto_venta).padStart(4, '0')}-${String(lastVenta.factura.numero_comprobante).padStart(8, '0')}</p>
+            <p>Fecha: ${new Date(lastVenta.fecha).toLocaleString('es-AR')}</p>
+          </div>
+          <div class="section">
+            ${lastVenta.empleado ? `
+              <p><strong>Empleado:</strong> ${lastVenta.empleado.nombre}</p>
+              ${lastVenta.empleado.dni ? `<p><strong>DNI:</strong> ${lastVenta.empleado.dni}</p>` : ''}
+              <p style="font-size: 8px;">(Cuenta Corriente)</p>
+            ` : `
+              <p><strong>Cliente:</strong> ${lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+              <p><strong>CUIT/DNI:</strong> ${lastVenta.cliente?.dni_cuit || lastVenta.factura?.doc_nro || 'Sin identificar'}</p>
+              <p><strong>IVA:</strong> ${lastVenta.cliente ? (CONDICIONES_IVA_MAP[lastVenta.cliente.condicion_iva] || 'Cons. Final') : 'Cons. Final'}</p>
+            `}
+            <p><strong>Cond. Venta:</strong> ${lastVenta.empleado ? 'Cuenta Corriente' : 'Contado'}</p>
+          </div>
+          <div class="section">
+            <p style="font-weight: bold; text-align: center;">DETALLE</p>
+            ${detallesHtml}
+          </div>
+          <div class="totals">
+            <p>Neto Gravado: $${lastVenta.factura.importe_neto?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
+            <p>IVA 21%: $${lastVenta.factura.importe_iva?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || '0,00'}</p>
+            <p class="total">TOTAL: $${lastVenta.factura.importe_total?.toLocaleString('es-AR', { minimumFractionDigits: 2 }) || lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+          </div>
+          <div class="footer">
+            <p class="cae">CAE: ${lastVenta.factura.cae}</p>
+            <p>Vto. CAE: ${lastVenta.factura.cae_vencimiento}</p>
+            <p style="margin-top: 4px;">Comprobante Autorizado - AFIP</p>
+            <p>www.afip.gob.ar/fe/qr/</p>
+            <p style="margin-top: 8px;">¡Gracias por su compra!</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+        </html>
+      `;
+    } else {
+      // Ticket simple
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Ticket #${lastVenta.numero_comprobante}</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 10px;
+              line-height: 1.3;
+              width: 72mm; 
+              margin: 0 auto; 
+              padding: 2mm;
+            }
+            .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 12px; }
+            .header p { margin: 1px 0; font-size: 9px; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 9px; }
+            .item { margin: 4px 0; padding-bottom: 4px; }
+            .item-name { display: block; word-wrap: break-word; }
+            .item-details { display: flex; justify-content: space-between; font-size: 9px; }
+            .item-discount { text-align: right; font-size: 8px; }
+            .total { font-weight: bold; font-size: 12px; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; text-align: center; }
+            .footer { text-align: center; margin-top: 8px; font-size: 9px; }
+            @media print { body { margin: 0; } html, body { width: 80mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>${comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'TICKET'}</h2>
+            ${comercioConfig?.direccion ? `<p>${comercioConfig.direccion}</p>` : ''}
+            ${comercioConfig?.telefono ? `<p>Tel: ${comercioConfig.telefono}</p>` : ''}
+            <p style="font-weight: bold; font-size: 11px;">TICKET #${lastVenta.numero_comprobante}</p>
+            <p>${new Date(lastVenta.fecha).toLocaleString('es-AR')}</p>
+          </div>
+          <div class="section">
+            ${lastVenta.empleado ? `
+              <p><strong>Empleado:</strong> ${lastVenta.empleado.nombre}</p>
+              ${lastVenta.empleado.dni ? `<p><strong>DNI:</strong> ${lastVenta.empleado.dni}</p>` : ''}
+              <p style="font-size: 8px;">(Cuenta Corriente)</p>
+            ` : `
+              <p><strong>Cliente:</strong> ${lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
+            `}
+          </div>
+          <div class="section">
+            ${detallesHtml}
+          </div>
+          ${lastVenta.descuento > 0 ? `<p style="text-align: right; font-size: 9px;">Descuento: -$${lastVenta.descuento.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>` : ''}
+          <div class="total">
+            TOTAL: $${lastVenta.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+          </div>
+          <div class="footer">
+            <p>¡Gracias por su compra!</p>
+          </div>
+          <script>window.print(); window.close();</script>
+        </body>
+        </html>
+      `;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
   if (loading) {
     return (
       <MainLayout>
@@ -2829,7 +3017,7 @@ export default function POS() {
                 )}
               </div>
 
-              <Button className="w-full no-print" onClick={() => window.print()}>
+              <Button className="w-full no-print" onClick={handleImprimirTicket}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
               </Button>
