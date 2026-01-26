@@ -1628,7 +1628,7 @@ export default function POS() {
           @page { size: 80mm auto; margin: 0; }
           body { 
             font-family: 'Courier New', monospace; 
-            font-size: 11px;
+            font-size: 16px;
             line-height: 1.3;
             width: 72mm; 
             margin: 0 auto; 
@@ -1751,7 +1751,7 @@ export default function POS() {
             @page { size: 80mm auto; margin: 0; }
             body { 
               font-family: 'Courier New', monospace; 
-              font-size: 11px;
+              font-size: 16px;
               line-height: 1.3;
               width: 72mm; 
               margin: 0 auto; 
@@ -1829,7 +1829,7 @@ export default function POS() {
             @page { size: 80mm auto; margin: 0; }
             body { 
               font-family: 'Courier New', monospace; 
-              font-size: 11px;
+              font-size: 16px;
               line-height: 1.3;
               width: 72mm; 
               margin: 0 auto; 
