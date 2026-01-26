@@ -1758,17 +1758,17 @@ export default function POS() {
               padding: 2mm;
             }
             .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-            .header h2 { margin: 0 0 4px 0; font-size: 13px; }
-            .header p { margin: 1px 0; font-size: 10px; }
-            .tipo-box { border: 1px solid #000; display: inline-block; padding: 4px 12px; margin: 4px 0; font-size: 16px; font-weight: bold; }
-            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 10px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 18px; }
+            .header p { margin: 1px 0; font-size: 14px; }
+            .tipo-box { border: 1px solid #000; display: inline-block; padding: 4px 12px; margin: 4px 0; font-size: 20px; font-weight: bold; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 14px; }
             .item { margin: 4px 0; padding-bottom: 4px; }
             .item-name { display: block; word-wrap: break-word; font-weight: bold; }
-            .item-details { display: flex; justify-content: space-between; font-size: 10px; }
-            .item-discount { text-align: right; font-size: 9px; }
-            .totals { text-align: right; font-size: 11px; margin-top: 4px; }
-            .total { font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
-            .footer { text-align: center; margin-top: 8px; font-size: 9px; }
+            .item-details { display: flex; justify-content: space-between; font-size: 14px; }
+            .item-discount { text-align: right; font-size: 12px; }
+            .totals { text-align: right; font-size: 16px; margin-top: 4px; }
+            .total { font-weight: bold; font-size: 18px; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
+            .footer { text-align: center; margin-top: 8px; font-size: 12px; }
             .cae { font-weight: bold; }
             @media print { body { margin: 0; } html, body { width: 80mm; } }
           </style>
@@ -1836,15 +1836,15 @@ export default function POS() {
               padding: 2mm;
             }
             .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-            .header h2 { margin: 0 0 4px 0; font-size: 13px; }
-            .header p { margin: 1px 0; font-size: 10px; }
-            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 10px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 18px; }
+            .header p { margin: 1px 0; font-size: 14px; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 14px; }
             .item { margin: 4px 0; padding-bottom: 4px; }
             .item-name { display: block; word-wrap: break-word; }
-            .item-details { display: flex; justify-content: space-between; font-size: 10px; }
-            .item-discount { text-align: right; font-size: 9px; }
-            .total { font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; text-align: center; }
-            .footer { text-align: center; margin-top: 8px; font-size: 10px; }
+            .item-details { display: flex; justify-content: space-between; font-size: 14px; }
+            .item-discount { text-align: right; font-size: 12px; }
+            .total { font-weight: bold; font-size: 18px; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; text-align: center; }
+            .footer { text-align: center; margin-top: 8px; font-size: 14px; }
             @media print { body { margin: 0; } html, body { width: 80mm; } }
           </style>
         </head>
