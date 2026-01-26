@@ -249,6 +249,19 @@
 
 /* Print styles for thermal printer Epson TMT900FA (80mm) */
 @media print {
+  /* Reset completo para impresión */
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 80mm !important;
+    height: auto !important;
+  }
+  
   body * {
     visibility: hidden;
   }
@@ -259,34 +272,39 @@
   }
   
   #printable-invoice {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
-    width: 72mm; /* 80mm paper - margins */
-    max-width: 72mm;
+    width: 76mm;
+    max-width: 76mm;
     padding: 2mm;
+    margin: 0;
     background: white !important;
     color: black !important;
     font-family: 'Courier New', monospace !important;
-    font-size: 10px !important;
-    line-height: 1.3 !important;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    box-sizing: border-box;
+    transform-origin: top left;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   #printable-invoice .thermal-header {
     text-align: center;
     border-bottom: 1px dashed black;
-    padding-bottom: 4mm;
-    margin-bottom: 2mm;
+    padding-bottom: 4mm !important;
+    margin-bottom: 2mm !important;
   }
 
   #printable-invoice .thermal-section {
     border-bottom: 1px dashed black;
-    padding: 2mm 0;
-    margin-bottom: 2mm;
+    padding: 2mm 0 !important;
+    margin-bottom: 2mm !important;
   }
 
   #printable-invoice .thermal-item {
-    margin-bottom: 2mm;
+    margin-bottom: 2mm !important;
   }
 
   #printable-invoice .thermal-item-name {
@@ -298,21 +316,21 @@
   #printable-invoice .thermal-item-details {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 10px !important;
   }
 
   #printable-invoice .thermal-total {
     font-weight: bold;
-    font-size: 12px !important;
+    font-size: 13px !important;
     border-top: 2px solid black;
-    padding-top: 2mm;
-    margin-top: 2mm;
+    padding-top: 2mm !important;
+    margin-top: 2mm !important;
   }
 
   #printable-invoice .thermal-footer {
     text-align: center;
-    margin-top: 4mm;
-    font-size: 8px !important;
+    margin-top: 4mm !important;
+    font-size: 9px !important;
   }
   
   #printable-invoice button,
@@ -322,6 +340,11 @@
   
   @page {
     size: 80mm auto;
-    margin: 0;
+    margin: 0mm;
+    padding: 0mm;
+  }
+  
+  @page :first {
+    margin-top: 0mm;
   }
 }
