@@ -1,126 +1,100 @@
 
-# Plan: Corregir Estilos de Impresión para Impresora Térmica 80mm
+# Plan: Corregir Impresión de Facturas desde Ventas
 
-## Problema Actual
+## Problema Identificado
 
-La impresión de tickets aparece muy pequeña y desplazada hacia abajo cuando se selecciona papel de 80mm. Esto ocurre por varios factores en los estilos CSS actuales:
+Al analizar el código y la captura de pantalla, el problema es que:
 
-1. El posicionamiento absoluto con `position: absolute` puede causar problemas de ubicación
-2. Los márgenes del navegador no se eliminan correctamente
-3. El escalado del navegador puede afectar el tamaño final
-4. La configuración de `@page` puede no ser suficiente para todos los navegadores
+1. **El HTML de la factura está diseñado para formato A4** (línea 825-921 de Ventas.tsx):
+   - Usa `grid-cols-2` para dividir en columnas
+   - Tiene padding de 6 (`p-6`)
+   - Usa bordes y diseño de factura tradicional
 
-## Solución Propuesta
+2. **Los estilos CSS fuerzan formato térmico 80mm**:
+   - Ancho fijo de 76mm
+   - `position: fixed` con `top: 0` y `left: 0`
 
-Modificar los estilos de impresión en `src/index.css` para:
+3. **El resultado**: La factura A4 se comprime a 76mm de ancho y aparece en la esquina superior izquierda del papel, pero el contenido está diseñado para ser más ancho, por lo que se ve pequeño y cortado.
 
-### 1. Mejorar el posicionamiento
-- Cambiar de `position: absolute` a `position: fixed` para mejor control
-- Agregar propiedades que fuercen el posicionamiento superior izquierdo
-- Usar `-webkit-print-color-adjust: exact` para mejor renderizado
+## Solución
 
-### 2. Optimizar la configuración de página
-- Agregar reglas más específicas para `@page`
-- Incluir `-webkit` prefixes para compatibilidad con Chrome
-- Forzar márgenes cero de manera más agresiva
-
-### 3. Mejorar el escalado
-- Agregar `transform-origin: top left` para asegurar que cualquier transformación inicie desde arriba
-- Usar `box-sizing: border-box` para cálculos precisos de tamaño
-- Agregar `page-break-inside: avoid` para evitar cortes inesperados
-
-### 4. Reset más agresivo del body
-- Ocultar completamente elementos no necesarios
-- Forzar dimensiones del viewport de impresión
+Crear **dos modos de impresión**:
+- **Ticket térmico 80mm**: Para tickets de venta del POS (formato actual)
+- **Factura A4/Carta**: Para facturas electrónicas desde Ventas
 
 ---
 
 ## Detalles Técnicos
 
-### Archivo a modificar: `src/index.css`
+### 1. Modificar src/index.css
 
-**Cambios en la sección `@media print`:**
+Agregar una segunda sección de estilos para facturas A4 usando un ID diferente (`printable-factura`):
 
 ```css
-@media print {
-  /* Reset completo para impresión */
-  * {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 80mm !important;
-    height: auto !important;
-  }
-  
-  body * {
-    visibility: hidden;
-  }
-  
-  #printable-invoice,
-  #printable-invoice * {
-    visibility: visible;
-  }
-  
-  #printable-invoice {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 76mm; /* Ajustado para 80mm con pequeño margen */
-    max-width: 76mm;
-    padding: 2mm;
-    margin: 0;
-    background: white !important;
-    color: black !important;
-    font-family: 'Courier New', monospace !important;
-    font-size: 11px !important; /* Aumentado de 10px */
-    line-height: 1.4 !important;
-    box-sizing: border-box;
-    transform-origin: top left;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  /* ... resto de estilos térmicos ... */
-  
-  @page {
-    size: 80mm auto;
-    margin: 0mm;
-    padding: 0mm;
-  }
-  
-  @page :first {
-    margin-top: 0mm;
-  }
+/* Estilos para factura A4 (desde página Ventas) */
+#printable-factura,
+#printable-factura * {
+  visibility: visible;
+}
+
+#printable-factura {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 210mm; /* Ancho A4 */
+  max-width: 210mm;
+  padding: 10mm;
+  margin: 0;
+  background: white !important;
+  color: black !important;
+  font-size: 12px !important;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 ```
 
-### Cambios principales:
+También agregar regla para detectar qué tipo de impresión usar:
 
-| Aspecto | Antes | Después |
-|---------|-------|---------|
-| Posición | `position: absolute` | `position: fixed` |
-| Ancho | `72mm` | `76mm` (más espacio útil) |
-| Font size | `10px` | `11px` (más legible) |
-| Reset body | Parcial | Completo con `!important` |
-| Márgenes @page | Solo `margin: 0` | `margin: 0mm; padding: 0mm` |
-| Primera página | No especificado | `@page :first { margin-top: 0mm }` |
+```css
+@page factura-a4 {
+  size: A4 portrait;
+  margin: 10mm;
+}
+```
+
+### 2. Modificar src/pages/Ventas.tsx
+
+Cambiar el ID del contenedor de factura de `printable-invoice` a `printable-factura`:
+
+**Antes (línea 825)**:
+```tsx
+<div id="printable-invoice" className="space-y-4">
+```
+
+**Después**:
+```tsx
+<div id="printable-factura" className="space-y-4">
+```
+
+### 3. Mantener compatibilidad
+
+- El POS seguirá usando `#printable-invoice` para tickets térmicos
+- Ventas usará `#printable-factura` para facturas A4
 
 ---
 
-## Archivos a Modificar
+## Cambios en Archivos
 
-1. **`src/index.css`** - Actualizar la sección `@media print` completa con los nuevos estilos optimizados
+| Archivo | Acción |
+|---------|--------|
+| `src/index.css` | Agregar estilos para `#printable-factura` con formato A4 |
+| `src/pages/Ventas.tsx` | Cambiar ID de `printable-invoice` a `printable-factura` |
 
 ---
 
 ## Resultado Esperado
 
-Después de implementar estos cambios:
-- ✅ El ticket aparecerá en la parte superior del papel
-- ✅ El tamaño del texto será más legible
-- ✅ El contenido ocupará correctamente el ancho del papel de 80mm
-- ✅ Compatible con la impresora Epson TMT900FA mencionada en los comentarios del código
+- Las facturas desde la página Ventas se imprimirán en formato A4 con la posición correcta
+- Los tickets del POS seguirán imprimiéndose en formato térmico 80mm
+- Cada tipo de documento usará el formato de papel apropiado
