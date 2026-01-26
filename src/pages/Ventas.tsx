@@ -938,7 +938,7 @@ export default function Ventas() {
                         * { margin: 0; padding: 0; box-sizing: border-box; }
                         body { 
                           font-family: Arial, sans-serif; 
-                          font-size: 11px; 
+                          font-size: 16px; 
                           line-height: 1.4;
                           padding: 20px;
                         }
