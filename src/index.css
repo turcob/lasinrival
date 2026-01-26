@@ -267,8 +267,31 @@
     background: white !important;
   }
 
+  /* Resetear posicionamiento de contenedores padre (Dialog, etc) */
+  [data-radix-portal],
+  [role="dialog"],
+  [data-state="open"],
+  .fixed,
+  [data-radix-portal] > div {
+    position: static !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
   #printable-invoice {
-    position: absolute !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
     width: 76mm !important;
@@ -281,6 +304,7 @@
     font-size: 11px !important;
     line-height: 1.4 !important;
     box-sizing: border-box !important;
+    transform: none !important;
     z-index: 999999 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
