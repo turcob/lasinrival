@@ -195,6 +195,9 @@ export default function POS() {
   const [clienteSearchResults, setClienteSearchResults] = useState<Cliente[]>([]);
   const [clienteSearchLoading, setClienteSearchLoading] = useState(false);
   const [empleadoDialogOpen, setEmpleadoDialogOpen] = useState(false);
+  const [empleadoSearchTerm, setEmpleadoSearchTerm] = useState('');
+  const [empleadoSearchResults, setEmpleadoSearchResults] = useState<Empleado[]>([]);
+  const [empleadoSearchLoading, setEmpleadoSearchLoading] = useState(false);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -304,6 +307,36 @@ export default function POS() {
 
     return () => clearTimeout(timer);
   }, [clienteSearchTerm]);
+
+  // Server-side search for employees with debounce
+  useEffect(() => {
+    if (!empleadoSearchTerm || empleadoSearchTerm.length < 2) {
+      setEmpleadoSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setEmpleadoSearchLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('empleados')
+          .select('id, nombre, dni, activo')
+          .eq('activo', true)
+          .or(`nombre.ilike.%${empleadoSearchTerm}%,dni.ilike.%${empleadoSearchTerm}%`)
+          .order('nombre')
+          .limit(50);
+
+        if (error) throw error;
+        setEmpleadoSearchResults(data as Empleado[]);
+      } catch (error) {
+        console.error('Error searching employees:', error);
+      } finally {
+        setEmpleadoSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [empleadoSearchTerm]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -2460,7 +2493,13 @@ export default function POS() {
       </Dialog>
 
       {/* Employee Selection Dialog */}
-      <Dialog open={empleadoDialogOpen} onOpenChange={setEmpleadoDialogOpen}>
+      <Dialog open={empleadoDialogOpen} onOpenChange={(open) => {
+        setEmpleadoDialogOpen(open);
+        if (!open) {
+          setEmpleadoSearchTerm('');
+          setEmpleadoSearchResults([]);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2468,29 +2507,76 @@ export default function POS() {
               Seleccionar Empleado
             </DialogTitle>
           </DialogHeader>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o DNI (mín. 2 caracteres)..."
+              value={empleadoSearchTerm}
+              onChange={(e) => setEmpleadoSearchTerm(e.target.value)}
+              className="pl-9"
+              autoFocus
+            />
+          </div>
           <ScrollArea className="max-h-80">
-            {empleados.length === 0 ? (
+            {empleadoSearchLoading && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Buscando...
+              </p>
+            )}
+            {!empleadoSearchLoading && empleadoSearchTerm && empleadoSearchTerm.length >= 2 && empleadoSearchResults.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No se encontraron empleados
+              </p>
+            )}
+            {!empleadoSearchLoading && empleadoSearchTerm && empleadoSearchTerm.length < 2 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Ingrese al menos 2 caracteres para buscar
+              </p>
+            )}
+            {!empleadoSearchTerm && empleados.length === 0 && (
               <div className="p-4 text-center text-muted-foreground">
                 <p>No hay empleados registrados</p>
                 <p className="text-sm">Agregue empleados desde el módulo de Empleados</p>
               </div>
-            ) : (
-              empleados.map((empleado) => (
-                <div
-                  key={empleado.id}
-                  className="p-3 hover:bg-muted cursor-pointer rounded border-b last:border-0"
-                  onClick={() => {
-                    setSelectedEmpleado(empleado);
-                    setEmpleadoDialogOpen(false);
-                  }}
-                >
-                  <p className="font-medium">{empleado.nombre}</p>
-                  {empleado.dni && (
-                    <p className="text-sm text-muted-foreground">DNI: {empleado.dni}</p>
-                  )}
-                </div>
-              ))
             )}
+            {!empleadoSearchTerm && empleados.slice(0, 10).map((empleado) => (
+              <div
+                key={empleado.id}
+                className="p-3 hover:bg-muted cursor-pointer rounded border-b last:border-0"
+                onClick={() => {
+                  setSelectedEmpleado(empleado);
+                  setEmpleadoDialogOpen(false);
+                  setEmpleadoSearchTerm('');
+                }}
+              >
+                <p className="font-medium">{empleado.nombre}</p>
+                {empleado.dni && (
+                  <p className="text-sm text-muted-foreground">DNI: {empleado.dni}</p>
+                )}
+              </div>
+            ))}
+            {!empleadoSearchTerm && empleados.length > 10 && (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Mostrando primeros 10. Use el buscador para encontrar más.
+              </p>
+            )}
+            {empleadoSearchResults.map((empleado) => (
+              <div
+                key={empleado.id}
+                className="p-3 hover:bg-muted cursor-pointer rounded border-t"
+                onClick={() => {
+                  setSelectedEmpleado(empleado);
+                  setEmpleadoDialogOpen(false);
+                  setEmpleadoSearchTerm('');
+                  setEmpleadoSearchResults([]);
+                }}
+              >
+                <p className="font-medium">{empleado.nombre}</p>
+                {empleado.dni && (
+                  <p className="text-sm text-muted-foreground">DNI: {empleado.dni}</p>
+                )}
+              </div>
+            ))}
           </ScrollArea>
         </DialogContent>
       </Dialog>
