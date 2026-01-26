@@ -249,60 +249,30 @@
 
 /* Print styles for thermal printer Epson TMT900FA (80mm) */
 @media print {
-  /* Ocultar absolutamente todo primero */
-  *, *::before, *::after {
-    visibility: hidden !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  /* Ocultar todo el body excepto el contenido imprimible */
+  body * {
+    visibility: hidden;
+  }
+  
+  #printable-invoice,
+  #printable-invoice * {
+    visibility: visible !important;
   }
   
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     width: 80mm !important;
-    min-width: 80mm !important;
-    max-width: 80mm !important;
     height: auto !important;
     background: white !important;
-    overflow: visible !important;
   }
 
-  /* Eliminar todos los contenedores que puedan interferir */
-  body > *:not(#printable-invoice),
-  [data-radix-portal],
-  [role="dialog"],
-  .fixed,
-  .absolute,
-  header,
-  nav,
-  aside,
-  footer {
-    display: none !important;
-    visibility: hidden !important;
-    position: static !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-  }
-  
-  /* Mostrar solo el contenido imprimible */
-  #printable-invoice,
-  #printable-invoice *,
-  #printable-invoice *::before,
-  #printable-invoice *::after {
-    visibility: visible !important;
-  }
-  
   #printable-invoice {
-    display: block !important;
-    position: fixed !important;
+    position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    right: auto !important;
-    bottom: auto !important;
     width: 76mm !important;
     max-width: 76mm !important;
-    min-width: 76mm !important;
     padding: 2mm !important;
     margin: 0 !important;
     background: white !important;
@@ -311,19 +281,14 @@
     font-size: 11px !important;
     line-height: 1.4 !important;
     box-sizing: border-box !important;
-    transform: none !important;
-    transform-origin: top left !important;
     z-index: 999999 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    page-break-inside: avoid !important;
   }
 
-  /* Forzar que el contenido interno se adapte */
-  #printable-invoice .grid,
+  /* Convertir grids a layout vertical para 80mm */
   #printable-invoice .grid-cols-2 {
     display: block !important;
-    grid-template-columns: none !important;
   }
 
   #printable-invoice .text-right {
@@ -336,31 +301,24 @@
     font-size: 12px !important;
   }
 
-  #printable-invoice .border,
-  #printable-invoice .border-2,
-  #printable-invoice .rounded-lg,
-  #printable-invoice .rounded {
-    border: 1px solid black !important;
-    border-radius: 0 !important;
+  #printable-invoice .border-2 {
+    border-width: 1px !important;
   }
 
-  #printable-invoice .p-6,
-  #printable-invoice .p-4,
-  #printable-invoice .p-3 {
+  #printable-invoice .p-6 {
     padding: 2mm !important;
   }
 
-  #printable-invoice .gap-4,
-  #printable-invoice .space-y-4 > * + * {
-    margin-top: 2mm !important;
-  }
-
-  #printable-invoice .bg-muted\/50 {
-    background: #f0f0f0 !important;
+  #printable-invoice .gap-4 {
+    gap: 2mm !important;
   }
 
   #printable-invoice .text-muted-foreground {
     color: #333 !important;
+  }
+
+  #printable-invoice .bg-muted\/50 {
+    background: #eee !important;
   }
 
   #printable-invoice .thermal-header {
@@ -370,40 +328,11 @@
     margin-bottom: 2mm !important;
   }
 
-  #printable-invoice .thermal-section {
-    border-bottom: 1px dashed black !important;
-    padding: 2mm 0 !important;
-    margin-bottom: 2mm !important;
-  }
-
-  #printable-invoice .thermal-item {
-    margin-bottom: 2mm !important;
-  }
-
-  #printable-invoice .thermal-item-name {
-    display: block !important;
-    word-wrap: break-word !important;
-    white-space: normal !important;
-  }
-
-  #printable-invoice .thermal-item-details {
-    display: flex !important;
-    justify-content: space-between !important;
-    font-size: 10px !important;
-  }
-
   #printable-invoice .thermal-total {
     font-weight: bold !important;
     font-size: 13px !important;
     border-top: 2px solid black !important;
     padding-top: 2mm !important;
-    margin-top: 2mm !important;
-  }
-
-  #printable-invoice .thermal-footer {
-    text-align: center !important;
-    margin-top: 4mm !important;
-    font-size: 9px !important;
   }
   
   #printable-invoice button,
@@ -413,11 +342,6 @@
   
   @page {
     size: 80mm auto;
-    margin: 0mm;
-    padding: 0mm;
-  }
-  
-  @page :first {
-    margin-top: 0mm;
+    margin: 0;
   }
 }
