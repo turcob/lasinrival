@@ -1628,7 +1628,7 @@ export default function POS() {
           @page { size: 80mm auto; margin: 0; }
           body { 
             font-family: 'Courier New', monospace; 
-            font-size: 10px;
+            font-size: 11px;
             line-height: 1.3;
             width: 72mm; 
             margin: 0 auto; 
@@ -1659,7 +1659,7 @@ export default function POS() {
             display: flex;
             justify-content: space-between;
           }
-          .footer { text-align: center; margin-top: 8px; font-size: 10px; }
+          .footer { text-align: center; margin-top: 8px; font-size: 11px; }
           @media print { 
             body { margin: 0; } 
             html, body { width: 80mm; }
@@ -1751,24 +1751,24 @@ export default function POS() {
             @page { size: 80mm auto; margin: 0; }
             body { 
               font-family: 'Courier New', monospace; 
-              font-size: 10px;
+              font-size: 11px;
               line-height: 1.3;
               width: 72mm; 
               margin: 0 auto; 
               padding: 2mm;
             }
             .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-            .header h2 { margin: 0 0 4px 0; font-size: 12px; }
-            .header p { margin: 1px 0; font-size: 9px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 13px; }
+            .header p { margin: 1px 0; font-size: 10px; }
             .tipo-box { border: 1px solid #000; display: inline-block; padding: 4px 12px; margin: 4px 0; font-size: 16px; font-weight: bold; }
-            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 9px; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 10px; }
             .item { margin: 4px 0; padding-bottom: 4px; }
             .item-name { display: block; word-wrap: break-word; font-weight: bold; }
-            .item-details { display: flex; justify-content: space-between; font-size: 9px; }
-            .item-discount { text-align: right; font-size: 8px; }
-            .totals { text-align: right; font-size: 10px; margin-top: 4px; }
-            .total { font-weight: bold; font-size: 12px; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
-            .footer { text-align: center; margin-top: 8px; font-size: 8px; }
+            .item-details { display: flex; justify-content: space-between; font-size: 10px; }
+            .item-discount { text-align: right; font-size: 9px; }
+            .totals { text-align: right; font-size: 11px; margin-top: 4px; }
+            .total { font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
+            .footer { text-align: center; margin-top: 8px; font-size: 9px; }
             .cae { font-weight: bold; }
             @media print { body { margin: 0; } html, body { width: 80mm; } }
           </style>
@@ -1829,22 +1829,22 @@ export default function POS() {
             @page { size: 80mm auto; margin: 0; }
             body { 
               font-family: 'Courier New', monospace; 
-              font-size: 10px;
+              font-size: 11px;
               line-height: 1.3;
               width: 72mm; 
               margin: 0 auto; 
               padding: 2mm;
             }
             .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-            .header h2 { margin: 0 0 4px 0; font-size: 12px; }
-            .header p { margin: 1px 0; font-size: 9px; }
-            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 9px; }
+            .header h2 { margin: 0 0 4px 0; font-size: 13px; }
+            .header p { margin: 1px 0; font-size: 10px; }
+            .section { border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 4px; font-size: 10px; }
             .item { margin: 4px 0; padding-bottom: 4px; }
             .item-name { display: block; word-wrap: break-word; }
-            .item-details { display: flex; justify-content: space-between; font-size: 9px; }
-            .item-discount { text-align: right; font-size: 8px; }
-            .total { font-weight: bold; font-size: 12px; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; text-align: center; }
-            .footer { text-align: center; margin-top: 8px; font-size: 9px; }
+            .item-details { display: flex; justify-content: space-between; font-size: 10px; }
+            .item-discount { text-align: right; font-size: 9px; }
+            .total { font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; text-align: center; }
+            .footer { text-align: center; margin-top: 8px; font-size: 10px; }
             @media print { body { margin: 0; } html, body { width: 80mm; } }
           </style>
         </head>
