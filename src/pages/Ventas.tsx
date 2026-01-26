@@ -822,8 +822,8 @@ export default function Ventas() {
           </DialogHeader>
           
           {selectedVenta && selectedFactura && (
-            <div id="printable-invoice" className="space-y-4">
-              <div className="border rounded-lg p-6 text-sm">
+            <>
+              <div id="printable-invoice" className="border rounded-lg p-6 text-sm">
                 {/* Header */}
                 <div className="grid grid-cols-2 gap-4 border-b pb-4">
                   <div>
@@ -914,11 +914,11 @@ export default function Ventas() {
                 </div>
               </div>
 
-              <Button className="w-full" onClick={() => window.print()}>
+              <Button className="w-full mt-4" onClick={() => window.print()}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir Factura
               </Button>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
