@@ -1,171 +1,232 @@
 
-## Plan: Sistema de Cuenta Corriente para Clientes en POS
+
+## Plan: Selector de Productos para Nota de Credito
 
 ### Resumen
-Implementar un sistema de cuenta corriente para clientes, permitiendo elegir entre "Pago Directo" (comportamiento actual) y "Cuenta Corriente" (nuevo), siguiendo el mismo patrón ya implementado para empleados.
+Modificar el dialog "Registrar Movimiento" para que cuando se seleccione "Nota de Credito" muestre las compras del cliente con sus productos, permitiendo seleccionar cuales incluir y ajustar cantidades para calcular el total automaticamente.
 
 ---
 
-### 1. Cambios en Base de Datos
-
-#### Nueva tabla: `cliente_movimientos`
-```sql
-CREATE TABLE cliente_movimientos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-  tipo TEXT NOT NULL, -- 'compra', 'pago', 'ajuste', 'devolucion', 'nota_credito'
-  monto NUMERIC NOT NULL,
-  concepto TEXT,
-  venta_id UUID REFERENCES ventas(id),
-  usuario_registro_id UUID NOT NULL,
-  fecha DATE DEFAULT CURRENT_DATE,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### Nueva vista: `cliente_saldos`
-```sql
-CREATE VIEW cliente_saldos AS
-SELECT 
-  cliente_id,
-  COALESCE(SUM(CASE WHEN tipo IN ('compra') THEN monto ELSE 0 END), 0) as total_deuda,
-  COALESCE(SUM(CASE WHEN tipo IN ('pago', 'nota_credito', 'devolucion') THEN monto ELSE 0 END), 0) as total_pagado,
-  COALESCE(SUM(CASE WHEN tipo = 'compra' THEN monto ELSE -monto END), 0) as saldo_actual
-FROM cliente_movimientos
-GROUP BY cliente_id;
-```
-
-#### Politicas RLS
-- Usuarios autenticados pueden ver movimientos
-- Usuarios con permiso `clientes.crear` pueden insertar/actualizar/eliminar
-
----
-
-### 2. Cambios en POS (`src/pages/POS.tsx`)
+### 1. Cambios en RegistrarPagoClienteDialog.tsx
 
 #### Nuevos Estados
 ```typescript
-const [clienteModalidadPago, setClienteModalidadPago] = useState<'pago_directo' | 'cuenta_corriente'>('pago_directo');
+const [comprasCliente, setComprasCliente] = useState<CompraCliente[]>([]);
+const [compraSeleccionada, setCompraSeleccionada] = useState<string | null>(null);
+const [productosVenta, setProductosVenta] = useState<ProductoVenta[]>([]);
+const [productosNotaCredito, setProductosNotaCredito] = useState<ProductoNotaCredito[]>([]);
 ```
 
-#### Modificar UI de Seleccion de Cliente
-Cuando se selecciona un cliente, mostrar opciones con radio buttons:
-```
-+---------------------------------------+
-| Cliente                   [Cambiar]   |
-+---------------------------------------+
-| ACME S.A.                             |
-| CUIT: 30-12345678-9                   |
-|                                       |
-| (•) Pago Directo  ← default           |
-|     El cliente paga ahora             |
-|                                       |
-| ( ) Cuenta Corriente                  |
-|     Carga el total como deuda         |
-+---------------------------------------+
-```
-
-**Nota**: Para clientes, el default sera "Pago Directo" (comportamiento actual), a diferencia de empleados donde es "Cuenta Corriente".
-
-#### Modificar Logica del Boton Cobrar
+#### Nuevas Interfaces
 ```typescript
-// Si hay cliente con CC seleccionada
-if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
-  handleProcesarVentaClienteCC(); // Nueva funcion
-} else {
-  setPagos([]);
-  setPagoDialogOpen(true);
+interface CompraCliente {
+  id: string;
+  venta_id: string;
+  monto: number;
+  fecha: string;
+  numero_comprobante: number;
+}
+
+interface ProductoVenta {
+  id: string;
+  producto_id: string | null;
+  descripcion: string;
+  codigo: string;
+  cantidad_original: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+interface ProductoNotaCredito {
+  detalle_id: string;
+  cantidad_seleccionada: number;
+  cantidad_max: number;
+  precio_unitario: number;
+  subtotal: number;
 }
 ```
 
-#### Nueva Funcion: `handleProcesarVentaClienteCC()`
-Similar a `handleProcesarVentaEmpleado()`:
-- Registrar la venta con estado 'completada'
-- Registrar movimiento en `cliente_movimientos` con tipo 'compra'
-- Actualizar stock
-- Registrar movimiento de caja con ingreso $0 (es fiado)
-- Mostrar ticket
+#### Flujo de UI para Nota de Credito
 
----
-
-### 3. Flujo Visual
+Cuando `tipo === 'nota_credito'`:
 
 ```
-+------------------------+
-|  Cliente Seleccionado  |
-+------------------------+
-           |
-           v
-+------------------------+
-|  Elegir Modalidad:     |
-|  ● Pago Directo        |
-|  ○ Cuenta Corriente    |
-+------------------------+
-           |
-     +-----+-----+
-     |           |
-     v           v
-+------------+  +--------+
-| Dialog     |  |  CC    |
-| de Pagos   |  |  Carga |
-| (normal)   |  |  deuda |
-+------------+  +--------+
++-------------------------------------------+
+| Tipo: [Nota de Credito v]                 |
++-------------------------------------------+
+| Seleccionar compra a acreditar:           |
+| [Venta #393 - 27/01/2026 - $18.889,20 v]  |
++-------------------------------------------+
+|                                           |
+| Productos de la compra:                   |
+| +---------------------------------------+ |
+| | [ ] | Producto         | Cant | Subt. | |
+| | [x] | ACEITUNA NEGRAS  |  [1] | $18k  | |
+| | [ ] | OTRO PRODUCTO    |  [0] | $0    | |
+| +---------------------------------------+ |
+|                                           |
+| Total Nota de Credito: $18.889,20         |
++-------------------------------------------+
+| [Cancelar]              [Registrar]       |
++-------------------------------------------+
+```
+
+#### Logica de Carga de Compras
+
+Cuando se selecciona `tipo = 'nota_credito'`:
+1. Buscar en `cliente_movimientos` todos los registros con `tipo = 'compra'` y `venta_id IS NOT NULL`
+2. Obtener el `numero_comprobante` de la venta relacionada
+3. Mostrar en selector las compras disponibles
+
+```typescript
+const fetchComprasCliente = async () => {
+  const { data } = await supabase
+    .from('cliente_movimientos')
+    .select(`
+      id,
+      venta_id,
+      monto,
+      fecha,
+      ventas!inner(numero_comprobante)
+    `)
+    .eq('cliente_id', clienteId)
+    .eq('tipo', 'compra')
+    .not('venta_id', 'is', null)
+    .order('fecha', { ascending: false });
+  
+  setComprasCliente(data || []);
+};
+```
+
+#### Logica de Carga de Productos
+
+Cuando se selecciona una compra:
+1. Obtener `venta_detalles` de la venta
+2. Mapear productos con descripcion
+3. Inicializar cantidades en 0 (usuario debe seleccionar)
+
+```typescript
+const fetchProductosVenta = async (ventaId: string) => {
+  const { data } = await supabase
+    .from('venta_detalles')
+    .select(`
+      id,
+      producto_id,
+      cantidad,
+      precio_unitario,
+      subtotal,
+      producto_temporal_nombre,
+      productos(descripcion, codigo_articulo)
+    `)
+    .eq('venta_id', ventaId);
+  
+  // Mapear a estructura con descripcion
+  const productos = data?.map(d => ({
+    id: d.id,
+    producto_id: d.producto_id,
+    descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Producto',
+    codigo: d.productos?.codigo_articulo || '',
+    cantidad_original: d.cantidad,
+    precio_unitario: d.precio_unitario,
+    subtotal: d.subtotal,
+  }));
+  
+  setProductosVenta(productos || []);
+  
+  // Inicializar nota de credito con cantidad 0
+  setProductosNotaCredito(productos?.map(p => ({
+    detalle_id: p.id,
+    cantidad_seleccionada: 0,
+    cantidad_max: p.cantidad_original,
+    precio_unitario: p.precio_unitario,
+    subtotal: 0,
+  })) || []);
+};
+```
+
+#### Calculo Dinamico del Total
+
+```typescript
+const totalNotaCredito = useMemo(() => {
+  return productosNotaCredito.reduce((sum, p) => 
+    sum + (p.cantidad_seleccionada * p.precio_unitario), 0);
+}, [productosNotaCredito]);
+```
+
+#### Validaciones
+
+1. Cantidad ingresada debe ser >= 0 y <= cantidad_original
+2. Al menos un producto debe tener cantidad > 0
+3. El total debe ser > 0
+
+#### Modificar Submit
+
+Para tipo `nota_credito`:
+- Usar el `totalNotaCredito` calculado automaticamente
+- Guardar referencia a la `venta_id` de la compra original
+- Concepto automatico: "NC - Venta #XXX - [productos]"
+
+---
+
+### 2. Componentes UI Adicionales
+
+Usar componentes existentes:
+- `Checkbox` para seleccionar productos
+- `Input` type="number" para cantidades
+- `Table` para mostrar productos
+
+---
+
+### 3. Flujo Visual Completo
+
+```
+Usuario abre dialog
+    |
+    v
+Selecciona "Nota de Credito"
+    |
+    v
+Se carga lista de compras CC del cliente
+    |
+    v
+Usuario selecciona una compra
+    |
+    v
+Se cargan productos de esa venta
+    |
+    v
+Usuario marca productos y ajusta cantidades
+    |
+    v
+Total se calcula automaticamente
+    |
+    v
+Usuario confirma -> Se guarda movimiento
 ```
 
 ---
 
-### 4. Gestion de Cuenta Corriente de Clientes
+### 4. Consideraciones Adicionales
 
-#### Nuevo Componente: `CuentaCorrienteClienteDialog.tsx`
-Similar al de empleados, permite:
-- Ver historial de movimientos del cliente
-- Ver saldo actual (debe/tiene a favor)
-- Registrar pagos manuales
-- Ver ventas asociadas a CC
-
-#### Agregar a Pagina de Clientes
-- Nuevo boton "Ver CC" en acciones de cada cliente
-- Mostrar columna de saldo en la tabla
+1. **Cantidades decimales**: Soportar productos con cantidad fraccionada (ej: 0.5 kg)
+2. **Productos temporales**: Mostrar nombre temporal si no tiene producto_id
+3. **Compras sin productos**: Si la compra no tiene venta_detalles, mostrar mensaje
 
 ---
 
-### 5. Impresion del Ticket
+### 5. Archivos a Modificar
 
-Para ventas en Cuenta Corriente de cliente:
-```
-Cliente: ACME S.A.
-CUIT: 30-12345678-9
-(Cuenta Corriente)
-
-Cond. Venta: Fiado
-```
+| Archivo | Cambios |
+|---------|---------|
+| `src/components/clientes/RegistrarPagoClienteDialog.tsx` | Agregar logica condicional para nota de credito con selector de compras y productos |
 
 ---
 
-### 6. Archivos a Crear/Modificar
+### 6. Beneficios
 
-| Archivo | Accion |
-|---------|--------|
-| `src/pages/POS.tsx` | Agregar estado, UI y logica para CC de clientes |
-| `src/pages/Clientes.tsx` | Agregar boton CC, mostrar saldo en tabla |
-| `src/components/clientes/CuentaCorrienteClienteDialog.tsx` | **NUEVO** - Dialog para ver/gestionar CC |
-| `src/components/clientes/RegistrarPagoClienteDialog.tsx` | **NUEVO** - Dialog para registrar pagos |
+1. Control preciso sobre que productos incluir en la nota de credito
+2. Calculo automatico del monto basado en productos seleccionados
+3. Trazabilidad completa: se sabe de que compra y que productos
+4. Validacion de cantidades (no puede acreditar mas de lo comprado)
+5. UX intuitiva con tabla de seleccion
 
----
-
-### 7. Consideraciones Adicionales
-
-1. **Limite de credito (futuro)**: Se podria agregar un campo `limite_credito` a la tabla `clientes` para controlar cuanto se le puede fiar
-
-2. **Notificaciones**: Alertar cuando un cliente supera cierto monto de deuda
-
-3. **Reportes**: Generar listado de clientes deudores con antigueedad de saldo
-
----
-
-### Resumen de Beneficios
-1. Flexibilidad para vender fiado a clientes de confianza
-2. Trazabilidad completa de deudas y pagos
-3. Patron consistente con el sistema de empleados
-4. UI intuitiva con radio buttons claros
-5. Gestion centralizada de cuentas corrientes
