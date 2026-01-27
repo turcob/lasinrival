@@ -36,6 +36,10 @@ interface Movimiento {
   fecha: string;
   created_at: string;
   venta_id: string | null;
+  forma_pago_id: string | null;
+  usuario_registro_id: string;
+  forma_pago_nombre?: string;
+  usuario_nombre?: string;
 }
 
 interface Saldo {
@@ -75,7 +79,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [movRes, saldoRes] = await Promise.all([
+      const [movRes, saldoRes, formasPagoRes, profilesRes] = await Promise.all([
         supabase
           .from('cliente_movimientos')
           .select('*')
@@ -87,9 +91,25 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
           .select('*')
           .eq('cliente_id', cliente.id)
           .maybeSingle(),
+        supabase
+          .from('formas_pago')
+          .select('id, nombre'),
+        supabase
+          .from('profiles')
+          .select('id, nombre'),
       ]);
 
-      if (movRes.data) setMovimientos(movRes.data);
+      const formasPagoMap = new Map(formasPagoRes.data?.map(fp => [fp.id, fp.nombre]) || []);
+      const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p.nombre]) || []);
+
+      if (movRes.data) {
+        const movsConNombres: Movimiento[] = movRes.data.map(mov => ({
+          ...mov,
+          forma_pago_nombre: mov.forma_pago_id ? formasPagoMap.get(mov.forma_pago_id) : undefined,
+          usuario_nombre: profilesMap.get(mov.usuario_registro_id),
+        }));
+        setMovimientos(movsConNombres);
+      }
       if (saldoRes.data) setSaldo(saldoRes.data);
       else setSaldo({ total_deuda: 0, total_pagado: 0, saldo_actual: 0 });
     } catch (error) {
@@ -163,6 +183,8 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                     <TableHead>Fecha</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Concepto</TableHead>
+                    <TableHead>Forma Pago</TableHead>
+                    <TableHead>Registrado por</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -185,6 +207,12 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {mov.concepto || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {mov.forma_pago_nombre || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {mov.usuario_nombre || '-'}
                         </TableCell>
                         <TableCell className={`text-right font-medium ${esDeuda ? 'text-destructive' : 'text-green-600'}`}>
                           {esDeuda ? '+' : '-'}${Number(mov.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
