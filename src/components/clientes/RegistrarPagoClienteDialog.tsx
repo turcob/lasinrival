@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface RegistrarPagoClienteDialogProps {
   open: boolean;
@@ -30,6 +41,32 @@ interface RegistrarPagoClienteDialogProps {
 interface FormaPago {
   id: string;
   nombre: string;
+}
+
+interface CompraCliente {
+  id: string;
+  venta_id: string;
+  monto: number;
+  fecha: string;
+  numero_comprobante: number;
+}
+
+interface ProductoVenta {
+  id: string;
+  producto_id: string | null;
+  descripcion: string;
+  codigo: string;
+  cantidad_original: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+interface ProductoNotaCredito {
+  detalle_id: string;
+  cantidad_seleccionada: number;
+  cantidad_max: number;
+  precio_unitario: number;
+  descripcion: string;
 }
 
 const TIPOS_MOVIMIENTO = [
@@ -52,11 +89,44 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Estados para Nota de Crédito
+  const [comprasCliente, setComprasCliente] = useState<CompraCliente[]>([]);
+  const [compraSeleccionada, setCompraSeleccionada] = useState<string | null>(null);
+  const [productosVenta, setProductosVenta] = useState<ProductoVenta[]>([]);
+  const [productosNotaCredito, setProductosNotaCredito] = useState<ProductoNotaCredito[]>([]);
+  const [loadingCompras, setLoadingCompras] = useState(false);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+
   useEffect(() => {
     if (open) {
       fetchFormasPago();
     }
   }, [open]);
+
+  // Cargar compras cuando se selecciona nota_credito
+  useEffect(() => {
+    if (tipo === 'nota_credito' && open) {
+      fetchComprasCliente();
+    } else {
+      setComprasCliente([]);
+      setCompraSeleccionada(null);
+      setProductosVenta([]);
+      setProductosNotaCredito([]);
+    }
+  }, [tipo, open, clienteId]);
+
+  // Cargar productos cuando se selecciona una compra
+  useEffect(() => {
+    if (compraSeleccionada) {
+      const compra = comprasCliente.find(c => c.id === compraSeleccionada);
+      if (compra) {
+        fetchProductosVenta(compra.venta_id);
+      }
+    } else {
+      setProductosVenta([]);
+      setProductosNotaCredito([]);
+    }
+  }, [compraSeleccionada]);
 
   const fetchFormasPago = async () => {
     const { data } = await supabase
@@ -67,21 +137,170 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     if (data) setFormasPago(data);
   };
 
+  const fetchComprasCliente = async () => {
+    setLoadingCompras(true);
+    try {
+      const { data, error } = await supabase
+        .from('cliente_movimientos')
+        .select(`
+          id,
+          venta_id,
+          monto,
+          fecha,
+          ventas!inner(numero_comprobante)
+        `)
+        .eq('cliente_id', clienteId)
+        .eq('tipo', 'compra')
+        .not('venta_id', 'is', null)
+        .order('fecha', { ascending: false });
+
+      if (error) throw error;
+
+      const compras: CompraCliente[] = (data || []).map((item: any) => ({
+        id: item.id,
+        venta_id: item.venta_id,
+        monto: item.monto,
+        fecha: item.fecha,
+        numero_comprobante: item.ventas?.numero_comprobante || 0,
+      }));
+
+      setComprasCliente(compras);
+    } catch (error) {
+      console.error('Error fetching purchases:', error);
+      toast.error('Error al cargar las compras del cliente');
+    } finally {
+      setLoadingCompras(false);
+    }
+  };
+
+  const fetchProductosVenta = async (ventaId: string) => {
+    setLoadingProductos(true);
+    try {
+      const { data, error } = await supabase
+        .from('venta_detalles')
+        .select(`
+          id,
+          producto_id,
+          cantidad,
+          precio_unitario,
+          subtotal,
+          producto_temporal_nombre,
+          productos(descripcion, codigo_articulo)
+        `)
+        .eq('venta_id', ventaId);
+
+      if (error) throw error;
+
+      const productos: ProductoVenta[] = (data || []).map((d: any) => ({
+        id: d.id,
+        producto_id: d.producto_id,
+        descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Producto',
+        codigo: d.productos?.codigo_articulo || '',
+        cantidad_original: d.cantidad,
+        precio_unitario: d.precio_unitario,
+        subtotal: d.subtotal,
+      }));
+
+      setProductosVenta(productos);
+
+      // Inicializar nota de credito con cantidad 0
+      setProductosNotaCredito(productos.map(p => ({
+        detalle_id: p.id,
+        cantidad_seleccionada: 0,
+        cantidad_max: p.cantidad_original,
+        precio_unitario: p.precio_unitario,
+        descripcion: p.descripcion,
+      })));
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error('Error al cargar los productos de la venta');
+    } finally {
+      setLoadingProductos(false);
+    }
+  };
+
   const requiereFormaPago = TIPOS_CON_FORMA_PAGO.includes(tipo);
+  const esNotaCredito = tipo === 'nota_credito';
+
+  // Calcular total de nota de crédito
+  const totalNotaCredito = useMemo(() => {
+    return productosNotaCredito.reduce((sum, p) => 
+      sum + (p.cantidad_seleccionada * p.precio_unitario), 0);
+  }, [productosNotaCredito]);
+
+  const handleCantidadChange = (detalleId: string, cantidad: number) => {
+    setProductosNotaCredito(prev => prev.map(p => {
+      if (p.detalle_id === detalleId) {
+        const cantidadValida = Math.max(0, Math.min(cantidad, p.cantidad_max));
+        return { ...p, cantidad_seleccionada: cantidadValida };
+      }
+      return p;
+    }));
+  };
+
+  const handleCheckboxChange = (detalleId: string, checked: boolean) => {
+    setProductosNotaCredito(prev => prev.map(p => {
+      if (p.detalle_id === detalleId) {
+        return { 
+          ...p, 
+          cantidad_seleccionada: checked ? p.cantidad_max : 0 
+        };
+      }
+      return p;
+    }));
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+    }).format(value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    const montoNum = parseFloat(monto.replace(',', '.'));
-    if (isNaN(montoNum) || montoNum <= 0) {
-      toast.error('Ingrese un monto válido');
-      return;
-    }
+    let montoFinal: number;
+    let conceptoFinal: string | null = concepto || null;
+    let ventaIdRef: string | null = null;
 
-    if (requiereFormaPago && !formaPagoId) {
-      toast.error('Seleccione una forma de pago');
-      return;
+    if (esNotaCredito) {
+      // Validaciones para nota de crédito
+      if (!compraSeleccionada) {
+        toast.error('Seleccione una compra para la nota de crédito');
+        return;
+      }
+
+      if (totalNotaCredito <= 0) {
+        toast.error('Seleccione al menos un producto con cantidad mayor a 0');
+        return;
+      }
+
+      montoFinal = totalNotaCredito;
+      
+      const compra = comprasCliente.find(c => c.id === compraSeleccionada);
+      ventaIdRef = compra?.venta_id || null;
+      
+      // Generar concepto automático
+      const productosSeleccionados = productosNotaCredito
+        .filter(p => p.cantidad_seleccionada > 0)
+        .map(p => `${p.descripcion} (${p.cantidad_seleccionada})`)
+        .join(', ');
+      
+      conceptoFinal = `NC - Venta #${compra?.numero_comprobante || ''} - ${productosSeleccionados}`;
+    } else {
+      // Validación para otros tipos
+      montoFinal = parseFloat(monto.replace(',', '.'));
+      if (isNaN(montoFinal) || montoFinal <= 0) {
+        toast.error('Ingrese un monto válido');
+        return;
+      }
+
+      if (requiereFormaPago && !formaPagoId) {
+        toast.error('Seleccione una forma de pago');
+        return;
+      }
     }
 
     setLoading(true);
@@ -89,19 +308,17 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       const { error } = await supabase.from('cliente_movimientos').insert([{
         cliente_id: clienteId,
         tipo,
-        monto: montoNum,
-        concepto: concepto || null,
+        monto: montoFinal,
+        concepto: conceptoFinal,
         usuario_registro_id: user.id,
         forma_pago_id: requiereFormaPago ? formaPagoId : null,
+        venta_id: ventaIdRef,
       }]);
 
       if (error) throw error;
 
       toast.success('Movimiento registrado correctamente');
-      setTipo('pago');
-      setMonto('');
-      setConcepto('');
-      setFormaPagoId('');
+      resetForm();
       onSuccess();
     } catch (error) {
       console.error('Error registering movement:', error);
@@ -111,16 +328,34 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   };
 
+  const resetForm = () => {
+    setTipo('pago');
+    setMonto('');
+    setConcepto('');
+    setFormaPagoId('');
+    setCompraSeleccionada(null);
+    setProductosVenta([]);
+    setProductosNotaCredito([]);
+  };
+
+  const handleTipoChange = (value: string) => {
+    setTipo(value);
+    setFormaPagoId('');
+    setCompraSeleccionada(null);
+    setProductosVenta([]);
+    setProductosNotaCredito([]);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar Movimiento</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Tipo de movimiento</Label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v); setFormaPagoId(''); }}>
+            <Select value={tipo} onValueChange={handleTipoChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -134,17 +369,138 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Monto</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              placeholder="0.00"
-              required
-            />
-          </div>
+          {/* UI específica para Nota de Crédito */}
+          {esNotaCredito && (
+            <>
+              <div className="space-y-2">
+                <Label>Seleccionar compra a acreditar</Label>
+                <Select 
+                  value={compraSeleccionada || ''} 
+                  onValueChange={setCompraSeleccionada}
+                  disabled={loadingCompras}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingCompras ? "Cargando..." : "Seleccionar compra"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {comprasCliente.length === 0 ? (
+                      <SelectItem value="none" disabled>
+                        No hay compras registradas
+                      </SelectItem>
+                    ) : (
+                      comprasCliente.map((compra) => (
+                        <SelectItem key={compra.id} value={compra.id}>
+                          Venta #{compra.numero_comprobante} - {format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es })} - {formatCurrency(compra.monto)}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {compraSeleccionada && (
+                <div className="space-y-2">
+                  <Label>Productos de la compra</Label>
+                  {loadingProductos ? (
+                    <p className="text-sm text-muted-foreground">Cargando productos...</p>
+                  ) : productosVenta.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay productos en esta venta</p>
+                  ) : (
+                    <div className="border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12"></TableHead>
+                            <TableHead>Producto</TableHead>
+                            <TableHead className="w-24 text-center">Cant. Orig.</TableHead>
+                            <TableHead className="w-28 text-center">Cantidad NC</TableHead>
+                            <TableHead className="w-28 text-right">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productosVenta.map((producto) => {
+                            const productoNC = productosNotaCredito.find(p => p.detalle_id === producto.id);
+                            const subtotal = (productoNC?.cantidad_seleccionada || 0) * producto.precio_unitario;
+                            const isSelected = (productoNC?.cantidad_seleccionada || 0) > 0;
+                            
+                            return (
+                              <TableRow key={producto.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => 
+                                      handleCheckboxChange(producto.id, checked as boolean)
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <span className="font-medium">{producto.descripcion}</span>
+                                    {producto.codigo && (
+                                      <span className="text-xs text-muted-foreground ml-2">
+                                        ({producto.codigo})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatCurrency(producto.precio_unitario)} c/u
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {producto.cantidad_original}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    inputMode="decimal"
+                                    step="any"
+                                    min="0"
+                                    max={producto.cantidad_original}
+                                    value={productoNC?.cantidad_seleccionada || 0}
+                                    onChange={(e) => 
+                                      handleCantidadChange(producto.id, parseFloat(e.target.value) || 0)
+                                    }
+                                    className="w-20 text-center"
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(subtotal)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {productosVenta.length > 0 && (
+                    <div className="flex justify-end pt-2">
+                      <div className="bg-muted px-4 py-2 rounded-md">
+                        <span className="text-sm text-muted-foreground mr-2">Total Nota de Crédito:</span>
+                        <span className="text-lg font-bold">{formatCurrency(totalNotaCredito)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* UI para otros tipos de movimiento */}
+          {!esNotaCredito && (
+            <div className="space-y-2">
+              <Label>Monto</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                placeholder="0.00"
+                required
+              />
+            </div>
+          )}
 
           {requiereFormaPago && (
             <div className="space-y-2">
@@ -164,21 +520,26 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Concepto (opcional)</Label>
-            <Textarea
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              placeholder="Descripción del movimiento"
-              rows={2}
-            />
-          </div>
+          {!esNotaCredito && (
+            <div className="space-y-2">
+              <Label>Concepto (opcional)</Label>
+              <Textarea
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Descripción del movimiento"
+                rows={2}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || (esNotaCredito && totalNotaCredito <= 0)}
+            >
               {loading ? 'Guardando...' : 'Registrar'}
             </Button>
           </div>
