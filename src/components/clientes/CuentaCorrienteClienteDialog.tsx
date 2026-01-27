@@ -55,8 +55,9 @@ const TIPO_LABELS: Record<string, { label: string; color: string; icon: any }> =
   compra: { label: 'Compra', color: 'destructive', icon: TrendingDown },
   pago: { label: 'Pago', color: 'default', icon: TrendingUp },
   devolucion: { label: 'Devolución', color: 'default', icon: TrendingUp },
-  ajuste: { label: 'Ajuste', color: 'secondary', icon: null },
+  nota_debito: { label: 'Nota de Débito', color: 'destructive', icon: TrendingDown },
   nota_credito: { label: 'Nota de Crédito', color: 'default', icon: TrendingUp },
+  anulacion: { label: 'Anulación', color: 'default', icon: TrendingUp },
 };
 
 export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMovimientoRegistrado }: CuentaCorrienteClienteDialogProps) {
