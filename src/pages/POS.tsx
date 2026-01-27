@@ -1066,7 +1066,7 @@ export default function POS() {
       }
 
       // Registrar movimiento en cuenta corriente del empleado
-      await supabase.from('empleado_movimientos').insert([{
+      const { error: movimientoError } = await supabase.from('empleado_movimientos').insert([{
         empleado_id: selectedEmpleado.id,
         tipo: 'compra',
         monto: total,
@@ -1074,6 +1074,12 @@ export default function POS() {
         venta_id: venta.id,
         usuario_registro_id: user.id,
       }]);
+
+      if (movimientoError) {
+        console.error('Error registrando movimiento en cuenta corriente:', movimientoError);
+        toast.error('Error al registrar en cuenta corriente del empleado');
+        throw movimientoError;
+      }
 
       // NO registrar movimiento de caja - no entra dinero
 
@@ -1481,7 +1487,7 @@ export default function POS() {
       // If this is an employee sale with cuenta corriente, register the movement in their account
       // For pago_directo, we do NOT create a debt movement
       if (isVentaEmpleado && selectedEmpleado && empleadoModalidadPago === 'cuenta_corriente') {
-        await supabase.from('empleado_movimientos').insert([{
+        const { error: movimientoEmpleadoError } = await supabase.from('empleado_movimientos').insert([{
           empleado_id: selectedEmpleado.id,
           tipo: 'compra',
           monto: totalFacturar,
@@ -1489,6 +1495,12 @@ export default function POS() {
           venta_id: venta.id,
           usuario_registro_id: user.id,
         }]);
+
+        if (movimientoEmpleadoError) {
+          console.error('Error registrando movimiento en cuenta corriente:', movimientoEmpleadoError);
+          toast.error('Error al registrar en cuenta corriente del empleado');
+          throw movimientoEmpleadoError;
+        }
       }
 
       await supabase.from('movimientos_caja').insert([{
