@@ -1,100 +1,135 @@
 
-# Plan: Corregir Impresión de Facturas desde Ventas
 
-## Problema Identificado
+## Plan: Agregar Opción de Pago Directo para Empleados en POS
 
-Al analizar el código y la captura de pantalla, el problema es que:
+### Situacion Actual
+Actualmente, cuando se activa "Venta a Empleado" en el POS, el sistema carga automaticamente el total de la venta a la cuenta corriente del empleado. No existe opcion para que el empleado pague en el momento como lo haria un cliente normal.
 
-1. **El HTML de la factura está diseñado para formato A4** (línea 825-921 de Ventas.tsx):
-   - Usa `grid-cols-2` para dividir en columnas
-   - Tiene padding de 6 (`p-6`)
-   - Usa bordes y diseño de factura tradicional
+### Solucion Propuesta
+Agregar un selector de modalidad de pago cuando se selecciona un empleado, permitiendo elegir entre:
+- **Cuenta Corriente**: El comportamiento actual (carga el total como deuda)
+- **Pago Directo**: Funciona igual que una venta a cliente, pasando por el dialogo de pagos normal
 
-2. **Los estilos CSS fuerzan formato térmico 80mm**:
-   - Ancho fijo de 76mm
-   - `position: fixed` con `top: 0` y `left: 0`
+### Cambios a Implementar
 
-3. **El resultado**: La factura A4 se comprime a 76mm de ancho y aparece en la esquina superior izquierda del papel, pero el contenido está diseñado para ser más ancho, por lo que se ve pequeño y cortado.
+#### 1. Nuevo Estado para Modalidad de Pago de Empleado
+Agregar un estado que controle si el empleado paga ahora o va a cuenta corriente:
+- `empleadoModalidadPago`: `'cuenta_corriente'` | `'pago_directo'`
 
-## Solución
+#### 2. Modificar la UI de Seleccion de Empleado
+Cuando se selecciona un empleado, mostrar dos opciones con radio buttons:
+- **Cuenta Corriente** (opcion por defecto): Muestra el badge "CC" actual
+- **Pago Directo**: Muestra un badge "Pago" y permite cobrar como cliente normal
 
-Crear **dos modos de impresión**:
-- **Ticket térmico 80mm**: Para tickets de venta del POS (formato actual)
-- **Factura A4/Carta**: Para facturas electrónicas desde Ventas
+#### 3. Modificar Logica del Boton de Cobrar
+El boton principal cambiara segun la modalidad:
+- Si es `cuenta_corriente`: Mantiene el texto "Cargar a CC $X" y ejecuta `handleProcesarVentaEmpleado()`
+- Si es `pago_directo`: Muestra "Cobrar $X" y abre el dialogo de pagos normal
 
----
+#### 4. Ajustar el Flujo de Venta con Pago Directo
+Cuando un empleado paga directamente:
+- Registrar la venta con `empleado_id` para trazabilidad
+- Pasar por el dialogo de pagos normal (efectivo, tarjeta, etc.)
+- Registrar los pagos en `venta_pagos`
+- Registrar el ingreso en `movimientos_caja`
+- **NO** crear movimiento de deuda en `empleado_movimientos`
 
-## Detalles Técnicos
-
-### 1. Modificar src/index.css
-
-Agregar una segunda sección de estilos para facturas A4 usando un ID diferente (`printable-factura`):
-
-```css
-/* Estilos para factura A4 (desde página Ventas) */
-#printable-factura,
-#printable-factura * {
-  visibility: visible;
-}
-
-#printable-factura {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 210mm; /* Ancho A4 */
-  max-width: 210mm;
-  padding: 10mm;
-  margin: 0;
-  background: white !important;
-  color: black !important;
-  font-size: 12px !important;
-  box-sizing: border-box;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-```
-
-También agregar regla para detectar qué tipo de impresión usar:
-
-```css
-@page factura-a4 {
-  size: A4 portrait;
-  margin: 10mm;
-}
-```
-
-### 2. Modificar src/pages/Ventas.tsx
-
-Cambiar el ID del contenedor de factura de `printable-invoice` a `printable-factura`:
-
-**Antes (línea 825)**:
-```tsx
-<div id="printable-invoice" className="space-y-4">
-```
-
-**Después**:
-```tsx
-<div id="printable-factura" className="space-y-4">
-```
-
-### 3. Mantener compatibilidad
-
-- El POS seguirá usando `#printable-invoice` para tickets térmicos
-- Ventas usará `#printable-factura` para facturas A4
+#### 5. Ajustar Impresion del Ticket
+El ticket mostrara:
+- Para Cuenta Corriente: "Empleado: [Nombre] (Cuenta Corriente)"
+- Para Pago Directo: "Empleado: [Nombre]" + forma de pago utilizada
 
 ---
 
-## Cambios en Archivos
+### Detalles Tecnicos
 
-| Archivo | Acción |
-|---------|--------|
-| `src/index.css` | Agregar estilos para `#printable-factura` con formato A4 |
-| `src/pages/Ventas.tsx` | Cambiar ID de `printable-invoice` a `printable-factura` |
+**Archivo a modificar:** `src/pages/POS.tsx`
 
----
+**Nuevo estado:**
+```typescript
+const [empleadoModalidadPago, setEmpleadoModalidadPago] = useState<'cuenta_corriente' | 'pago_directo'>('cuenta_corriente');
+```
 
-## Resultado Esperado
+**Cambios en la UI (seccion de seleccion de empleado):**
+```text
++---------------------------------------+
+| Empleado                  [Cambiar]   |
++---------------------------------------+
+| JUAN PEREZ                            |
+| DNI: 12345678                         |
+|                                       |
+| ( ) Cuenta Corriente  ← seleccionar   |
+|     Carga el total como deuda         |
+|                                       |
+| ( ) Pago Directo                      |
+|     El empleado paga ahora            |
++---------------------------------------+
+```
 
-- Las facturas desde la página Ventas se imprimirán en formato A4 con la posición correcta
-- Los tickets del POS seguirán imprimiéndose en formato térmico 80mm
-- Cada tipo de documento usará el formato de papel apropiado
+**Logica del boton principal:**
+```typescript
+onClick={() => {
+  if (isVentaEmpleado) {
+    if (!selectedEmpleado) {
+      toast.error('Seleccione un empleado');
+      return;
+    }
+    if (empleadoModalidadPago === 'cuenta_corriente') {
+      handleProcesarVentaEmpleado();
+    } else {
+      // Pago directo: abrir dialogo de pagos normal
+      setPagos([]);
+      setPagoDialogOpen(true);
+    }
+  } else {
+    setPagos([]);
+    setPagoDialogOpen(true);
+  }
+}}
+```
+
+**Ajuste en handleProcesarVenta (linea ~1276):**
+```typescript
+// Solo registrar en CC si NO es empleado con pago directo
+if (isVentaEmpleado && selectedEmpleado && empleadoModalidadPago === 'cuenta_corriente') {
+  await supabase.from('empleado_movimientos').insert([...]);
+}
+// Si es pago directo, NO se crea movimiento de deuda
+```
+
+### Flujo Visual
+
+```text
++------------------------+
+|  Venta a Empleado: ON  |
++------------------------+
+           |
+           v
++------------------------+
+|  Seleccionar Empleado  |
++------------------------+
+           |
+           v
++------------------------+
+|  Elegir Modalidad:     |
+|  ○ Cuenta Corriente    |
+|  ○ Pago Directo        |
++------------------------+
+           |
+     +-----+-----+
+     |           |
+     v           v
++--------+  +------------+
+|  CC    |  | Pago       |
+|  Carga |  | Dialog     |
+|  deuda |  | (efectivo, |
++--------+  | tarjeta)   |
+            +------------+
+```
+
+### Resumen de Beneficios
+1. Flexibilidad para empleados que prefieren pagar al momento
+2. Mantiene la trazabilidad de ventas a empleados
+3. No requiere cambios en la base de datos
+4. Flujo intuitivo con radio buttons claros
+
