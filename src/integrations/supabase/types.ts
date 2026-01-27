@@ -255,15 +255,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cheque_detalles: {
+        Row: {
+          banco: string
+          cliente_movimiento_id: string
+          created_at: string | null
+          cuit_emisor: string | null
+          emisor: string
+          fecha_emision: string
+          fecha_vencimiento: string
+          id: string
+          numero_cheque: string
+          observaciones: string | null
+        }
+        Insert: {
+          banco: string
+          cliente_movimiento_id: string
+          created_at?: string | null
+          cuit_emisor?: string | null
+          emisor: string
+          fecha_emision: string
+          fecha_vencimiento: string
+          id?: string
+          numero_cheque: string
+          observaciones?: string | null
+        }
+        Update: {
+          banco?: string
+          cliente_movimiento_id?: string
+          created_at?: string | null
+          cuit_emisor?: string | null
+          emisor?: string
+          fecha_emision?: string
+          fecha_vencimiento?: string
+          id?: string
+          numero_cheque?: string
+          observaciones?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheque_detalles_cliente_movimiento_id_fkey"
+            columns: ["cliente_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_movimientos: {
         Row: {
           cliente_id: string
           concepto: string | null
           created_at: string | null
+          estado_imputacion: string | null
           fecha: string | null
+          fecha_imputacion: string | null
           forma_pago_id: string | null
           id: string
+          imputado_por: string | null
           monto: number
+          motivo_rechazo: string | null
           tipo: string
           usuario_registro_id: string
           venta_id: string | null
@@ -272,10 +323,14 @@ export type Database = {
           cliente_id: string
           concepto?: string | null
           created_at?: string | null
+          estado_imputacion?: string | null
           fecha?: string | null
+          fecha_imputacion?: string | null
           forma_pago_id?: string | null
           id?: string
+          imputado_por?: string | null
           monto: number
+          motivo_rechazo?: string | null
           tipo: string
           usuario_registro_id: string
           venta_id?: string | null
@@ -284,10 +339,14 @@ export type Database = {
           cliente_id?: string
           concepto?: string | null
           created_at?: string | null
+          estado_imputacion?: string | null
           fecha?: string | null
+          fecha_imputacion?: string | null
           forma_pago_id?: string | null
           id?: string
+          imputado_por?: string | null
           monto?: number
+          motivo_rechazo?: string | null
           tipo?: string
           usuario_registro_id?: string
           venta_id?: string | null

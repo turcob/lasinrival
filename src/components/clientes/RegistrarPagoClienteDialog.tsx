@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { CalendarIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -69,6 +73,16 @@ interface ProductoNotaCredito {
   descripcion: string;
 }
 
+interface ChequeData {
+  numero_cheque: string;
+  banco: string;
+  emisor: string;
+  fecha_emision: Date | undefined;
+  fecha_vencimiento: Date | undefined;
+  cuit_emisor: string;
+  observaciones: string;
+}
+
 const TIPOS_MOVIMIENTO = [
   { value: 'pago', label: 'Pago' },
   { value: 'devolucion', label: 'Devolución' },
@@ -80,6 +94,9 @@ const TIPOS_MOVIMIENTO = [
 // Tipos que requieren forma de pago
 const TIPOS_CON_FORMA_PAGO = ['pago'];
 
+// Formas de pago que requieren imputación
+const FORMAS_PAGO_PENDIENTES_IMPUTACION = ['cheque', 'transferencia'];
+
 export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSuccess }: RegistrarPagoClienteDialogProps) {
   const { user } = useAuth();
   const [tipo, setTipo] = useState('pago');
@@ -88,6 +105,17 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const [formaPagoId, setFormaPagoId] = useState('');
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Estados para datos de cheque
+  const [chequeData, setChequeData] = useState<ChequeData>({
+    numero_cheque: '',
+    banco: '',
+    emisor: '',
+    fecha_emision: undefined,
+    fecha_vencimiento: undefined,
+    cuit_emisor: '',
+    observaciones: '',
+  });
 
   // Estados para Nota de Crédito
   const [comprasCliente, setComprasCliente] = useState<CompraCliente[]>([]);
@@ -221,6 +249,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
 
   const requiereFormaPago = TIPOS_CON_FORMA_PAGO.includes(tipo);
   const esNotaCredito = tipo === 'nota_credito';
+  
+  // Determinar si la forma de pago seleccionada es cheque
+  const formaPagoSeleccionada = formasPago.find(fp => fp.id === formaPagoId);
+  const esCheque = formaPagoSeleccionada?.nombre.toLowerCase().includes('cheque');
+  const esTransferencia = formaPagoSeleccionada?.nombre.toLowerCase().includes('transferencia');
+  const requiereImputacion = esCheque || esTransferencia;
 
   // Calcular total de nota de crédito
   const totalNotaCredito = useMemo(() => {
@@ -301,23 +335,77 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         toast.error('Seleccione una forma de pago');
         return;
       }
+
+      // Validaciones para cheque
+      if (esCheque) {
+        if (!chequeData.numero_cheque.trim()) {
+          toast.error('Ingrese el número de cheque');
+          return;
+        }
+        if (!chequeData.banco.trim()) {
+          toast.error('Ingrese el banco del cheque');
+          return;
+        }
+        if (!chequeData.emisor.trim()) {
+          toast.error('Ingrese el emisor del cheque');
+          return;
+        }
+        if (!chequeData.fecha_emision) {
+          toast.error('Seleccione la fecha de emisión del cheque');
+          return;
+        }
+        if (!chequeData.fecha_vencimiento) {
+          toast.error('Seleccione la fecha de vencimiento del cheque');
+          return;
+        }
+      }
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('cliente_movimientos').insert([{
-        cliente_id: clienteId,
-        tipo,
-        monto: montoFinal,
-        concepto: conceptoFinal,
-        usuario_registro_id: user.id,
-        forma_pago_id: requiereFormaPago ? formaPagoId : null,
-        venta_id: ventaIdRef,
-      }]);
+      // Determinar estado de imputación
+      const estadoImputacion = requiereImputacion ? 'pendiente' : 'confirmado';
 
-      if (error) throw error;
+      // Insertar movimiento
+      const { data: movimientoData, error: movError } = await supabase
+        .from('cliente_movimientos')
+        .insert([{
+          cliente_id: clienteId,
+          tipo,
+          monto: montoFinal,
+          concepto: conceptoFinal,
+          usuario_registro_id: user.id,
+          forma_pago_id: requiereFormaPago ? formaPagoId : null,
+          venta_id: ventaIdRef,
+          estado_imputacion: estadoImputacion,
+        }])
+        .select('id')
+        .single();
 
-      toast.success('Movimiento registrado correctamente');
+      if (movError) throw movError;
+
+      // Si es cheque, guardar los detalles del cheque
+      if (esCheque && movimientoData) {
+        const { error: chequeError } = await supabase
+          .from('cheque_detalles')
+          .insert([{
+            cliente_movimiento_id: movimientoData.id,
+            numero_cheque: chequeData.numero_cheque.trim(),
+            banco: chequeData.banco.trim(),
+            emisor: chequeData.emisor.trim(),
+            fecha_emision: chequeData.fecha_emision!.toISOString().split('T')[0],
+            fecha_vencimiento: chequeData.fecha_vencimiento!.toISOString().split('T')[0],
+            cuit_emisor: chequeData.cuit_emisor.trim() || null,
+            observaciones: chequeData.observaciones.trim() || null,
+          }]);
+
+        if (chequeError) throw chequeError;
+      }
+
+      const mensaje = requiereImputacion 
+        ? 'Movimiento registrado (pendiente de imputación)'
+        : 'Movimiento registrado correctamente';
+      toast.success(mensaje);
       resetForm();
       onSuccess();
     } catch (error) {
@@ -336,6 +424,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
+    setChequeData({
+      numero_cheque: '',
+      banco: '',
+      emisor: '',
+      fecha_emision: undefined,
+      fecha_vencimiento: undefined,
+      cuit_emisor: '',
+      observaciones: '',
+    });
   };
 
   const handleTipoChange = (value: string) => {
@@ -344,6 +441,20 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
+  };
+
+  const handleFormaPagoChange = (value: string) => {
+    setFormaPagoId(value);
+    // Reset cheque data when changing payment method
+    setChequeData({
+      numero_cheque: '',
+      banco: '',
+      emisor: '',
+      fecha_emision: undefined,
+      fecha_vencimiento: undefined,
+      cuit_emisor: '',
+      observaciones: '',
+    });
   };
 
   return (
@@ -505,7 +616,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           {requiereFormaPago && (
             <div className="space-y-2">
               <Label>Forma de Pago</Label>
-              <Select value={formaPagoId} onValueChange={setFormaPagoId}>
+              <Select value={formaPagoId} onValueChange={handleFormaPagoChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar forma de pago" />
                 </SelectTrigger>
@@ -517,6 +628,125 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                   ))}
                 </SelectContent>
               </Select>
+              {requiereImputacion && (
+                <p className="text-xs text-warning">
+                  ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Campos adicionales para Cheque */}
+          {esCheque && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+              <h4 className="font-medium text-sm">Datos del Cheque</h4>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Número de Cheque *</Label>
+                  <Input
+                    value={chequeData.numero_cheque}
+                    onChange={(e) => setChequeData({ ...chequeData, numero_cheque: e.target.value })}
+                    placeholder="Ej: 12345678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Banco *</Label>
+                  <Input
+                    value={chequeData.banco}
+                    onChange={(e) => setChequeData({ ...chequeData, banco: e.target.value })}
+                    placeholder="Ej: Banco Nación"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Emisor / Librador *</Label>
+                  <Input
+                    value={chequeData.emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, emisor: e.target.value })}
+                    placeholder="Nombre del emisor"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CUIT del Emisor</Label>
+                  <Input
+                    value={chequeData.cuit_emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, cuit_emisor: e.target.value })}
+                    placeholder="XX-XXXXXXXX-X"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Fecha de Emisión *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !chequeData.fecha_emision && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {chequeData.fecha_emision 
+                          ? format(chequeData.fecha_emision, "dd/MM/yyyy", { locale: es })
+                          : "Seleccionar fecha"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={chequeData.fecha_emision}
+                        onSelect={(date) => setChequeData({ ...chequeData, fecha_emision: date })}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha de Vencimiento *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !chequeData.fecha_vencimiento && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {chequeData.fecha_vencimiento 
+                          ? format(chequeData.fecha_vencimiento, "dd/MM/yyyy", { locale: es })
+                          : "Seleccionar fecha"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={chequeData.fecha_vencimiento}
+                        onSelect={(date) => setChequeData({ ...chequeData, fecha_vencimiento: date })}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Observaciones</Label>
+                <Textarea
+                  value={chequeData.observaciones}
+                  onChange={(e) => setChequeData({ ...chequeData, observaciones: e.target.value })}
+                  placeholder="Observaciones adicionales..."
+                  rows={2}
+                />
+              </div>
             </div>
           )}
 
