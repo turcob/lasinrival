@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -59,6 +61,14 @@ interface MovimientoPendiente {
   } | null;
 }
 
+interface VentaPendiente {
+  id: string;
+  numero_comprobante: number;
+  fecha: string;
+  total: number;
+  saldo_pendiente: number;
+}
+
 export default function Imputacion() {
   const { user } = useAuth();
   const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
@@ -72,6 +82,12 @@ export default function Imputacion() {
   const [selectedMovimiento, setSelectedMovimiento] = useState<MovimientoPendiente | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [processing, setProcessing] = useState(false);
+  
+  // Factura selection states
+  const [ventasPendientes, setVentasPendientes] = useState<VentaPendiente[]>([]);
+  const [selectedVentas, setSelectedVentas] = useState<string[]>([]);
+  const [loadingVentas, setLoadingVentas] = useState(false);
+  const [conceptoImputacion, setConceptoImputacion] = useState('');
 
   useEffect(() => {
     fetchMovimientos();
@@ -149,17 +165,111 @@ export default function Imputacion() {
     return matchesSearch;
   });
 
+  const fetchVentasPendientes = async (clienteId: string) => {
+    setLoadingVentas(true);
+    try {
+      // Obtener ventas del cliente que tienen movimientos tipo 'compra' en cuenta corriente
+      const { data: movCompras, error: movError } = await supabase
+        .from('cliente_movimientos')
+        .select('venta_id, monto')
+        .eq('cliente_id', clienteId)
+        .eq('tipo', 'compra')
+        .not('venta_id', 'is', null);
+
+      if (movError) throw movError;
+
+      // Obtener pagos confirmados para cada venta
+      const { data: movPagos, error: pagosError } = await supabase
+        .from('cliente_movimientos')
+        .select('venta_id, monto')
+        .eq('cliente_id', clienteId)
+        .eq('tipo', 'pago')
+        .eq('estado_imputacion', 'confirmado')
+        .not('venta_id', 'is', null);
+
+      if (pagosError) throw pagosError;
+
+      // Calcular saldos por venta
+      const ventaMontos = new Map<string, { compra: number; pagado: number }>();
+      
+      (movCompras || []).forEach(m => {
+        if (m.venta_id) {
+          const current = ventaMontos.get(m.venta_id) || { compra: 0, pagado: 0 };
+          current.compra += Number(m.monto);
+          ventaMontos.set(m.venta_id, current);
+        }
+      });
+
+      (movPagos || []).forEach(m => {
+        if (m.venta_id) {
+          const current = ventaMontos.get(m.venta_id) || { compra: 0, pagado: 0 };
+          current.pagado += Number(m.monto);
+          ventaMontos.set(m.venta_id, current);
+        }
+      });
+
+      // Filtrar ventas con saldo pendiente
+      const ventaIds = Array.from(ventaMontos.entries())
+        .filter(([_, v]) => v.compra > v.pagado)
+        .map(([id]) => id);
+
+      if (ventaIds.length === 0) {
+        setVentasPendientes([]);
+        return;
+      }
+
+      // Obtener detalles de las ventas
+      const { data: ventas, error: ventasError } = await supabase
+        .from('ventas')
+        .select('id, numero_comprobante, fecha, total')
+        .in('id', ventaIds)
+        .order('fecha', { ascending: true });
+
+      if (ventasError) throw ventasError;
+
+      const ventasConSaldo: VentaPendiente[] = (ventas || []).map(v => {
+        const montos = ventaMontos.get(v.id) || { compra: 0, pagado: 0 };
+        return {
+          ...v,
+          saldo_pendiente: montos.compra - montos.pagado,
+        };
+      }).filter(v => v.saldo_pendiente > 0);
+
+      setVentasPendientes(ventasConSaldo);
+    } catch (error) {
+      console.error('Error fetching ventas pendientes:', error);
+      setVentasPendientes([]);
+    } finally {
+      setLoadingVentas(false);
+    }
+  };
+
   const handleConfirmar = async () => {
     if (!selectedMovimiento || !user) return;
     
     setProcessing(true);
     try {
+      // Construir concepto con las facturas seleccionadas
+      let conceptoFinal = selectedMovimiento.concepto || '';
+      if (selectedVentas.length > 0) {
+        const ventasSeleccionadas = ventasPendientes.filter(v => selectedVentas.includes(v.id));
+        const facturasTexto = ventasSeleccionadas.map(v => `Fact. #${v.numero_comprobante}`).join(', ');
+        conceptoFinal = conceptoFinal 
+          ? `${conceptoFinal} - Imputa a: ${facturasTexto}`
+          : `Imputa a: ${facturasTexto}`;
+      } else if (conceptoImputacion.trim()) {
+        conceptoFinal = conceptoFinal 
+          ? `${conceptoFinal} - ${conceptoImputacion.trim()}`
+          : conceptoImputacion.trim();
+      }
+
       const { error } = await supabase
         .from('cliente_movimientos')
         .update({
           estado_imputacion: 'confirmado',
           fecha_imputacion: new Date().toISOString(),
           imputado_por: user.id,
+          concepto: conceptoFinal || selectedMovimiento.concepto,
         })
         .eq('id', selectedMovimiento.id);
 
@@ -168,6 +278,9 @@ export default function Imputacion() {
       toast.success('Movimiento confirmado correctamente');
       setConfirmDialogOpen(false);
       setSelectedMovimiento(null);
+      setSelectedVentas([]);
+      setConceptoImputacion('');
+      setVentasPendientes([]);
       fetchMovimientos();
     } catch (error) {
       console.error('Error confirming movimiento:', error);
@@ -209,7 +322,18 @@ export default function Imputacion() {
 
   const openConfirmDialog = (mov: MovimientoPendiente) => {
     setSelectedMovimiento(mov);
+    setSelectedVentas([]);
+    setConceptoImputacion('');
     setConfirmDialogOpen(true);
+    fetchVentasPendientes(mov.cliente_id);
+  };
+
+  const toggleVentaSelection = (ventaId: string) => {
+    setSelectedVentas(prev => 
+      prev.includes(ventaId) 
+        ? prev.filter(id => id !== ventaId)
+        : [...prev, ventaId]
+    );
   };
 
   const openRejectDialog = (mov: MovimientoPendiente) => {
@@ -399,13 +523,12 @@ export default function Imputacion() {
 
         {/* Confirm Dialog */}
         <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Confirmar Imputación</DialogTitle>
             </DialogHeader>
             {selectedMovimiento && (
               <div className="space-y-4">
-                <p>¿Está seguro de confirmar este movimiento?</p>
                 <div className="bg-muted p-4 rounded-md space-y-2">
                   <div><strong>Cliente:</strong> {selectedMovimiento.cliente_nombre}</div>
                   <div><strong>Monto:</strong> {formatCurrency(selectedMovimiento.monto)}</div>
@@ -416,6 +539,79 @@ export default function Imputacion() {
                       <div><strong>Banco:</strong> {selectedMovimiento.cheque.banco}</div>
                       <div><strong>Emisor:</strong> {selectedMovimiento.cheque.emisor}</div>
                     </>
+                  )}
+                </div>
+
+                {/* Sección de facturas pendientes */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Imputar a facturas (opcional)</Label>
+                  
+                  {loadingVentas ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  ) : ventasPendientes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay facturas pendientes para este cliente
+                    </p>
+                  ) : (
+                    <ScrollArea className="h-[200px] border rounded-md p-3">
+                      <div className="space-y-2">
+                        {ventasPendientes.map((venta) => (
+                          <div 
+                            key={venta.id} 
+                            className={`flex items-center justify-between p-2 rounded-md border cursor-pointer hover:bg-muted/50 ${
+                              selectedVentas.includes(venta.id) ? 'bg-primary/10 border-primary' : ''
+                            }`}
+                            onClick={() => toggleVentaSelection(venta.id)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox 
+                                checked={selectedVentas.includes(venta.id)}
+                                onCheckedChange={() => toggleVentaSelection(venta.id)}
+                              />
+                              <div>
+                                <div className="font-medium">Factura #{venta.numero_comprobante}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {format(new Date(venta.fecha), 'dd/MM/yyyy', { locale: es })}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-medium text-destructive">
+                                {formatCurrency(venta.saldo_pendiente)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Total: {formatCurrency(venta.total)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+
+                  {selectedVentas.length > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {selectedVentas.length} factura(s) seleccionada(s) - Total saldo: {
+                        formatCurrency(
+                          ventasPendientes
+                            .filter(v => selectedVentas.includes(v.id))
+                            .reduce((sum, v) => sum + v.saldo_pendiente, 0)
+                        )
+                      }
+                    </div>
+                  )}
+
+                  {ventasPendientes.length === 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Concepto de imputación</Label>
+                      <Input
+                        value={conceptoImputacion}
+                        onChange={(e) => setConceptoImputacion(e.target.value)}
+                        placeholder="Ej: Pago a cuenta, Anticipo..."
+                      />
+                    </div>
                   )}
                 </div>
               </div>
