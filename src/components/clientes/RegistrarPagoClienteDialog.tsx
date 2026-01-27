@@ -30,8 +30,9 @@ interface RegistrarPagoClienteDialogProps {
 const TIPOS_MOVIMIENTO = [
   { value: 'pago', label: 'Pago' },
   { value: 'devolucion', label: 'Devolución' },
-  { value: 'ajuste', label: 'Ajuste' },
+  { value: 'nota_debito', label: 'Nota de Débito' },
   { value: 'nota_credito', label: 'Nota de Crédito' },
+  { value: 'anulacion', label: 'Anulación de Compra' },
 ];
 
 export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSuccess }: RegistrarPagoClienteDialogProps) {
