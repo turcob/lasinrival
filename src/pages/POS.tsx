@@ -23,7 +23,9 @@ import {
   Percent,
   ChevronDown,
   Package,
-  UserCheck
+  UserCheck,
+  Wallet,
+  CreditCard as CreditCardIcon
 } from 'lucide-react';
 import {
   Dialog,
@@ -50,6 +52,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Collapsible,
   CollapsibleContent,
@@ -190,6 +193,7 @@ export default function POS() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
   const [isVentaEmpleado, setIsVentaEmpleado] = useState(false);
+  const [empleadoModalidadPago, setEmpleadoModalidadPago] = useState<'cuenta_corriente' | 'pago_directo'>('cuenta_corriente');
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
   const [clienteSearchTerm, setClienteSearchTerm] = useState('');
   const [clienteSearchResults, setClienteSearchResults] = useState<Cliente[]>([]);
@@ -1272,8 +1276,9 @@ export default function POS() {
         }
       }
 
-      // If this is an employee sale, register the movement in their account
-      if (isVentaEmpleado && selectedEmpleado) {
+      // If this is an employee sale with cuenta corriente, register the movement in their account
+      // For pago_directo, we do NOT create a debt movement
+      if (isVentaEmpleado && selectedEmpleado && empleadoModalidadPago === 'cuenta_corriente') {
         await supabase.from('empleado_movimientos').insert([{
           empleado_id: selectedEmpleado.id,
           tipo: 'compra',
@@ -1386,6 +1391,7 @@ export default function POS() {
         pagos, 
         cliente: isVentaEmpleado ? null : selectedCliente, 
         empleado: isVentaEmpleado ? selectedEmpleado : null,
+        empleadoPagoDirecto: isVentaEmpleado && empleadoModalidadPago === 'pago_directo',
         factura: facturaInfo 
       });
       
@@ -1394,6 +1400,7 @@ export default function POS() {
       setSelectedCliente(null);
       setSelectedEmpleado(null);
       setIsVentaEmpleado(false);
+      setEmpleadoModalidadPago('cuenta_corriente');
       setEditingPedidoId(null);
       setDescuentoGlobal(0);
       setPagoDialogOpen(false);
@@ -2185,8 +2192,10 @@ export default function POS() {
                       setIsVentaEmpleado(checked);
                       if (checked) {
                         setSelectedCliente(null);
+                        setEmpleadoModalidadPago('cuenta_corriente'); // Reset to default
                       } else {
                         setSelectedEmpleado(null);
+                        setEmpleadoModalidadPago('cuenta_corriente'); // Reset to default
                       }
                     }}
                   />
@@ -2194,10 +2203,22 @@ export default function POS() {
                     Venta a Empleado
                   </Label>
                 </div>
-                {isVentaEmpleado && (
-                  <Badge variant="secondary" className="text-xs">
-                    <UserCheck className="h-3 w-3 mr-1" />
-                    CC
+                {isVentaEmpleado && selectedEmpleado && (
+                  <Badge 
+                    variant={empleadoModalidadPago === 'cuenta_corriente' ? 'secondary' : 'default'} 
+                    className="text-xs"
+                  >
+                    {empleadoModalidadPago === 'cuenta_corriente' ? (
+                      <>
+                        <Wallet className="h-3 w-3 mr-1" />
+                        CC
+                      </>
+                    ) : (
+                      <>
+                        <CreditCardIcon className="h-3 w-3 mr-1" />
+                        Pago
+                      </>
+                    )}
                   </Badge>
                 )}
               </div>
@@ -2215,12 +2236,39 @@ export default function POS() {
                     </Button>
                   </div>
                   {selectedEmpleado ? (
-                    <div className="p-2 bg-primary/10 border border-primary/30 rounded">
-                      <p className="font-medium">{selectedEmpleado.nombre}</p>
-                      {selectedEmpleado.dni && (
-                        <p className="text-sm text-muted-foreground">DNI: {selectedEmpleado.dni}</p>
-                      )}
-                      <p className="text-xs text-primary mt-1">Se cargará a cuenta corriente</p>
+                    <div className="p-2 bg-primary/10 border border-primary/30 rounded space-y-2">
+                      <div>
+                        <p className="font-medium">{selectedEmpleado.nombre}</p>
+                        {selectedEmpleado.dni && (
+                          <p className="text-sm text-muted-foreground">DNI: {selectedEmpleado.dni}</p>
+                        )}
+                      </div>
+                      <RadioGroup 
+                        value={empleadoModalidadPago} 
+                        onValueChange={(value: 'cuenta_corriente' | 'pago_directo') => setEmpleadoModalidadPago(value)}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-start space-x-2 p-2 rounded border border-muted hover:bg-muted/50 cursor-pointer">
+                          <RadioGroupItem value="cuenta_corriente" id="modalidad-cc" className="mt-0.5" />
+                          <Label htmlFor="modalidad-cc" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <Wallet className="h-4 w-4 text-primary" />
+                              <span className="font-medium">Cuenta Corriente</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Carga el total como deuda</p>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-2 p-2 rounded border border-muted hover:bg-muted/50 cursor-pointer">
+                          <RadioGroupItem value="pago_directo" id="modalidad-pago" className="mt-0.5" />
+                          <Label htmlFor="modalidad-pago" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <CreditCardIcon className="h-4 w-4 text-success" />
+                              <span className="font-medium">Pago Directo</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">El empleado paga ahora</p>
+                          </Label>
+                        </div>
+                      </RadioGroup>
                     </div>
                   ) : (
                     <p className="text-sm text-destructive">Seleccione un empleado</p>
@@ -2339,8 +2387,14 @@ export default function POS() {
                     toast.error('Seleccione un empleado para la venta');
                     return;
                   }
-                  // Procesar directo a cuenta corriente
-                  handleProcesarVentaEmpleado();
+                  if (empleadoModalidadPago === 'cuenta_corriente') {
+                    // Procesar directo a cuenta corriente
+                    handleProcesarVentaEmpleado();
+                  } else {
+                    // Pago directo: abrir diálogo de pagos normal
+                    setPagos([]);
+                    setPagoDialogOpen(true);
+                  }
                 } else {
                   // Flujo normal de pago
                   setPagos([]);
@@ -2349,10 +2403,17 @@ export default function POS() {
               }}
             >
               {isVentaEmpleado ? (
-                <>
-                  <UserCheck className="mr-2 h-5 w-5" />
-                  {emitiendo ? 'Procesando...' : `Cargar a CC $${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
-                </>
+                empleadoModalidadPago === 'cuenta_corriente' ? (
+                  <>
+                    <Wallet className="mr-2 h-5 w-5" />
+                    {emitiendo ? 'Procesando...' : `Cargar a CC $${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    {emitiendo ? 'Procesando...' : `Cobrar $${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                  </>
+                )
               ) : (
                 <>
                   <CreditCard className="mr-2 h-5 w-5" />
@@ -2404,6 +2465,9 @@ export default function POS() {
                     setEditingPedidoId(null);
                     setCart([]);
                     setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setEmpleadoModalidadPago('cuenta_corriente');
                     setDescuentoGlobal(0);
                   }}
                 >
@@ -2999,7 +3063,11 @@ export default function POS() {
                         <>
                           <p><strong>Empleado:</strong> {lastVenta.empleado.nombre}</p>
                           {lastVenta.empleado.dni && <p><strong>DNI:</strong> {lastVenta.empleado.dni}</p>}
-                          <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                          {lastVenta.empleadoPagoDirecto ? (
+                            <p className="font-medium text-[8px]">(Pago Directo)</p>
+                          ) : (
+                            <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                          )}
                         </>
                       ) : (
                         <>
@@ -3009,7 +3077,7 @@ export default function POS() {
                           {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
                         </>
                       )}
-                      <p><strong>Cond. Venta:</strong> {lastVenta.empleado ? 'Cuenta Corriente' : 'Contado'}</p>
+                      <p><strong>Cond. Venta:</strong> {lastVenta.empleado ? (lastVenta.empleadoPagoDirecto ? 'Contado' : 'Cuenta Corriente') : 'Contado'}</p>
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
@@ -3062,7 +3130,11 @@ export default function POS() {
                         <>
                           <p><strong>Empleado:</strong> {lastVenta.empleado.nombre}</p>
                           {lastVenta.empleado.dni && <p><strong>DNI:</strong> {lastVenta.empleado.dni}</p>}
-                          <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                          {lastVenta.empleadoPagoDirecto ? (
+                            <p className="font-medium text-[8px]">(Pago Directo)</p>
+                          ) : (
+                            <p className="font-medium text-[8px]">(Cuenta Corriente)</p>
+                          )}
                         </>
                       ) : (
                         <p><strong>Cliente:</strong> {lastVenta.cliente?.nombre || 'Consumidor Final'}</p>
