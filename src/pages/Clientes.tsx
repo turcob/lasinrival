@@ -4,8 +4,9 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
+import { CuentaCorrienteClienteDialog } from '@/components/clientes/CuentaCorrienteClienteDialog';
 import {
   Dialog,
   DialogContent,
@@ -93,6 +94,9 @@ export default function Clientes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [ccDialogOpen, setCcDialogOpen] = useState(false);
+  const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
+  const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     codigo_cliente: '',
     nombre: '',
@@ -180,6 +184,23 @@ export default function Clientes() {
       
       setClientes(data || []);
       setTotalCount(count || 0);
+
+      // Fetch saldos for all clients in this page
+      if (data && data.length > 0) {
+        const clienteIds = data.map(c => c.id);
+        const { data: saldosData } = await supabase
+          .from('cliente_saldos')
+          .select('cliente_id, saldo_actual')
+          .in('cliente_id', clienteIds);
+        
+        if (saldosData) {
+          const saldosMap: Record<string, number> = {};
+          saldosData.forEach(s => {
+            saldosMap[s.cliente_id] = Number(s.saldo_actual) || 0;
+          });
+          setClienteSaldos(saldosMap);
+        }
+      }
     } catch (error) {
       console.error('Error fetching clientes:', error);
       toast.error('Error al cargar los clientes');
@@ -557,7 +578,7 @@ export default function Clientes() {
                 <TableHead className="font-semibold">Teléfono</TableHead>
                 <TableHead className="font-semibold">Zona</TableHead>
                 <TableHead className="font-semibold">Vendedor</TableHead>
-                <TableHead className="font-semibold">Lista de Precio</TableHead>
+                <TableHead className="font-semibold">Saldo CC</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="font-semibold">Acciones</TableHead>
               </TableRow>
@@ -578,7 +599,9 @@ export default function Clientes() {
                   </TableCell>
                 </TableRow>
               ) : (
-                clientes.map((cliente) => (
+                clientes.map((cliente) => {
+                  const saldo = clienteSaldos[cliente.id] || 0;
+                  return (
                   <TableRow key={cliente.id} className="table-row-hover">
                     <TableCell>
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
@@ -620,10 +643,31 @@ export default function Clientes() {
                         </TooltipProvider>
                       ) : '-'}
                     </TableCell>
-                    <TableCell>{cliente.listas_precios?.nombre || 'Por defecto'}</TableCell>
+                    <TableCell>
+                      <span className={`font-medium ${saldo > 0 ? 'text-destructive' : saldo < 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        {saldo !== 0 ? `$${saldo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
+                      </span>
+                    </TableCell>
                     <TableCell><StatusBadge status={cliente.activo} /></TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setCcCliente(cliente);
+                                  setCcDialogOpen(true);
+                                }}
+                              >
+                                <Wallet className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver Cuenta Corriente</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(cliente)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -640,7 +684,8 @@ export default function Clientes() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -709,6 +754,16 @@ export default function Clientes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cuenta Corriente Dialog */}
+      {ccCliente && (
+        <CuentaCorrienteClienteDialog
+          open={ccDialogOpen}
+          onOpenChange={setCcDialogOpen}
+          cliente={ccCliente}
+          onMovimientoRegistrado={fetchClientes}
+        />
+      )}
     </MainLayout>
   );
 }

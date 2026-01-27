@@ -255,6 +255,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_movimientos: {
+        Row: {
+          cliente_id: string
+          concepto: string | null
+          created_at: string | null
+          fecha: string | null
+          id: string
+          monto: number
+          tipo: string
+          usuario_registro_id: string
+          venta_id: string | null
+        }
+        Insert: {
+          cliente_id: string
+          concepto?: string | null
+          created_at?: string | null
+          fecha?: string | null
+          id?: string
+          monto: number
+          tipo: string
+          usuario_registro_id: string
+          venta_id?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          concepto?: string | null
+          created_at?: string | null
+          fecha?: string | null
+          id?: string
+          monto?: number
+          tipo?: string
+          usuario_registro_id?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_movimientos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean | null
@@ -1766,6 +1817,23 @@ export type Database = {
       }
     }
     Views: {
+      cliente_saldos: {
+        Row: {
+          cliente_id: string | null
+          saldo_actual: number | null
+          total_deuda: number | null
+          total_pagado: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empleado_saldos: {
         Row: {
           empleado_id: string | null
