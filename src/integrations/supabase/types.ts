@@ -261,6 +261,7 @@ export type Database = {
           concepto: string | null
           created_at: string | null
           fecha: string | null
+          forma_pago_id: string | null
           id: string
           monto: number
           tipo: string
@@ -272,6 +273,7 @@ export type Database = {
           concepto?: string | null
           created_at?: string | null
           fecha?: string | null
+          forma_pago_id?: string | null
           id?: string
           monto: number
           tipo: string
@@ -283,6 +285,7 @@ export type Database = {
           concepto?: string | null
           created_at?: string | null
           fecha?: string | null
+          forma_pago_id?: string | null
           id?: string
           monto?: number
           tipo?: string
@@ -295,6 +298,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_movimientos_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
             referencedColumns: ["id"]
           },
           {
