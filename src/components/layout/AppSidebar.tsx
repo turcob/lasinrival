@@ -55,6 +55,7 @@ const catalogNavItems: NavItem[] = [
 const operationsNavItems: NavItem[] = [
   { title: 'Cajas', href: '/cajas', icon: CreditCard, module: 'cajas' },
   { title: 'Imputación', href: '/imputacion', icon: CreditCard, module: 'clientes' },
+  { title: 'Asociar Pagos', href: '/asociacion-pagos', icon: CreditCard, module: 'clientes' },
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
   { title: 'Inventario', href: '/inventario', icon: Archive, module: 'inventario' },
