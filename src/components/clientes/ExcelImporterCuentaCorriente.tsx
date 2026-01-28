@@ -47,8 +47,10 @@ interface ClienteRow {
   'Tipo comprobante'?: string;
   'Nro. comprobante'?: string;
   Fecha?: string | number;
+  'Fecha vto.'?: string | number;
   Debe?: string | number;
   Haber?: string | number;
+  Importe?: string | number;
   Acumulado?: string | number;
   Estado?: string;
 }
@@ -119,9 +121,18 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     if (!tipoComprobante || tipoComprobante === '') {
       const debe = parseNumber(row.Debe);
       const haber = parseNumber(row.Haber);
+      const importe = parseNumber(row.Importe);
+      
+      // Si Debe y Haber son 0, pero hay Importe -> saldo inicial
+      if (debe === 0 && haber === 0 && importe !== 0) {
+        return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
+      }
+      
+      // Caso anterior: si hay valores en Debe/Haber
       if (debe !== 0 || haber !== 0) {
         return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
       }
+      
       return null;
     }
     
@@ -163,9 +174,16 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         const debe = parseNumber(row.Debe);
         const haber = parseNumber(row.Haber);
         
+        const importe = parseNumber(row.Importe);
+        
         let monto: number;
         if (tipoInfo.tipo === 'saldo_inicial') {
-          monto = debe - haber;
+          // Si Debe y Haber son 0, usar Importe
+          if (debe === 0 && haber === 0) {
+            monto = importe;
+          } else {
+            monto = debe - haber;
+          }
         } else if (tipoInfo.tipo === 'compra') {
           monto = debe;
         } else {
@@ -177,7 +195,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         movimientos.push({
           clienteCodigo: clienteInfo.codigo,
           clienteNombre: clienteInfo.nombre,
-          fecha: parseExcelDate(row.Fecha),
+          fecha: parseExcelDate(row['Fecha vto.']),
           tipo: tipoInfo.tipo,
           tipoOriginal: tipoInfo.tipoOriginal,
           nroComprobante: row['Nro. comprobante']?.toString() || '',
