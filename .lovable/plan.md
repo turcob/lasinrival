@@ -1,107 +1,158 @@
 
-## Plan: Corregir registro de compras en cuenta corriente de empleados
 
-### Problema Detectado
+# Plan: Importador de Cuenta Corriente y Pantalla de Asociacion de Pagos
 
-Cuando un usuario con rol **vendedor** realiza una venta a un empleado seleccionando "Cuenta Corriente", el movimiento de deuda **no se registra** en la tabla `empleado_movimientos`.
+## Resumen
 
-**Causa raíz**: La política RLS de `empleado_movimientos` requiere el permiso `crear` en el módulo `empleados`, pero los vendedores no tienen este permiso. El insert falla silenciosamente.
-
-**Evidencia**:
-- Venta #414 (ALVAREZ ARIEL): Total $882.65 - Sin movimiento de CC registrado
-- Venta #405 (ELIAS FERNANDA): Total $7,327.99 - Sin movimiento de CC registrado
-- Venta #412 (ALVAREZ ARIEL): Total $3,261.37 - Movimiento registrado correctamente (procesado por usuario con permisos)
+Implementar dos funcionalidades complementarias:
+1. **Importador de saldos historicos** desde el Excel de cuenta corriente
+2. **Pantalla de asociacion de pagos a facturas** que permita buscar un cliente y gestionar la vinculacion de sus pagos pendientes con facturas abiertas
 
 ---
 
-### Solución Propuesta
+## 1. Importador de Cuenta Corriente de Clientes
 
-Agregar una nueva política RLS que permita a usuarios con permiso de crear ventas (`pos.crear`) también insertar movimientos de empleados cuando registran una venta.
+### Logica de importacion
 
----
+Dado que todos los recibos del archivo ya estan imputados, la estrategia sera:
+- Importar **saldo inicial** por cliente como un movimiento tipo `saldo_inicial` (nuevo tipo)
+- Todos los movimientos se importaran con `estado_imputacion = 'confirmado'`
+- Se mapeara el codigo del cliente (ej: `010`) con `clientes.codigo_cliente`
 
-### Cambios de Base de Datos
+### Nuevo componente
 
-**Migración SQL**:
+**Archivo:** `src/components/clientes/ExcelImporterCuentaCorriente.tsx`
 
-```sql
--- Política para permitir a vendedores registrar compras de empleados
-CREATE POLICY "Users with pos permission can insert empleado_movimientos" 
-ON public.empleado_movimientos 
-FOR INSERT 
-TO authenticated
-WITH CHECK (
-  has_permission(auth.uid(), 'pos'::text, 'crear'::app_permission)
-);
+```text
+Flujo:
+1. Subir archivo Excel
+2. Parsear y agrupar por cliente
+3. Extraer codigo del formato "CODIGO - NOMBRE"
+4. Buscar cliente por codigo_cliente en BD
+5. Calcular saldo total (ultima fila de cada cliente)
+6. Crear movimiento tipo 'saldo_inicial' con el monto
+7. Mostrar resumen de importacion
 ```
 
+### Mapeo de datos
+
+| Columna Excel | Campo BD |
+|---------------|----------|
+| Cliente (codigo) | Buscar en `clientes.codigo_cliente` |
+| Acumulado (ultima fila) | `monto` del saldo_inicial |
+| - | `tipo = 'saldo_inicial'` |
+| - | `estado_imputacion = 'confirmado'` |
+| - | `concepto = 'Saldo inicial importado'` |
+
+### Integracion
+
+Agregar boton "Importar Cuenta Corriente" en `src/pages/Clientes.tsx`
+
 ---
 
-### Cambios de Código
+## 2. Pantalla de Asociacion de Pagos a Facturas
 
-**Archivo**: `src/pages/POS.tsx`
+### Nueva pagina
 
-Agregar manejo de errores para la inserción de movimientos de empleado:
+**Archivo:** `src/pages/AsociacionPagos.tsx`
 
-```typescript
-// Línea ~1069: Agregar verificación de error
-const { error: movimientoError } = await supabase.from('empleado_movimientos').insert([{
-  empleado_id: selectedEmpleado.id,
-  tipo: 'compra',
-  monto: total,
-  concepto: `Compra - Venta #${venta.numero_comprobante}`,
-  venta_id: venta.id,
-  usuario_registro_id: user.id,
-}]);
+### Funcionalidad
 
-if (movimientoError) {
-  console.error('Error registrando movimiento:', movimientoError);
-  toast.error('Error al registrar en cuenta corriente');
-  throw movimientoError;
-}
+Pantalla con layout de dos columnas:
+
+```text
++----------------------------------------------------+
+| Buscar cliente: [_______________] [Buscar]         |
++----------------------------------------------------+
+|                                                    |
+| Cliente: PANADERIA BUHO | Saldo: $15,000          |
+|                                                    |
++------------------------+---------------------------+
+| FACTURAS PENDIENTES    | PAGOS DISPONIBLES        |
++------------------------+---------------------------+
+| [x] FAC-001 $5,000    | [ ] REC-001 $3,000       |
+| [ ] FAC-002 $8,000    | [ ] REC-002 $2,000       |
+| [ ] FAC-003 $4,000    |                          |
+|                        |                          |
+| Total: $17,000        | Total: $5,000            |
++------------------------+---------------------------+
+|         [ Asociar Pagos Seleccionados ]           |
++----------------------------------------------------+
 ```
 
-Aplicar el mismo cambio en la función `handleConfirmarVenta` (~línea 1484).
+### Columna izquierda: Facturas
+
+- Lista todas las ventas del cliente que tienen saldo pendiente
+- Cada factura muestra: numero, fecha, total, saldo restante
+- Checkbox para seleccionar multiples facturas
+
+### Columna derecha: Pagos disponibles
+
+- Lista movimientos tipo `pago` que NO estan asociados a una factura (`venta_id IS NULL`)
+- Muestra: concepto, fecha, monto, forma de pago
+- Checkbox para seleccionar que pagos asociar
+
+### Accion "Asociar"
+
+- Actualiza el campo `venta_id` de los pagos seleccionados
+- Registra en el concepto a que facturas se imputo
+- Si un pago cubre multiples facturas, se divide en movimientos parciales
 
 ---
 
-### Archivos a Modificar
+## 3. Cambios en la Base de Datos
 
-| Archivo | Cambio |
+### Nuevo tipo de movimiento
+
+Agregar `saldo_inicial` como tipo valido en `cliente_movimientos`
+- Funciona como deuda si es positivo
+- Funciona como credito si es negativo
+
+### Vista actualizada
+
+La vista `cliente_saldos` ya calcula el saldo correctamente basandose en los tipos de movimiento
+
+---
+
+## Archivos a crear/modificar
+
+| Archivo | Accion |
 |---------|--------|
-| Nueva migración SQL | Agregar política RLS para `empleado_movimientos` |
-| `src/pages/POS.tsx` | Agregar manejo de errores en inserts de movimientos |
+| `src/components/clientes/ExcelImporterCuentaCorriente.tsx` | Crear |
+| `src/pages/AsociacionPagos.tsx` | Crear |
+| `src/pages/Clientes.tsx` | Agregar boton de importacion |
+| `src/App.tsx` | Agregar ruta `/asociacion-pagos` |
+| `src/components/layout/AppSidebar.tsx` | Agregar enlace en menu |
 
 ---
 
-### Script de Corrección de Datos
+## Detalles Tecnicos
 
-Para corregir las ventas existentes sin movimiento registrado, se proporcionará un script SQL opcional:
+### Parseo del Excel
 
-```sql
--- Corregir ventas de empleados sin movimiento en CC
-INSERT INTO empleado_movimientos (empleado_id, tipo, monto, concepto, venta_id, usuario_registro_id, fecha)
-SELECT 
-  v.empleado_id,
-  'compra',
-  v.total,
-  'Compra - Venta #' || v.numero_comprobante || ' (corrección)',
-  v.id,
-  v.usuario_id,
-  v.fecha::date
-FROM ventas v
-LEFT JOIN empleado_movimientos em ON em.venta_id = v.id
-WHERE v.empleado_id IS NOT NULL 
-  AND v.estado = 'confirmada'
-  AND v.anulada = false
-  AND em.id IS NULL;
+```text
+- Libreria: XLSX (ya instalada)
+- Formato numeros: Argentino (96,053.22)
+- Extraccion codigo: split(' - ')[0].trim()
 ```
 
+### Calculo de saldo a importar
+
+Para cada cliente del Excel:
+1. Buscar la ultima fila (mayor fecha o ultima posicion)
+2. Tomar el valor de "Acumulado" como saldo inicial
+3. Si es positivo: el cliente debe al comercio
+4. Si es negativo: el cliente tiene saldo a favor
+
+### Validaciones
+
+- No crear movimiento si el cliente no existe en la BD
+- Evitar duplicados verificando si ya existe un `saldo_inicial` para ese cliente
+- Mostrar errores y exitos en resumen final
+
 ---
 
-### Resultado Esperado
+## Navegacion
 
-Después de aplicar estos cambios:
-1. Vendedores podrán registrar ventas a cuenta corriente de empleados correctamente
-2. Los errores de inserción serán visibles al usuario (no fallarán silenciosamente)
-3. Los datos históricos podrán ser corregidos con el script opcional
+La nueva pantalla "Asociacion de Pagos" se agregara al menu lateral en la seccion de Clientes o como subitem del modulo de Imputacion
+
