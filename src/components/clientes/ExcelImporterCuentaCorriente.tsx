@@ -14,11 +14,26 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+
+type TipoMovimiento = 'saldo_inicial' | 'compra' | 'pago' | 'nota_credito';
+
+interface MovimientoExcel {
+  clienteCodigo: string;
+  clienteNombre: string;
+  fecha: string | null;
+  tipo: TipoMovimiento;
+  tipoOriginal: string;
+  nroComprobante: string;
+  monto: number;
+}
 
 interface ImportResult {
   clienteCodigo: string;
   clienteNombre: string;
-  saldo: number;
+  tipo: string;
+  nroComprobante: string;
+  monto: number;
   status: 'success' | 'error' | 'skipped';
   message: string;
 }
@@ -31,12 +46,26 @@ interface ClienteRow {
   Cliente: string;
   'Tipo comprobante'?: string;
   'Nro. comprobante'?: string;
+  Fecha?: string | number;
   Debe?: string | number;
   Haber?: string | number;
   Acumulado?: string | number;
-  'Saldo inicial'?: string | number;
   Estado?: string;
 }
+
+const TIPO_LABELS: Record<TipoMovimiento, string> = {
+  saldo_inicial: 'Saldo Inicial',
+  compra: 'Factura',
+  pago: 'Recibo',
+  nota_credito: 'Nota Crédito',
+};
+
+const TIPO_COLORS: Record<TipoMovimiento, string> = {
+  saldo_inicial: 'bg-secondary text-secondary-foreground',
+  compra: 'bg-destructive/10 text-destructive',
+  pago: 'bg-primary/10 text-primary',
+  nota_credito: 'bg-accent text-accent-foreground',
+};
 
 export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporterCuentaCorrienteProps) {
   const [open, setOpen] = useState(false);
@@ -44,21 +73,36 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'results'>('upload');
-  const [parsedData, setParsedData] = useState<Map<string, { codigo: string; nombre: string; saldo: number }>>(new Map());
+  const [parsedMovimientos, setParsedMovimientos] = useState<MovimientoExcel[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   const parseNumber = (value: string | number | undefined): number => {
     if (value === undefined || value === null || value === '') return 0;
     if (typeof value === 'number') return value;
-    // Handle Argentine format: 96,053.22 or -5,000.00
     const cleaned = value.toString().replace(/,/g, '');
     return parseFloat(cleaned) || 0;
   };
 
+  const parseExcelDate = (value: string | number | undefined): string | null => {
+    if (!value) return null;
+    if (typeof value === 'number') {
+      const date = XLSX.SSF.parse_date_code(value);
+      if (date) {
+        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      }
+    }
+    if (typeof value === 'string') {
+      const parts = value.split('/');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    return null;
+  };
+
   const extractClienteCode = (clienteStr: string): { codigo: string; nombre: string } | null => {
     if (!clienteStr) return null;
-    // Format: "010 - PANADERIA BUHO"
     const parts = clienteStr.split(' - ');
     if (parts.length >= 2) {
       return {
@@ -66,6 +110,31 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         nombre: parts.slice(1).join(' - ').trim()
       };
     }
+    return null;
+  };
+
+  const determinarTipoMovimiento = (row: ClienteRow): { tipo: TipoMovimiento; tipoOriginal: string } | null => {
+    const tipoComprobante = row['Tipo comprobante']?.toString().trim().toUpperCase();
+    
+    if (!tipoComprobante || tipoComprobante === '') {
+      const debe = parseNumber(row.Debe);
+      const haber = parseNumber(row.Haber);
+      if (debe !== 0 || haber !== 0) {
+        return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
+      }
+      return null;
+    }
+    
+    if (tipoComprobante === 'FAC') {
+      return { tipo: 'compra', tipoOriginal: 'FAC' };
+    }
+    if (tipoComprobante === 'REC') {
+      return { tipo: 'pago', tipoOriginal: 'REC' };
+    }
+    if (tipoComprobante === 'NCR') {
+      return { tipo: 'nota_credito', tipoOriginal: 'NCR' };
+    }
+    
     return null;
   };
 
@@ -80,8 +149,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<ClienteRow>(worksheet);
 
-      // Group by client and get the last accumulated balance
-      const clienteBalances = new Map<string, { codigo: string; nombre: string; saldo: number }>();
+      const movimientos: MovimientoExcel[] = [];
       
       for (const row of jsonData) {
         if (!row.Cliente) continue;
@@ -89,24 +157,41 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         const clienteInfo = extractClienteCode(row.Cliente);
         if (!clienteInfo) continue;
 
-        const acumulado = parseNumber(row.Acumulado);
+        const tipoInfo = determinarTipoMovimiento(row);
+        if (!tipoInfo) continue;
+
+        const debe = parseNumber(row.Debe);
+        const haber = parseNumber(row.Haber);
         
-        // Always update with the latest accumulated value (last row wins)
-        clienteBalances.set(clienteInfo.codigo, {
-          codigo: clienteInfo.codigo,
-          nombre: clienteInfo.nombre,
-          saldo: acumulado
+        let monto: number;
+        if (tipoInfo.tipo === 'saldo_inicial') {
+          monto = debe - haber;
+        } else if (tipoInfo.tipo === 'compra') {
+          monto = debe;
+        } else {
+          monto = haber;
+        }
+
+        if (monto === 0) continue;
+
+        movimientos.push({
+          clienteCodigo: clienteInfo.codigo,
+          clienteNombre: clienteInfo.nombre,
+          fecha: parseExcelDate(row.Fecha),
+          tipo: tipoInfo.tipo,
+          tipoOriginal: tipoInfo.tipoOriginal,
+          nroComprobante: row['Nro. comprobante']?.toString() || '',
+          monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
         });
       }
 
-      setParsedData(clienteBalances);
+      setParsedMovimientos(movimientos);
       setStep('preview');
     } catch (error) {
       console.error('Error parsing Excel:', error);
       toast.error('Error al leer el archivo Excel');
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -121,10 +206,9 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     setImporting(true);
     setProgress(0);
     const importResults: ImportResult[] = [];
-    const total = parsedData.size;
+    const total = parsedMovimientos.length;
     let processed = 0;
 
-    // Fetch all clients with their codes
     const { data: clientes } = await supabase
       .from('clientes')
       .select('id, codigo_cliente, nombre');
@@ -136,70 +220,149 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       }
     });
 
-    // Check for existing saldo_inicial movements
     const { data: existingMovimientos } = await supabase
       .from('cliente_movimientos')
-      .select('cliente_id')
-      .eq('tipo', 'saldo_inicial');
+      .select('cliente_id, tipo, concepto');
 
-    const clientesWithSaldoInicial = new Set(existingMovimientos?.map(m => m.cliente_id) || []);
+    const clientesSaldoInicial = new Set<string>();
+    const conceptosExistentes = new Map<string, Set<string>>();
 
-    for (const [codigo, data] of parsedData) {
-      const cliente = clienteMap.get(codigo);
+    existingMovimientos?.forEach(m => {
+      if (m.tipo === 'saldo_inicial') {
+        clientesSaldoInicial.add(m.cliente_id);
+      }
+      if (m.concepto) {
+        if (!conceptosExistentes.has(m.cliente_id)) {
+          conceptosExistentes.set(m.cliente_id, new Set());
+        }
+        conceptosExistentes.get(m.cliente_id)!.add(m.concepto);
+      }
+    });
+
+    for (const mov of parsedMovimientos) {
+      const cliente = clienteMap.get(mov.clienteCodigo);
       
       if (!cliente) {
         importResults.push({
-          clienteCodigo: codigo,
-          clienteNombre: data.nombre,
-          saldo: data.saldo,
+          clienteCodigo: mov.clienteCodigo,
+          clienteNombre: mov.clienteNombre,
+          tipo: mov.tipoOriginal,
+          nroComprobante: mov.nroComprobante,
+          monto: mov.monto,
           status: 'error',
-          message: 'Cliente no encontrado en la base de datos'
+          message: 'Cliente no encontrado'
         });
-      } else if (clientesWithSaldoInicial.has(cliente.id)) {
+      } else if (mov.tipo === 'saldo_inicial' && clientesSaldoInicial.has(cliente.id)) {
         importResults.push({
-          clienteCodigo: codigo,
-          clienteNombre: data.nombre,
-          saldo: data.saldo,
+          clienteCodigo: mov.clienteCodigo,
+          clienteNombre: mov.clienteNombre,
+          tipo: mov.tipoOriginal,
+          nroComprobante: mov.nroComprobante,
+          monto: mov.monto,
           status: 'skipped',
-          message: 'Ya tiene saldo inicial importado'
+          message: 'Ya tiene saldo inicial'
         });
-      } else if (data.saldo === 0) {
-        importResults.push({
-          clienteCodigo: codigo,
-          clienteNombre: data.nombre,
-          saldo: data.saldo,
-          status: 'skipped',
-          message: 'Saldo es cero'
-        });
+      } else if (mov.nroComprobante) {
+        const clienteConceptos = conceptosExistentes.get(cliente.id);
+        const conceptoBuscar = mov.nroComprobante;
+        const yaExiste = clienteConceptos && 
+          Array.from(clienteConceptos).some(c => c.includes(conceptoBuscar));
+        
+        if (yaExiste) {
+          importResults.push({
+            clienteCodigo: mov.clienteCodigo,
+            clienteNombre: mov.clienteNombre,
+            tipo: mov.tipoOriginal,
+            nroComprobante: mov.nroComprobante,
+            monto: mov.monto,
+            status: 'skipped',
+            message: 'Comprobante ya existe'
+          });
+        } else {
+          const concepto = mov.tipo === 'saldo_inicial' 
+            ? `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`
+            : `${mov.tipoOriginal} ${mov.nroComprobante}`;
+
+          const { error } = await supabase
+            .from('cliente_movimientos')
+            .insert({
+              cliente_id: cliente.id,
+              tipo: mov.tipo,
+              monto: Math.abs(mov.monto),
+              concepto,
+              estado_imputacion: 'confirmado',
+              usuario_registro_id: user.id,
+              fecha: mov.fecha || new Date().toISOString().split('T')[0]
+            });
+
+          if (error) {
+            importResults.push({
+              clienteCodigo: mov.clienteCodigo,
+              clienteNombre: mov.clienteNombre,
+              tipo: mov.tipoOriginal,
+              nroComprobante: mov.nroComprobante,
+              monto: mov.monto,
+              status: 'error',
+              message: error.message
+            });
+          } else {
+            if (!conceptosExistentes.has(cliente.id)) {
+              conceptosExistentes.set(cliente.id, new Set());
+            }
+            conceptosExistentes.get(cliente.id)!.add(concepto);
+            
+            if (mov.tipo === 'saldo_inicial') {
+              clientesSaldoInicial.add(cliente.id);
+            }
+
+            importResults.push({
+              clienteCodigo: mov.clienteCodigo,
+              clienteNombre: mov.clienteNombre,
+              tipo: mov.tipoOriginal,
+              nroComprobante: mov.nroComprobante,
+              monto: mov.monto,
+              status: 'success',
+              message: 'Importado correctamente'
+            });
+          }
+        }
       } else {
-        // Insert saldo_inicial movement
+        const concepto = `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`;
+
         const { error } = await supabase
           .from('cliente_movimientos')
           .insert({
             cliente_id: cliente.id,
-            tipo: 'saldo_inicial',
-            monto: Math.abs(data.saldo),
-            concepto: `Saldo inicial importado${data.saldo < 0 ? ' (a favor del cliente)' : ''}`,
+            tipo: mov.tipo,
+            monto: Math.abs(mov.monto),
+            concepto,
             estado_imputacion: 'confirmado',
             usuario_registro_id: user.id,
-            fecha: new Date().toISOString().split('T')[0]
+            fecha: mov.fecha || new Date().toISOString().split('T')[0]
           });
 
         if (error) {
           importResults.push({
-            clienteCodigo: codigo,
-            clienteNombre: data.nombre,
-            saldo: data.saldo,
+            clienteCodigo: mov.clienteCodigo,
+            clienteNombre: mov.clienteNombre,
+            tipo: mov.tipoOriginal,
+            nroComprobante: mov.nroComprobante,
+            monto: mov.monto,
             status: 'error',
             message: error.message
           });
         } else {
+          if (mov.tipo === 'saldo_inicial') {
+            clientesSaldoInicial.add(cliente.id);
+          }
           importResults.push({
-            clienteCodigo: codigo,
-            clienteNombre: data.nombre,
-            saldo: data.saldo,
+            clienteCodigo: mov.clienteCodigo,
+            clienteNombre: mov.clienteNombre,
+            tipo: mov.tipoOriginal,
+            nroComprobante: mov.nroComprobante,
+            monto: mov.monto,
             status: 'success',
-            message: 'Saldo inicial importado correctamente'
+            message: 'Importado correctamente'
           });
         }
       }
@@ -214,7 +377,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     
     const successCount = importResults.filter(r => r.status === 'success').length;
     if (successCount > 0) {
-      toast.success(`${successCount} saldos iniciales importados correctamente`);
+      toast.success(`${successCount} movimientos importados correctamente`);
       onImportComplete?.();
     }
   };
@@ -222,7 +385,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   const handleClose = () => {
     setOpen(false);
     setStep('upload');
-    setParsedData(new Map());
+    setParsedMovimientos([]);
     setResults([]);
     setProgress(0);
   };
@@ -234,6 +397,11 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     }).format(value);
   };
 
+  const resumenPorTipo = parsedMovimientos.reduce((acc, m) => {
+    acc[m.tipo] = (acc[m.tipo] || 0) + 1;
+    return acc;
+  }, {} as Record<TipoMovimiento, number>);
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
       <DialogTrigger asChild>
@@ -242,15 +410,15 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
           Importar Cuenta Corriente
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Importar Saldos de Cuenta Corriente</DialogTitle>
+          <DialogTitle>Importar Movimientos de Cuenta Corriente</DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Sube el archivo Excel de cuenta corriente. Se importará el saldo acumulado final de cada cliente.
+              Sube el archivo Excel de cuenta corriente. Se importarán todos los movimientos individuales (Saldo inicial, FAC, REC, NCR).
             </p>
             <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8">
               <label className="flex cursor-pointer flex-col items-center gap-2">
@@ -272,31 +440,52 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
 
         {step === 'preview' && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Se encontraron <strong>{parsedData.size}</strong> clientes con saldos para importar.
-            </p>
-            <ScrollArea className="h-[300px] rounded-md border">
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(resumenPorTipo).map(([tipo, count]) => (
+                <Badge key={tipo} variant="outline" className={TIPO_COLORS[tipo as TipoMovimiento]}>
+                  {TIPO_LABELS[tipo as TipoMovimiento]}: {count}
+                </Badge>
+              ))}
+              <Badge variant="secondary">
+                Total: {parsedMovimientos.length}
+              </Badge>
+            </div>
+            
+            <ScrollArea className="h-[400px] rounded-md border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-background">
                   <tr className="border-b">
                     <th className="p-2 text-left">Código</th>
-                    <th className="p-2 text-left">Nombre</th>
-                    <th className="p-2 text-right">Saldo</th>
+                    <th className="p-2 text-left">Cliente</th>
+                    <th className="p-2 text-left">Fecha</th>
+                    <th className="p-2 text-left">Tipo</th>
+                    <th className="p-2 text-left">Comprobante</th>
+                    <th className="p-2 text-right">Monto</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from(parsedData.entries()).map(([codigo, data]) => (
-                    <tr key={codigo} className="border-b">
-                      <td className="p-2">{codigo}</td>
-                      <td className="p-2">{data.nombre}</td>
-                      <td className={`p-2 text-right ${data.saldo < 0 ? 'text-primary' : 'text-destructive'}`}>
-                        {formatCurrency(data.saldo)}
+                  {parsedMovimientos.map((mov, index) => (
+                    <tr key={index} className="border-b">
+                      <td className="p-2 font-mono text-xs">{mov.clienteCodigo}</td>
+                      <td className="p-2 truncate max-w-[150px]" title={mov.clienteNombre}>
+                        {mov.clienteNombre}
+                      </td>
+                      <td className="p-2 text-xs">{mov.fecha || '-'}</td>
+                      <td className="p-2">
+                        <Badge variant="outline" className={`text-xs ${TIPO_COLORS[mov.tipo]}`}>
+                          {mov.tipoOriginal}
+                        </Badge>
+                      </td>
+                      <td className="p-2 font-mono text-xs">{mov.nroComprobante || '-'}</td>
+                      <td className={`p-2 text-right ${mov.tipo === 'compra' || mov.tipo === 'saldo_inicial' ? 'text-destructive' : 'text-primary'}`}>
+                        {formatCurrency(mov.monto)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </ScrollArea>
+            
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={handleClose}>
                 Cancelar
@@ -332,13 +521,15 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
                 <span>{results.filter(r => r.status === 'error').length} errores</span>
               </div>
             </div>
-            <ScrollArea className="h-[300px] rounded-md border">
+            <ScrollArea className="h-[400px] rounded-md border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-background">
                   <tr className="border-b">
                     <th className="p-2 text-left">Estado</th>
                     <th className="p-2 text-left">Cliente</th>
-                    <th className="p-2 text-right">Saldo</th>
+                    <th className="p-2 text-left">Tipo</th>
+                    <th className="p-2 text-left">Comprobante</th>
+                    <th className="p-2 text-right">Monto</th>
                     <th className="p-2 text-left">Mensaje</th>
                   </tr>
                 </thead>
@@ -351,11 +542,13 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
                         {result.status === 'error' && <XCircle className="h-4 w-4 text-destructive" />}
                       </td>
                       <td className="p-2">
-                        <span className="font-medium">{result.clienteCodigo}</span>
-                        <span className="ml-2 text-muted-foreground">{result.clienteNombre}</span>
+                        <span className="font-mono text-xs">{result.clienteCodigo}</span>
+                        <span className="ml-1 text-muted-foreground">{result.clienteNombre}</span>
                       </td>
-                      <td className="p-2 text-right">{formatCurrency(result.saldo)}</td>
-                      <td className="p-2 text-muted-foreground">{result.message}</td>
+                      <td className="p-2">{result.tipo}</td>
+                      <td className="p-2 font-mono text-xs">{result.nroComprobante || '-'}</td>
+                      <td className="p-2 text-right">{formatCurrency(result.monto)}</td>
+                      <td className="p-2 text-muted-foreground text-xs">{result.message}</td>
                     </tr>
                   ))}
                 </tbody>
