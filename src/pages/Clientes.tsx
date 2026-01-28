@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
+import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { CuentaCorrienteClienteDialog } from '@/components/clientes/CuentaCorrienteClienteDialog';
 import {
   Dialog,
@@ -312,8 +313,9 @@ export default function Clientes() {
   return (
     <MainLayout>
       <PageHeader title="Clientes" description="Gestión de clientes">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <ExcelImporterClientes onImportComplete={fetchData} />
+          <ExcelImporterCuentaCorriente onImportComplete={fetchData} />
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
