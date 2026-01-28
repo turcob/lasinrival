@@ -47,6 +47,7 @@ interface ClienteRow {
   'Tipo comprobante'?: string;
   'Nro. comprobante'?: string;
   Fecha?: string | number;
+  'Fecha comprobante'?: string | number;
   'Fecha vto.'?: string | number;
   Debe?: string | number;
   Haber?: string | number;
@@ -117,22 +118,14 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
 
   const determinarTipoMovimiento = (row: ClienteRow): { tipo: TipoMovimiento; tipoOriginal: string } | null => {
     const tipoComprobante = row['Tipo comprobante']?.toString().trim().toUpperCase();
+    const estado = row.Estado?.toString().trim().toLowerCase();
+    
+    // Si el estado indica saldo inicial, es saldo inicial
+    if (estado && estado.includes('saldo inicial')) {
+      return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
+    }
     
     if (!tipoComprobante || tipoComprobante === '') {
-      const debe = parseNumber(row.Debe);
-      const haber = parseNumber(row.Haber);
-      const importe = parseNumber(row.Importe);
-      
-      // Si Debe y Haber son 0, pero hay Importe -> saldo inicial
-      if (debe === 0 && haber === 0 && importe !== 0) {
-        return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
-      }
-      
-      // Caso anterior: si hay valores en Debe/Haber
-      if (debe !== 0 || haber !== 0) {
-        return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
-      }
-      
       return null;
     }
     
@@ -178,12 +171,8 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         
         let monto: number;
         if (tipoInfo.tipo === 'saldo_inicial') {
-          // Si Debe y Haber son 0, usar Importe
-          if (debe === 0 && haber === 0) {
-            monto = importe;
-          } else {
-            monto = debe - haber;
-          }
+          // Para saldo inicial, usar columna Importe
+          monto = importe;
         } else if (tipoInfo.tipo === 'compra') {
           monto = debe;
         } else {
@@ -195,7 +184,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         movimientos.push({
           clienteCodigo: clienteInfo.codigo,
           clienteNombre: clienteInfo.nombre,
-          fecha: parseExcelDate(row['Fecha vto.']),
+          fecha: parseExcelDate(row['Fecha comprobante']),
           tipo: tipoInfo.tipo,
           tipoOriginal: tipoInfo.tipoOriginal,
           nroComprobante: row['Nro. comprobante']?.toString() || '',
