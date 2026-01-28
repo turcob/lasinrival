@@ -1,151 +1,137 @@
 
 
-# Plan: Importar Todos los Movimientos del Excel
+# Plan: Ajustar Columna de Fecha y Lógica de Saldo Inicial
 
 ## Resumen
 
-Modificar el importador para que importe **todos los movimientos individuales** del Excel (Saldo inicial, FAC, REC, NCR) en lugar de solo el saldo final. Se incluira validacion para evitar duplicados.
+Modificar el importador para:
+1. Usar la columna **"Fecha vto."** para la fecha de los movimientos
+2. Detectar **saldo inicial** cuando `Debe=0` y `Haber=0`, tomando el valor de la columna **"Importe"**
 
 ---
 
-## Cambios en el Componente
+## Cambios en el Archivo
 
 ### Archivo: `src/components/clientes/ExcelImporterCuentaCorriente.tsx`
 
-### Nueva Estructura de Datos
+### 1. Actualizar la interfaz ClienteRow
 
-```text
-Antes: Map<codigo, { saldo final }>
-Ahora: Array<{ cliente, tipo, fecha, nroComprobante, monto, estado }>
-```
-
-### Mapeo de Tipos de Comprobante
-
-| Excel | Base de Datos | Campo Monto |
-|-------|---------------|-------------|
-| Saldo inicial | `saldo_inicial` | Debe - Haber (puede ser negativo) |
-| FAC | `compra` | `Debe` |
-| REC | `pago` | `Haber` |
-| NCR | `nota_credito` | `Haber` |
-
-### Logica de Importacion
-
-1. **Parsear todas las filas** del Excel (no agrupar por cliente)
-2. **Clasificar cada fila** segun su tipo de comprobante
-3. **Validar duplicados** antes de importar:
-   - Si ya existe un `saldo_inicial` para ese cliente → omitir la fila de saldo inicial
-   - Si ya existe un movimiento con el mismo `concepto` (nro. comprobante) → omitir
-4. **Insertar movimientos** en `cliente_movimientos`
-
-### Prevencion de Duplicados
-
-Para cada movimiento se verificara:
-- **Saldo inicial**: Consulta si existe `tipo = 'saldo_inicial'` para ese cliente
-- **FAC/REC/NCR**: Consulta si existe un movimiento con el mismo numero de comprobante en el concepto
-
-```text
-SELECT id FROM cliente_movimientos 
-WHERE cliente_id = ? 
-AND concepto LIKE '%B0001101163413%'  -- Numero de comprobante
-```
-
----
-
-## Flujo de Usuario Actualizado
-
-```text
-1. Subir archivo Excel
-         ↓
-2. Parsear TODAS las filas (no solo saldos)
-         ↓
-3. Vista previa muestra:
-   - Total de movimientos por tipo
-   - Lista detallada con fecha, tipo, comprobante, monto
-         ↓
-4. Al confirmar:
-   a. Verificar cliente existe
-   b. Verificar no duplicado
-   c. Insertar movimiento
-         ↓
-5. Resumen: exitosos, omitidos, errores
-```
-
----
-
-## Cambios Especificos en el Codigo
-
-### 1. Nueva interfaz para movimientos
+Agregar la nueva columna del Excel:
 
 ```typescript
-interface MovimientoExcel {
-  clienteCodigo: string;
-  clienteNombre: string;
-  fecha: string | null;
-  tipo: 'saldo_inicial' | 'compra' | 'pago' | 'nota_credito';
-  nroComprobante: string;
-  monto: number;
-  estado: string;
+interface ClienteRow {
+  Cliente: string;
+  'Tipo comprobante'?: string;
+  'Nro. comprobante'?: string;
+  Fecha?: string | number;
+  'Fecha vto.'?: string | number;  // NUEVO - columna de fecha a usar
+  Debe?: string | number;
+  Haber?: string | number;
+  Importe?: string | number;       // NUEVO - para saldo inicial
+  Acumulado?: string | number;
+  Estado?: string;
 }
 ```
 
-### 2. Parseo de filas individuales
+### 2. Modificar la lógica de determinación de tipo
 
-En lugar de agrupar por cliente, se creara un array con todos los movimientos:
+Actualizar la función `determinarTipoMovimiento` para detectar saldo inicial cuando Debe=0 y Haber=0:
 
-```text
-Para cada fila del Excel:
-  - Si "Tipo comprobante" esta vacio y hay "Saldo inicial:" → tipo = saldo_inicial
-  - Si "Tipo comprobante" = FAC → tipo = compra
-  - Si "Tipo comprobante" = REC → tipo = pago
-  - Si "Tipo comprobante" = NCR → tipo = nota_credito
+```typescript
+const determinarTipoMovimiento = (row: ClienteRow): { tipo: TipoMovimiento; tipoOriginal: string } | null => {
+  const tipoComprobante = row['Tipo comprobante']?.toString().trim().toUpperCase();
+  
+  // Si no hay tipo de comprobante, verificar si es saldo inicial
+  if (!tipoComprobante || tipoComprobante === '') {
+    const debe = parseNumber(row.Debe);
+    const haber = parseNumber(row.Haber);
+    const importe = parseNumber(row.Importe);
+    
+    // NUEVO: Si Debe y Haber son 0, pero hay Importe -> saldo inicial
+    if (debe === 0 && haber === 0 && importe !== 0) {
+      return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
+    }
+    
+    // Caso anterior: si hay valores en Debe/Haber
+    if (debe !== 0 || haber !== 0) {
+      return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
+    }
+    
+    return null;
+  }
+  
+  // FAC, REC, NCR sin cambios
+  if (tipoComprobante === 'FAC') {
+    return { tipo: 'compra', tipoOriginal: 'FAC' };
+  }
+  if (tipoComprobante === 'REC') {
+    return { tipo: 'pago', tipoOriginal: 'REC' };
+  }
+  if (tipoComprobante === 'NCR') {
+    return { tipo: 'nota_credito', tipoOriginal: 'NCR' };
+  }
+  
+  return null;
+};
 ```
 
-### 3. Validacion de duplicados
+### 3. Modificar el cálculo del monto
 
-Antes de importar:
-```text
-1. Obtener todos los cliente_movimientos existentes
-2. Crear Set con conceptos existentes por cliente
-3. Para cada movimiento a importar:
-   - Verificar si nro comprobante ya existe
-   - Si existe → marcar como omitido
+En `handleFileSelect`, actualizar la lógica para usar Importe cuando corresponda:
+
+```typescript
+let monto: number;
+if (tipoInfo.tipo === 'saldo_inicial') {
+  const debe = parseNumber(row.Debe);
+  const haber = parseNumber(row.Haber);
+  const importe = parseNumber(row.Importe);
+  
+  // NUEVO: Si Debe y Haber son 0, usar Importe
+  if (debe === 0 && haber === 0) {
+    monto = importe;
+  } else {
+    monto = debe - haber;
+  }
+} else if (tipoInfo.tipo === 'compra') {
+  monto = parseNumber(row.Debe);
+} else {
+  monto = parseNumber(row.Haber);
+}
 ```
 
-### 4. Vista previa mejorada
+### 4. Cambiar la columna de fecha
 
-Mostrar tabla con:
-- Codigo cliente
-- Nombre cliente
-- Fecha
-- Tipo (FAC/REC/NCR/Saldo Inicial)
-- Nro. Comprobante
-- Monto
+En `handleFileSelect`, cambiar de `row.Fecha` a `row['Fecha vto.']`:
+
+```typescript
+// Antes:
+fecha: parseExcelDate(row.Fecha),
+
+// Después:
+fecha: parseExcelDate(row['Fecha vto.']),
+```
 
 ---
 
-## Consideraciones
+## Resumen de Cambios
 
-### Saldo Inicial Negativo
-
-Si el saldo inicial es negativo (cliente tiene credito a favor), se importara como:
-- `tipo = 'saldo_inicial'` con `monto` negativo
-- La vista `cliente_saldos` sumara este valor negativo a la deuda, resultando en credito a favor
-
-### Fecha de Saldo Inicial
-
-Las filas de "Saldo inicial" no tienen fecha. Se usara la fecha actual o una fecha configurable (primer dia del periodo).
-
-### Estado de Imputacion
-
-Todos los movimientos se importan con `estado_imputacion = 'confirmado'` ya que son datos historicos verificados.
+| Aspecto | Antes | Después |
+|---------|-------|---------|
+| Columna fecha | `Fecha` | `Fecha vto.` |
+| Saldo inicial | Solo si Debe o Haber != 0 | También si Debe=0, Haber=0 e Importe != 0 |
+| Monto saldo inicial | `Debe - Haber` | Si Debe=Haber=0 usa `Importe`, sino `Debe - Haber` |
 
 ---
 
-## Archivos a Modificar
+## Ejemplo de Comportamiento
 
-| Archivo | Cambios |
-|---------|---------|
-| `src/components/clientes/ExcelImporterCuentaCorriente.tsx` | Reestructurar para importar movimientos individuales |
+**Fila del Excel:**
+| Cliente | Tipo comprobante | Debe | Haber | Importe |
+|---------|------------------|------|-------|---------|
+| 010 - Cliente X | (vacío) | 0 | 0 | 15,000 |
 
-No se requieren cambios en la base de datos ya que los tipos de movimiento ya estan soportados en la vista `cliente_saldos`.
+**Resultado:**
+- Tipo: `saldo_inicial`
+- Monto: `15,000` (tomado de Importe)
+- Concepto: "Saldo inicial importado"
 
