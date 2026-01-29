@@ -773,20 +773,24 @@ export default function Cajas() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              setTipoMovimiento('egreso');
-              setMovimientoDialogOpen(true);
-            }}>
-              <ArrowDownCircle className="mr-2 h-4 w-4" />
-              Egreso
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setTipoMovimiento('ingreso');
-              setMovimientoDialogOpen(true);
-            }}>
-              <ArrowUpCircle className="mr-2 h-4 w-4" />
-              Ingreso
-            </Button>
+            {isAdmin && (
+              <>
+                <Button variant="outline" onClick={() => {
+                  setTipoMovimiento('egreso');
+                  setMovimientoDialogOpen(true);
+                }}>
+                  <ArrowDownCircle className="mr-2 h-4 w-4" />
+                  Egreso
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setTipoMovimiento('ingreso');
+                  setMovimientoDialogOpen(true);
+                }}>
+                  <ArrowUpCircle className="mr-2 h-4 w-4" />
+                  Ingreso
+                </Button>
+              </>
+            )}
             <Button onClick={() => setCierreDialogOpen(true)}>
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
