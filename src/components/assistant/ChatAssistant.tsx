@@ -300,10 +300,9 @@ export function ChatAssistant() {
             </div>
           </>
         ) : (
-          /* Sugerencia Form */
           <div className="p-4 space-y-4">
             <div className="text-center py-4">
-              <Lightbulb className="h-12 w-12 mx-auto text-yellow-500 mb-2" />
+              <Lightbulb className="h-12 w-12 mx-auto text-primary mb-2" />
               <h4 className="font-semibold">¿Tienes una sugerencia?</h4>
               <p className="text-sm text-muted-foreground">
                 Cuéntanos cómo podemos mejorar el sistema

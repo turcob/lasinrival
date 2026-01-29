@@ -277,7 +277,9 @@ export default function Sugerencias() {
           {selectedSugerencia && (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium mb-1">Sugerencia de {selectedSugerencia.profiles?.nombre}:</p>
+                <p className="text-sm font-medium mb-1">Sugerencia de {selectedSugerencia.usuario_nombre}:</p>
+                <p className="text-sm bg-muted p-3 rounded-lg">{selectedSugerencia.contenido}</p>
+              </div>
                 <p className="text-sm bg-muted p-3 rounded-lg">{selectedSugerencia.contenido}</p>
               </div>
               
