@@ -318,6 +318,62 @@ export default function Cajas() {
     }
   };
 
+  const handleEditarMovimiento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movimientoAEditar || !isAdmin) return;
+
+    const nuevoMonto = parseFloat(movimientoData.monto);
+    if (isNaN(nuevoMonto) || nuevoMonto <= 0) {
+      toast.error('Ingrese un monto válido');
+      return;
+    }
+
+    try {
+      const montoAnterior = movimientoAEditar.monto;
+      const diferenciaMonto = nuevoMonto - montoAnterior;
+
+      // Actualizar el movimiento
+      const { error } = await supabase
+        .from('movimientos_caja')
+        .update({
+          concepto: movimientoData.concepto,
+          monto: nuevoMonto,
+        })
+        .eq('id', movimientoAEditar.id);
+
+      if (error) throw error;
+
+      // Actualizar totales de la caja si el monto cambió
+      if (diferenciaMonto !== 0) {
+        const updateField = movimientoAEditar.tipo === 'ingreso' ? 'total_ventas' : 'total_egresos';
+        
+        // Obtener la caja actual
+        const { data: cajaData } = await supabase
+          .from('cajas')
+          .select(updateField)
+          .eq('id', movimientoAEditar.caja_id)
+          .single();
+
+        if (cajaData) {
+          const valorActual = (cajaData as any)[updateField] || 0;
+          await supabase
+            .from('cajas')
+            .update({ [updateField]: valorActual + diferenciaMonto })
+            .eq('id', movimientoAEditar.caja_id);
+        }
+      }
+
+      toast.success('Movimiento actualizado correctamente');
+      setEditarMovimientoDialogOpen(false);
+      setMovimientoAEditar(null);
+      setMovimientoData({ concepto: '', monto: '' });
+      fetchData();
+    } catch (error) {
+      console.error('Error updating movement:', error);
+      toast.error('Error al actualizar el movimiento');
+    }
+  };
+
   const handleCerrarCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cajaActiva || !user) return;
