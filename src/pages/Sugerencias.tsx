@@ -280,8 +280,6 @@ export default function Sugerencias() {
                 <p className="text-sm font-medium mb-1">Sugerencia de {selectedSugerencia.usuario_nombre}:</p>
                 <p className="text-sm bg-muted p-3 rounded-lg">{selectedSugerencia.contenido}</p>
               </div>
-                <p className="text-sm bg-muted p-3 rounded-lg">{selectedSugerencia.contenido}</p>
-              </div>
               
               <Textarea
                 value={respuesta}
