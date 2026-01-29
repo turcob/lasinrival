@@ -147,7 +147,6 @@ export default function Sugerencias() {
       <PageHeader
         title="Sugerencias"
         description="Visualiza y gestiona las sugerencias de los usuarios"
-        icon={Lightbulb}
       />
 
       {/* Stats */}
