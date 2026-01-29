@@ -18,7 +18,8 @@ import {
   UserCog,
   Shield,
   UserCheck,
-  MapPin
+  MapPin,
+  Lightbulb
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,6 +67,7 @@ const adminNavItems: NavItem[] = [
   { title: 'Empleados', href: '/empleados', icon: Users, module: 'empleados' },
   { title: 'Usuarios', href: '/usuarios', icon: UserCog, module: 'usuarios' },
   { title: 'Roles y Permisos', href: '/roles', icon: Shield, module: 'roles' },
+  { title: 'Sugerencias', href: '/sugerencias', icon: Lightbulb },
   { title: 'Configuración', href: '/configuracion', icon: Settings },
 ];
 
