@@ -1217,6 +1217,7 @@ export default function Cajas() {
                           <th className="text-left p-2 text-sm">Hora</th>
                           <th className="text-left p-2 text-sm">Concepto</th>
                           <th className="text-right p-2 text-sm">Monto</th>
+                          {isAdmin && <th className="text-center p-2 text-sm w-12">Acc.</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1229,6 +1230,22 @@ export default function Cajas() {
                             <td className={`p-2 text-sm text-right ${mov.tipo === 'ingreso' ? 'text-success' : 'text-destructive'}`}>
                               {mov.tipo === 'ingreso' ? '+' : '-'}${mov.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </td>
+                            {isAdmin && (
+                              <td className="p-2 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => {
+                                    setMovimientoAEditar(mov);
+                                    setMovimientoData({ concepto: mov.concepto, monto: mov.monto.toString() });
+                                    setEditarMovimientoDialogOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
