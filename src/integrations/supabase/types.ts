@@ -1521,6 +1521,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sugerencias: {
+        Row: {
+          contenido: string
+          created_at: string
+          estado: string
+          fecha_respuesta: string | null
+          id: string
+          respondido_por: string | null
+          respuesta: string | null
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          contenido: string
+          created_at?: string
+          estado?: string
+          fecha_respuesta?: string | null
+          id?: string
+          respondido_por?: string | null
+          respuesta?: string | null
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          contenido?: string
+          created_at?: string
+          estado?: string
+          fecha_respuesta?: string | null
+          id?: string
+          respondido_por?: string | null
+          respuesta?: string | null
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       tarjeta_cuotas: {
         Row: {
           activo: boolean | null

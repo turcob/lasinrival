@@ -80,6 +80,7 @@ function AppRoutes() {
       <Route path="/zonas" element={<ProtectedRoute><Zonas /></ProtectedRoute>} />
       <Route path="/imputacion" element={<ProtectedRoute><Imputacion /></ProtectedRoute>} />
       <Route path="/asociacion-pagos" element={<ProtectedRoute><AsociacionPagos /></ProtectedRoute>} />
+      <Route path="/sugerencias" element={<ProtectedRoute><Sugerencias /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
