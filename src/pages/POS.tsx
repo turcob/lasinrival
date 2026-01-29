@@ -1574,7 +1574,7 @@ export default function POS() {
               importe_iva: parseFloat(ivaAmount.toFixed(2)),
             };
             
-            await supabase
+            const { error: insertCompError } = await supabase
               .from('comprobantes_afip')
               .insert({
                 tipo_comprobante: facturaData.tipo_comprobante,
@@ -1592,7 +1592,12 @@ export default function POS() {
                 venta_id: venta.id,
               });
             
-            toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
+            if (insertCompError) {
+              console.error('Error guardando comprobante en DB:', insertCompError);
+              toast.warning(`Factura emitida (CAE: ${facturaResult.cae}) pero hubo error al guardar en base de datos: ${insertCompError.message}`);
+            } else {
+              toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
+            }
           }
         } catch (facturaErr: any) {
           toast.error('Error al emitir factura: ' + facturaErr.message);
