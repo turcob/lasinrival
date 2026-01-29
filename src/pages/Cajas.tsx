@@ -113,6 +113,8 @@ export default function Cajas() {
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
   const [editarArqueoDialogOpen, setEditarArqueoDialogOpen] = useState(false);
   const [confirmarArqueoDialogOpen, setConfirmarArqueoDialogOpen] = useState(false);
+  const [editarMovimientoDialogOpen, setEditarMovimientoDialogOpen] = useState(false);
+  const [movimientoAEditar, setMovimientoAEditar] = useState<Movimiento | null>(null);
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
@@ -313,6 +315,62 @@ export default function Cajas() {
     } catch (error) {
       console.error('Error registering movement:', error);
       toast.error('Error al registrar el movimiento');
+    }
+  };
+
+  const handleEditarMovimiento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movimientoAEditar || !isAdmin) return;
+
+    const nuevoMonto = parseFloat(movimientoData.monto);
+    if (isNaN(nuevoMonto) || nuevoMonto <= 0) {
+      toast.error('Ingrese un monto válido');
+      return;
+    }
+
+    try {
+      const montoAnterior = movimientoAEditar.monto;
+      const diferenciaMonto = nuevoMonto - montoAnterior;
+
+      // Actualizar el movimiento
+      const { error } = await supabase
+        .from('movimientos_caja')
+        .update({
+          concepto: movimientoData.concepto,
+          monto: nuevoMonto,
+        })
+        .eq('id', movimientoAEditar.id);
+
+      if (error) throw error;
+
+      // Actualizar totales de la caja si el monto cambió
+      if (diferenciaMonto !== 0) {
+        const updateField = movimientoAEditar.tipo === 'ingreso' ? 'total_ventas' : 'total_egresos';
+        
+        // Obtener la caja actual
+        const { data: cajaData } = await supabase
+          .from('cajas')
+          .select(updateField)
+          .eq('id', movimientoAEditar.caja_id)
+          .single();
+
+        if (cajaData) {
+          const valorActual = (cajaData as any)[updateField] || 0;
+          await supabase
+            .from('cajas')
+            .update({ [updateField]: valorActual + diferenciaMonto })
+            .eq('id', movimientoAEditar.caja_id);
+        }
+      }
+
+      toast.success('Movimiento actualizado correctamente');
+      setEditarMovimientoDialogOpen(false);
+      setMovimientoAEditar(null);
+      setMovimientoData({ concepto: '', monto: '' });
+      fetchData();
+    } catch (error) {
+      console.error('Error updating movement:', error);
+      toast.error('Error al actualizar el movimiento');
     }
   };
 
@@ -715,20 +773,24 @@ export default function Cajas() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              setTipoMovimiento('egreso');
-              setMovimientoDialogOpen(true);
-            }}>
-              <ArrowDownCircle className="mr-2 h-4 w-4" />
-              Egreso
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setTipoMovimiento('ingreso');
-              setMovimientoDialogOpen(true);
-            }}>
-              <ArrowUpCircle className="mr-2 h-4 w-4" />
-              Ingreso
-            </Button>
+            {isAdmin && (
+              <>
+                <Button variant="outline" onClick={() => {
+                  setTipoMovimiento('egreso');
+                  setMovimientoDialogOpen(true);
+                }}>
+                  <ArrowDownCircle className="mr-2 h-4 w-4" />
+                  Egreso
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setTipoMovimiento('ingreso');
+                  setMovimientoDialogOpen(true);
+                }}>
+                  <ArrowUpCircle className="mr-2 h-4 w-4" />
+                  Ingreso
+                </Button>
+              </>
+            )}
             <Button onClick={() => setCierreDialogOpen(true)}>
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
@@ -1155,6 +1217,7 @@ export default function Cajas() {
                           <th className="text-left p-2 text-sm">Hora</th>
                           <th className="text-left p-2 text-sm">Concepto</th>
                           <th className="text-right p-2 text-sm">Monto</th>
+                          {isAdmin && <th className="text-center p-2 text-sm w-12">Acc.</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1167,6 +1230,22 @@ export default function Cajas() {
                             <td className={`p-2 text-sm text-right ${mov.tipo === 'ingreso' ? 'text-success' : 'text-destructive'}`}>
                               {mov.tipo === 'ingreso' ? '+' : '-'}${mov.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </td>
+                            {isAdmin && (
+                              <td className="p-2 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => {
+                                    setMovimientoAEditar(mov);
+                                    setMovimientoData({ concepto: mov.concepto, monto: mov.monto.toString() });
+                                    setEditarMovimientoDialogOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1203,6 +1282,52 @@ export default function Cajas() {
         caja={selectedCaja}
         onSuccess={fetchData}
       />
+
+      {/* Editar Movimiento Dialog (solo admin) */}
+      <Dialog open={editarMovimientoDialogOpen} onOpenChange={(open) => {
+        setEditarMovimientoDialogOpen(open);
+        if (!open) {
+          setMovimientoAEditar(null);
+          setMovimientoData({ concepto: '', monto: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Editar {movimientoAEditar?.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditarMovimiento} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_concepto">Concepto *</Label>
+              <Input
+                id="edit_concepto"
+                value={movimientoData.concepto}
+                onChange={(e) => setMovimientoData({ ...movimientoData, concepto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_monto">Monto *</Label>
+              <Input
+                id="edit_monto"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={movimientoData.monto}
+                onChange={(e) => setMovimientoData({ ...movimientoData, monto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setEditarMovimientoDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar Cambios</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
