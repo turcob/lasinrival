@@ -113,6 +113,8 @@ export default function Cajas() {
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
   const [editarArqueoDialogOpen, setEditarArqueoDialogOpen] = useState(false);
   const [confirmarArqueoDialogOpen, setConfirmarArqueoDialogOpen] = useState(false);
+  const [editarMovimientoDialogOpen, setEditarMovimientoDialogOpen] = useState(false);
+  const [movimientoAEditar, setMovimientoAEditar] = useState<Movimiento | null>(null);
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
