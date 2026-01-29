@@ -1282,6 +1282,52 @@ export default function Cajas() {
         caja={selectedCaja}
         onSuccess={fetchData}
       />
+
+      {/* Editar Movimiento Dialog (solo admin) */}
+      <Dialog open={editarMovimientoDialogOpen} onOpenChange={(open) => {
+        setEditarMovimientoDialogOpen(open);
+        if (!open) {
+          setMovimientoAEditar(null);
+          setMovimientoData({ concepto: '', monto: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Editar {movimientoAEditar?.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditarMovimiento} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_concepto">Concepto *</Label>
+              <Input
+                id="edit_concepto"
+                value={movimientoData.concepto}
+                onChange={(e) => setMovimientoData({ ...movimientoData, concepto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit_monto">Monto *</Label>
+              <Input
+                id="edit_monto"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={movimientoData.monto}
+                onChange={(e) => setMovimientoData({ ...movimientoData, monto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setEditarMovimientoDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar Cambios</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
