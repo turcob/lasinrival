@@ -27,6 +27,7 @@ import Vendedores from "./pages/Vendedores";
 import Zonas from "./pages/Zonas";
 import Imputacion from "./pages/Imputacion";
 import AsociacionPagos from "./pages/AsociacionPagos";
+import Sugerencias from "./pages/Sugerencias";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
