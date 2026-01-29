@@ -22,10 +22,8 @@ interface Sugerencia {
   respondido_por: string | null;
   fecha_respuesta: string | null;
   created_at: string;
-  profiles?: {
-    nombre: string;
-    email: string;
-  };
+  usuario_nombre?: string;
+  usuario_email?: string;
 }
 
 export default function Sugerencias() {
@@ -44,16 +42,30 @@ export default function Sugerencias() {
 
   const fetchSugerencias = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch sugerencias
+      const { data: sugerenciasData, error: sugerenciasError } = await supabase
         .from('sugerencias')
-        .select(`
-          *,
-          profiles:usuario_id (nombre, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setSugerencias(data || []);
+      if (sugerenciasError) throw sugerenciasError;
+
+      // Fetch profiles for each sugerencia
+      const userIds = [...new Set((sugerenciasData || []).map(s => s.usuario_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, nombre, email')
+        .in('id', userIds);
+
+      const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+
+      const enrichedSugerencias = (sugerenciasData || []).map(s => ({
+        ...s,
+        usuario_nombre: profilesMap.get(s.usuario_id)?.nombre || 'Usuario',
+        usuario_email: profilesMap.get(s.usuario_id)?.email || ''
+      }));
+
+      setSugerencias(enrichedSugerencias);
     } catch (error) {
       console.error('Error fetching sugerencias:', error);
       toast.error('Error al cargar las sugerencias');
