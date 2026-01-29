@@ -125,9 +125,9 @@ export default function Sugerencias() {
       case 'pendiente':
         return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
       case 'en_revision':
-        return <Badge variant="outline" className="gap-1 border-blue-500 text-blue-500"><MessageSquare className="h-3 w-3" /> En revisión</Badge>;
+        return <Badge variant="outline" className="gap-1"><MessageSquare className="h-3 w-3" /> En revisión</Badge>;
       case 'respondida':
-        return <Badge variant="default" className="gap-1 bg-green-600"><CheckCircle className="h-3 w-3" /> Respondida</Badge>;
+        return <Badge className="gap-1 bg-green-600 hover:bg-green-700"><CheckCircle className="h-3 w-3" /> Respondida</Badge>;
       case 'rechazada':
         return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> Rechazada</Badge>;
       default:
