@@ -217,9 +217,9 @@ export default function Sugerencias() {
                     </div>
                     
                     <p className="font-medium">
-                      {sugerencia.profiles?.nombre || 'Usuario'}
+                      {sugerencia.usuario_nombre}
                       <span className="text-sm text-muted-foreground ml-2">
-                        ({sugerencia.profiles?.email})
+                        ({sugerencia.usuario_email})
                       </span>
                     </p>
                     
