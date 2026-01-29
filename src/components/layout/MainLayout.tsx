@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { cn } from '@/lib/utils';
 import { SidebarProvider, useSidebarContext } from '@/contexts/SidebarContext';
+import { ChatAssistant } from '@/components/assistant/ChatAssistant';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           {children}
         </div>
       </main>
+      <ChatAssistant />
     </div>
   );
 }

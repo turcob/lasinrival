@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.generar-token-admin]
 verify_jwt = false
+
+[functions.chat-asistente]
+verify_jwt = false
