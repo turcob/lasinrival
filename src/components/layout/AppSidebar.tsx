@@ -19,7 +19,8 @@ import {
   Shield,
   UserCheck,
   MapPin,
-  Lightbulb
+  Lightbulb,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
