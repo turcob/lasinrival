@@ -29,6 +29,7 @@ import Imputacion from "./pages/Imputacion";
 import AsociacionPagos from "./pages/AsociacionPagos";
 import Sugerencias from "./pages/Sugerencias";
 import Pedidos from "./pages/Pedidos";
+import Logistica from "./pages/Logistica";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
