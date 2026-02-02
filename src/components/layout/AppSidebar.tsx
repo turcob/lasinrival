@@ -21,7 +21,8 @@ import {
   MapPin,
   Lightbulb,
   ClipboardList,
-  Truck
+  Truck,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,6 +60,7 @@ const catalogNavItems: NavItem[] = [
 const operationsNavItems: NavItem[] = [
   { title: 'Cajas', href: '/cajas', icon: CreditCard, module: 'cajas' },
   { title: 'Logística', href: '/logistica', icon: Truck, module: 'logistica' },
+  { title: 'Agenda Visitas', href: '/agenda-visitas', icon: Calendar, module: 'ventas' },
   { title: 'Imputación', href: '/imputacion', icon: CreditCard, module: 'clientes' },
   { title: 'Asociar Pagos', href: '/asociacion-pagos', icon: CreditCard, module: 'clientes' },
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
