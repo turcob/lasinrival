@@ -1,16 +1,11 @@
-import { useState } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
   useHojaRuta,
   useCambiarEstadoHojaRuta,
@@ -30,28 +25,28 @@ import {
   XCircle,
   Package,
   Phone,
-  GripVertical,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const estadoHojaConfig: Record<HojaRutaEstado, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  planificada: { label: 'Planificada', variant: 'secondary' },
-  en_carga: { label: 'En Carga', variant: 'outline' },
-  en_ruta: { label: 'En Ruta', variant: 'default' },
-  completada: { label: 'Completada', variant: 'secondary' },
-  cancelada: { label: 'Cancelada', variant: 'destructive' },
+const estadoHojaConfig: Record<HojaRutaEstado, { label: string; className: string }> = {
+  planificada: { label: 'Planificada', className: 'bg-muted text-muted-foreground' },
+  en_carga: { label: 'En Carga', className: 'bg-amber-100 text-amber-800' },
+  en_ruta: { label: 'En Ruta', className: 'bg-blue-100 text-blue-800' },
+  completada: { label: 'Completada', className: 'bg-green-100 text-green-800' },
+  cancelada: { label: 'Cancelada', className: 'bg-red-100 text-red-800' },
 };
 
-const estadoParadaConfig: Record<ParadaEstado, { label: string; color: string; icon: React.ElementType }> = {
-  pendiente: { label: 'Pendiente', color: 'text-muted-foreground', icon: Clock },
-  en_camino: { label: 'En Camino', color: 'text-blue-600', icon: Truck },
-  entregado: { label: 'Entregado', color: 'text-green-600', icon: CheckCircle },
-  entrega_parcial: { label: 'Parcial', color: 'text-amber-600', icon: AlertTriangle },
-  rechazado: { label: 'Rechazado', color: 'text-destructive', icon: XCircle },
-  no_entregado: { label: 'No Entregado', color: 'text-destructive', icon: XCircle },
+const estadoParadaConfig: Record<ParadaEstado, { label: string; className: string; icon: React.ElementType }> = {
+  pendiente: { label: 'Pendiente', className: 'text-muted-foreground', icon: Clock },
+  en_camino: { label: 'En Camino', className: 'text-blue-600', icon: Truck },
+  entregado: { label: 'Entregado', className: 'text-green-600', icon: CheckCircle },
+  entrega_parcial: { label: 'Parcial', className: 'text-amber-600', icon: AlertTriangle },
+  rechazado: { label: 'Rechazado', className: 'text-destructive', icon: XCircle },
+  no_entregado: { label: 'No Entregado', className: 'text-destructive', icon: XCircle },
 };
 
 interface DetalleHojaRutaDialogProps {
@@ -65,8 +60,6 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
-
-  const [paradaAccion, setParadaAccion] = useState<string | null>(null);
 
   if (!hojaRutaId) return null;
 
@@ -89,7 +82,6 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
   const handleEstadoParada = async (paradaId: string, estado: ParadaEstado) => {
     await actualizarParada.mutateAsync({ id: paradaId, estado });
-    setParadaAccion(null);
   };
 
   const handleEliminarParada = async (paradaId: string) => {
@@ -99,34 +91,46 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
-            </span>
-            {hojaRuta && (
-              <Badge variant={estadoHojaConfig[hojaRuta.estado].variant}>
-                {estadoHojaConfig[hojaRuta.estado].label}
-              </Badge>
-            )}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Detalle de la hoja de ruta y sus paradas
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
+          </SheetTitle>
+          <SheetDescription>
+            Detalle y gestión de entregas
+          </SheetDescription>
+        </SheetHeader>
 
         {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-40 w-full" />
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : hojaRuta ? (
-          <div className="space-y-4">
-            {/* Info header */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="space-y-6 mt-6">
+            {/* Estado badge */}
+            <div className="flex items-center justify-between">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${estadoHojaConfig[hojaRuta.estado].className}`}>
+                {estadoHojaConfig[hojaRuta.estado].label}
+              </span>
+              
+              {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && (
+                <Button 
+                  size="sm"
+                  onClick={handleCambiarEstadoHoja}
+                  disabled={cambiarEstado.isPending}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {hojaRuta.estado === 'planificada' && 'Iniciar Carga'}
+                  {hojaRuta.estado === 'en_carga' && 'Iniciar Ruta'}
+                  {hojaRuta.estado === 'en_ruta' && 'Completar'}
+                </Button>
+              )}
+            </div>
+
+            {/* Info grid */}
+            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -159,102 +163,63 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               </div>
             </div>
 
-            {/* Action buttons */}
-            {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && (
-              <div className="flex gap-2 mb-4">
-                <Button 
-                  onClick={handleCambiarEstadoHoja}
-                  disabled={cambiarEstado.isPending}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  {hojaRuta.estado === 'planificada' && 'Iniciar Carga'}
-                  {hojaRuta.estado === 'en_carga' && 'Iniciar Ruta'}
-                  {hojaRuta.estado === 'en_ruta' && 'Completar'}
-                </Button>
-              </div>
-            )}
-
             {/* Paradas */}
-            <div>
-              <h3 className="font-semibold mb-2 flex items-center gap-2">
+            <div className="space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Paradas ({hojaRuta.paradas?.length || 0})
               </h3>
               
-              <div className="border rounded-lg max-h-[400px] overflow-y-auto">
+              <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
                 {!hojaRuta.paradas || hojaRuta.paradas.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     No hay paradas asignadas
                   </div>
                 ) : (
-                  <div className="p-2 space-y-2">
-                    {hojaRuta.paradas.map((parada, index) => {
-                      const estadoConfig = estadoParadaConfig[parada.estado];
-                      const IconEstado = estadoConfig.icon;
-                      
-                      return (
-                        <Card key={parada.id} className="relative">
-                          <CardHeader className="p-3 pb-2">
-                            <div className="flex items-start gap-3">
-                              <div className="flex items-center gap-2">
-                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                                  {index + 1}
-                                </span>
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-mono font-semibold">
-                                    #{parada.pedido?.numero_pedido}
-                                  </span>
-                                  <IconEstado className={`h-4 w-4 ${estadoConfig.color}`} />
-                                  <span className={`text-sm ${estadoConfig.color}`}>
-                                    {estadoConfig.label}
-                                  </span>
-                                </div>
-                                <CardTitle className="text-base truncate">
-                                  {parada.pedido?.cliente?.nombre}
-                                </CardTitle>
-                              </div>
-
-                              <div className="text-right">
-                                <p className="font-semibold">
-                                  ${parada.pedido?.total?.toLocaleString('es-AR')}
-                                </p>
-                              </div>
-                            </div>
-                          </CardHeader>
+                  hojaRuta.paradas.map((parada, index) => {
+                    const estadoConfig = estadoParadaConfig[parada.estado];
+                    const IconEstado = estadoConfig.icon;
+                    
+                    return (
+                      <div key={parada.id} className="p-4">
+                        <div className="flex items-start gap-3">
+                          <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold shrink-0">
+                            {index + 1}
+                          </span>
                           
-                          <CardContent className="p-3 pt-0">
-                            <div className="flex items-start gap-4 text-sm text-muted-foreground">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-semibold">
+                                #{parada.pedido?.numero_pedido}
+                              </span>
+                              <IconEstado className={`h-4 w-4 ${estadoConfig.className}`} />
+                              <span className={`text-sm ${estadoConfig.className}`}>
+                                {estadoConfig.label}
+                              </span>
+                            </div>
+                            
+                            <p className="font-medium">
+                              {parada.pedido?.cliente?.nombre}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                               {parada.pedido?.cliente?.direccion && (
-                                <div className="flex items-center gap-1">
+                                <span className="flex items-center gap-1">
                                   <MapPin className="h-3 w-3" />
-                                  <span className="truncate max-w-[200px]">
-                                    {parada.pedido.cliente.direccion}
-                                  </span>
-                                </div>
+                                  {parada.pedido.cliente.direccion}
+                                </span>
                               )}
                               {parada.pedido?.cliente?.telefono && (
-                                <div className="flex items-center gap-1">
+                                <span className="flex items-center gap-1">
                                   <Phone className="h-3 w-3" />
-                                  <span>{parada.pedido.cliente.telefono}</span>
-                                </div>
-                              )}
-                              {parada.ventana_horaria_desde && parada.ventana_horaria_hasta && (
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span>
-                                    {parada.ventana_horaria_desde} - {parada.ventana_horaria_hasta}
-                                  </span>
-                                </div>
+                                  {parada.pedido.cliente.telefono}
+                                </span>
                               )}
                             </div>
 
                             {/* Actions for parada */}
                             {hojaRuta.estado === 'en_ruta' && parada.estado === 'pendiente' && (
-                              <div className="flex gap-2 mt-3">
+                              <div className="flex gap-2 pt-2">
                                 <Button 
                                   size="sm" 
                                   variant="outline"
@@ -281,28 +246,33 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 </Button>
                               </div>
                             )}
+                          </div>
 
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold">
+                              ${parada.pedido?.total?.toLocaleString('es-AR')}
+                            </p>
                             {hojaRuta.estado === 'planificada' && (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="absolute top-2 right-2 text-destructive"
+                                className="text-destructive mt-2"
                                 onClick={() => handleEliminarParada(parada.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
           </div>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

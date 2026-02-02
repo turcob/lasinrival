@@ -3,26 +3,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { NativeSelect } from '@/components/ui/native-select';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { 
   useVehiculos, 
   useCrearHojaRuta,
@@ -30,7 +20,7 @@ import {
 } from '@/hooks/useLogistica';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, User, Truck, Calendar } from 'lucide-react';
+import { MapPin, User, Truck, Calendar, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 const formSchema = z.object({
@@ -56,7 +46,6 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
   const crearHojaRuta = useCrearHojaRuta();
 
-  // Get empleados for chofer/responsable selection
   const { data: empleados = [] } = useQuery({
     queryKey: ['empleados-activos'],
     queryFn: async () => {
@@ -70,7 +59,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     },
   });
 
-  const form = useForm<FormValues>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fecha: format(new Date(), 'yyyy-MM-dd'),
@@ -100,213 +89,163 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       observaciones: values.observaciones || undefined,
       pedido_ids: selectedPedidos,
     });
-    form.reset();
+    reset();
     setSelectedPedidos([]);
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
             Nueva Hoja de Ruta
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Formulario para crear una nueva hoja de ruta
-          </DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>
+            Complete los datos y seleccione los pedidos a incluir
+          </SheetDescription>
+        </SheetHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <FormField
-                control={form.control}
-                name="fecha"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Fecha *
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="hora_salida_estimada"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Hora Salida Estimada</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="vehiculo_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      Vehículo
-                    </FormLabel>
-                    <FormControl>
-                      <NativeSelect {...field}>
-                        <option value="">Seleccionar vehículo</option>
-                        {vehiculos.map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.patente} - {v.marca} {v.modelo}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="chofer_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Chofer
-                    </FormLabel>
-                    <FormControl>
-                      <NativeSelect {...field}>
-                        <option value="">Seleccionar chofer</option>
-                        {empleados.map(e => (
-                          <option key={e.id} value={e.id}>{e.nombre}</option>
-                        ))}
-                      </NativeSelect>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="responsable_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Responsable</FormLabel>
-                    <FormControl>
-                      <NativeSelect {...field}>
-                        <option value="">Seleccionar responsable</option>
-                        {empleados.map(e => (
-                          <option key={e.id} value={e.id}>{e.nombre}</option>
-                        ))}
-                      </NativeSelect>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="observaciones"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Observaciones</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Notas adicionales..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fecha" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Fecha *
+              </Label>
+              <Input id="fecha" type="date" {...register('fecha')} />
+              {errors.fecha && (
+                <p className="text-sm text-destructive">{errors.fecha.message}</p>
+              )}
             </div>
 
-            {/* Pedidos selection */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold">Pedidos Disponibles</h3>
-                <Badge variant="secondary">
-                  {selectedPedidos.length} seleccionados
-                </Badge>
-              </div>
-              
-              <div className="border rounded-md max-h-[250px] overflow-y-auto">
-                {pedidosDisponibles.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    No hay pedidos disponibles para asignar
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-2">
-                    {pedidosDisponibles.map((pedido) => (
+            <div className="space-y-2">
+              <Label htmlFor="hora_salida_estimada">Hora Salida Estimada</Label>
+              <Input id="hora_salida_estimada" type="time" {...register('hora_salida_estimada')} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="vehiculo_id" className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Vehículo
+              </Label>
+              <select
+                id="vehiculo_id"
+                {...register('vehiculo_id')}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Seleccionar vehículo</option>
+                {vehiculos.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.patente} - {v.marca} {v.modelo}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="chofer_id" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Chofer
+              </Label>
+              <select
+                id="chofer_id"
+                {...register('chofer_id')}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Seleccionar chofer</option>
+                {empleados.map(e => (
+                  <option key={e.id} value={e.id}>{e.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="responsable_id">Responsable</Label>
+              <select
+                id="responsable_id"
+                {...register('responsable_id')}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Seleccionar responsable</option>
+                {empleados.map(e => (
+                  <option key={e.id} value={e.id}>{e.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="observaciones">Observaciones</Label>
+              <Textarea id="observaciones" {...register('observaciones')} placeholder="Notas adicionales..." />
+            </div>
+          </div>
+
+          {/* Pedidos selection */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label>Pedidos Disponibles</Label>
+              <span className="text-sm text-muted-foreground">
+                {selectedPedidos.length} seleccionados
+              </span>
+            </div>
+            
+            <div className="border rounded-md max-h-[200px] overflow-y-auto">
+              {pedidosDisponibles.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  No hay pedidos disponibles para asignar
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {pedidosDisponibles.map((pedido) => {
+                    const isSelected = selectedPedidos.includes(pedido.id);
+                    return (
                       <div 
                         key={pedido.id}
-                        className={`
-                          p-3 rounded-lg border cursor-pointer transition-colors
-                          ${selectedPedidos.includes(pedido.id) 
-                            ? 'border-primary bg-primary/5' 
-                            : 'hover:bg-muted'
-                          }
-                        `}
+                        className={`p-3 cursor-pointer transition-colors hover:bg-muted ${isSelected ? 'bg-primary/5' : ''}`}
                         onClick={() => togglePedido(pedido.id)}
                       >
-                        <div className="flex items-start gap-3">
-                          <Checkbox 
-                            checked={selectedPedidos.includes(pedido.id)}
-                            onCheckedChange={() => togglePedido(pedido.id)}
-                          />
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-input'}`}>
+                            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold">
+                              <span className="font-mono font-semibold text-sm">
                                 #{pedido.numero_pedido}
                               </span>
-                              <Badge variant="outline" className="text-xs">
+                              <span className="text-xs px-2 py-0.5 rounded bg-muted">
                                 {pedido.estado}
-                              </Badge>
+                              </span>
                             </div>
-                            <p className="text-sm font-medium truncate">
+                            <p className="text-sm truncate">
                               {pedido.cliente?.nombre}
                             </p>
-                            {pedido.cliente?.direccion && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {pedido.cliente.direccion}
-                              </p>
-                            )}
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">
+                            <p className="font-semibold text-sm">
                               ${pedido.total.toLocaleString('es-AR')}
                             </p>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={crearHojaRuta.isPending}>
-                Crear Hoja de Ruta
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={crearHojaRuta.isPending}>
+              {crearHojaRuta.isPending ? 'Creando...' : 'Crear Hoja de Ruta'}
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
