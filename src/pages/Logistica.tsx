@@ -129,16 +129,16 @@ export default function Logistica() {
 
   const hojasColumns = [
     { 
+      key: 'numero_hoja',
       header: '#', 
-      accessorKey: 'numero_hoja' as const,
-      cell: (h: typeof hojasRuta[0]) => (
+      render: (h: typeof hojasRuta[0]) => (
         <span className="font-mono font-medium">#{h.numero_hoja}</span>
       )
     },
     { 
+      key: 'fecha',
       header: 'Fecha', 
-      accessorKey: 'fecha' as const,
-      cell: (h: typeof hojasRuta[0]) => (
+      render: (h: typeof hojasRuta[0]) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <span>{format(new Date(h.fecha), 'dd/MM/yyyy', { locale: es })}</span>
@@ -146,9 +146,9 @@ export default function Logistica() {
       )
     },
     { 
+      key: 'vehiculo',
       header: 'Vehículo', 
-      accessorKey: 'vehiculo' as const,
-      cell: (h: typeof hojasRuta[0]) => (
+      render: (h: typeof hojasRuta[0]) => (
         <div className="flex items-center gap-2">
           <Truck className="h-4 w-4 text-muted-foreground" />
           <span>{h.vehiculo?.patente || '-'}</span>
@@ -156,14 +156,14 @@ export default function Logistica() {
       )
     },
     { 
+      key: 'chofer',
       header: 'Chofer', 
-      accessorKey: 'chofer' as const,
-      cell: (h: typeof hojasRuta[0]) => h.chofer?.nombre || '-'
+      render: (h: typeof hojasRuta[0]) => h.chofer?.nombre || '-'
     },
     { 
+      key: 'hora_salida_estimada',
       header: 'Hora Salida', 
-      accessorKey: 'hora_salida_estimada' as const,
-      cell: (h: typeof hojasRuta[0]) => (
+      render: (h: typeof hojasRuta[0]) => (
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <span>{h.hora_salida_estimada || '-'}</span>
@@ -171,17 +171,17 @@ export default function Logistica() {
       )
     },
     { 
+      key: 'estado',
       header: 'Estado', 
-      accessorKey: 'estado' as const,
-      cell: (h: typeof hojasRuta[0]) => {
+      render: (h: typeof hojasRuta[0]) => {
         const config = estadoConfig[h.estado];
         return <Badge variant={config.variant}>{config.label}</Badge>;
       }
     },
     {
+      key: 'id',
       header: 'Acciones',
-      accessorKey: 'id' as const,
-      cell: (h: typeof hojasRuta[0]) => (
+      render: (h: typeof hojasRuta[0]) => (
         <div className="flex gap-1">
           <Button 
             variant="ghost" 
