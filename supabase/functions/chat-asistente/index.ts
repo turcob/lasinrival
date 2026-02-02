@@ -27,6 +27,16 @@ const SYSTEM_PROMPT = `Eres el asistente virtual del sistema de gestión comerci
 - Anular ventas (solo administradores)
 - Filtrar por fecha, cliente, vendedor
 
+### Pedidos / Preventa
+- Crear pedidos para clientes (preventas)
+- Estados del pedido: pendiente → confirmado → preparado → despachado → entregado
+- Si el cliente rechaza productos: estado "parcial" o "devuelto"
+- Validación de saldo vencido: no se pueden crear pedidos si el cliente tiene deuda vencida
+- Sugerencias de productos frecuentes basadas en el historial de compras del cliente
+- Rendición del pedido: cuando el camionero vuelve, registra devoluciones y genera la venta
+- Los productos devueltos se reingresan automáticamente al stock
+- El pedido rendido genera una venta en cuenta corriente
+
 ### Productos
 - Gestión del catálogo de productos
 - Campos: código, descripción, precio costo, marca, categoría, subcategoría, tipo
