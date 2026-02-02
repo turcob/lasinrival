@@ -333,7 +333,7 @@ export default function Logistica() {
           <DataTable
             data={hojasFiltradas}
             columns={hojasColumns}
-            isLoading={loadingHojas}
+            loading={loadingHojas}
           />
         </TabsContent>
 
@@ -341,7 +341,7 @@ export default function Logistica() {
           <DataTable
             data={vehiculosFiltrados}
             columns={vehiculosColumns}
-            isLoading={loadingVehiculos}
+            loading={loadingVehiculos}
           />
         </TabsContent>
       </Tabs>

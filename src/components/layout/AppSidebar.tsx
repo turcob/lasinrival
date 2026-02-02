@@ -20,7 +20,8 @@ import {
   UserCheck,
   MapPin,
   Lightbulb,
-  ClipboardList
+  ClipboardList,
+  Truck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';

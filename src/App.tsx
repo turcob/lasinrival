@@ -84,6 +84,7 @@ function AppRoutes() {
       <Route path="/asociacion-pagos" element={<ProtectedRoute><AsociacionPagos /></ProtectedRoute>} />
       <Route path="/sugerencias" element={<ProtectedRoute><Sugerencias /></ProtectedRoute>} />
       <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
+      <Route path="/logistica" element={<ProtectedRoute><Logistica /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
