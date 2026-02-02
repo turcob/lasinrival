@@ -238,7 +238,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             </div>
 
             {/* Pedidos selection */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">Pedidos Disponibles</h3>
                 <Badge variant="secondary">
@@ -246,7 +246,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 </Badge>
               </div>
               
-              <ScrollArea className="flex-1 border rounded-md">
+              <div className="border rounded-md max-h-[250px] overflow-y-auto">
                 {pedidosDisponibles.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     No hay pedidos disponibles para asignar
@@ -298,10 +298,10 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <div className="flex justify-end gap-2 pt-4 border-t">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
