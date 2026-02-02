@@ -910,6 +910,206 @@ export type Database = {
         }
         Relationships: []
       }
+      hoja_ruta_devoluciones: {
+        Row: {
+          cantidad: number
+          created_at: string
+          detalle_motivo: string | null
+          hoja_ruta_id: string
+          id: string
+          motivo: string
+          parada_id: string
+          pedido_detalle_id: string
+          reingresado_stock: boolean | null
+          usuario_id: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          detalle_motivo?: string | null
+          hoja_ruta_id: string
+          id?: string
+          motivo: string
+          parada_id: string
+          pedido_detalle_id: string
+          reingresado_stock?: boolean | null
+          usuario_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          detalle_motivo?: string | null
+          hoja_ruta_id?: string
+          id?: string
+          motivo?: string
+          parada_id?: string
+          pedido_detalle_id?: string
+          reingresado_stock?: boolean | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_devoluciones_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_devoluciones_parada_id_fkey"
+            columns: ["parada_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_ruta_paradas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_devoluciones_pedido_detalle_id_fkey"
+            columns: ["pedido_detalle_id"]
+            isOneToOne: false
+            referencedRelation: "pedido_detalles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hoja_ruta_paradas: {
+        Row: {
+          created_at: string
+          estado: string
+          hoja_ruta_id: string
+          hora_llegada: string | null
+          hora_salida: string | null
+          id: string
+          observaciones: string | null
+          orden: number
+          pedido_id: string
+          updated_at: string
+          ventana_horaria_desde: string | null
+          ventana_horaria_hasta: string | null
+        }
+        Insert: {
+          created_at?: string
+          estado?: string
+          hoja_ruta_id: string
+          hora_llegada?: string | null
+          hora_salida?: string | null
+          id?: string
+          observaciones?: string | null
+          orden?: number
+          pedido_id: string
+          updated_at?: string
+          ventana_horaria_desde?: string | null
+          ventana_horaria_hasta?: string | null
+        }
+        Update: {
+          created_at?: string
+          estado?: string
+          hoja_ruta_id?: string
+          hora_llegada?: string | null
+          hora_salida?: string | null
+          id?: string
+          observaciones?: string | null
+          orden?: number
+          pedido_id?: string
+          updated_at?: string
+          ventana_horaria_desde?: string | null
+          ventana_horaria_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_paradas_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_paradas_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hojas_ruta: {
+        Row: {
+          chofer_id: string | null
+          created_at: string
+          estado: string
+          fecha: string
+          hora_regreso: string | null
+          hora_salida_estimada: string | null
+          hora_salida_real: string | null
+          id: string
+          km_final: number | null
+          km_inicial: number | null
+          numero_hoja: number
+          observaciones: string | null
+          responsable_id: string | null
+          updated_at: string
+          usuario_id: string
+          vehiculo_id: string | null
+        }
+        Insert: {
+          chofer_id?: string | null
+          created_at?: string
+          estado?: string
+          fecha?: string
+          hora_regreso?: string | null
+          hora_salida_estimada?: string | null
+          hora_salida_real?: string | null
+          id?: string
+          km_final?: number | null
+          km_inicial?: number | null
+          numero_hoja?: number
+          observaciones?: string | null
+          responsable_id?: string | null
+          updated_at?: string
+          usuario_id: string
+          vehiculo_id?: string | null
+        }
+        Update: {
+          chofer_id?: string | null
+          created_at?: string
+          estado?: string
+          fecha?: string
+          hora_regreso?: string | null
+          hora_salida_estimada?: string | null
+          hora_salida_real?: string | null
+          id?: string
+          km_final?: number | null
+          km_inicial?: number | null
+          numero_hoja?: number
+          observaciones?: string | null
+          responsable_id?: string | null
+          updated_at?: string
+          usuario_id?: string
+          vehiculo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hojas_ruta_chofer_id_fkey"
+            columns: ["chofer_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hojas_ruta_responsable_id_fkey"
+            columns: ["responsable_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hojas_ruta_vehiculo_id_fkey"
+            columns: ["vehiculo_id"]
+            isOneToOne: false
+            referencedRelation: "vehiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lista_precio_excepciones: {
         Row: {
           created_at: string | null
@@ -1902,6 +2102,45 @@ export type Database = {
           rol_codigo?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vehiculos: {
+        Row: {
+          activo: boolean | null
+          capacidad_bultos: number | null
+          capacidad_kg: number | null
+          created_at: string
+          id: string
+          marca: string | null
+          modelo: string | null
+          observaciones: string | null
+          patente: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean | null
+          capacidad_bultos?: number | null
+          capacidad_kg?: number | null
+          created_at?: string
+          id?: string
+          marca?: string | null
+          modelo?: string | null
+          observaciones?: string | null
+          patente: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean | null
+          capacidad_bultos?: number | null
+          capacidad_kg?: number | null
+          created_at?: string
+          id?: string
+          marca?: string | null
+          modelo?: string | null
+          observaciones?: string | null
+          patente?: string
+          updated_at?: string
         }
         Relationships: []
       }
