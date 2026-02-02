@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-
+import { NativeSelect } from '@/components/ui/native-select';
 import { Badge } from '@/components/ui/badge';
 import { 
   useVehiculos, 
@@ -162,17 +162,14 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                       Vehículo
                     </FormLabel>
                     <FormControl>
-                      <select
-                        {...field}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
+                      <NativeSelect {...field}>
                         <option value="">Seleccionar vehículo</option>
                         {vehiculos.map(v => (
                           <option key={v.id} value={v.id}>
                             {v.patente} - {v.marca} {v.modelo}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -189,15 +186,12 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                       Chofer
                     </FormLabel>
                     <FormControl>
-                      <select
-                        {...field}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
+                      <NativeSelect {...field}>
                         <option value="">Seleccionar chofer</option>
                         {empleados.map(e => (
                           <option key={e.id} value={e.id}>{e.nombre}</option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,15 +205,12 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                   <FormItem>
                     <FormLabel>Responsable</FormLabel>
                     <FormControl>
-                      <select
-                        {...field}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
+                      <NativeSelect {...field}>
                         <option value="">Seleccionar responsable</option>
                         {empleados.map(e => (
                           <option key={e.id} value={e.id}>{e.nombre}</option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
