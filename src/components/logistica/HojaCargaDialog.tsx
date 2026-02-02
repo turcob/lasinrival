@@ -1,15 +1,13 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useHojaRuta, useHojaCarga } from '@/hooks/useLogistica';
-import { Printer, Package } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Printer, Package, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -32,10 +30,10 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
   const isLoading = loadingHoja || loadingProductos;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none">
-        <DialogHeader className="print:mb-4">
-          <DialogTitle className="flex items-center justify-between">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto print:max-w-none">
+        <SheetHeader className="print:mb-4">
+          <SheetTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Hoja de Carga
@@ -49,21 +47,20 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
-          </DialogTitle>
-          <DialogDescription className="sr-only">
+          </SheetTitle>
+          <SheetDescription>
             Lista de productos a cargar para la hoja de ruta
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-40 w-full" />
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : hojaRuta ? (
-          <div className="space-y-4">
+          <div className="space-y-6 mt-6">
             {/* Header info */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg print:bg-transparent print:border print:border-foreground">
+            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg print:bg-transparent print:border print:border-foreground">
               <div>
                 <p className="text-sm text-muted-foreground">Hoja de Ruta</p>
                 <p className="font-semibold">#{hojaRuta.numero_hoja}</p>
@@ -89,44 +86,46 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
             </div>
 
             {/* Products table */}
-            <div>
-              <h3 className="font-semibold mb-2">Productos a Cargar</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-24">Código</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead className="text-right w-24">Cantidad</TableHead>
-                    <TableHead className="w-24 print:block hidden">✓</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productos.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        No hay productos para cargar
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    productos.map((producto) => (
-                      <TableRow key={producto.id}>
-                        <TableCell className="font-mono">{producto.codigo}</TableCell>
-                        <TableCell>{producto.descripcion}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {producto.cantidad_total}
-                        </TableCell>
-                        <TableCell className="print:block hidden">
-                          <div className="w-6 h-6 border border-foreground" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            <div className="space-y-2">
+              <h3 className="font-semibold">Productos a Cargar</h3>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-medium">Código</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium">Descripción</th>
+                      <th className="px-4 py-2 text-right text-sm font-medium">Cantidad</th>
+                      <th className="px-4 py-2 w-12 print:block hidden">✓</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {productos.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                          No hay productos para cargar
+                        </td>
+                      </tr>
+                    ) : (
+                      productos.map((producto) => (
+                        <tr key={producto.id}>
+                          <td className="px-4 py-2 font-mono text-sm">{producto.codigo}</td>
+                          <td className="px-4 py-2 text-sm">{producto.descripcion}</td>
+                          <td className="px-4 py-2 text-right font-semibold">
+                            {producto.cantidad_total}
+                          </td>
+                          <td className="px-4 py-2 print:block hidden">
+                            <div className="w-5 h-5 border border-foreground" />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Summary */}
-            <div className="flex justify-between items-center p-4 bg-muted rounded-lg print:bg-transparent print:border print:border-foreground">
+            <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg print:bg-transparent print:border print:border-foreground">
               <span className="font-semibold">Total de productos distintos:</span>
               <span className="text-xl font-bold">{productos.length}</span>
             </div>
@@ -146,7 +145,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
             </div>
           </div>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

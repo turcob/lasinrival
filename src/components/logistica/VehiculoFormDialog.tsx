@@ -3,24 +3,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useVehiculos, useCrearVehiculo, useActualizarVehiculo } from '@/hooks/useLogistica';
+import { Truck } from 'lucide-react';
 
 const formSchema = z.object({
   patente: z.string().min(1, 'La patente es requerida'),
@@ -47,7 +41,7 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
   const vehiculo = vehiculoId ? vehiculos.find(v => v.id === vehiculoId) : null;
   const isEditing = !!vehiculo;
 
-  const form = useForm<FormValues>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       patente: '',
@@ -61,7 +55,7 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
 
   useEffect(() => {
     if (vehiculo) {
-      form.reset({
+      reset({
         patente: vehiculo.patente,
         marca: vehiculo.marca || '',
         modelo: vehiculo.modelo || '',
@@ -70,7 +64,7 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
         observaciones: vehiculo.observaciones || '',
       });
     } else {
-      form.reset({
+      reset({
         patente: '',
         marca: '',
         modelo: '',
@@ -79,7 +73,7 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
         observaciones: '',
       });
     }
-  }, [vehiculo, form]);
+  }, [vehiculo, reset]);
 
   const onSubmit = async (values: FormValues) => {
     const data = {
@@ -101,119 +95,88 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo'}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Formulario para {isEditing ? 'editar' : 'crear'} un vehículo
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            {isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo'}
+          </SheetTitle>
+          <SheetDescription>
+            {isEditing ? 'Modifique los datos del vehículo' : 'Complete los datos del nuevo vehículo'}
+          </SheetDescription>
+        </SheetHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="patente"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Patente *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ABC 123" className="uppercase" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-6">
+          <div className="space-y-2">
+            <Label htmlFor="patente">Patente *</Label>
+            <Input 
+              id="patente" 
+              {...register('patente')} 
+              placeholder="ABC 123" 
+              className="uppercase" 
             />
+            {errors.patente && (
+              <p className="text-sm text-destructive">{errors.patente.message}</p>
+            )}
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="marca"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Marca</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ford" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="marca">Marca</Label>
+              <Input id="marca" {...register('marca')} placeholder="Ford" />
+            </div>
 
-              <FormField
-                control={form.control}
-                name="modelo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Modelo</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Transit" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="modelo">Modelo</Label>
+              <Input id="modelo" {...register('modelo')} placeholder="Transit" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="capacidad_kg">Capacidad (kg)</Label>
+              <Input 
+                id="capacidad_kg" 
+                type="number" 
+                {...register('capacidad_kg')} 
+                placeholder="1500" 
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="capacidad_kg"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacidad (kg)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" placeholder="1500" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="capacidad_bultos"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacidad (bultos)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" placeholder="50" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="capacidad_bultos">Capacidad (bultos)</Label>
+              <Input 
+                id="capacidad_bultos" 
+                type="number" 
+                {...register('capacidad_bultos')} 
+                placeholder="50" 
               />
             </div>
+          </div>
 
-            <FormField
-              control={form.control}
-              name="observaciones"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observaciones</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Notas sobre el vehículo..." />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="observaciones">Observaciones</Label>
+            <Textarea 
+              id="observaciones" 
+              {...register('observaciones')} 
+              placeholder="Notas sobre el vehículo..." 
             />
+          </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={crearVehiculo.isPending || actualizarVehiculo.isPending}
-              >
-                {isEditing ? 'Guardar Cambios' : 'Crear Vehículo'}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={crearVehiculo.isPending || actualizarVehiculo.isPending}
+            >
+              {isEditing ? 'Guardar Cambios' : 'Crear Vehículo'}
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
