@@ -85,23 +85,23 @@ export default function Logistica() {
 
   const vehiculosColumns = [
     { 
+      key: 'patente',
       header: 'Patente', 
-      accessorKey: 'patente' as const,
-      cell: (v: typeof vehiculos[0]) => (
+      render: (v: typeof vehiculos[0]) => (
         <span className="font-mono font-medium">{v.patente}</span>
       )
     },
     { 
+      key: 'marca',
       header: 'Marca / Modelo', 
-      accessorKey: 'marca' as const,
-      cell: (v: typeof vehiculos[0]) => (
+      render: (v: typeof vehiculos[0]) => (
         <span>{v.marca} {v.modelo}</span>
       )
     },
     { 
+      key: 'capacidad_kg',
       header: 'Capacidad', 
-      accessorKey: 'capacidad_kg' as const,
-      cell: (v: typeof vehiculos[0]) => (
+      render: (v: typeof vehiculos[0]) => (
         <div className="text-sm">
           {v.capacidad_kg && <span>{v.capacidad_kg} kg</span>}
           {v.capacidad_kg && v.capacidad_bultos && <span> / </span>}
@@ -110,9 +110,9 @@ export default function Logistica() {
       )
     },
     {
+      key: 'id',
       header: 'Acciones',
-      accessorKey: 'id' as const,
-      cell: (v: typeof vehiculos[0]) => (
+      render: (v: typeof vehiculos[0]) => (
         <Button 
           variant="ghost" 
           size="sm"
