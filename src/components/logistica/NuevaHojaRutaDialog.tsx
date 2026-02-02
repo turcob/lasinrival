@@ -115,7 +115,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <FormField
                 control={form.control}
