@@ -1360,6 +1360,118 @@ export type Database = {
           },
         ]
       }
+      objetivos_vendedor: {
+        Row: {
+          cobertura_actual: number | null
+          created_at: string
+          id: string
+          meta_cobertura_porcentaje: number | null
+          meta_ticket_promedio: number | null
+          meta_ventas: number | null
+          meta_visitas: number | null
+          periodo_anio: number
+          periodo_mes: number
+          ticket_promedio_actual: number | null
+          updated_at: string
+          vendedor_id: string
+          ventas_realizadas: number | null
+          visitas_realizadas: number | null
+        }
+        Insert: {
+          cobertura_actual?: number | null
+          created_at?: string
+          id?: string
+          meta_cobertura_porcentaje?: number | null
+          meta_ticket_promedio?: number | null
+          meta_ventas?: number | null
+          meta_visitas?: number | null
+          periodo_anio: number
+          periodo_mes: number
+          ticket_promedio_actual?: number | null
+          updated_at?: string
+          vendedor_id: string
+          ventas_realizadas?: number | null
+          visitas_realizadas?: number | null
+        }
+        Update: {
+          cobertura_actual?: number | null
+          created_at?: string
+          id?: string
+          meta_cobertura_porcentaje?: number | null
+          meta_ticket_promedio?: number | null
+          meta_ventas?: number | null
+          meta_visitas?: number | null
+          periodo_anio?: number
+          periodo_mes?: number
+          ticket_promedio_actual?: number | null
+          updated_at?: string
+          vendedor_id?: string
+          ventas_realizadas?: number | null
+          visitas_realizadas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objetivos_vendedor_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objetivos_zona: {
+        Row: {
+          clientes_nuevos: number | null
+          created_at: string
+          id: string
+          meta_clientes_nuevos: number | null
+          meta_ventas: number | null
+          meta_visitas: number | null
+          periodo_anio: number
+          periodo_mes: number
+          updated_at: string
+          ventas_realizadas: number | null
+          visitas_realizadas: number | null
+          zona_id: string
+        }
+        Insert: {
+          clientes_nuevos?: number | null
+          created_at?: string
+          id?: string
+          meta_clientes_nuevos?: number | null
+          meta_ventas?: number | null
+          meta_visitas?: number | null
+          periodo_anio: number
+          periodo_mes: number
+          updated_at?: string
+          ventas_realizadas?: number | null
+          visitas_realizadas?: number | null
+          zona_id: string
+        }
+        Update: {
+          clientes_nuevos?: number | null
+          created_at?: string
+          id?: string
+          meta_clientes_nuevos?: number | null
+          meta_ventas?: number | null
+          meta_visitas?: number | null
+          periodo_anio?: number
+          periodo_mes?: number
+          updated_at?: string
+          ventas_realizadas?: number | null
+          visitas_realizadas?: number | null
+          zona_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objetivos_zona_zona_id_fkey"
+            columns: ["zona_id"]
+            isOneToOne: false
+            referencedRelation: "zonas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_detalles: {
         Row: {
           cantidad_devuelta: number | null
@@ -1689,6 +1801,98 @@ export type Database = {
             columns: ["tipo_producto_id"]
             isOneToOne: false
             referencedRelation: "tipos_producto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_foco: {
+        Row: {
+          activo: boolean | null
+          created_at: string
+          id: string
+          meta_monto: number | null
+          meta_unidades: number | null
+          monto_vendido: number | null
+          periodo_anio: number
+          periodo_mes: number
+          producto_id: string
+          unidades_vendidas: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string
+          id?: string
+          meta_monto?: number | null
+          meta_unidades?: number | null
+          monto_vendido?: number | null
+          periodo_anio: number
+          periodo_mes: number
+          producto_id: string
+          unidades_vendidas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string
+          id?: string
+          meta_monto?: number | null
+          meta_unidades?: number | null
+          monto_vendido?: number | null
+          periodo_anio?: number
+          periodo_mes?: number
+          producto_id?: string
+          unidades_vendidas?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_foco_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_foco_vendedor: {
+        Row: {
+          created_at: string
+          id: string
+          meta_unidades: number | null
+          producto_foco_id: string
+          unidades_vendidas: number | null
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meta_unidades?: number | null
+          producto_foco_id: string
+          unidades_vendidas?: number | null
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meta_unidades?: number | null
+          producto_foco_id?: string
+          unidades_vendidas?: number | null
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_foco_vendedor_producto_foco_id_fkey"
+            columns: ["producto_foco_id"]
+            isOneToOne: false
+            referencedRelation: "productos_foco"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_foco_vendedor_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
             referencedColumns: ["id"]
           },
         ]
@@ -2375,6 +2579,113 @@ export type Database = {
             columns: ["empleado_id"]
             isOneToOne: false
             referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visita_incidencias: {
+        Row: {
+          created_at: string
+          descripcion: string
+          estado: string
+          id: string
+          prioridad: string
+          tipo: string
+          visita_id: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion: string
+          estado?: string
+          id?: string
+          prioridad?: string
+          tipo: string
+          visita_id: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string
+          estado?: string
+          id?: string
+          prioridad?: string
+          tipo?: string
+          visita_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_incidencias_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visitas: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          estado: string
+          fecha_checkin: string | null
+          fecha_programada: string
+          hora_programada: string | null
+          id: string
+          latitud_checkin: number | null
+          longitud_checkin: number | null
+          motivo_no_visita: string | null
+          notas: string | null
+          precision_gps: number | null
+          updated_at: string
+          usuario_id: string
+          vendedor_id: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          estado?: string
+          fecha_checkin?: string | null
+          fecha_programada: string
+          hora_programada?: string | null
+          id?: string
+          latitud_checkin?: number | null
+          longitud_checkin?: number | null
+          motivo_no_visita?: string | null
+          notas?: string | null
+          precision_gps?: number | null
+          updated_at?: string
+          usuario_id: string
+          vendedor_id: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          estado?: string
+          fecha_checkin?: string | null
+          fecha_programada?: string
+          hora_programada?: string | null
+          id?: string
+          latitud_checkin?: number | null
+          longitud_checkin?: number | null
+          motivo_no_visita?: string | null
+          notas?: string | null
+          precision_gps?: number | null
+          updated_at?: string
+          usuario_id?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
             referencedColumns: ["id"]
           },
         ]
