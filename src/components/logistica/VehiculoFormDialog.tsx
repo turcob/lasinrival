@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -104,6 +105,9 @@ export function VehiculoFormDialog({ open, onOpenChange, vehiculoId }: VehiculoF
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Vehículo' : 'Nuevo Vehículo'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulario para {isEditing ? 'editar' : 'crear'} un vehículo
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

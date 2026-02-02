@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -112,6 +113,9 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             <MapPin className="h-5 w-5" />
             Nueva Hoja de Ruta
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulario para crear una nueva hoja de ruta
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

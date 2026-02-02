@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -112,6 +113,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               </Badge>
             )}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Detalle de la hoja de ruta y sus paradas
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
