@@ -28,6 +28,7 @@ import Zonas from "./pages/Zonas";
 import Imputacion from "./pages/Imputacion";
 import AsociacionPagos from "./pages/AsociacionPagos";
 import Sugerencias from "./pages/Sugerencias";
+import Pedidos from "./pages/Pedidos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +82,7 @@ function AppRoutes() {
       <Route path="/imputacion" element={<ProtectedRoute><Imputacion /></ProtectedRoute>} />
       <Route path="/asociacion-pagos" element={<ProtectedRoute><AsociacionPagos /></ProtectedRoute>} />
       <Route path="/sugerencias" element={<ProtectedRoute><Sugerencias /></ProtectedRoute>} />
+      <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
