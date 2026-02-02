@@ -39,6 +39,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { title: 'Punto de Venta', href: '/pos', icon: ShoppingCart, module: 'ventas' },
+  { title: 'Pedidos', href: '/pedidos', icon: ClipboardList, module: 'pedidos' },
   { title: 'Ventas', href: '/ventas', icon: DollarSign, module: 'ventas' },
 ];
 
