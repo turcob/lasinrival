@@ -106,7 +106,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -115,7 +115,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <FormField
                 control={form.control}
@@ -238,7 +238,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             </div>
 
             {/* Pedidos selection */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">Pedidos Disponibles</h3>
                 <Badge variant="secondary">
@@ -246,7 +246,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 </Badge>
               </div>
               
-              <ScrollArea className="flex-1 border rounded-md">
+              <div className="border rounded-md max-h-[250px] overflow-y-auto">
                 {pedidosDisponibles.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     No hay pedidos disponibles para asignar
@@ -298,10 +298,10 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <div className="flex justify-end gap-2 pt-4 border-t">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
