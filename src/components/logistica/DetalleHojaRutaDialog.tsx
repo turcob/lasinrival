@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   useHojaRuta,
@@ -99,7 +99,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -120,7 +120,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             <Skeleton className="h-40 w-full" />
           </div>
         ) : hojaRuta ? (
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="space-y-4">
             {/* Info header */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="flex items-center gap-2">
@@ -171,13 +171,13 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             )}
 
             {/* Paradas */}
-            <div className="flex-1 overflow-hidden">
+            <div>
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Paradas ({hojaRuta.paradas?.length || 0})
               </h3>
               
-              <ScrollArea className="h-[400px] border rounded-lg">
+              <div className="border rounded-lg max-h-[400px] overflow-y-auto">
                 {!hojaRuta.paradas || hojaRuta.paradas.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     No hay paradas asignadas
@@ -294,7 +294,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           </div>
         ) : null}
