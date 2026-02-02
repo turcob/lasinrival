@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -49,6 +50,9 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
               Imprimir
             </Button>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Lista de productos a cargar para la hoja de ruta
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
