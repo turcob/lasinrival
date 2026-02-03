@@ -734,7 +734,8 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
     queryFn: async () => {
       if (!hojaRutaId) return [];
       
-      const { data, error } = await supabase
+      // Consultar la tabla nueva hoja_ruta_cobros
+      const { data: cobrosNuevos, error: errorNuevos } = await supabase
         .from('hoja_ruta_cobros')
         .select(`
           id,
@@ -749,8 +750,64 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
         .eq('hoja_ruta_id', hojaRutaId)
         .order('created_at');
 
-      if (error) throw error;
-      return data;
+      if (errorNuevos) throw errorNuevos;
+
+      // También consultar la tabla legacy cobros (vinculada via paradas)
+      const { data: paradas } = await supabase
+        .from('hoja_ruta_paradas')
+        .select('id')
+        .eq('hoja_ruta_id', hojaRutaId);
+      
+      const paradasIds = paradas?.map(p => p.id) || [];
+      
+      let cobrosLegacy: Array<{
+        id: string;
+        monto: number;
+        referencia: string | null;
+        observaciones: string | null;
+        created_at: string;
+        forma_pago: { id: string; nombre: string } | null;
+        pedido: { numero_pedido: number } | null;
+        parada: { id: string } | null;
+        medio_pago: string;
+      }> = [];
+
+      if (paradasIds.length > 0) {
+        const { data: cobrosViejos } = await supabase
+          .from('cobros')
+          .select(`
+            id,
+            monto,
+            referencia,
+            observaciones,
+            created_at,
+            medio_pago,
+            hoja_ruta_parada_id
+          `)
+          .in('hoja_ruta_parada_id', paradasIds)
+          .order('created_at');
+
+        if (cobrosViejos) {
+          cobrosLegacy = cobrosViejos.map(c => ({
+            id: c.id,
+            monto: c.monto,
+            referencia: c.referencia,
+            observaciones: c.observaciones,
+            created_at: c.created_at,
+            forma_pago: { id: 'legacy', nombre: c.medio_pago },
+            pedido: null,
+            parada: { id: c.hoja_ruta_parada_id },
+            medio_pago: c.medio_pago,
+          }));
+        }
+      }
+
+      // Combinar y ordenar por fecha
+      const todosCobros = [...(cobrosNuevos || []), ...cobrosLegacy].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      return todosCobros;
     },
     enabled: !!hojaRutaId,
   });
@@ -812,7 +869,8 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
     queryFn: async () => {
       if (!hojaRutaId) return [];
       
-      const { data, error } = await supabase
+      // Consultar la tabla nueva hoja_ruta_devoluciones
+      const { data: devolucionesNuevas, error: errorNuevas } = await supabase
         .from('hoja_ruta_devoluciones')
         .select(`
           id,
@@ -833,8 +891,66 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
         .eq('hoja_ruta_id', hojaRutaId)
         .order('created_at');
 
-      if (error) throw error;
-      return data;
+      if (errorNuevas) throw errorNuevas;
+
+      // También consultar la tabla legacy devoluciones (vinculada via paradas)
+      const { data: paradas } = await supabase
+        .from('hoja_ruta_paradas')
+        .select('id')
+        .eq('hoja_ruta_id', hojaRutaId);
+      
+      const paradasIds = paradas?.map(p => p.id) || [];
+      
+      let devolucionesLegacy: Array<{
+        id: string;
+        cantidad: number;
+        motivo: string;
+        detalle_motivo: string | null;
+        reingresado_stock: boolean | null;
+        created_at: string;
+        parada: { id: string } | null;
+        pedido_detalle: { id: string; producto: { codigo_articulo: string; descripcion: string } | null } | null;
+      }> = [];
+
+      if (paradasIds.length > 0) {
+        const { data: devolucionesViejas } = await supabase
+          .from('devoluciones')
+          .select(`
+            id,
+            cantidad,
+            motivo,
+            detalle_motivo,
+            created_at,
+            hoja_ruta_parada_id,
+            producto_id,
+            producto:productos(codigo_articulo, descripcion)
+          `)
+          .in('hoja_ruta_parada_id', paradasIds)
+          .order('created_at');
+
+        if (devolucionesViejas) {
+          devolucionesLegacy = devolucionesViejas.map((d: any) => ({
+            id: d.id,
+            cantidad: d.cantidad,
+            motivo: d.motivo,
+            detalle_motivo: d.detalle_motivo,
+            reingresado_stock: null,
+            created_at: d.created_at,
+            parada: { id: d.hoja_ruta_parada_id },
+            pedido_detalle: d.producto ? { 
+              id: d.producto_id, 
+              producto: d.producto 
+            } : null,
+          }));
+        }
+      }
+
+      // Combinar y ordenar por fecha
+      const todasDevoluciones = [...(devolucionesNuevas || []), ...devolucionesLegacy].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      return todasDevoluciones;
     },
     enabled: !!hojaRutaId,
   });
