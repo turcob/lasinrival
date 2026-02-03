@@ -1,194 +1,124 @@
 
-# Plan: Simplificación de Estados de Pedidos
+# Plan: Limpieza de Tablas Duplicadas
 
-## Resumen
+## Resumen del Problema
 
-Se modificara el sistema de pedidos para simplificar los estados y restringir las transiciones, alineándolo con el flujo real del negocio donde los vendedores crean pedidos, se preparan internamente, y solo pasan a "despachado" cuando logística los asigna a una hoja de ruta.
+Existen tablas duplicadas en la base de datos que generan confusión:
 
-## Cambios a Realizar
+| Tabla Actual | Registros | Estado | Acción |
+|--------------|-----------|--------|--------|
+| `hojas_ruta` | 2 | En uso activo | Mantener |
+| `hoja_ruta` | 0 | Obsoleta | Eliminar |
+| `usuarios` | 0 | Obsoleta | Eliminar |
 
-### 1. Modificación del Enum de Estados en Base de Datos
+## Dependencias a Actualizar
 
-Actualizar el tipo `pedido_estado` para tener solo 4 estados:
+Las siguientes funciones de base de datos usan las tablas obsoletas y deben ser actualizadas:
 
-```sql
--- Eliminar valores no usados del enum
-ALTER TYPE pedido_estado RENAME VALUE 'confirmado' TO 'preparado_old';
-ALTER TYPE pedido_estado RENAME VALUE 'entregado' TO 'entregado_old';
-ALTER TYPE pedido_estado RENAME VALUE 'parcial' TO 'parcial_old';
-ALTER TYPE pedido_estado RENAME VALUE 'devuelto' TO 'devuelto_old';
-ALTER TYPE pedido_estado RENAME VALUE 'anulado' TO 'rechazado';
-```
+1. **`get_usuario_id()`** - Busca en tabla `usuarios` (obsoleta)
+2. **`is_route_owner()`** - Une `hoja_ruta` con `usuarios`
+3. **`is_stop_owner()`** - Une `hoja_ruta_paradas` con `hoja_ruta` y `usuarios`
 
-**Nota:** Por limitaciones de PostgreSQL, en lugar de modificar el enum existente, crearemos una migración que:
-- Marque pedidos antiguos con estados obsoletos
-- Actualice la lógica para solo usar: `pendiente`, `preparado`, `despachado`, `rechazado`
+## Plan de Migración
 
-### 2. Actualización de Tipos TypeScript
+### Paso 1: Actualizar Funciones de Seguridad
 
-**Archivo:** `src/hooks/usePedidos.ts`
+Modificar las funciones para usar las tablas correctas:
 
-```typescript
-// ANTES
-export type PedidoEstado = 
-  | 'pendiente' 
-  | 'confirmado' 
-  | 'preparado' 
-  | 'despachado' 
-  | 'entregado' 
-  | 'parcial' 
-  | 'devuelto' 
-  | 'anulado';
+- `get_usuario_id()` → Usar `empleados.user_id` (ya vinculado al auth user)
+- `is_route_owner()` → Usar `hojas_ruta.chofer_id` → `empleados.user_id`
+- `is_stop_owner()` → Ajustar para la nueva estructura
 
-// DESPUÉS
-export type PedidoEstado = 
-  | 'pendiente' 
-  | 'preparado' 
-  | 'despachado' 
-  | 'rechazado';
-```
-
-### 3. Actualización del Flujo de Estados en UI
-
-**Archivo:** `src/components/pedidos/DetallePedidoDialog.tsx`
-
-```typescript
-// ANTES
-const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
-  pendiente: ['confirmado', 'anulado'],
-  confirmado: ['preparado', 'anulado'],
-  preparado: ['despachado', 'anulado'],
-  despachado: ['entregado', 'parcial', 'devuelto'],
-  ...
-};
-
-// DESPUÉS
-const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
-  pendiente: ['preparado', 'rechazado'],
-  preparado: ['rechazado'],  // Sin opción de despachado manual
-  despachado: [],            // Solo logística gestiona
-  rechazado: [],
-};
-```
-
-### 4. Actualización de Configuración Visual de Estados
-
-**Archivos:** `src/pages/Pedidos.tsx` y `src/components/pedidos/DetallePedidoDialog.tsx`
-
-```typescript
-const estadoConfig = {
-  pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
-  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
-  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
-};
-```
-
-### 5. Automatización del Estado "Despachado"
-
-**Archivo:** `src/hooks/useLogistica.ts`
-
-Modificar `useCrearHojaRuta` y `useAgregarParada` para que al asignar un pedido a una hoja de ruta, automáticamente cambie su estado a `despachado`:
-
-```typescript
-// En useCrearHojaRuta, después de insertar las paradas:
-if (data.pedido_ids && data.pedido_ids.length > 0) {
-  // Insertar paradas...
-  
-  // Cambiar estado de pedidos a despachado
-  await supabase
-    .from('pedidos')
-    .update({ estado: 'despachado' })
-    .in('id', data.pedido_ids);
-    
-  // Registrar en historial
-  for (const pedidoId of data.pedido_ids) {
-    await supabase.from('pedido_historial').insert({
-      pedido_id: pedidoId,
-      estado_anterior: 'preparado',
-      estado_nuevo: 'despachado',
-      usuario_id: user.id,
-      observaciones: `Asignado a hoja de ruta #${hojaRuta.numero_hoja}`
-    });
-  }
-}
-```
-
-### 6. Actualización de Pedidos Disponibles para Ruta
-
-**Archivo:** `src/hooks/useLogistica.ts`
-
-Modificar `usePedidosDisponiblesParaRuta` para que solo muestre pedidos en estado `preparado`:
-
-```typescript
-// ANTES
-.in('estado', ['confirmado', 'preparado', 'despachado'])
-
-// DESPUÉS  
-.eq('estado', 'preparado')
-```
-
-### 7. Eliminación de Funcionalidad de Rendición desde Pedidos
-
-**Archivo:** `src/components/pedidos/DetallePedidoDialog.tsx`
-
-Remover el botón "Rendir Pedido" y el componente `RendirPedidoDialog` de la vista de detalle de pedidos, ya que esta gestión se realiza exclusivamente desde Logística.
-
-### 8. Actualización del Diálogo de Cambio de Estado
-
-**Archivo:** `src/components/pedidos/CambiarEstadoDialog.tsx`
-
-Adaptar los labels para usar "Rechazado" en lugar de "Anulado":
-
-```typescript
-const estadoLabels: Record<PedidoEstado, string> = {
-  pendiente: 'Pendiente',
-  preparado: 'Preparado',
-  despachado: 'Despachado',
-  rechazado: 'Rechazado',
-};
-```
-
-## Archivos a Modificar
-
-| Archivo | Cambios |
-|---------|---------|
-| `src/hooks/usePedidos.ts` | Actualizar tipo `PedidoEstado`, eliminar función `useRendirPedido` |
-| `src/pages/Pedidos.tsx` | Actualizar `estadoConfig` con 4 estados |
-| `src/components/pedidos/DetallePedidoDialog.tsx` | Actualizar flujo de estados, eliminar botón rendir |
-| `src/components/pedidos/CambiarEstadoDialog.tsx` | Actualizar labels de estados |
-| `src/hooks/useLogistica.ts` | Automatizar cambio a despachado, filtrar solo preparados |
-| `src/components/logistica/NuevaHojaRutaDialog.tsx` | Sin cambios (usa hook actualizado) |
-
-## Migración de Datos Existentes
-
-Se creara una migración SQL para:
-1. Convertir pedidos con estado `confirmado` a `preparado`
-2. Convertir pedidos con estado `anulado` a `rechazado`
-3. Mantener `entregado`, `parcial`, `devuelto` como estados legacy solo visibles (para historial)
+### Paso 2: Eliminar Tabla `hoja_ruta`
 
 ```sql
--- Migrar estados existentes
-UPDATE pedidos SET estado = 'preparado' WHERE estado = 'confirmado';
-UPDATE pedidos SET estado = 'rechazado' WHERE estado = 'anulado';
+DROP TABLE IF EXISTS public.hoja_ruta CASCADE;
 ```
 
-## Flujo Final
+### Paso 3: Eliminar Tabla `usuarios`
 
-```text
-+------------+     +-----------+     +------------+
-| Pendiente  | --> | Preparado | --> | Despachado |
-+------------+     +-----------+     +------------+
-      |                  |                 |
-      v                  v                 v
-+------------+     (automático        (Gestionado
-| Rechazado  |      desde             en Logística)
-+------------+      Logística)
+```sql
+DROP TABLE IF EXISTS public.usuarios CASCADE;
 ```
 
-## Detalles Tecnicos
+### Paso 4: Actualizar Políticas RLS
 
-- El cambio de `pendiente` a `preparado` se realiza manualmente desde el modulo de Pedidos
-- El cambio de `pendiente` o `preparado` a `rechazado` se realiza manualmente desde Pedidos
-- El cambio a `despachado` SOLO ocurre automaticamente al asignar el pedido a una hoja de ruta
-- Las devoluciones, cobranzas y rendicion se gestionan exclusivamente desde el modulo de Logistica
+Las políticas que usan estas funciones se actualizarán automáticamente cuando reemplacemos las funciones.
+
+## Sección Técnica
+
+### Nueva Implementación de Funciones
+
+```sql
+-- Obtener empleado_id del usuario autenticado
+CREATE OR REPLACE FUNCTION public.get_empleado_id()
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN (
+    SELECT id FROM public.empleados 
+    WHERE user_id = auth.uid() 
+    LIMIT 1
+  );
+END;
+$$;
+
+-- Verificar si el usuario es dueño de la ruta (es el chofer asignado)
+CREATE OR REPLACE FUNCTION public.is_route_owner(route_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.hojas_ruta hr
+    JOIN public.empleados e ON hr.chofer_id = e.id
+    WHERE hr.id = route_id 
+    AND e.user_id = auth.uid()
+  );
+END;
+$$;
+
+-- Verificar si el usuario es dueño de la parada
+CREATE OR REPLACE FUNCTION public.is_stop_owner(stop_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.hoja_ruta_paradas p
+    JOIN public.hojas_ruta hr ON p.hoja_ruta_id = hr.id
+    JOIN public.empleados e ON hr.chofer_id = e.id
+    WHERE p.id = stop_id 
+    AND e.user_id = auth.uid()
+  );
+END;
+$$;
+```
+
+### Actualización de Políticas RLS
+
+Las tablas afectadas con políticas que usan estas funciones:
+- `hoja_ruta` (se eliminará)
+- `hoja_ruta_paradas` 
+- `cobros`
+- `devoluciones`
+- `rendiciones`
+
+Estas políticas usarán las nuevas funciones que apuntan a `hojas_ruta` y `empleados`.
+
+## Beneficios
+
+1. Estructura de datos limpia sin duplicaciones
+2. Relación clara: `Usuario Auth` → `Empleado` → `Chofer en Hoja de Ruta`
+3. Políticas RLS funcionando correctamente para la app del chofer
+4. Sincronización con la app externa que ya ajustaste
+
+## Verificación Post-Migración
+
+- Confirmar que las hojas de ruta existentes (2) siguen funcionando
+- Verificar que los cobros y paradas mantienen sus relaciones
+- Probar acceso del chofer a sus rutas asignadas
