@@ -728,3 +728,68 @@ export function useRendicionHojaRuta(hojaRutaId: string | undefined) {
     enabled: !!hojaRutaId,
   });
 }
+
+// ============== DEVOLUCIONES QUERY ==============
+export function useDevolucionesParada(paradaId: string | undefined) {
+  return useQuery({
+    queryKey: ['devoluciones-parada', paradaId],
+    queryFn: async () => {
+      if (!paradaId) return [];
+      
+      const { data, error } = await supabase
+        .from('hoja_ruta_devoluciones')
+        .select(`
+          id,
+          cantidad,
+          motivo,
+          detalle_motivo,
+          reingresado_stock,
+          created_at,
+          pedido_detalle:pedido_detalles(
+            id,
+            producto:productos(codigo_articulo, descripcion)
+          )
+        `)
+        .eq('parada_id', paradaId)
+        .order('created_at');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!paradaId,
+  });
+}
+
+export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['devoluciones-hoja-ruta', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return [];
+      
+      const { data, error } = await supabase
+        .from('hoja_ruta_devoluciones')
+        .select(`
+          id,
+          cantidad,
+          motivo,
+          detalle_motivo,
+          reingresado_stock,
+          created_at,
+          parada:hoja_ruta_paradas(
+            id,
+            pedido:pedidos(numero_pedido, cliente:clientes(nombre))
+          ),
+          pedido_detalle:pedido_detalles(
+            id,
+            producto:productos(codigo_articulo, descripcion)
+          )
+        `)
+        .eq('hoja_ruta_id', hojaRutaId)
+        .order('created_at');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!hojaRutaId,
+  });
+}

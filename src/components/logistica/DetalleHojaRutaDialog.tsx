@@ -13,6 +13,7 @@ import {
   useActualizarEstadoParada,
   useEliminarParada,
   useCobrosHojaRuta,
+  useDevolucionesParada,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
@@ -32,10 +33,13 @@ import {
   Loader2,
   DollarSign,
   FileCheck,
-  Banknote
+  Banknote,
+  PackageX,
+  RotateCcw
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
+import { RegistrarDevolucionDialog } from './RegistrarDevolucionDialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -70,7 +74,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
 
-  // Estados para diálogos de cobro y rendición
+  // Estados para diálogos de cobro, rendición y devoluciones
   const [cobroDialog, setCobroDialog] = useState<{
     open: boolean;
     paradaId: string;
@@ -79,6 +83,17 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     montoCobrado: number;
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
+  const [devolucionDialog, setDevolucionDialog] = useState<{
+    open: boolean;
+    paradaId: string;
+    pedidoDetalles: Array<{
+      id: string;
+      producto_id: string | null;
+      cantidad_pedida: number;
+      cantidad_entregada: number | null;
+      producto?: { descripcion: string; codigo_articulo: string };
+    }>;
+  }>({ open: false, paradaId: '', pedidoDetalles: [] });
 
   // Calcular monto cobrado por pedido
   const getCobradoPorPedido = (pedidoId: string): number => {
@@ -285,29 +300,47 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                               </div>
                             )}
 
-                            {/* Botón de cobro - visible cuando está en ruta o entregado */}
+                            {/* Botones de cobro y devolución - visible cuando está en ruta o entregado */}
                             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && 
-                             ['entregado', 'entrega_parcial'].includes(parada.estado) && parada.pedido && (
-                              <div className="pt-2 flex items-center gap-2">
+                             ['entregado', 'entrega_parcial', 'rechazado'].includes(parada.estado) && parada.pedido && (
+                              <div className="pt-2 flex flex-wrap items-center gap-2">
                                 {getCobradoPorParada(parada.id) > 0 && (
                                   <Badge variant="secondary" className="text-xs">
                                     <Banknote className="h-3 w-3 mr-1" />
                                     Cobrado: ${getCobradoPorParada(parada.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                   </Badge>
                                 )}
+                                
+                                {/* Botón Cobrar */}
+                                {['entregado', 'entrega_parcial'].includes(parada.estado) && (
+                                  <Button
+                                    size="sm"
+                                    variant={getCobradoPorParada(parada.id) >= parada.pedido.total ? "outline" : "default"}
+                                    onClick={() => setCobroDialog({
+                                      open: true,
+                                      paradaId: parada.id,
+                                      pedidoId: parada.pedido!.id,
+                                      totalPedido: parada.pedido!.total,
+                                      montoCobrado: getCobradoPorParada(parada.id),
+                                    })}
+                                  >
+                                    <DollarSign className="h-4 w-4 mr-1" />
+                                    {getCobradoPorParada(parada.id) > 0 ? 'Agregar Cobro' : 'Cobrar'}
+                                  </Button>
+                                )}
+
+                                {/* Botón Devoluciones */}
                                 <Button
                                   size="sm"
-                                  variant={getCobradoPorParada(parada.id) >= parada.pedido.total ? "outline" : "default"}
-                                  onClick={() => setCobroDialog({
+                                  variant="outline"
+                                  onClick={() => setDevolucionDialog({
                                     open: true,
                                     paradaId: parada.id,
-                                    pedidoId: parada.pedido!.id,
-                                    totalPedido: parada.pedido!.total,
-                                    montoCobrado: getCobradoPorParada(parada.id),
+                                    pedidoDetalles: parada.pedido?.detalles || [],
                                   })}
                                 >
-                                  <DollarSign className="h-4 w-4 mr-1" />
-                                  {getCobradoPorParada(parada.id) > 0 ? 'Agregar Cobro' : 'Cobrar'}
+                                  <PackageX className="h-4 w-4 mr-1" />
+                                  Devoluciones
                                 </Button>
                               </div>
                             )}
@@ -371,6 +404,18 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onOpenChange={setRendicionOpen}
           hojaRutaId={hojaRutaId}
           numeroHoja={hojaRuta.numero_hoja}
+          onSuccess={() => refetch()}
+        />
+      )}
+
+      {/* Diálogo de Devoluciones */}
+      {hojaRutaId && (
+        <RegistrarDevolucionDialog
+          open={devolucionDialog.open}
+          onOpenChange={(open) => setDevolucionDialog({ ...devolucionDialog, open })}
+          hojaRutaId={hojaRutaId}
+          paradaId={devolucionDialog.paradaId}
+          pedidoDetalles={devolucionDialog.pedidoDetalles}
           onSuccess={() => refetch()}
         />
       )}
