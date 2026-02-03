@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, AlertTriangle, X, Check } from 'lucide-react';
+import { Package, AlertTriangle, X, Check, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,8 @@ interface LineaPreparacion {
   unidadMedida: string;
   cantidadPedida: number;
   inputValue: string;
+  cantidadPreparada: number; // valor calculado
+  subtotal: number; // valor calculado
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
@@ -56,6 +58,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     if (open && pedido?.detalles) {
       setLineas(pedido.detalles.map((d: PedidoDetalle) => {
         const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
+        const precioConDescuento = d.precio_unitario * (1 - (d.descuento_porcentaje || 0) / 100);
         return {
           detalleId: d.id,
           productoId: d.producto_id,
@@ -64,6 +67,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           unidadMedida: d.producto?.unidad_medida || 'UN',
           cantidadPedida: d.cantidad_pedida,
           inputValue: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
+          cantidadPreparada: d.cantidad_pedida,
+          subtotal: d.cantidad_pedida * precioConDescuento,
           precioUnitario: d.precio_unitario,
           descuentoPorcentaje: d.descuento_porcentaje || 0,
         };
@@ -84,19 +89,24 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     ));
   };
 
-  // Cálculos derivados - se recalculan en cada render cuando cambia lineas
-  const lineasCalculadas = lineas.map(linea => {
-    const esPorPeso = isProductoPorPeso(linea.unidadMedida);
-    const cantidadParsed = parseCantidad(linea.inputValue, esPorPeso);
-    const cantidadPreparada = Math.min(Math.max(0, cantidadParsed), linea.cantidadPedida);
-    const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
-    const subtotal = cantidadPreparada * precioConDescuento;
-    const diferencia = cantidadPreparada !== linea.cantidadPedida;
-    return { ...linea, esPorPeso, cantidadPreparada, subtotal, diferencia };
-  });
+  // Botón calcular - actualiza cantidadPreparada y subtotal
+  const handleCalcular = (detalleId: string) => {
+    setLineas(prev => prev.map(l => {
+      if (l.detalleId !== detalleId) return l;
+      
+      const esPorPeso = isProductoPorPeso(l.unidadMedida);
+      const cantidadParsed = parseCantidad(l.inputValue, esPorPeso);
+      const cantidadPreparada = Math.min(Math.max(0, cantidadParsed), l.cantidadPedida);
+      const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
+      const subtotal = cantidadPreparada * precioConDescuento;
+      
+      return { ...l, cantidadPreparada, subtotal };
+    }));
+  };
 
-  const totalFinal = lineasCalculadas.reduce((sum, l) => sum + l.subtotal, 0);
-  const hayDiferencias = lineasCalculadas.some(l => l.diferencia);
+  // Valores derivados del estado
+  const totalFinal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
+  const hayDiferencias = lineas.some(l => l.cantidadPreparada !== l.cantidadPedida);
 
   const handleConfirmar = async () => {
     if (!pedido) return;
@@ -107,7 +117,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       numeroPedido: pedido.numero_pedido,
       clienteNombre: pedido.cliente?.nombre || 'Cliente',
       clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineasCalculadas.map(l => ({
+      lineas: lineas.map(l => ({
         detalleId: l.detalleId,
         productoId: l.productoId,
         codigo: l.codigo,
@@ -130,7 +140,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           direccion: pedido.cliente?.direccion || '',
           cuit: pedido.cliente?.dni_cuit || '',
         },
-        lineas: lineasCalculadas.filter(l => l.cantidadPreparada > 0).map(l => ({
+        lineas: lineas.filter(l => l.cantidadPreparada > 0).map(l => ({
           codigo: l.codigo,
           descripcion: l.descripcion,
           cantidad: l.cantidadPreparada,
@@ -174,65 +184,81 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       ) : (
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto space-y-4">
-            {lineasCalculadas.map((linea) => (
-              <div 
-                key={linea.detalleId}
-                className={`p-4 rounded-lg border-2 transition-colors ${
-                  linea.diferencia ? 'border-amber-400 bg-amber-50' : 'border-border bg-card'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  {/* Product Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-sm text-muted-foreground">{linea.codigo}</span>
-                      {linea.esPorPeso && (
-                        <Badge variant="outline" className="text-xs">Por Peso</Badge>
-                      )}
-                      {linea.diferencia && (
-                        <Badge variant="secondary" className="text-xs bg-amber-200 text-amber-800">Modificado</Badge>
-                      )}
-                    </div>
-                    <p className="font-medium truncate">{linea.descripcion}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Precio: {formatCurrency(linea.precioUnitario)}
-                      {linea.esPorPeso && '/kg'}
-                      {linea.descuentoPorcentaje > 0 && ` (-${linea.descuentoPorcentaje}%)`}
-                    </p>
-                  </div>
-
-                  {/* Quantity Controls */}
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Pedido</p>
-                      <p className="font-medium text-lg">
-                        {formatCantidadInicial(linea.cantidadPedida, linea.esPorPeso)} {linea.unidadMedida}
+            {lineas.map((linea) => {
+              const esPorPeso = isProductoPorPeso(linea.unidadMedida);
+              const diferencia = linea.cantidadPreparada !== linea.cantidadPedida;
+              
+              return (
+                <div 
+                  key={linea.detalleId}
+                  className={`p-4 rounded-lg border-2 transition-colors ${
+                    diferencia ? 'border-amber-400 bg-amber-50' : 'border-border bg-card'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-sm text-muted-foreground">{linea.codigo}</span>
+                        {esPorPeso && (
+                          <Badge variant="outline" className="text-xs">Por Peso</Badge>
+                        )}
+                        {diferencia && (
+                          <Badge variant="secondary" className="text-xs bg-amber-200 text-amber-800">Modificado</Badge>
+                        )}
+                      </div>
+                      <p className="font-medium truncate">{linea.descripcion}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Precio: {formatCurrency(linea.precioUnitario)}
+                        {esPorPeso && '/kg'}
+                        {linea.descuentoPorcentaje > 0 && ` (-${linea.descuentoPorcentaje}%)`}
                       </p>
                     </div>
 
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={linea.inputValue}
-                        onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
-                        className={`w-32 text-center font-medium text-lg ${
-                          linea.diferencia ? 'border-amber-500 bg-amber-50' : ''
-                        }`}
-                      />
-                    </div>
+                    {/* Quantity Controls */}
+                    <div className="flex items-center gap-3">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">Pedido</p>
+                        <p className="font-medium text-lg">
+                          {formatCantidadInicial(linea.cantidadPedida, esPorPeso)} {linea.unidadMedida}
+                        </p>
+                      </div>
 
-                    <div className="text-right min-w-[120px]">
-                      <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
-                      <p className={`font-bold text-lg ${linea.diferencia ? 'text-amber-700' : ''}`}>
-                        {formatCurrency(linea.subtotal)}
-                      </p>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={linea.inputValue}
+                            onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
+                            className={`w-28 text-center font-medium text-lg ${
+                              diferencia ? 'border-amber-500 bg-amber-50' : ''
+                            }`}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleCalcular(linea.detalleId)}
+                            title="Calcular"
+                          >
+                            <Calculator className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="text-right min-w-[120px]">
+                        <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
+                        <p className={`font-bold text-lg ${diferencia ? 'text-amber-700' : ''}`}>
+                          {formatCurrency(linea.subtotal)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
