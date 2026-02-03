@@ -922,13 +922,33 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
             detalle_motivo,
             created_at,
             hoja_ruta_parada_id,
-            producto_id,
-            producto:productos(codigo_articulo, descripcion)
+            producto_id
           `)
           .in('hoja_ruta_parada_id', paradasIds)
           .order('created_at');
 
-        if (devolucionesViejas) {
+        if (devolucionesViejas && devolucionesViejas.length > 0) {
+          // Obtener los productos asociados en una consulta separada
+          const productoIds = devolucionesViejas
+            .map(d => d.producto_id)
+            .filter((id): id is string => id !== null);
+          
+          let productosMap: Record<string, { codigo_articulo: string; descripcion: string }> = {};
+          
+          if (productoIds.length > 0) {
+            const { data: productos } = await supabase
+              .from('productos')
+              .select('id, codigo_articulo, descripcion')
+              .in('id', productoIds);
+            
+            if (productos) {
+              productosMap = productos.reduce((acc, p) => {
+                acc[p.id] = { codigo_articulo: p.codigo_articulo, descripcion: p.descripcion };
+                return acc;
+              }, {} as Record<string, { codigo_articulo: string; descripcion: string }>);
+            }
+          }
+
           devolucionesLegacy = devolucionesViejas.map((d: any) => ({
             id: d.id,
             cantidad: d.cantidad,
@@ -937,9 +957,9 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
             reingresado_stock: null,
             created_at: d.created_at,
             parada: { id: d.hoja_ruta_parada_id },
-            pedido_detalle: d.producto ? { 
+            pedido_detalle: d.producto_id && productosMap[d.producto_id] ? { 
               id: d.producto_id, 
-              producto: d.producto 
+              producto: productosMap[d.producto_id] 
             } : null,
           }));
         }
