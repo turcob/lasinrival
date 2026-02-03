@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, AlertTriangle, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,7 @@ interface LineaPreparacion {
   descripcion: string;
   unidadMedida: string;
   cantidadPedida: number;
-  inputValue: string; // texto del input
+  inputValue: string;
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
@@ -84,24 +84,19 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     ));
   };
 
-  const getCantidadPreparada = (linea: LineaPreparacion): number => {
+  // Cálculos derivados - se recalculan en cada render cuando cambia lineas
+  const lineasCalculadas = lineas.map(linea => {
     const esPorPeso = isProductoPorPeso(linea.unidadMedida);
-    const cantidad = parseCantidad(linea.inputValue, esPorPeso);
-    return Math.min(Math.max(0, cantidad), linea.cantidadPedida);
-  };
-
-  const calcularSubtotalLinea = (linea: LineaPreparacion) => {
-    const cantidadPreparada = getCantidadPreparada(linea);
+    const cantidadParsed = parseCantidad(linea.inputValue, esPorPeso);
+    const cantidadPreparada = Math.min(Math.max(0, cantidadParsed), linea.cantidadPedida);
     const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
-    return cantidadPreparada * precioConDescuento;
-  };
+    const subtotal = cantidadPreparada * precioConDescuento;
+    const diferencia = cantidadPreparada !== linea.cantidadPedida;
+    return { ...linea, esPorPeso, cantidadPreparada, subtotal, diferencia };
+  });
 
-  const totales = useMemo(() => {
-    const subtotal = lineas.reduce((sum, l) => sum + calcularSubtotalLinea(l), 0);
-    return { subtotal, total: subtotal };
-  }, [lineas]);
-
-  const hayDiferencias = lineas.some(l => getCantidadPreparada(l) !== l.cantidadPedida);
+  const totalFinal = lineasCalculadas.reduce((sum, l) => sum + l.subtotal, 0);
+  const hayDiferencias = lineasCalculadas.some(l => l.diferencia);
 
   const handleConfirmar = async () => {
     if (!pedido) return;
@@ -112,18 +107,18 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       numeroPedido: pedido.numero_pedido,
       clienteNombre: pedido.cliente?.nombre || 'Cliente',
       clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.map(l => ({
+      lineas: lineasCalculadas.map(l => ({
         detalleId: l.detalleId,
         productoId: l.productoId,
         codigo: l.codigo,
         descripcion: l.descripcion,
         cantidadPedida: l.cantidadPedida,
-        cantidadPreparada: getCantidadPreparada(l),
+        cantidadPreparada: l.cantidadPreparada,
         precioUnitario: l.precioUnitario,
         descuentoPorcentaje: l.descuentoPorcentaje,
-        subtotal: calcularSubtotalLinea(l),
+        subtotal: l.subtotal,
       })),
-      totalFinal: totales.total,
+      totalFinal: totalFinal,
     });
 
     if (resultado) {
@@ -135,15 +130,15 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           direccion: pedido.cliente?.direccion || '',
           cuit: pedido.cliente?.dni_cuit || '',
         },
-        lineas: lineas.filter(l => getCantidadPreparada(l) > 0).map(l => ({
+        lineas: lineasCalculadas.filter(l => l.cantidadPreparada > 0).map(l => ({
           codigo: l.codigo,
           descripcion: l.descripcion,
-          cantidad: getCantidadPreparada(l),
+          cantidad: l.cantidadPreparada,
           precioUnitario: l.precioUnitario,
           descuento: l.descuentoPorcentaje,
-          subtotal: calcularSubtotalLinea(l),
+          subtotal: l.subtotal,
         })),
-        total: totales.total,
+        total: totalFinal,
       });
       onOpenChange(false);
     }
@@ -179,72 +174,65 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       ) : (
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto space-y-4">
-            {lineas.map((linea) => {
-              const esPorPeso = isProductoPorPeso(linea.unidadMedida);
-              const cantidadPreparada = getCantidadPreparada(linea);
-              const diferencia = cantidadPreparada !== linea.cantidadPedida;
-              const subtotal = calcularSubtotalLinea(linea);
-              
-              return (
-                <div 
-                  key={linea.detalleId}
-                  className={`p-4 rounded-lg border-2 transition-colors ${
-                    diferencia ? 'border-amber-400 bg-amber-50' : 'border-border bg-card'
-                  }`}
-                >
-                  <div className="flex flex-col md:flex-row md:items-center gap-4">
-                    {/* Product Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-sm text-muted-foreground">{linea.codigo}</span>
-                        {esPorPeso && (
-                          <Badge variant="outline" className="text-xs">Por Peso</Badge>
-                        )}
-                        {diferencia && (
-                          <Badge variant="secondary" className="text-xs bg-amber-200 text-amber-800">Modificado</Badge>
-                        )}
-                      </div>
-                      <p className="font-medium truncate">{linea.descripcion}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Precio: {formatCurrency(linea.precioUnitario)}
-                        {esPorPeso && '/kg'}
-                        {linea.descuentoPorcentaje > 0 && ` (-${linea.descuentoPorcentaje}%)`}
+            {lineasCalculadas.map((linea) => (
+              <div 
+                key={linea.detalleId}
+                className={`p-4 rounded-lg border-2 transition-colors ${
+                  linea.diferencia ? 'border-amber-400 bg-amber-50' : 'border-border bg-card'
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-sm text-muted-foreground">{linea.codigo}</span>
+                      {linea.esPorPeso && (
+                        <Badge variant="outline" className="text-xs">Por Peso</Badge>
+                      )}
+                      {linea.diferencia && (
+                        <Badge variant="secondary" className="text-xs bg-amber-200 text-amber-800">Modificado</Badge>
+                      )}
+                    </div>
+                    <p className="font-medium truncate">{linea.descripcion}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Precio: {formatCurrency(linea.precioUnitario)}
+                      {linea.esPorPeso && '/kg'}
+                      {linea.descuentoPorcentaje > 0 && ` (-${linea.descuentoPorcentaje}%)`}
+                    </p>
+                  </div>
+
+                  {/* Quantity Controls */}
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Pedido</p>
+                      <p className="font-medium text-lg">
+                        {formatCantidadInicial(linea.cantidadPedida, linea.esPorPeso)} {linea.unidadMedida}
                       </p>
                     </div>
 
-                    {/* Quantity Controls */}
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Pedido</p>
-                        <p className="font-medium text-lg">
-                          {formatCantidadInicial(linea.cantidadPedida, esPorPeso)} {linea.unidadMedida}
-                        </p>
-                      </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={linea.inputValue}
+                        onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
+                        className={`w-32 text-center font-medium text-lg ${
+                          linea.diferencia ? 'border-amber-500 bg-amber-50' : ''
+                        }`}
+                      />
+                    </div>
 
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={linea.inputValue}
-                          onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
-                          className={`w-32 text-center font-medium text-lg ${
-                            diferencia ? 'border-amber-500 bg-amber-50' : ''
-                          }`}
-                        />
-                      </div>
-
-                      <div className="text-right min-w-[100px]">
-                        <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
-                        <p className={`font-bold ${diferencia ? 'text-amber-700' : ''}`}>
-                          {formatCurrency(subtotal)}
-                        </p>
-                      </div>
+                    <div className="text-right min-w-[120px]">
+                      <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
+                      <p className={`font-bold text-lg ${linea.diferencia ? 'text-amber-700' : ''}`}>
+                        {formatCurrency(linea.subtotal)}
+                      </p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -274,11 +262,11 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
               <div>
                 <p className="text-sm text-muted-foreground">Nuevo Total</p>
                 <p className={`text-2xl font-bold ${hayDiferencias ? 'text-amber-700' : 'text-primary'}`}>
-                  {formatCurrency(totales.total)}
+                  {formatCurrency(totalFinal)}
                 </p>
                 {hayDiferencias && (
                   <p className="text-xs text-muted-foreground">
-                    Diferencia: {formatCurrency(totales.total - (pedido?.total || 0))}
+                    Diferencia: {formatCurrency(totalFinal - (pedido?.total || 0))}
                   </p>
                 )}
               </div>
@@ -290,7 +278,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
               </Button>
               <Button 
                 onClick={handleConfirmar}
-                disabled={prepararPedido.isPending || totales.total === 0}
+                disabled={prepararPedido.isPending || totalFinal === 0}
                 size="lg"
                 className="min-w-[200px]"
               >
