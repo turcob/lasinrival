@@ -198,7 +198,7 @@ export default function Usuarios() {
           .eq('id', data.user.id);
 
         // Link to empleado if selected
-        if (formData.empleado_id) {
+        if (formData.empleado_id && formData.empleado_id !== '__none__') {
           await supabase
             .from('empleados')
             .update({ user_id: data.user.id })
@@ -431,7 +431,7 @@ export default function Usuarios() {
 
   const openLinkEmpleadoDialog = (user: UserWithRoles) => {
     setSelectedUser(user);
-    setSelectedEmpleadoId(user.empleado_id || '');
+    setSelectedEmpleadoId(user.empleado_id || '__none__');
     setLinkEmpleadoDialogOpen(true);
   };
 
@@ -445,8 +445,8 @@ export default function Usuarios() {
         .update({ user_id: null })
         .eq('user_id', selectedUser.id);
 
-      // Set new link if selected
-      if (selectedEmpleadoId) {
+      // Set new link if selected (not the placeholder)
+      if (selectedEmpleadoId && selectedEmpleadoId !== '__none__') {
         const { error } = await supabase
           .from('empleados')
           .update({ user_id: selectedUser.id })
@@ -644,16 +644,16 @@ export default function Usuarios() {
                 <div className="space-y-2">
                   <Label htmlFor="empleado">Vincular a Empleado</Label>
                   <Select
-                    value={formData.empleado_id}
+                    value={formData.empleado_id || '__none__'}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, empleado_id: value })
+                      setFormData({ ...formData, empleado_id: value === '__none__' ? '' : value })
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sin vincular (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin vincular</SelectItem>
+                      <SelectItem value="__none__">Sin vincular</SelectItem>
                       {getAvailableEmpleados().map((emp) => (
                         <SelectItem key={emp.id} value={emp.id}>
                           {emp.nombre}
@@ -852,7 +852,7 @@ export default function Usuarios() {
                   <SelectValue placeholder="Seleccionar empleado..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin vincular</SelectItem>
+                  <SelectItem value="__none__">Sin vincular</SelectItem>
                   {getAvailableEmpleados(selectedUser?.id).map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
                       {emp.nombre}
