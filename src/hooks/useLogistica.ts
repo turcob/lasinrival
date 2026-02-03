@@ -496,14 +496,57 @@ export function useActualizarEstadoParada() {
         updateData.observaciones = observaciones;
       }
 
+      // Actualizar la parada
       const { error } = await supabase
         .from('hoja_ruta_paradas')
         .update(updateData)
         .eq('id', id);
       if (error) throw error;
+
+      // Obtener la hoja de ruta asociada para verificar si todas las paradas están completas
+      const { data: parada } = await supabase
+        .from('hoja_ruta_paradas')
+        .select('hoja_ruta_id')
+        .eq('id', id)
+        .single();
+
+      if (parada?.hoja_ruta_id) {
+        // Verificar si todas las paradas tienen estado final
+        const estadosFinales = ['entregado', 'entrega_parcial', 'rechazado', 'no_entregado'];
+        
+        const { data: todasParadas } = await supabase
+          .from('hoja_ruta_paradas')
+          .select('estado')
+          .eq('hoja_ruta_id', parada.hoja_ruta_id);
+
+        if (todasParadas && todasParadas.length > 0) {
+          const todasCompletas = todasParadas.every(p => estadosFinales.includes(p.estado));
+          
+          if (todasCompletas) {
+            // Verificar que la hoja esté en estado 'en_ruta' antes de completarla
+            const { data: hojaRuta } = await supabase
+              .from('hojas_ruta')
+              .select('estado')
+              .eq('id', parada.hoja_ruta_id)
+              .single();
+
+            if (hojaRuta?.estado === 'en_ruta') {
+              // Completar automáticamente la hoja de ruta
+              await supabase
+                .from('hojas_ruta')
+                .update({ 
+                  estado: 'completada',
+                  hora_regreso: new Date().toISOString()
+                })
+                .eq('id', parada.hoja_ruta_id);
+            }
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-ruta'] });
+      queryClient.invalidateQueries({ queryKey: ['hojas-ruta'] });
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       toast({ title: 'Estado de parada actualizado' });
     },
