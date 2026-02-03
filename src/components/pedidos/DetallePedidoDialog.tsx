@@ -40,12 +40,12 @@ import {
   type PedidoEstado 
 } from '@/hooks/usePedidos';
 import { CambiarEstadoDialog } from './CambiarEstadoDialog';
-import { PrepararPedidoDialog } from './PrepararPedidoDialog';
 
 interface DetallePedidoDialogProps {
   pedidoId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onPrepararPedido?: (pedidoId: string) => void;
 }
 
 // Configuración visual de estados (incluye legacy para historial)
@@ -80,9 +80,8 @@ const flujoEstados: Record<string, PedidoEstado[]> = {
   anulado: [],
 };
 
-export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePedidoDialogProps) {
+export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPedido }: DetallePedidoDialogProps) {
   const [cambiarEstadoDialog, setCambiarEstadoDialog] = useState<PedidoEstado | null>(null);
-  const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
 
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const { data: historial } = usePedidoHistorial(pedidoId || undefined);
@@ -336,7 +335,11 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
                             key={estado}
                             variant="outline"
                             size="sm"
-                            onClick={() => setPrepararDialogOpen(true)}
+                            onClick={() => {
+                              if (onPrepararPedido && pedido) {
+                                onPrepararPedido(pedido.id);
+                              }
+                            }}
                           >
                             <Package className="h-4 w-4 mr-1" />
                             Preparar Pedido
@@ -366,26 +369,13 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
       </Dialog>
 
       {pedido && (
-        <>
-          <CambiarEstadoDialog
-            pedidoId={pedido.id}
-            estadoActual={estadoActual}
-            nuevoEstado={cambiarEstadoDialog}
-            open={!!cambiarEstadoDialog}
-            onOpenChange={(open) => !open && setCambiarEstadoDialog(null)}
-          />
-          <PrepararPedidoDialog
-            pedidoId={pedido.id}
-            open={prepararDialogOpen}
-            onOpenChange={(open) => {
-              setPrepararDialogOpen(open);
-              if (!open) {
-                // Cerrar el diálogo de detalle también si se completó la preparación
-                onOpenChange(false);
-              }
-            }}
-          />
-        </>
+        <CambiarEstadoDialog
+          pedidoId={pedido.id}
+          estadoActual={estadoActual}
+          nuevoEstado={cambiarEstadoDialog}
+          open={!!cambiarEstadoDialog}
+          onOpenChange={(open) => !open && setCambiarEstadoDialog(null)}
+        />
       )}
     </>
   );

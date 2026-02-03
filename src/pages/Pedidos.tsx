@@ -43,6 +43,7 @@ import {
 import { usePedidos, type PedidoEstado } from '@/hooks/usePedidos';
 import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
+import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
 
 // Estados principales del sistema
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -66,6 +67,7 @@ export default function Pedidos() {
   const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('todos');
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
+  const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
 
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
@@ -244,6 +246,16 @@ export default function Pedidos() {
         pedidoId={pedidoSeleccionado}
         open={!!pedidoSeleccionado}
         onOpenChange={(open) => !open && setPedidoSeleccionado(null)}
+        onPrepararPedido={(pedidoId) => {
+          setPedidoSeleccionado(null);
+          setPrepararPedidoId(pedidoId);
+        }}
+      />
+
+      <PrepararPedidoDialog
+        pedidoId={prepararPedidoId}
+        open={!!prepararPedidoId}
+        onOpenChange={(open) => !open && setPrepararPedidoId(null)}
       />
     </MainLayout>
   );
