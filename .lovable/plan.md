@@ -1,137 +1,194 @@
 
-
-# Plan: Ajustar Columna de Fecha y Lógica de Saldo Inicial
+# Plan: Simplificación de Estados de Pedidos
 
 ## Resumen
 
-Modificar el importador para:
-1. Usar la columna **"Fecha vto."** para la fecha de los movimientos
-2. Detectar **saldo inicial** cuando `Debe=0` y `Haber=0`, tomando el valor de la columna **"Importe"**
+Se modificara el sistema de pedidos para simplificar los estados y restringir las transiciones, alineándolo con el flujo real del negocio donde los vendedores crean pedidos, se preparan internamente, y solo pasan a "despachado" cuando logística los asigna a una hoja de ruta.
 
----
+## Cambios a Realizar
 
-## Cambios en el Archivo
+### 1. Modificación del Enum de Estados en Base de Datos
 
-### Archivo: `src/components/clientes/ExcelImporterCuentaCorriente.tsx`
+Actualizar el tipo `pedido_estado` para tener solo 4 estados:
 
-### 1. Actualizar la interfaz ClienteRow
-
-Agregar la nueva columna del Excel:
-
-```typescript
-interface ClienteRow {
-  Cliente: string;
-  'Tipo comprobante'?: string;
-  'Nro. comprobante'?: string;
-  Fecha?: string | number;
-  'Fecha vto.'?: string | number;  // NUEVO - columna de fecha a usar
-  Debe?: string | number;
-  Haber?: string | number;
-  Importe?: string | number;       // NUEVO - para saldo inicial
-  Acumulado?: string | number;
-  Estado?: string;
-}
+```sql
+-- Eliminar valores no usados del enum
+ALTER TYPE pedido_estado RENAME VALUE 'confirmado' TO 'preparado_old';
+ALTER TYPE pedido_estado RENAME VALUE 'entregado' TO 'entregado_old';
+ALTER TYPE pedido_estado RENAME VALUE 'parcial' TO 'parcial_old';
+ALTER TYPE pedido_estado RENAME VALUE 'devuelto' TO 'devuelto_old';
+ALTER TYPE pedido_estado RENAME VALUE 'anulado' TO 'rechazado';
 ```
 
-### 2. Modificar la lógica de determinación de tipo
+**Nota:** Por limitaciones de PostgreSQL, en lugar de modificar el enum existente, crearemos una migración que:
+- Marque pedidos antiguos con estados obsoletos
+- Actualice la lógica para solo usar: `pendiente`, `preparado`, `despachado`, `rechazado`
 
-Actualizar la función `determinarTipoMovimiento` para detectar saldo inicial cuando Debe=0 y Haber=0:
+### 2. Actualización de Tipos TypeScript
+
+**Archivo:** `src/hooks/usePedidos.ts`
 
 ```typescript
-const determinarTipoMovimiento = (row: ClienteRow): { tipo: TipoMovimiento; tipoOriginal: string } | null => {
-  const tipoComprobante = row['Tipo comprobante']?.toString().trim().toUpperCase();
-  
-  // Si no hay tipo de comprobante, verificar si es saldo inicial
-  if (!tipoComprobante || tipoComprobante === '') {
-    const debe = parseNumber(row.Debe);
-    const haber = parseNumber(row.Haber);
-    const importe = parseNumber(row.Importe);
-    
-    // NUEVO: Si Debe y Haber son 0, pero hay Importe -> saldo inicial
-    if (debe === 0 && haber === 0 && importe !== 0) {
-      return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
-    }
-    
-    // Caso anterior: si hay valores en Debe/Haber
-    if (debe !== 0 || haber !== 0) {
-      return { tipo: 'saldo_inicial', tipoOriginal: 'Saldo inicial' };
-    }
-    
-    return null;
-  }
-  
-  // FAC, REC, NCR sin cambios
-  if (tipoComprobante === 'FAC') {
-    return { tipo: 'compra', tipoOriginal: 'FAC' };
-  }
-  if (tipoComprobante === 'REC') {
-    return { tipo: 'pago', tipoOriginal: 'REC' };
-  }
-  if (tipoComprobante === 'NCR') {
-    return { tipo: 'nota_credito', tipoOriginal: 'NCR' };
-  }
-  
-  return null;
+// ANTES
+export type PedidoEstado = 
+  | 'pendiente' 
+  | 'confirmado' 
+  | 'preparado' 
+  | 'despachado' 
+  | 'entregado' 
+  | 'parcial' 
+  | 'devuelto' 
+  | 'anulado';
+
+// DESPUÉS
+export type PedidoEstado = 
+  | 'pendiente' 
+  | 'preparado' 
+  | 'despachado' 
+  | 'rechazado';
+```
+
+### 3. Actualización del Flujo de Estados en UI
+
+**Archivo:** `src/components/pedidos/DetallePedidoDialog.tsx`
+
+```typescript
+// ANTES
+const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
+  pendiente: ['confirmado', 'anulado'],
+  confirmado: ['preparado', 'anulado'],
+  preparado: ['despachado', 'anulado'],
+  despachado: ['entregado', 'parcial', 'devuelto'],
+  ...
+};
+
+// DESPUÉS
+const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
+  pendiente: ['preparado', 'rechazado'],
+  preparado: ['rechazado'],  // Sin opción de despachado manual
+  despachado: [],            // Solo logística gestiona
+  rechazado: [],
 };
 ```
 
-### 3. Modificar el cálculo del monto
+### 4. Actualización de Configuración Visual de Estados
 
-En `handleFileSelect`, actualizar la lógica para usar Importe cuando corresponda:
+**Archivos:** `src/pages/Pedidos.tsx` y `src/components/pedidos/DetallePedidoDialog.tsx`
 
 ```typescript
-let monto: number;
-if (tipoInfo.tipo === 'saldo_inicial') {
-  const debe = parseNumber(row.Debe);
-  const haber = parseNumber(row.Haber);
-  const importe = parseNumber(row.Importe);
+const estadoConfig = {
+  pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
+  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
+  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
+};
+```
+
+### 5. Automatización del Estado "Despachado"
+
+**Archivo:** `src/hooks/useLogistica.ts`
+
+Modificar `useCrearHojaRuta` y `useAgregarParada` para que al asignar un pedido a una hoja de ruta, automáticamente cambie su estado a `despachado`:
+
+```typescript
+// En useCrearHojaRuta, después de insertar las paradas:
+if (data.pedido_ids && data.pedido_ids.length > 0) {
+  // Insertar paradas...
   
-  // NUEVO: Si Debe y Haber son 0, usar Importe
-  if (debe === 0 && haber === 0) {
-    monto = importe;
-  } else {
-    monto = debe - haber;
+  // Cambiar estado de pedidos a despachado
+  await supabase
+    .from('pedidos')
+    .update({ estado: 'despachado' })
+    .in('id', data.pedido_ids);
+    
+  // Registrar en historial
+  for (const pedidoId of data.pedido_ids) {
+    await supabase.from('pedido_historial').insert({
+      pedido_id: pedidoId,
+      estado_anterior: 'preparado',
+      estado_nuevo: 'despachado',
+      usuario_id: user.id,
+      observaciones: `Asignado a hoja de ruta #${hojaRuta.numero_hoja}`
+    });
   }
-} else if (tipoInfo.tipo === 'compra') {
-  monto = parseNumber(row.Debe);
-} else {
-  monto = parseNumber(row.Haber);
 }
 ```
 
-### 4. Cambiar la columna de fecha
+### 6. Actualización de Pedidos Disponibles para Ruta
 
-En `handleFileSelect`, cambiar de `row.Fecha` a `row['Fecha vto.']`:
+**Archivo:** `src/hooks/useLogistica.ts`
+
+Modificar `usePedidosDisponiblesParaRuta` para que solo muestre pedidos en estado `preparado`:
 
 ```typescript
-// Antes:
-fecha: parseExcelDate(row.Fecha),
+// ANTES
+.in('estado', ['confirmado', 'preparado', 'despachado'])
 
-// Después:
-fecha: parseExcelDate(row['Fecha vto.']),
+// DESPUÉS  
+.eq('estado', 'preparado')
 ```
 
----
+### 7. Eliminación de Funcionalidad de Rendición desde Pedidos
 
-## Resumen de Cambios
+**Archivo:** `src/components/pedidos/DetallePedidoDialog.tsx`
 
-| Aspecto | Antes | Después |
-|---------|-------|---------|
-| Columna fecha | `Fecha` | `Fecha vto.` |
-| Saldo inicial | Solo si Debe o Haber != 0 | También si Debe=0, Haber=0 e Importe != 0 |
-| Monto saldo inicial | `Debe - Haber` | Si Debe=Haber=0 usa `Importe`, sino `Debe - Haber` |
+Remover el botón "Rendir Pedido" y el componente `RendirPedidoDialog` de la vista de detalle de pedidos, ya que esta gestión se realiza exclusivamente desde Logística.
 
----
+### 8. Actualización del Diálogo de Cambio de Estado
 
-## Ejemplo de Comportamiento
+**Archivo:** `src/components/pedidos/CambiarEstadoDialog.tsx`
 
-**Fila del Excel:**
-| Cliente | Tipo comprobante | Debe | Haber | Importe |
-|---------|------------------|------|-------|---------|
-| 010 - Cliente X | (vacío) | 0 | 0 | 15,000 |
+Adaptar los labels para usar "Rechazado" en lugar de "Anulado":
 
-**Resultado:**
-- Tipo: `saldo_inicial`
-- Monto: `15,000` (tomado de Importe)
-- Concepto: "Saldo inicial importado"
+```typescript
+const estadoLabels: Record<PedidoEstado, string> = {
+  pendiente: 'Pendiente',
+  preparado: 'Preparado',
+  despachado: 'Despachado',
+  rechazado: 'Rechazado',
+};
+```
 
+## Archivos a Modificar
+
+| Archivo | Cambios |
+|---------|---------|
+| `src/hooks/usePedidos.ts` | Actualizar tipo `PedidoEstado`, eliminar función `useRendirPedido` |
+| `src/pages/Pedidos.tsx` | Actualizar `estadoConfig` con 4 estados |
+| `src/components/pedidos/DetallePedidoDialog.tsx` | Actualizar flujo de estados, eliminar botón rendir |
+| `src/components/pedidos/CambiarEstadoDialog.tsx` | Actualizar labels de estados |
+| `src/hooks/useLogistica.ts` | Automatizar cambio a despachado, filtrar solo preparados |
+| `src/components/logistica/NuevaHojaRutaDialog.tsx` | Sin cambios (usa hook actualizado) |
+
+## Migración de Datos Existentes
+
+Se creara una migración SQL para:
+1. Convertir pedidos con estado `confirmado` a `preparado`
+2. Convertir pedidos con estado `anulado` a `rechazado`
+3. Mantener `entregado`, `parcial`, `devuelto` como estados legacy solo visibles (para historial)
+
+```sql
+-- Migrar estados existentes
+UPDATE pedidos SET estado = 'preparado' WHERE estado = 'confirmado';
+UPDATE pedidos SET estado = 'rechazado' WHERE estado = 'anulado';
+```
+
+## Flujo Final
+
+```text
++------------+     +-----------+     +------------+
+| Pendiente  | --> | Preparado | --> | Despachado |
++------------+     +-----------+     +------------+
+      |                  |                 |
+      v                  v                 v
++------------+     (automático        (Gestionado
+| Rechazado  |      desde             en Logística)
++------------+      Logística)
+```
+
+## Detalles Tecnicos
+
+- El cambio de `pendiente` a `preparado` se realiza manualmente desde el modulo de Pedidos
+- El cambio de `pendiente` o `preparado` a `rechazado` se realiza manualmente desde Pedidos
+- El cambio a `despachado` SOLO ocurre automaticamente al asignar el pedido a una hoja de ruta
+- Las devoluciones, cobranzas y rendicion se gestionan exclusivamente desde el modulo de Logistica
