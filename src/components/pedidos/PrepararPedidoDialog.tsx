@@ -59,9 +59,9 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
 
-  // Initialize lines from pedido
+  // Initialize lines from pedido - only when dialog opens or pedido loads
   useEffect(() => {
-    if (pedido?.detalles) {
+    if (open && pedido?.detalles) {
       setLineas(pedido.detalles.map((d: PedidoDetalle) => {
         const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
         return {
@@ -71,14 +71,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           descripcion: d.producto?.descripcion || '',
           unidadMedida: d.producto?.unidad_medida || 'UN',
           cantidadPedida: d.cantidad_pedida,
-          cantidadPreparada: d.cantidad_pedida, // Default to full quantity
+          cantidadPreparada: d.cantidad_pedida,
           cantidadTexto: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
           precioUnitario: d.precio_unitario,
           descuentoPorcentaje: d.descuento_porcentaje || 0,
         };
       }));
     }
-  }, [pedido]);
+  }, [open, pedido?.id]); // Solo reinicializar cuando cambia el pedido o se abre el diálogo
 
   const handleCantidadChange = (detalleId: string, value: string, esPorPeso: boolean) => {
     setLineas(prev => prev.map(l => {
