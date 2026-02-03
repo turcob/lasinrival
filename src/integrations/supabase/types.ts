@@ -3178,6 +3178,7 @@ export type Database = {
         | "parcial"
         | "devuelto"
         | "anulado"
+        | "rechazado"
       solicitud_descuento_estado:
         | "pendiente"
         | "aprobada"
@@ -3330,6 +3331,7 @@ export const Constants = {
         "parcial",
         "devuelto",
         "anulado",
+        "rechazado",
       ],
       solicitud_descuento_estado: [
         "pendiente",
