@@ -87,13 +87,13 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     ));
   };
 
-  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean) => {
+  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean, inputValue: string) => {
     setLineas(prev => prev.map(l => {
       if (l.detalleId !== detalleId) return l;
       
-      // Parsear el valor actual del texto
-      const normalizedValue = l.cantidadTexto.replace(',', '.');
-      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(l.cantidadTexto) || 0);
+      // Parsear el valor directamente del input (no del estado)
+      const normalizedValue = inputValue.replace(',', '.');
+      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(inputValue) || 0);
       const cantidadFinal = Math.min(Math.max(0, cantidad), l.cantidadPedida);
       
       return { 
@@ -226,7 +226,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                             inputMode="decimal"
                             value={linea.cantidadTexto}
                             onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value)}
-                            onBlur={() => handleCantidadBlur(linea.detalleId, esPorPeso)}
+                            onBlur={(e) => handleCantidadBlur(linea.detalleId, esPorPeso, e.target.value)}
                             className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
                           />
                         </TableCell>
