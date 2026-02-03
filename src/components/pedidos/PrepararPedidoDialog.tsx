@@ -97,16 +97,6 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     }));
   };
 
-  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean) => {
-    setLineas(prev => prev.map(l => {
-      if (l.detalleId !== detalleId) return l;
-      // Reformatear al perder el foco
-      return {
-        ...l,
-        cantidadTexto: formatCantidadInicial(l.cantidadPreparada, esPorPeso)
-      };
-    }));
-  };
 
   const calcularSubtotalLinea = (linea: LineaPreparacion) => {
     const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
@@ -229,7 +219,6 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                             inputMode="decimal"
                             value={linea.cantidadTexto}
                             onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value, esPorPeso)}
-                            onBlur={() => handleCantidadBlur(linea.detalleId, esPorPeso)}
                             className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
                           />
                         </TableCell>
