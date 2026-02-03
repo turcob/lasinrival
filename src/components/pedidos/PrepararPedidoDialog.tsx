@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Printer, Package, AlertTriangle, X, Check } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Package, AlertTriangle, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,7 @@ interface LineaPreparacion {
   descripcion: string;
   unidadMedida: string;
   cantidadPedida: number;
-  cantidadPreparada: number;
+  inputValue: string; // texto del input
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
@@ -33,10 +33,11 @@ const isProductoPorPeso = (unidadMedida: string) => {
 
 const parseCantidad = (value: string, esPorPeso: boolean): number => {
   const normalized = value.replace(',', '.');
-  return esPorPeso ? (parseFloat(normalized) || 0) : (parseInt(value) || 0);
+  const parsed = esPorPeso ? parseFloat(normalized) : parseInt(normalized);
+  return isNaN(parsed) ? 0 : parsed;
 };
 
-const formatCantidad = (cantidad: number, esPorPeso: boolean): string => {
+const formatCantidadInicial = (cantidad: number, esPorPeso: boolean): string => {
   return esPorPeso ? cantidad.toFixed(3).replace('.', ',') : cantidad.toString();
 };
 
@@ -46,7 +47,6 @@ const formatCurrency = (value: number) => {
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
-  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
@@ -54,42 +54,46 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
   // Initialize lines when dialog opens
   useEffect(() => {
     if (open && pedido?.detalles) {
-      setLineas(pedido.detalles.map((d: PedidoDetalle) => ({
-        detalleId: d.id,
-        productoId: d.producto_id,
-        codigo: d.producto?.codigo_articulo || '',
-        descripcion: d.producto?.descripcion || '',
-        unidadMedida: d.producto?.unidad_medida || 'UN',
-        cantidadPedida: d.cantidad_pedida,
-        cantidadPreparada: d.cantidad_pedida,
-        precioUnitario: d.precio_unitario,
-        descuentoPorcentaje: d.descuento_porcentaje || 0,
-      })));
+      setLineas(pedido.detalles.map((d: PedidoDetalle) => {
+        const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
+        return {
+          detalleId: d.id,
+          productoId: d.producto_id,
+          codigo: d.producto?.codigo_articulo || '',
+          descripcion: d.producto?.descripcion || '',
+          unidadMedida: d.producto?.unidad_medida || 'UN',
+          cantidadPedida: d.cantidad_pedida,
+          inputValue: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
+          precioUnitario: d.precio_unitario,
+          descuentoPorcentaje: d.descuento_porcentaje || 0,
+        };
+      }));
     }
   }, [open, pedido?.id]);
 
-  // Clear refs when dialog closes
+  // Reset when dialog closes
   useEffect(() => {
     if (!open) {
-      inputRefs.current.clear();
+      setLineas([]);
     }
   }, [open]);
 
-  const handleInputChange = useCallback((detalleId: string, esPorPeso: boolean, maxCantidad: number) => {
-    const input = inputRefs.current.get(detalleId);
-    if (!input) return;
-    
-    const cantidad = parseCantidad(input.value, esPorPeso);
-    const cantidadFinal = Math.min(Math.max(0, cantidad), maxCantidad);
-    
+  const handleInputChange = (detalleId: string, value: string) => {
     setLineas(prev => prev.map(l => 
-      l.detalleId === detalleId ? { ...l, cantidadPreparada: cantidadFinal } : l
+      l.detalleId === detalleId ? { ...l, inputValue: value } : l
     ));
-  }, []);
+  };
+
+  const getCantidadPreparada = (linea: LineaPreparacion): number => {
+    const esPorPeso = isProductoPorPeso(linea.unidadMedida);
+    const cantidad = parseCantidad(linea.inputValue, esPorPeso);
+    return Math.min(Math.max(0, cantidad), linea.cantidadPedida);
+  };
 
   const calcularSubtotalLinea = (linea: LineaPreparacion) => {
+    const cantidadPreparada = getCantidadPreparada(linea);
     const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
-    return linea.cantidadPreparada * precioConDescuento;
+    return cantidadPreparada * precioConDescuento;
   };
 
   const totales = useMemo(() => {
@@ -97,7 +101,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     return { subtotal, total: subtotal };
   }, [lineas]);
 
-  const hayDiferencias = lineas.some(l => l.cantidadPreparada !== l.cantidadPedida);
+  const hayDiferencias = lineas.some(l => getCantidadPreparada(l) !== l.cantidadPedida);
 
   const handleConfirmar = async () => {
     if (!pedido) return;
@@ -114,7 +118,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
         codigo: l.codigo,
         descripcion: l.descripcion,
         cantidadPedida: l.cantidadPedida,
-        cantidadPreparada: l.cantidadPreparada,
+        cantidadPreparada: getCantidadPreparada(l),
         precioUnitario: l.precioUnitario,
         descuentoPorcentaje: l.descuentoPorcentaje,
         subtotal: calcularSubtotalLinea(l),
@@ -131,10 +135,10 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           direccion: pedido.cliente?.direccion || '',
           cuit: pedido.cliente?.dni_cuit || '',
         },
-        lineas: lineas.filter(l => l.cantidadPreparada > 0).map(l => ({
+        lineas: lineas.filter(l => getCantidadPreparada(l) > 0).map(l => ({
           codigo: l.codigo,
           descripcion: l.descripcion,
-          cantidad: l.cantidadPreparada,
+          cantidad: getCantidadPreparada(l),
           precioUnitario: l.precioUnitario,
           descuento: l.descuentoPorcentaje,
           subtotal: calcularSubtotalLinea(l),
@@ -177,7 +181,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
           <div className="max-w-4xl mx-auto space-y-4">
             {lineas.map((linea) => {
               const esPorPeso = isProductoPorPeso(linea.unidadMedida);
-              const diferencia = linea.cantidadPreparada !== linea.cantidadPedida;
+              const cantidadPreparada = getCantidadPreparada(linea);
+              const diferencia = cantidadPreparada !== linea.cantidadPedida;
               const subtotal = calcularSubtotalLinea(linea);
               
               return (
@@ -211,23 +216,20 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                     <div className="flex items-center gap-4">
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground mb-1">Pedido</p>
-                        <p className="font-medium">
-                          {formatCantidad(linea.cantidadPedida, esPorPeso)} {linea.unidadMedida}
+                        <p className="font-medium text-lg">
+                          {formatCantidadInicial(linea.cantidadPedida, esPorPeso)} {linea.unidadMedida}
                         </p>
                       </div>
 
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
                         <Input
-                          ref={(el) => {
-                            if (el) inputRefs.current.set(linea.detalleId, el);
-                          }}
                           type="text"
                           inputMode="decimal"
-                          defaultValue={formatCantidad(linea.cantidadPedida, esPorPeso)}
-                          onChange={() => handleInputChange(linea.detalleId, esPorPeso, linea.cantidadPedida)}
-                          className={`w-28 text-center font-medium ${
-                            diferencia ? 'border-amber-500 bg-white' : ''
+                          value={linea.inputValue}
+                          onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
+                          className={`w-32 text-center font-medium text-lg ${
+                            diferencia ? 'border-amber-500 bg-amber-50' : ''
                           }`}
                         />
                       </div>
