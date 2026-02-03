@@ -998,44 +998,6 @@ export type Database = {
         }
         Relationships: []
       }
-      hoja_ruta: {
-        Row: {
-          created_at: string | null
-          estado: string
-          fecha: string
-          id: string
-          observaciones: string | null
-          updated_at: string | null
-          usuario_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          estado?: string
-          fecha?: string
-          id?: string
-          observaciones?: string | null
-          updated_at?: string | null
-          usuario_id: string
-        }
-        Update: {
-          created_at?: string | null
-          estado?: string
-          fecha?: string
-          id?: string
-          observaciones?: string | null
-          updated_at?: string | null
-          usuario_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hoja_ruta_usuario_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       hoja_ruta_cobros: {
         Row: {
           created_at: string
@@ -2296,15 +2258,7 @@ export type Database = {
           observaciones?: string | null
           tipo_diferencia?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "rendiciones_hoja_ruta_id_fkey"
-            columns: ["hoja_ruta_id"]
-            isOneToOne: false
-            referencedRelation: "hoja_ruta"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       role_permissions: {
         Row: {
@@ -2630,39 +2584,6 @@ export type Database = {
           id?: string
           rol_codigo?: string | null
           role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      usuarios: {
-        Row: {
-          activo: boolean | null
-          created_at: string | null
-          email: string | null
-          id: string
-          nombre: string
-          rol: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          activo?: boolean | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          nombre: string
-          rol?: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          activo?: boolean | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          nombre?: string
-          rol?: string
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -3142,7 +3063,7 @@ export type Database = {
     }
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
-      get_usuario_id: { Args: never; Returns: string }
+      get_empleado_id: { Args: never; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_permission: {
         Args: {
