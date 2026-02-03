@@ -80,19 +80,26 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     }
   }, [open, pedido?.id]); // Solo reinicializar cuando cambia el pedido o se abre el diálogo
 
-  const handleCantidadChange = (detalleId: string, value: string, esPorPeso: boolean) => {
+  const handleCantidadChange = (detalleId: string, value: string) => {
+    // Solo actualizar el texto mientras escribe
+    setLineas(prev => prev.map(l => 
+      l.detalleId === detalleId ? { ...l, cantidadTexto: value } : l
+    ));
+  };
+
+  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean) => {
     setLineas(prev => prev.map(l => {
       if (l.detalleId !== detalleId) return l;
       
-      // Actualizar el texto del input directamente
-      const normalizedValue = value.replace(',', '.');
-      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(value) || 0);
+      // Parsear el valor actual del texto
+      const normalizedValue = l.cantidadTexto.replace(',', '.');
+      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(l.cantidadTexto) || 0);
       const cantidadFinal = Math.min(Math.max(0, cantidad), l.cantidadPedida);
       
       return { 
         ...l, 
-        cantidadTexto: value,
-        cantidadPreparada: cantidadFinal 
+        cantidadPreparada: cantidadFinal,
+        cantidadTexto: formatCantidadInicial(cantidadFinal, esPorPeso)
       };
     }));
   };
@@ -218,7 +225,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                             type="text"
                             inputMode="decimal"
                             value={linea.cantidadTexto}
-                            onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value, esPorPeso)}
+                            onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value)}
+                            onBlur={() => handleCantidadBlur(linea.detalleId, esPorPeso)}
                             className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
                           />
                         </TableCell>
