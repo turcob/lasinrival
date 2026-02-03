@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useCambiarEstadoPedido, useAnularPedido, type PedidoEstado } from '@/hooks/usePedidos';
+import { useCambiarEstadoPedido, useRechazarPedido, type PedidoEstado } from '@/hooks/usePedidos';
 
 interface CambiarEstadoDialogProps {
   pedidoId: string;
@@ -20,11 +20,13 @@ interface CambiarEstadoDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const estadoLabels: Record<PedidoEstado, string> = {
+const estadoLabels: Record<string, string> = {
   pendiente: 'Pendiente',
-  confirmado: 'Confirmado',
   preparado: 'Preparado',
   despachado: 'Despachado',
+  rechazado: 'Rechazado',
+  // Legacy labels para historial
+  confirmado: 'Confirmado',
   entregado: 'Entregado',
   parcial: 'Entrega Parcial',
   devuelto: 'Devuelto',
@@ -41,15 +43,15 @@ export function CambiarEstadoDialog({
   const [observaciones, setObservaciones] = useState('');
   
   const cambiarEstado = useCambiarEstadoPedido();
-  const anularPedido = useAnularPedido();
+  const rechazarPedido = useRechazarPedido();
 
   if (!nuevoEstado) return null;
 
-  const esAnulacion = nuevoEstado === 'anulado';
+  const esRechazo = nuevoEstado === 'rechazado';
 
   const handleConfirmar = async () => {
-    if (esAnulacion) {
-      await anularPedido.mutateAsync({
+    if (esRechazo) {
+      await rechazarPedido.mutateAsync({
         pedidoId,
         motivo: observaciones || 'Sin motivo especificado'
       });
@@ -64,30 +66,30 @@ export function CambiarEstadoDialog({
     onOpenChange(false);
   };
 
-  const isPending = cambiarEstado.isPending || anularPedido.isPending;
+  const isPending = cambiarEstado.isPending || rechazarPedido.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {esAnulacion ? 'Anular Pedido' : `Cambiar a ${estadoLabels[nuevoEstado]}`}
+            {esRechazo ? 'Rechazar Pedido' : `Cambiar a ${estadoLabels[nuevoEstado] || nuevoEstado}`}
           </DialogTitle>
           <DialogDescription>
-            {esAnulacion 
-              ? 'Esta acción no se puede deshacer. El pedido quedará marcado como anulado.'
-              : `El pedido pasará de "${estadoLabels[estadoActual]}" a "${estadoLabels[nuevoEstado]}".`
+            {esRechazo 
+              ? 'Esta acción no se puede deshacer. El pedido quedará marcado como rechazado.'
+              : `El pedido pasará de "${estadoLabels[estadoActual] || estadoActual}" a "${estadoLabels[nuevoEstado] || nuevoEstado}".`
             }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>{esAnulacion ? 'Motivo de anulación *' : 'Observaciones (opcional)'}</Label>
+            <Label>{esRechazo ? 'Motivo de rechazo *' : 'Observaciones (opcional)'}</Label>
             <Textarea
               value={observaciones}
               onChange={e => setObservaciones(e.target.value)}
-              placeholder={esAnulacion ? 'Ingrese el motivo de la anulación...' : 'Agregar comentarios...'}
+              placeholder={esRechazo ? 'Ingrese el motivo del rechazo...' : 'Agregar comentarios...'}
               rows={3}
             />
           </div>
@@ -98,9 +100,9 @@ export function CambiarEstadoDialog({
             Cancelar
           </Button>
           <Button 
-            variant={esAnulacion ? 'destructive' : 'default'}
+            variant={esRechazo ? 'destructive' : 'default'}
             onClick={handleConfirmar}
-            disabled={isPending || (esAnulacion && !observaciones.trim())}
+            disabled={isPending || (esRechazo && !observaciones.trim())}
           >
             {isPending ? 'Procesando...' : 'Confirmar'}
           </Button>

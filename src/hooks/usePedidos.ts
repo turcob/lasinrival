@@ -3,11 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Estados activos del sistema de pedidos
 export type PedidoEstado = 
   | 'pendiente' 
-  | 'confirmado' 
   | 'preparado' 
   | 'despachado' 
+  | 'rechazado'
+  // Estados legacy (solo para historial)
+  | 'confirmado'
   | 'entregado' 
   | 'parcial' 
   | 'devuelto' 
@@ -582,7 +585,7 @@ export function useRendirPedido() {
   });
 }
 
-export function useAnularPedido() {
+export function useRechazarPedido() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -599,13 +602,13 @@ export function useAnularPedido() {
 
       await supabase
         .from('pedidos')
-        .update({ estado: 'anulado' })
+        .update({ estado: 'rechazado' })
         .eq('id', pedidoId);
 
       await supabase.from('pedido_historial').insert({
         pedido_id: pedidoId,
         estado_anterior: pedido?.estado,
-        estado_nuevo: 'anulado',
+        estado_nuevo: 'rechazado',
         usuario_id: user.id,
         observaciones: motivo
       });
@@ -613,11 +616,11 @@ export function useAnularPedido() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       queryClient.invalidateQueries({ queryKey: ['pedido'] });
-      toast({ title: 'Pedido anulado' });
+      toast({ title: 'Pedido rechazado' });
     },
     onError: (error) => {
       toast({ 
-        title: 'Error al anular pedido', 
+        title: 'Error al rechazar pedido', 
         description: error.message,
         variant: 'destructive' 
       });

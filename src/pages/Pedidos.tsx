@@ -44,16 +44,22 @@ import { usePedidos, type PedidoEstado } from '@/hooks/usePedidos';
 import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 
-const estadoConfig: Record<PedidoEstado, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
+// Estados principales del sistema
+const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
+  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
+  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
+  // Estados legacy (solo para visualización de pedidos históricos)
   confirmado: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
-  preparado: { label: 'Preparado', color: 'bg-purple-100 text-purple-800', icon: Package },
-  despachado: { label: 'Despachado', color: 'bg-indigo-100 text-indigo-800', icon: Truck },
   entregado: { label: 'Entregado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   parcial: { label: 'Parcial', color: 'bg-orange-100 text-orange-800', icon: AlertTriangle },
-  devuelto: { label: 'Devuelto', color: 'bg-red-100 text-red-800', icon: RotateCcw },
+  devuelto: { label: 'Devuelto', color: 'bg-red-100 text-red-100', icon: RotateCcw },
   anulado: { label: 'Anulado', color: 'bg-gray-100 text-gray-800', icon: XCircle },
 };
+
+// Solo estos estados se muestran en el filtro y estadísticas
+const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
   const [busqueda, setBusqueda] = useState('');
@@ -108,9 +114,9 @@ export default function Pedidos() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos los estados</SelectItem>
-              {Object.entries(estadoConfig).map(([key, config]) => (
+              {estadosActivos.map((key) => (
                 <SelectItem key={key} value={key}>
-                  {config.label}
+                  {estadoConfig[key]?.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -122,8 +128,9 @@ export default function Pedidos() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {Object.entries(estadoConfig).slice(0, 6).map(([key, config]) => {
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {estadosActivos.map((key) => {
+            const config = estadoConfig[key];
             const count = pedidos?.filter(p => p.estado === key).length || 0;
             const Icon = config.icon;
             return (
