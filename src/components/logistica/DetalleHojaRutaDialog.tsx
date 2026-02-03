@@ -13,7 +13,7 @@ import {
   useActualizarEstadoParada,
   useEliminarParada,
   useCobrosHojaRuta,
-  useDevolucionesParada,
+  useDevolucionesHojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
@@ -70,10 +70,10 @@ interface DetalleHojaRutaDialogProps {
 export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: DetalleHojaRutaDialogProps) {
   const { data: hojaRuta, isLoading, refetch } = useHojaRuta(hojaRutaId || undefined);
   const { data: cobros } = useCobrosHojaRuta(hojaRutaId || undefined);
+  const { data: devoluciones } = useDevolucionesHojaRuta(hojaRutaId || undefined);
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
-
   // Estados para diálogos de cobro, rendición y devoluciones
   const [cobroDialog, setCobroDialog] = useState<{
     open: boolean;
@@ -368,6 +368,72 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
+
+            {/* Sección de Devoluciones Registradas */}
+            {devoluciones && devoluciones.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-amber-600" />
+                  Devoluciones Registradas ({devoluciones.length})
+                </h3>
+                
+                <div className="border border-amber-200 rounded-lg divide-y bg-amber-50/50 max-h-[200px] overflow-y-auto">
+                  {devoluciones.map((devolucion: any) => (
+                    <div key={devolucion.id} className="p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">
+                          {devolucion.pedido_detalle?.producto?.descripcion || 'Producto'}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {devolucion.cantidad} un.
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="capitalize">
+                          {devolucion.motivo?.replace(/_/g, ' ') || 'Sin motivo'}
+                        </span>
+                        <span>
+                          {format(new Date(devolucion.created_at), 'dd/MM HH:mm', { locale: es })}
+                        </span>
+                      </div>
+                      {devolucion.detalle_motivo && (
+                        <p className="text-xs text-muted-foreground italic">
+                          {devolucion.detalle_motivo}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sección de Cobros Registrados */}
+            {cobros && cobros.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-green-600" />
+                  Cobros Registrados ({cobros.length})
+                </h3>
+                
+                <div className="border border-green-200 rounded-lg divide-y bg-green-50/50 max-h-[200px] overflow-y-auto">
+                  {cobros.map((cobro: any) => (
+                    <div key={cobro.id} className="p-3 flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-sm">
+                          ${cobro.monto?.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {cobro.forma_pago?.nombre || cobro.medio_pago || 'Efectivo'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(cobro.created_at), 'dd/MM HH:mm', { locale: es })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Botón de Rendición - visible cuando la ruta está en curso o completada */}
             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && (
