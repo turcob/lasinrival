@@ -36,11 +36,17 @@ interface LineaPreparacion {
   productoId: string | null;
   codigo: string;
   descripcion: string;
+  unidadMedida: string;
   cantidadPedida: number;
   cantidadPreparada: number;
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
+
+const isProductoPorPeso = (unidadMedida: string) => {
+  const unidad = (unidadMedida || '').toUpperCase().replace('.', '').trim();
+  return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
+};
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
@@ -56,6 +62,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
         productoId: d.producto_id,
         codigo: d.producto?.codigo_articulo || '',
         descripcion: d.producto?.descripcion || '',
+        unidadMedida: d.producto?.unidad_medida || 'UN',
         cantidadPedida: d.cantidad_pedida,
         cantidadPreparada: d.cantidad_pedida, // Default to full quantity
         precioUnitario: d.precio_unitario,
@@ -64,8 +71,10 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     }
   }, [pedido]);
 
-  const handleCantidadChange = (detalleId: string, value: string) => {
-    const cantidad = parseInt(value) || 0;
+  const handleCantidadChange = (detalleId: string, value: string, esPorPeso: boolean) => {
+    // Normalize comma to dot for decimal parsing
+    const normalizedValue = value.replace(',', '.');
+    const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(value) || 0);
     setLineas(prev => prev.map(l => 
       l.detalleId === detalleId 
         ? { ...l, cantidadPreparada: Math.min(Math.max(0, cantidad), l.cantidadPedida) }
@@ -172,23 +181,40 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                 <TableBody>
                   {lineas.map((linea) => {
                     const diferencia = linea.cantidadPreparada !== linea.cantidadPedida;
+                    const esPorPeso = isProductoPorPeso(linea.unidadMedida);
                     return (
                       <TableRow key={linea.detalleId} className={diferencia ? 'bg-yellow-50' : ''}>
                         <TableCell className="font-mono text-sm">{linea.codigo}</TableCell>
-                        <TableCell>{linea.descripcion}</TableCell>
-                        <TableCell className="text-center">{linea.cantidadPedida}</TableCell>
+                        <TableCell>
+                          <div>{linea.descripcion}</div>
+                          {esPorPeso && (
+                            <span className="text-xs text-muted-foreground">Por peso (kg)</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {esPorPeso 
+                            ? linea.cantidadPedida.toFixed(3).replace('.', ',')
+                            : linea.cantidadPedida
+                          } {linea.unidadMedida}
+                        </TableCell>
                         <TableCell>
                           <Input
-                            type="number"
+                            type={esPorPeso ? "text" : "number"}
+                            inputMode={esPorPeso ? "decimal" : "numeric"}
                             min={0}
                             max={linea.cantidadPedida}
-                            value={linea.cantidadPreparada}
-                            onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value)}
-                            className={`w-20 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
+                            step={esPorPeso ? "0.001" : "1"}
+                            value={esPorPeso 
+                              ? linea.cantidadPreparada.toFixed(3).replace('.', ',')
+                              : linea.cantidadPreparada
+                            }
+                            onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value, esPorPeso)}
+                            className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
                           />
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(linea.precioUnitario)}
+                          {esPorPeso && <span className="text-xs text-muted-foreground">/kg</span>}
                           {linea.descuentoPorcentaje > 0 && (
                             <span className="text-xs text-muted-foreground ml-1">
                               (-{linea.descuentoPorcentaje}%)

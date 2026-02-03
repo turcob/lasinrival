@@ -69,6 +69,7 @@ export interface PedidoDetalle {
     descripcion: string;
     codigo_articulo: string;
     stock_actual: number | null;
+    unidad_medida: string | null;
   };
 }
 
@@ -144,7 +145,7 @@ export function usePedido(id: string | undefined) {
         .from('pedido_detalles')
         .select(`
           *,
-          producto:productos(id, descripcion, codigo_articulo, stock_actual)
+          producto:productos(id, descripcion, codigo_articulo, stock_actual, unidad_medida)
         `)
         .eq('pedido_id', id);
 
