@@ -65,8 +65,8 @@ export function RendicionHojaRutaDialog({
 
   const loadData = async () => {
     try {
-      // Cargar cobros de la hoja de ruta
-      const { data: cobrosData } = await supabase
+      // Cargar cobros de la hoja de ruta (tabla nueva)
+      const { data: cobrosNuevos } = await supabase
         .from('hoja_ruta_cobros')
         .select(`
           id,
@@ -78,41 +78,75 @@ export function RendicionHojaRutaDialog({
         `)
         .eq('hoja_ruta_id', hojaRutaId);
 
-      if (cobrosData) {
-        const formattedCobros = cobrosData.map(c => ({
-          ...c,
-          forma_pago: c.forma_pago as unknown as { id: string; nombre: string },
-          pedido: c.pedido as unknown as { numero_pedido: number },
-          parada: c.parada as unknown as { id: string },
-        }));
-        setCobros(formattedCobros);
+      // También cargar cobros de la tabla legacy
+      const { data: paradas } = await supabase
+        .from('hoja_ruta_paradas')
+        .select('id')
+        .eq('hoja_ruta_id', hojaRutaId);
+      
+      const paradasIds = paradas?.map(p => p.id) || [];
+      
+      let cobrosLegacy: Cobro[] = [];
+      if (paradasIds.length > 0) {
+        const { data: cobrosViejos } = await supabase
+          .from('cobros')
+          .select(`
+            id,
+            monto,
+            referencia,
+            medio_pago,
+            hoja_ruta_parada_id
+          `)
+          .in('hoja_ruta_parada_id', paradasIds);
 
-        // Calcular resumen por medio de pago
-        const resumenMap = new Map<string, ResumenPorMedio>();
-        formattedCobros.forEach(cobro => {
-          const fpId = cobro.forma_pago.id;
-          const existing = resumenMap.get(fpId);
-          if (existing) {
-            existing.total += cobro.monto;
-          } else {
-            resumenMap.set(fpId, {
-              forma_pago_id: fpId,
-              nombre: cobro.forma_pago.nombre,
-              total: cobro.monto,
-            });
-          }
-        });
-        setResumen(Array.from(resumenMap.values()));
-
-        // Pre-llenar los montos declarados con los totales
-        Array.from(resumenMap.values()).forEach(r => {
-          const lower = r.nombre.toLowerCase();
-          if (lower.includes('efectivo')) setEfectivoDeclarado(r.total);
-          else if (lower.includes('transfer')) setTransferenciasDeclarado(r.total);
-          else if (lower.includes('qr') || lower.includes('mercado')) setQrDeclarado(r.total);
-          else if (lower.includes('tarjeta')) setTarjetaDeclarado(r.total);
-        });
+        if (cobrosViejos) {
+          cobrosLegacy = cobrosViejos.map(c => ({
+            id: c.id,
+            monto: c.monto,
+            referencia: c.referencia,
+            forma_pago: { id: 'legacy', nombre: c.medio_pago },
+            pedido: { numero_pedido: 0 },
+            parada: { id: c.hoja_ruta_parada_id },
+          }));
+        }
       }
+
+      // Combinar todos los cobros
+      const formattedCobrosNuevos = (cobrosNuevos || []).map(c => ({
+        ...c,
+        forma_pago: c.forma_pago as unknown as { id: string; nombre: string },
+        pedido: c.pedido as unknown as { numero_pedido: number },
+        parada: c.parada as unknown as { id: string },
+      }));
+      
+      const todosCobros = [...formattedCobrosNuevos, ...cobrosLegacy];
+      setCobros(todosCobros);
+
+      // Calcular resumen por medio de pago
+      const resumenMap = new Map<string, ResumenPorMedio>();
+      todosCobros.forEach(cobro => {
+        const fpNombre = cobro.forma_pago.nombre;
+        const existing = resumenMap.get(fpNombre);
+        if (existing) {
+          existing.total += cobro.monto;
+        } else {
+          resumenMap.set(fpNombre, {
+            forma_pago_id: cobro.forma_pago.id,
+            nombre: fpNombre,
+            total: cobro.monto,
+          });
+        }
+      });
+      setResumen(Array.from(resumenMap.values()));
+
+      // Pre-llenar los montos declarados con los totales
+      Array.from(resumenMap.values()).forEach(r => {
+        const lower = r.nombre.toLowerCase();
+        if (lower.includes('efectivo')) setEfectivoDeclarado(r.total);
+        else if (lower.includes('transfer')) setTransferenciasDeclarado(r.total);
+        else if (lower.includes('qr') || lower.includes('mercado')) setQrDeclarado(r.total);
+        else if (lower.includes('tarjeta')) setTarjetaDeclarado(r.total);
+      });
 
       // Verificar si ya existe una rendición
       const { data: rendicion } = await supabase
