@@ -97,26 +97,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       const esPorPeso = isProductoPorPeso(l.unidadMedida);
       const cantidadParsed = parseCantidad(l.inputValue, esPorPeso);
       const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
-      
-      // Usar directamente el valor parseado del input
       const subtotal = cantidadParsed * precioConDescuento;
-      
-      // DEBUG: mostrar valores en consola y alerta
-      const debug = `
-CÁLCULO LÍNEA: ${l.descripcion}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Input texto: "${l.inputValue}"
-Es por peso: ${esPorPeso}
-Cantidad parseada: ${cantidadParsed}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Precio unitario: ${l.precioUnitario}
-Descuento %: ${l.descuentoPorcentaje}
-Precio con descuento: ${precioConDescuento}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
-`;
-      console.log(debug);
-      alert(debug);
       
       return { ...l, cantidadPreparada: cantidadParsed, subtotal };
     }));
@@ -204,13 +185,17 @@ SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
           <div className="max-w-4xl mx-auto space-y-4">
             {lineas.map((linea) => {
               const esPorPeso = isProductoPorPeso(linea.unidadMedida);
-              const diferencia = linea.cantidadPreparada !== linea.cantidadPedida;
+              const esMenor = linea.cantidadPreparada < linea.cantidadPedida;
+              const esMayor = linea.cantidadPreparada > linea.cantidadPedida;
+              const hayDiferencia = esMenor || esMayor;
               
               return (
                 <div 
                   key={linea.detalleId}
                   className={`p-4 rounded-lg border-2 transition-colors ${
-                    diferencia ? 'border-amber-400 bg-amber-50' : 'border-border bg-card'
+                    esMayor ? 'border-blue-400 bg-blue-50' : 
+                    esMenor ? 'border-amber-400 bg-amber-50' : 
+                    'border-border bg-card'
                   }`}
                 >
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -221,8 +206,11 @@ SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
                         {esPorPeso && (
                           <Badge variant="outline" className="text-xs">Por Peso</Badge>
                         )}
-                        {diferencia && (
-                          <Badge variant="secondary" className="text-xs bg-amber-200 text-amber-800">Modificado</Badge>
+                        {esMayor && (
+                          <Badge className="text-xs bg-blue-500 text-white">+Mayor</Badge>
+                        )}
+                        {esMenor && (
+                          <Badge className="text-xs bg-amber-500 text-white">-Menor</Badge>
                         )}
                       </div>
                       <p className="font-medium truncate">{linea.descripcion}</p>
@@ -244,14 +232,15 @@ SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
 
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground mb-1">A Preparar</p>
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                           <Input
                             type="text"
                             inputMode="decimal"
                             value={linea.inputValue}
                             onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
                             className={`w-28 text-center font-medium text-lg ${
-                              diferencia ? 'border-amber-500 bg-amber-50' : ''
+                              esMayor ? 'border-blue-500 bg-blue-50' :
+                              esMenor ? 'border-amber-500 bg-amber-50' : ''
                             }`}
                           />
                           <Button
@@ -268,7 +257,9 @@ SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
 
                       <div className="text-right min-w-[120px]">
                         <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
-                        <p className={`font-bold text-lg ${diferencia ? 'text-amber-700' : ''}`}>
+                        <p className={`font-bold text-lg ${
+                          esMayor ? 'text-blue-700' : esMenor ? 'text-amber-700' : ''
+                        }`}>
                           {formatCurrency(linea.subtotal)}
                         </p>
                       </div>
