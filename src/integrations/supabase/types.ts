@@ -483,6 +483,53 @@ export type Database = {
           },
         ]
       }
+      cobros: {
+        Row: {
+          banco: string | null
+          created_at: string | null
+          fecha_cheque: string | null
+          hoja_ruta_parada_id: string
+          id: string
+          medio_pago: string
+          monto: number
+          numero_cheque: string | null
+          observaciones: string | null
+          referencia: string | null
+        }
+        Insert: {
+          banco?: string | null
+          created_at?: string | null
+          fecha_cheque?: string | null
+          hoja_ruta_parada_id: string
+          id?: string
+          medio_pago: string
+          monto: number
+          numero_cheque?: string | null
+          observaciones?: string | null
+          referencia?: string | null
+        }
+        Update: {
+          banco?: string | null
+          created_at?: string | null
+          fecha_cheque?: string | null
+          hoja_ruta_parada_id?: string
+          id?: string
+          medio_pago?: string
+          monto?: number
+          numero_cheque?: string | null
+          observaciones?: string | null
+          referencia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobros_hoja_ruta_parada_id_fkey"
+            columns: ["hoja_ruta_parada_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_ruta_paradas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comprobantes_afip: {
         Row: {
           cae: string
@@ -700,6 +747,44 @@ export type Database = {
           },
         ]
       }
+      devoluciones: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          detalle_motivo: string | null
+          hoja_ruta_parada_id: string
+          id: string
+          motivo: string
+          producto_id: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string | null
+          detalle_motivo?: string | null
+          hoja_ruta_parada_id: string
+          id?: string
+          motivo: string
+          producto_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          detalle_motivo?: string | null
+          hoja_ruta_parada_id?: string
+          id?: string
+          motivo?: string
+          producto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devoluciones_hoja_ruta_parada_id_fkey"
+            columns: ["hoja_ruta_parada_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_ruta_paradas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empleado_liquidaciones: {
         Row: {
           anio: number
@@ -909,6 +994,44 @@ export type Database = {
           nombre?: string
         }
         Relationships: []
+      }
+      hoja_ruta: {
+        Row: {
+          created_at: string | null
+          estado: string
+          fecha: string
+          id: string
+          observaciones: string | null
+          updated_at: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          estado?: string
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          updated_at?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string | null
+          estado?: string
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          updated_at?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hoja_ruta_cobros: {
         Row: {
@@ -2130,6 +2253,56 @@ export type Database = {
         }
         Relationships: []
       }
+      rendiciones: {
+        Row: {
+          created_at: string | null
+          diferencia: number
+          fecha_cierre: string | null
+          hoja_ruta_id: string
+          id: string
+          monto_cobrado_efectivo: number
+          monto_cobrado_otros: number
+          monto_esperado: number
+          monto_total_cobrado: number
+          observaciones: string | null
+          tipo_diferencia: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          diferencia?: number
+          fecha_cierre?: string | null
+          hoja_ruta_id: string
+          id?: string
+          monto_cobrado_efectivo?: number
+          monto_cobrado_otros?: number
+          monto_esperado?: number
+          monto_total_cobrado?: number
+          observaciones?: string | null
+          tipo_diferencia?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          diferencia?: number
+          fecha_cierre?: string | null
+          hoja_ruta_id?: string
+          id?: string
+          monto_cobrado_efectivo?: number
+          monto_cobrado_otros?: number
+          monto_esperado?: number
+          monto_total_cobrado?: number
+          observaciones?: string | null
+          tipo_diferencia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rendiciones_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           id: string
@@ -2454,6 +2627,39 @@ export type Database = {
           id?: string
           rol_codigo?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usuarios: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          email: string | null
+          id: string
+          nombre: string
+          rol: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nombre: string
+          rol?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nombre?: string
+          rol?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -2933,6 +3139,7 @@ export type Database = {
     }
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
+      get_usuario_id: { Args: never; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_permission: {
         Args: {
@@ -2949,6 +3156,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_route_owner: { Args: { route_id: string }; Returns: boolean }
+      is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
     }
     Enums: {
       app_permission:
