@@ -910,6 +910,74 @@ export type Database = {
         }
         Relationships: []
       }
+      hoja_ruta_cobros: {
+        Row: {
+          created_at: string
+          forma_pago_id: string
+          hoja_ruta_id: string
+          id: string
+          monto: number
+          observaciones: string | null
+          parada_id: string
+          pedido_id: string
+          referencia: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          forma_pago_id: string
+          hoja_ruta_id: string
+          id?: string
+          monto?: number
+          observaciones?: string | null
+          parada_id: string
+          pedido_id: string
+          referencia?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          forma_pago_id?: string
+          hoja_ruta_id?: string
+          id?: string
+          monto?: number
+          observaciones?: string | null
+          parada_id?: string
+          pedido_id?: string
+          referencia?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_cobros_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_cobros_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_cobros_parada_id_fkey"
+            columns: ["parada_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_ruta_paradas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_cobros_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_ruta_devoluciones: {
         Row: {
           cantidad: number
@@ -1027,6 +1095,81 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: false
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hoja_ruta_rendiciones: {
+        Row: {
+          aprobado_por: string | null
+          caja_id: string | null
+          created_at: string
+          diferencia: number | null
+          estado: string
+          fecha_aprobacion: string | null
+          fecha_rendicion: string
+          hoja_ruta_id: string
+          id: string
+          observaciones: string | null
+          total_efectivo: number
+          total_general: number
+          total_qr: number
+          total_tarjeta: number
+          total_transferencias: number
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          aprobado_por?: string | null
+          caja_id?: string | null
+          created_at?: string
+          diferencia?: number | null
+          estado?: string
+          fecha_aprobacion?: string | null
+          fecha_rendicion?: string
+          hoja_ruta_id: string
+          id?: string
+          observaciones?: string | null
+          total_efectivo?: number
+          total_general?: number
+          total_qr?: number
+          total_tarjeta?: number
+          total_transferencias?: number
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          aprobado_por?: string | null
+          caja_id?: string | null
+          created_at?: string
+          diferencia?: number | null
+          estado?: string
+          fecha_aprobacion?: string | null
+          fecha_rendicion?: string
+          hoja_ruta_id?: string
+          id?: string
+          observaciones?: string | null
+          total_efectivo?: number
+          total_general?: number
+          total_qr?: number
+          total_tarjeta?: number
+          total_transferencias?: number
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_rendiciones_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_ruta_rendiciones_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
             referencedColumns: ["id"]
           },
         ]
@@ -1618,6 +1761,7 @@ export type Database = {
       pedidos: {
         Row: {
           cliente_id: string
+          cobrado_en_entrega: boolean | null
           created_at: string
           descuento: number | null
           estado: Database["public"]["Enums"]["pedido_estado"]
@@ -1627,6 +1771,7 @@ export type Database = {
           fecha_rendicion: string | null
           id: string
           lista_precio_id: string | null
+          monto_cobrado: number | null
           numero_pedido: number
           observaciones: string | null
           rendido: boolean | null
@@ -1640,6 +1785,7 @@ export type Database = {
         }
         Insert: {
           cliente_id: string
+          cobrado_en_entrega?: boolean | null
           created_at?: string
           descuento?: number | null
           estado?: Database["public"]["Enums"]["pedido_estado"]
@@ -1649,6 +1795,7 @@ export type Database = {
           fecha_rendicion?: string | null
           id?: string
           lista_precio_id?: string | null
+          monto_cobrado?: number | null
           numero_pedido?: number
           observaciones?: string | null
           rendido?: boolean | null
@@ -1662,6 +1809,7 @@ export type Database = {
         }
         Update: {
           cliente_id?: string
+          cobrado_en_entrega?: boolean | null
           created_at?: string
           descuento?: number | null
           estado?: Database["public"]["Enums"]["pedido_estado"]
@@ -1671,6 +1819,7 @@ export type Database = {
           fecha_rendicion?: string | null
           id?: string
           lista_precio_id?: string | null
+          monto_cobrado?: number | null
           numero_pedido?: number
           observaciones?: string | null
           rendido?: boolean | null

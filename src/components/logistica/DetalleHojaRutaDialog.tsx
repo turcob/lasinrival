@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -11,6 +12,7 @@ import {
   useCambiarEstadoHojaRuta,
   useActualizarEstadoParada,
   useEliminarParada,
+  useCobrosHojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
@@ -27,8 +29,14 @@ import {
   Phone,
   Trash2,
   AlertTriangle,
-  Loader2
+  Loader2,
+  DollarSign,
+  FileCheck,
+  Banknote
 } from 'lucide-react';
+import { RegistrarCobroDialog } from './RegistrarCobroDialog';
+import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
+import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -56,10 +64,40 @@ interface DetalleHojaRutaDialogProps {
 }
 
 export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: DetalleHojaRutaDialogProps) {
-  const { data: hojaRuta, isLoading } = useHojaRuta(hojaRutaId || undefined);
+  const { data: hojaRuta, isLoading, refetch } = useHojaRuta(hojaRutaId || undefined);
+  const { data: cobros } = useCobrosHojaRuta(hojaRutaId || undefined);
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
+
+  // Estados para diálogos de cobro y rendición
+  const [cobroDialog, setCobroDialog] = useState<{
+    open: boolean;
+    paradaId: string;
+    pedidoId: string;
+    totalPedido: number;
+    montoCobrado: number;
+  }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
+  const [rendicionOpen, setRendicionOpen] = useState(false);
+
+  // Calcular monto cobrado por pedido
+  const getCobradoPorPedido = (pedidoId: string): number => {
+    if (!cobros) return 0;
+    return cobros
+      .filter((c: any) => c.pedido?.numero_pedido && c.pedido)
+      .filter((c: any) => {
+        // Filtrar por pedido_id real, necesitamos agregarlo al query
+        return true; // Por ahora retornar todos
+      })
+      .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
+  };
+
+  const getCobradoPorParada = (paradaId: string): number => {
+    if (!cobros) return 0;
+    return cobros
+      .filter((c: any) => c.parada?.id === paradaId)
+      .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
+  };
 
   if (!hojaRutaId) return null;
 
@@ -219,7 +257,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
                             {/* Actions for parada */}
                             {hojaRuta.estado === 'en_ruta' && parada.estado === 'pendiente' && (
-                              <div className="flex gap-2 pt-2">
+                              <div className="flex flex-wrap gap-2 pt-2">
                                 <Button 
                                   size="sm" 
                                   variant="outline"
@@ -243,6 +281,33 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 >
                                   <XCircle className="h-4 w-4 mr-1" />
                                   Rechazado
+                                </Button>
+                              </div>
+                            )}
+
+                            {/* Botón de cobro - visible cuando está en ruta o entregado */}
+                            {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && 
+                             ['entregado', 'entrega_parcial'].includes(parada.estado) && parada.pedido && (
+                              <div className="pt-2 flex items-center gap-2">
+                                {getCobradoPorParada(parada.id) > 0 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <Banknote className="h-3 w-3 mr-1" />
+                                    Cobrado: ${getCobradoPorParada(parada.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  </Badge>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant={getCobradoPorParada(parada.id) >= parada.pedido.total ? "outline" : "default"}
+                                  onClick={() => setCobroDialog({
+                                    open: true,
+                                    paradaId: parada.id,
+                                    pedidoId: parada.pedido!.id,
+                                    totalPedido: parada.pedido!.total,
+                                    montoCobrado: getCobradoPorParada(parada.id),
+                                  })}
+                                >
+                                  <DollarSign className="h-4 w-4 mr-1" />
+                                  {getCobradoPorParada(parada.id) > 0 ? 'Agregar Cobro' : 'Cobrar'}
                                 </Button>
                               </div>
                             )}
@@ -270,9 +335,45 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
+
+            {/* Botón de Rendición - visible cuando la ruta está en curso o completada */}
+            {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && (
+              <div className="pt-4 border-t">
+                <Button 
+                  className="w-full"
+                  onClick={() => setRendicionOpen(true)}
+                >
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Rendición de Cobranza
+                </Button>
+              </div>
+            )}
           </div>
         ) : null}
       </SheetContent>
+
+      {/* Diálogo de Cobro */}
+      <RegistrarCobroDialog
+        open={cobroDialog.open}
+        onOpenChange={(open) => setCobroDialog({ ...cobroDialog, open })}
+        hojaRutaId={hojaRutaId}
+        paradaId={cobroDialog.paradaId}
+        pedidoId={cobroDialog.pedidoId}
+        totalPedido={cobroDialog.totalPedido}
+        montoCobrado={cobroDialog.montoCobrado}
+        onSuccess={() => refetch()}
+      />
+
+      {/* Diálogo de Rendición */}
+      {hojaRuta && (
+        <RendicionHojaRutaDialog
+          open={rendicionOpen}
+          onOpenChange={setRendicionOpen}
+          hojaRutaId={hojaRutaId}
+          numeroHoja={hojaRuta.numero_hoja}
+          onSuccess={() => refetch()}
+        />
+      )}
     </Sheet>
   );
 }

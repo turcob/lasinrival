@@ -654,3 +654,77 @@ export function usePedidosDisponiblesParaRuta() {
     },
   });
 }
+
+// ============== COBROS EN HOJA DE RUTA ==============
+export function useCobrosParada(paradaId: string | undefined) {
+  return useQuery({
+    queryKey: ['cobros-parada', paradaId],
+    queryFn: async () => {
+      if (!paradaId) return [];
+      
+      const { data, error } = await supabase
+        .from('hoja_ruta_cobros')
+        .select(`
+          id,
+          monto,
+          referencia,
+          observaciones,
+          created_at,
+          forma_pago:formas_pago(id, nombre)
+        `)
+        .eq('parada_id', paradaId)
+        .order('created_at');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!paradaId,
+  });
+}
+
+export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['cobros-hoja-ruta', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return [];
+      
+      const { data, error } = await supabase
+        .from('hoja_ruta_cobros')
+        .select(`
+          id,
+          monto,
+          referencia,
+          observaciones,
+          created_at,
+          forma_pago:formas_pago(id, nombre),
+          pedido:pedidos(numero_pedido),
+          parada:hoja_ruta_paradas(id)
+        `)
+        .eq('hoja_ruta_id', hojaRutaId)
+        .order('created_at');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!hojaRutaId,
+  });
+}
+
+export function useRendicionHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['rendicion-hoja-ruta', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return null;
+      
+      const { data, error } = await supabase
+        .from('hoja_ruta_rendiciones')
+        .select('*')
+        .eq('hoja_ruta_id', hojaRutaId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!hojaRutaId,
+  });
+}
