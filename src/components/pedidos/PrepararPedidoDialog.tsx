@@ -96,9 +96,10 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       
       const esPorPeso = isProductoPorPeso(l.unidadMedida);
       const cantidadParsed = parseCantidad(l.inputValue, esPorPeso);
-      const cantidadPreparada = Math.min(Math.max(0, cantidadParsed), l.cantidadPedida);
       const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
-      const subtotal = cantidadPreparada * precioConDescuento;
+      
+      // Usar directamente el valor parseado del input
+      const subtotal = cantidadParsed * precioConDescuento;
       
       // DEBUG: mostrar valores en consola y alerta
       const debug = `
@@ -107,19 +108,17 @@ CÁLCULO LÍNEA: ${l.descripcion}
 Input texto: "${l.inputValue}"
 Es por peso: ${esPorPeso}
 Cantidad parseada: ${cantidadParsed}
-Cantidad máxima (pedida): ${l.cantidadPedida}
-Cantidad preparada (limitada): ${cantidadPreparada}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Precio unitario: ${l.precioUnitario}
 Descuento %: ${l.descuentoPorcentaje}
 Precio con descuento: ${precioConDescuento}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SUBTOTAL = ${cantidadPreparada} × ${precioConDescuento} = ${subtotal}
+SUBTOTAL = ${cantidadParsed} × ${precioConDescuento} = ${subtotal}
 `;
       console.log(debug);
       alert(debug);
       
-      return { ...l, cantidadPreparada, subtotal };
+      return { ...l, cantidadPreparada: cantidadParsed, subtotal };
     }));
   };
 
