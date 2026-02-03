@@ -3167,7 +3167,13 @@ export type Database = {
         | "eliminar"
         | "anular"
         | "exportar"
-      app_role: "admin" | "encargado" | "cajero" | "vendedor" | "deposito"
+      app_role:
+        | "admin"
+        | "encargado"
+        | "cajero"
+        | "vendedor"
+        | "deposito"
+        | "chofer"
       cash_register_status: "abierta" | "cerrada"
       pedido_estado:
         | "pendiente"
@@ -3320,7 +3326,14 @@ export const Constants = {
         "anular",
         "exportar",
       ],
-      app_role: ["admin", "encargado", "cajero", "vendedor", "deposito"],
+      app_role: [
+        "admin",
+        "encargado",
+        "cajero",
+        "vendedor",
+        "deposito",
+        "chofer",
+      ],
       cash_register_status: ["abierta", "cerrada"],
       pedido_estado: [
         "pendiente",

@@ -55,6 +55,7 @@ const CARGOS = [
   'Repositor',
   'Administrativo',
   'Depósito',
+  'Chofer',
   'Limpieza',
   'Otro',
 ];
