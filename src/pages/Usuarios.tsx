@@ -40,7 +40,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito';
+  role: 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito' | 'chofer';
 }
 
 interface UserWithRoles extends Profile {
@@ -53,6 +53,7 @@ const roleLabels: Record<string, string> = {
   cajero: 'Cajero',
   vendedor: 'Vendedor',
   deposito: 'Depósito',
+  chofer: 'Chofer',
 };
 
 const roleColors: Record<string, string> = {
@@ -61,9 +62,10 @@ const roleColors: Record<string, string> = {
   cajero: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   vendedor: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   deposito: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  chofer: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
 };
 
-const allRoles = ['admin', 'encargado', 'cajero', 'vendedor', 'deposito'] as const;
+const allRoles = ['admin', 'encargado', 'cajero', 'vendedor', 'deposito', 'chofer'] as const;
 
 export default function Usuarios() {
   const { hasRole } = useAuth();
