@@ -277,7 +277,7 @@ export function useCrearHojaRuta() {
 
       if (hojaError) throw hojaError;
 
-      // Add pedidos as paradas
+      // Add pedidos as paradas and change their status to 'despachado'
       if (data.pedido_ids && data.pedido_ids.length > 0) {
         const paradasInsert = data.pedido_ids.map((pedido_id, index) => ({
           hoja_ruta_id: hojaRuta.id,
@@ -291,6 +291,25 @@ export function useCrearHojaRuta() {
           .insert(paradasInsert);
 
         if (paradasError) throw paradasError;
+
+        // Cambiar estado de pedidos a 'despachado' automáticamente
+        const { error: updateError } = await supabase
+          .from('pedidos')
+          .update({ estado: 'despachado' })
+          .in('id', data.pedido_ids);
+
+        if (updateError) throw updateError;
+
+        // Registrar en historial de cada pedido
+        const historialInsert = data.pedido_ids.map(pedido_id => ({
+          pedido_id,
+          estado_anterior: 'preparado' as const,
+          estado_nuevo: 'despachado' as const,
+          usuario_id: user.id,
+          observaciones: `Asignado a hoja de ruta #${hojaRuta.numero_hoja}`
+        }));
+
+        await supabase.from('pedido_historial').insert(historialInsert);
       }
 
       return hojaRuta;
@@ -298,6 +317,7 @@ export function useCrearHojaRuta() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hojas-ruta'] });
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+      queryClient.invalidateQueries({ queryKey: ['pedidos-disponibles-ruta'] });
       toast({ title: 'Hoja de ruta creada exitosamente' });
     },
     onError: (error) => {
@@ -364,6 +384,7 @@ export function useCambiarEstadoHojaRuta() {
 export function useAgregarParada() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: {
@@ -373,6 +394,8 @@ export function useAgregarParada() {
       ventana_horaria_desde?: string;
       ventana_horaria_hasta?: string;
     }) => {
+      if (!user) throw new Error('Usuario no autenticado');
+
       // Get max orden
       const { data: maxOrden } = await supabase
         .from('hoja_ruta_paradas')
@@ -380,6 +403,13 @@ export function useAgregarParada() {
         .eq('hoja_ruta_id', data.hoja_ruta_id)
         .order('orden', { ascending: false })
         .limit(1)
+        .single();
+
+      // Get hoja de ruta number
+      const { data: hojaRuta } = await supabase
+        .from('hojas_ruta')
+        .select('numero_hoja')
+        .eq('id', data.hoja_ruta_id)
         .single();
 
       const { error } = await supabase
@@ -394,10 +424,26 @@ export function useAgregarParada() {
         });
 
       if (error) throw error;
+
+      // Cambiar estado del pedido a 'despachado' automáticamente
+      await supabase
+        .from('pedidos')
+        .update({ estado: 'despachado' })
+        .eq('id', data.pedido_id);
+
+      // Registrar en historial del pedido
+      await supabase.from('pedido_historial').insert({
+        pedido_id: data.pedido_id,
+        estado_anterior: 'preparado' as const,
+        estado_nuevo: 'despachado' as const,
+        usuario_id: user.id,
+        observaciones: `Asignado a hoja de ruta #${hojaRuta?.numero_hoja || 'N/A'}`
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-ruta'] });
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+      queryClient.invalidateQueries({ queryKey: ['pedidos-disponibles-ruta'] });
       toast({ title: 'Parada agregada' });
     },
     onError: (error) => {
@@ -628,21 +674,21 @@ export function usePedidosDisponiblesParaRuta() {
   return useQuery({
     queryKey: ['pedidos-disponibles-ruta'],
     queryFn: async () => {
-      // Get pedidos that are confirmed/prepared/dispatched but not yet assigned to a route
+      // Get pedidos that are already assigned to a route
       const { data: pedidosAsignados } = await supabase
         .from('hoja_ruta_paradas')
         .select('pedido_id');
 
       const pedidosAsignadosIds = pedidosAsignados?.map(p => p.pedido_id) || [];
 
+      // Solo mostrar pedidos en estado 'preparado' que no estén asignados
       let query = supabase
         .from('pedidos')
         .select(`
           id, numero_pedido, fecha_pedido, total, estado,
           cliente:clientes(id, nombre, direccion, telefono, zona_id)
         `)
-        .in('estado', ['confirmado', 'preparado', 'despachado'])
-        .eq('rendido', false);
+        .eq('estado', 'preparado');  // Solo pedidos preparados
 
       if (pedidosAsignadosIds.length > 0) {
         query = query.not('id', 'in', `(${pedidosAsignadosIds.join(',')})`);

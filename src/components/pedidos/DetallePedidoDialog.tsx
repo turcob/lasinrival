@@ -9,7 +9,6 @@ import {
   MapPin,
   Phone,
   FileText,
-  History,
   AlertTriangle,
   CheckCircle,
   Truck,
@@ -38,11 +37,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   usePedido, 
   usePedidoHistorial, 
-  useCambiarEstadoPedido,
-  useAnularPedido,
   type PedidoEstado 
 } from '@/hooks/usePedidos';
-import { RendirPedidoDialog } from './RendirPedidoDialog';
 import { CambiarEstadoDialog } from './CambiarEstadoDialog';
 
 interface DetallePedidoDialogProps {
@@ -51,22 +47,32 @@ interface DetallePedidoDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const estadoConfig: Record<PedidoEstado, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
+// Configuración visual de estados (incluye legacy para historial)
+const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
+  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
+  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
+  // Legacy para visualización de historial
   confirmado: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
-  preparado: { label: 'Preparado', color: 'bg-purple-100 text-purple-800', icon: Package },
-  despachado: { label: 'Despachado', color: 'bg-indigo-100 text-indigo-800', icon: Truck },
   entregado: { label: 'Entregado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   parcial: { label: 'Parcial', color: 'bg-orange-100 text-orange-800', icon: AlertTriangle },
   devuelto: { label: 'Devuelto', color: 'bg-red-100 text-red-800', icon: RotateCcw },
   anulado: { label: 'Anulado', color: 'bg-gray-100 text-gray-800', icon: XCircle },
 };
 
-const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
-  pendiente: ['confirmado', 'anulado'],
-  confirmado: ['preparado', 'anulado'],
-  preparado: ['despachado', 'anulado'],
-  despachado: ['entregado', 'parcial', 'devuelto'],
+// Nuevo flujo simplificado: 
+// - pendiente -> preparado o rechazado
+// - preparado -> rechazado (despachado solo se hace automáticamente desde logística)
+// - despachado -> sin acciones desde pedidos (se gestiona en logística)
+// - rechazado -> estado final
+const flujoEstados: Record<string, PedidoEstado[]> = {
+  pendiente: ['preparado', 'rechazado'],
+  preparado: ['rechazado'],
+  despachado: [],  // Solo se gestiona desde logística
+  rechazado: [],
+  // Legacy states - sin transiciones permitidas
+  confirmado: [],
   entregado: [],
   parcial: [],
   devuelto: [],
@@ -74,13 +80,10 @@ const flujoEstados: Record<PedidoEstado, PedidoEstado[]> = {
 };
 
 export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePedidoDialogProps) {
-  const [rendirDialogOpen, setRendirDialogOpen] = useState(false);
   const [cambiarEstadoDialog, setCambiarEstadoDialog] = useState<PedidoEstado | null>(null);
 
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const { data: historial } = usePedidoHistorial(pedidoId || undefined);
-  const cambiarEstado = useCambiarEstadoPedido();
-  const anularPedido = useAnularPedido();
 
   if (!pedidoId) return null;
 
@@ -90,7 +93,6 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
 
   const estadoActual = pedido?.estado as PedidoEstado;
   const siguientesEstados = flujoEstados[estadoActual] || [];
-  const puedeRendir = estadoActual === 'despachado' && !pedido?.rendido;
 
   return (
     <>
@@ -312,21 +314,21 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
                 <div className="border-t p-4">
                   <div className="flex flex-wrap gap-2">
                     {siguientesEstados.map(estado => {
-                      if (estado === 'anulado') {
+                      if (estado === 'rechazado') {
                         return (
                           <Button
                             key={estado}
                             variant="destructive"
                             size="sm"
-                            onClick={() => setCambiarEstadoDialog('anulado')}
+                            onClick={() => setCambiarEstadoDialog('rechazado')}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
-                            Anular
+                            Rechazar
                           </Button>
                         );
                       }
                       const config = estadoConfig[estado];
-                      const Icon = config.icon;
+                      const Icon = config?.icon || Package;
                       return (
                         <Button
                           key={estado}
@@ -335,16 +337,10 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
                           onClick={() => setCambiarEstadoDialog(estado)}
                         >
                           <Icon className="h-4 w-4 mr-1" />
-                          {config.label}
+                          {config?.label || estado}
                         </Button>
                       );
                     })}
-                    {puedeRendir && (
-                      <Button onClick={() => setRendirDialogOpen(true)}>
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Rendir Pedido
-                      </Button>
-                    )}
                   </div>
                 </div>
               )}
@@ -354,24 +350,13 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange }: DetallePed
       </Dialog>
 
       {pedido && (
-        <>
-          <RendirPedidoDialog
-            pedido={pedido}
-            open={rendirDialogOpen}
-            onOpenChange={setRendirDialogOpen}
-            onSuccess={() => {
-              setRendirDialogOpen(false);
-            }}
-          />
-
-          <CambiarEstadoDialog
-            pedidoId={pedido.id}
-            estadoActual={estadoActual}
-            nuevoEstado={cambiarEstadoDialog}
-            open={!!cambiarEstadoDialog}
-            onOpenChange={(open) => !open && setCambiarEstadoDialog(null)}
-          />
-        </>
+        <CambiarEstadoDialog
+          pedidoId={pedido.id}
+          estadoActual={estadoActual}
+          nuevoEstado={cambiarEstadoDialog}
+          open={!!cambiarEstadoDialog}
+          onOpenChange={(open) => !open && setCambiarEstadoDialog(null)}
+        />
       )}
     </>
   );
