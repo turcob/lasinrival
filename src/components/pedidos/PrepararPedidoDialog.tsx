@@ -39,6 +39,7 @@ interface LineaPreparacion {
   unidadMedida: string;
   cantidadPedida: number;
   cantidadPreparada: number;
+  cantidadTexto: string; // String para el input controlado
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
@@ -46,6 +47,10 @@ interface LineaPreparacion {
 const isProductoPorPeso = (unidadMedida: string) => {
   const unidad = (unidadMedida || '').toUpperCase().replace('.', '').trim();
   return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
+};
+
+const formatCantidadInicial = (cantidad: number, esPorPeso: boolean) => {
+  return esPorPeso ? cantidad.toFixed(3).replace('.', ',') : cantidad.toString();
 };
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararPedidoDialogProps) {
@@ -57,29 +62,50 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
   // Initialize lines from pedido
   useEffect(() => {
     if (pedido?.detalles) {
-      setLineas(pedido.detalles.map((d: PedidoDetalle) => ({
-        detalleId: d.id,
-        productoId: d.producto_id,
-        codigo: d.producto?.codigo_articulo || '',
-        descripcion: d.producto?.descripcion || '',
-        unidadMedida: d.producto?.unidad_medida || 'UN',
-        cantidadPedida: d.cantidad_pedida,
-        cantidadPreparada: d.cantidad_pedida, // Default to full quantity
-        precioUnitario: d.precio_unitario,
-        descuentoPorcentaje: d.descuento_porcentaje || 0,
-      })));
+      setLineas(pedido.detalles.map((d: PedidoDetalle) => {
+        const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
+        return {
+          detalleId: d.id,
+          productoId: d.producto_id,
+          codigo: d.producto?.codigo_articulo || '',
+          descripcion: d.producto?.descripcion || '',
+          unidadMedida: d.producto?.unidad_medida || 'UN',
+          cantidadPedida: d.cantidad_pedida,
+          cantidadPreparada: d.cantidad_pedida, // Default to full quantity
+          cantidadTexto: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
+          precioUnitario: d.precio_unitario,
+          descuentoPorcentaje: d.descuento_porcentaje || 0,
+        };
+      }));
     }
   }, [pedido]);
 
   const handleCantidadChange = (detalleId: string, value: string, esPorPeso: boolean) => {
-    // Normalize comma to dot for decimal parsing
-    const normalizedValue = value.replace(',', '.');
-    const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(value) || 0);
-    setLineas(prev => prev.map(l => 
-      l.detalleId === detalleId 
-        ? { ...l, cantidadPreparada: Math.min(Math.max(0, cantidad), l.cantidadPedida) }
-        : l
-    ));
+    setLineas(prev => prev.map(l => {
+      if (l.detalleId !== detalleId) return l;
+      
+      // Actualizar el texto del input directamente
+      const normalizedValue = value.replace(',', '.');
+      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(value) || 0);
+      const cantidadFinal = Math.min(Math.max(0, cantidad), l.cantidadPedida);
+      
+      return { 
+        ...l, 
+        cantidadTexto: value,
+        cantidadPreparada: cantidadFinal 
+      };
+    }));
+  };
+
+  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean) => {
+    setLineas(prev => prev.map(l => {
+      if (l.detalleId !== detalleId) return l;
+      // Reformatear al perder el foco
+      return {
+        ...l,
+        cantidadTexto: formatCantidadInicial(l.cantidadPreparada, esPorPeso)
+      };
+    }));
   };
 
   const calcularSubtotalLinea = (linea: LineaPreparacion) => {
@@ -199,16 +225,11 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                         </TableCell>
                         <TableCell>
                           <Input
-                            type={esPorPeso ? "text" : "number"}
-                            inputMode={esPorPeso ? "decimal" : "numeric"}
-                            min={0}
-                            max={linea.cantidadPedida}
-                            step={esPorPeso ? "0.001" : "1"}
-                            value={esPorPeso 
-                              ? linea.cantidadPreparada.toFixed(3).replace('.', ',')
-                              : linea.cantidadPreparada
-                            }
+                            type="text"
+                            inputMode="decimal"
+                            value={linea.cantidadTexto}
                             onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value, esPorPeso)}
+                            onBlur={() => handleCantidadBlur(linea.detalleId, esPorPeso)}
                             className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
                           />
                         </TableCell>
