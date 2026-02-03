@@ -100,6 +100,25 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
       const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
       const subtotal = cantidadPreparada * precioConDescuento;
       
+      // DEBUG: mostrar valores en consola y alerta
+      const debug = `
+CÁLCULO LÍNEA: ${l.descripcion}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Input texto: "${l.inputValue}"
+Es por peso: ${esPorPeso}
+Cantidad parseada: ${cantidadParsed}
+Cantidad máxima (pedida): ${l.cantidadPedida}
+Cantidad preparada (limitada): ${cantidadPreparada}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Precio unitario: ${l.precioUnitario}
+Descuento %: ${l.descuentoPorcentaje}
+Precio con descuento: ${precioConDescuento}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUBTOTAL = ${cantidadPreparada} × ${precioConDescuento} = ${subtotal}
+`;
+      console.log(debug);
+      alert(debug);
+      
       return { ...l, cantidadPreparada, subtotal };
     }));
   };
