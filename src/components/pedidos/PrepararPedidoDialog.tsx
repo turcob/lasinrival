@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Printer, Package, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { CantidadInput } from './CantidadInput';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -39,7 +39,6 @@ interface LineaPreparacion {
   unidadMedida: string;
   cantidadPedida: number;
   cantidadPreparada: number;
-  cantidadTexto: string; // String para el input controlado
   precioUnitario: number;
   descuentoPorcentaje: number;
 }
@@ -49,9 +48,6 @@ const isProductoPorPeso = (unidadMedida: string) => {
   return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
 };
 
-const formatCantidadInicial = (cantidad: number, esPorPeso: boolean) => {
-  return esPorPeso ? cantidad.toFixed(3).replace('.', ',') : cantidad.toString();
-};
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
@@ -59,50 +55,36 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
 
-  // Initialize lines from pedido - only when dialog opens or pedido loads
+  // Track if dialog has been initialized for this pedido
+  const initializedRef = useRef<string | null>(null);
+
+  // Initialize lines from pedido - only when dialog opens with a new pedido
   useEffect(() => {
-    if (open && pedido?.detalles) {
-      setLineas(pedido.detalles.map((d: PedidoDetalle) => {
-        const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
-        return {
-          detalleId: d.id,
-          productoId: d.producto_id,
-          codigo: d.producto?.codigo_articulo || '',
-          descripcion: d.producto?.descripcion || '',
-          unidadMedida: d.producto?.unidad_medida || 'UN',
-          cantidadPedida: d.cantidad_pedida,
-          cantidadPreparada: d.cantidad_pedida,
-          cantidadTexto: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
-          precioUnitario: d.precio_unitario,
-          descuentoPorcentaje: d.descuento_porcentaje || 0,
-        };
-      }));
+    if (open && pedido?.detalles && initializedRef.current !== pedido.id) {
+      initializedRef.current = pedido.id;
+      setLineas(pedido.detalles.map((d: PedidoDetalle) => ({
+        detalleId: d.id,
+        productoId: d.producto_id,
+        codigo: d.producto?.codigo_articulo || '',
+        descripcion: d.producto?.descripcion || '',
+        unidadMedida: d.producto?.unidad_medida || 'UN',
+        cantidadPedida: d.cantidad_pedida,
+        cantidadPreparada: d.cantidad_pedida,
+        precioUnitario: d.precio_unitario,
+        descuentoPorcentaje: d.descuento_porcentaje || 0,
+      })));
     }
-  }, [open, pedido?.id]); // Solo reinicializar cuando cambia el pedido o se abre el diálogo
+    // Reset when dialog closes
+    if (!open) {
+      initializedRef.current = null;
+    }
+  }, [open, pedido]);
 
-  const handleCantidadChange = (detalleId: string, value: string) => {
-    // Solo actualizar el texto mientras escribe
+  const handleCantidadUpdate = useCallback((detalleId: string, nuevaCantidad: number) => {
     setLineas(prev => prev.map(l => 
-      l.detalleId === detalleId ? { ...l, cantidadTexto: value } : l
+      l.detalleId === detalleId ? { ...l, cantidadPreparada: nuevaCantidad } : l
     ));
-  };
-
-  const handleCantidadBlur = (detalleId: string, esPorPeso: boolean, inputValue: string) => {
-    setLineas(prev => prev.map(l => {
-      if (l.detalleId !== detalleId) return l;
-      
-      // Parsear el valor directamente del input (no del estado)
-      const normalizedValue = inputValue.replace(',', '.');
-      const cantidad = esPorPeso ? (parseFloat(normalizedValue) || 0) : (parseInt(inputValue) || 0);
-      const cantidadFinal = Math.min(Math.max(0, cantidad), l.cantidadPedida);
-      
-      return { 
-        ...l, 
-        cantidadPreparada: cantidadFinal,
-        cantidadTexto: formatCantidadInicial(cantidadFinal, esPorPeso)
-      };
-    }));
-  };
+  }, []);
 
 
   const calcularSubtotalLinea = (linea: LineaPreparacion) => {
@@ -221,13 +203,11 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                           } {linea.unidadMedida}
                         </TableCell>
                         <TableCell>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={linea.cantidadTexto}
-                            onChange={(e) => handleCantidadChange(linea.detalleId, e.target.value)}
-                            onBlur={(e) => handleCantidadBlur(linea.detalleId, esPorPeso, e.target.value)}
-                            className={`w-24 text-center mx-auto ${diferencia ? 'border-yellow-500' : ''}`}
+                          <CantidadInput
+                            cantidadInicial={linea.cantidadPedida}
+                            cantidadMaxima={linea.cantidadPedida}
+                            esPorPeso={esPorPeso}
+                            onCantidadChange={(cantidad) => handleCantidadUpdate(linea.detalleId, cantidad)}
                           />
                         </TableCell>
                         <TableCell className="text-right">
