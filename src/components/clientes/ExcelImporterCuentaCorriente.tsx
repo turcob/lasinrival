@@ -200,45 +200,63 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     setProgress(5);
     setParsingMessage(`Cargando archivo: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
+    // Usar requestAnimationFrame para asegurar que la UI se actualice
+    const updateUI = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
     try {
-      // Usar setTimeout para permitir que la UI se actualice
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await updateUI();
       
       setProgress(10);
-      setParsingMessage('Leyendo archivo...');
+      setParsingMessage('Leyendo archivo en memoria...');
+      await updateUI();
       
       const data = await file.arrayBuffer();
       
-      setProgress(30);
+      setProgress(25);
       setParsingMessage('Parseando estructura del Excel...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await updateUI();
       
       const workbook = XLSX.read(data, { type: 'array' });
       
-      setProgress(50);
-      setParsingMessage('Extrayendo datos...');
-      await new Promise(resolve => setTimeout(resolve, 50));
+      setProgress(45);
+      setParsingMessage('Convirtiendo a datos...');
+      await updateUI();
       
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<ClienteRow>(worksheet);
       
-      setProgress(60);
-      setParsingMessage(`Procesando ${jsonData.length} filas...`);
-      await new Promise(resolve => setTimeout(resolve, 50));
+      setProgress(65);
+      setParsingMessage(`Analizando ${jsonData.length.toLocaleString()} filas...`);
+      await updateUI();
 
-      const movimientos = processExcelData(jsonData);
+      // Procesar en chunks para no bloquear la UI
+      const chunkSize = 5000;
+      let allMovimientos: MovimientoExcel[] = [];
+      
+      for (let i = 0; i < jsonData.length; i += chunkSize) {
+        const chunk = jsonData.slice(i, i + chunkSize);
+        const chunkMovimientos = processExcelData(chunk);
+        allMovimientos = allMovimientos.concat(chunkMovimientos);
+        
+        const progressValue = 65 + Math.round(((i + chunk.length) / jsonData.length) * 30);
+        setProgress(progressValue);
+        setParsingMessage(`Procesando filas ${i.toLocaleString()} - ${Math.min(i + chunkSize, jsonData.length).toLocaleString()} de ${jsonData.length.toLocaleString()}...`);
+        await updateUI();
+      }
 
       setProgress(100);
-      setParsingMessage(`¡Listo! ${movimientos.length} movimientos encontrados`);
-      await new Promise(resolve => setTimeout(resolve, 300));
+      setParsingMessage(`¡Listo! ${allMovimientos.length.toLocaleString()} movimientos válidos encontrados`);
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setParsedMovimientos(movimientos);
+      setParsedMovimientos(allMovimientos);
+      setParsing(false);
+      setProgress(0);
+      setParsingMessage('');
       setStep('preview');
     } catch (error) {
       console.error('Error parsing Excel:', error);
       toast.error('Error al leer el archivo Excel: ' + (error instanceof Error ? error.message : 'Error desconocido'));
-    } finally {
       setParsing(false);
       setProgress(0);
       setParsingMessage('');
