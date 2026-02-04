@@ -805,15 +805,19 @@ export default function Cajas() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            {isAdmin && (
+            {/* Vendedores no tienen acceso a Ingreso/Egreso, otros roles sí */}
+            {!isVendedor && (
               <>
-                <Button variant="outline" onClick={() => {
-                  setTipoMovimiento('egreso');
-                  setMovimientoDialogOpen(true);
-                }}>
-                  <ArrowDownCircle className="mr-2 h-4 w-4" />
-                  Egreso
-                </Button>
+                {/* Solo admin puede hacer egresos */}
+                {isAdmin && (
+                  <Button variant="outline" onClick={() => {
+                    setTipoMovimiento('egreso');
+                    setMovimientoDialogOpen(true);
+                  }}>
+                    <ArrowDownCircle className="mr-2 h-4 w-4" />
+                    Egreso
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => {
                   setTipoMovimiento('ingreso');
                   setMovimientoDialogOpen(true);
@@ -823,7 +827,10 @@ export default function Cajas() {
                 </Button>
               </>
             )}
-            <Button onClick={() => setCierreDialogOpen(true)}>
+            <Button onClick={() => {
+              setCajaACerrar(null);
+              setCierreDialogOpen(true);
+            }}>
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
             </Button>
