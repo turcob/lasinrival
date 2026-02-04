@@ -121,6 +121,7 @@ export default function Cajas() {
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
+  const [cajaSeleccionadaMovimiento, setCajaSeleccionadaMovimiento] = useState<string>(''); // Caja seleccionada para movimientos (admin)
   const [cierreData, setCierreData] = useState({ observaciones: '' });
   
   // Filtro por usuario para admins
@@ -287,7 +288,20 @@ export default function Cajas() {
 
   const handleRegistrarMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cajaActiva || !user) return;
+    if (!user) return;
+
+    // Determinar en qué caja registrar el movimiento
+    let cajaDestino: Caja | undefined;
+    if (isAdmin && cajaSeleccionadaMovimiento) {
+      cajaDestino = cajasAbiertas.find(c => c.id === cajaSeleccionadaMovimiento);
+    } else {
+      cajaDestino = cajaActiva || undefined;
+    }
+
+    if (!cajaDestino) {
+      toast.error('Debe seleccionar una caja');
+      return;
+    }
 
     const monto = parseFloat(movimientoData.monto);
     if (isNaN(monto) || monto <= 0) {
@@ -297,7 +311,7 @@ export default function Cajas() {
 
     try {
       const { error } = await supabase.from('movimientos_caja').insert([{
-        caja_id: cajaActiva.id,
+        caja_id: cajaDestino.id,
         usuario_id: user.id,
         tipo: tipoMovimiento,
         concepto: movimientoData.concepto,
@@ -309,17 +323,18 @@ export default function Cajas() {
       // Update caja totals
       const updateField = tipoMovimiento === 'ingreso' ? 'total_ventas' : 'total_egresos';
       const currentValue = tipoMovimiento === 'ingreso' 
-        ? cajaActiva.total_ventas || 0 
-        : cajaActiva.total_egresos || 0;
+        ? cajaDestino.total_ventas || 0 
+        : cajaDestino.total_egresos || 0;
 
       await supabase
         .from('cajas')
         .update({ [updateField]: currentValue + monto })
-        .eq('id', cajaActiva.id);
+        .eq('id', cajaDestino.id);
 
       toast.success('Movimiento registrado correctamente');
       setMovimientoDialogOpen(false);
       setMovimientoData({ concepto: '', monto: '' });
+      setCajaSeleccionadaMovimiento('');
       fetchData();
     } catch (error) {
       console.error('Error registering movement:', error);
@@ -800,35 +815,42 @@ export default function Cajas() {
   return (
     <MainLayout>
       <PageHeader title="Cajas" description="Gestión de cajas y arqueos">
-        {!cajaActiva ? (
-          <Button onClick={() => setAperturaDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Abrir Caja
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            {/* Vendedores no tienen acceso a Ingreso/Egreso, otros roles sí */}
-            {!isVendedor && (
-              <>
-                {/* Solo admin puede hacer egresos */}
-                {isAdmin && (
-                  <Button variant="outline" onClick={() => {
-                    setTipoMovimiento('egreso');
-                    setMovimientoDialogOpen(true);
-                  }}>
-                    <ArrowDownCircle className="mr-2 h-4 w-4" />
-                    Egreso
-                  </Button>
-                )}
+        <div className="flex gap-2">
+          {/* Botón Abrir Caja - solo si el usuario no tiene caja abierta */}
+          {!cajaActiva && (
+            <Button onClick={() => setAperturaDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Abrir Caja
+            </Button>
+          )}
+          
+          {/* Botones de Ingreso/Egreso para admin (si hay cualquier caja abierta) o para usuarios con caja propia */}
+          {(cajaActiva || (isAdmin && cajasAbiertas.length > 0)) && !isVendedor && (
+            <>
+              {/* Solo admin puede hacer egresos */}
+              {isAdmin && (
                 <Button variant="outline" onClick={() => {
-                  setTipoMovimiento('ingreso');
+                  setTipoMovimiento('egreso');
+                  setCajaSeleccionadaMovimiento(cajaActiva?.id || cajasAbiertas[0]?.id || '');
                   setMovimientoDialogOpen(true);
                 }}>
-                  <ArrowUpCircle className="mr-2 h-4 w-4" />
-                  Ingreso
+                  <ArrowDownCircle className="mr-2 h-4 w-4" />
+                  Egreso
                 </Button>
-              </>
-            )}
+              )}
+              <Button variant="outline" onClick={() => {
+                setTipoMovimiento('ingreso');
+                setCajaSeleccionadaMovimiento(cajaActiva?.id || cajasAbiertas[0]?.id || '');
+                setMovimientoDialogOpen(true);
+              }}>
+                <ArrowUpCircle className="mr-2 h-4 w-4" />
+                Ingreso
+              </Button>
+            </>
+          )}
+          
+          {/* Botón Cerrar Caja - solo si el usuario tiene caja abierta */}
+          {cajaActiva && (
             <Button onClick={() => {
               setCajaACerrar(null);
               setCierreDialogOpen(true);
@@ -836,8 +858,8 @@ export default function Cajas() {
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </PageHeader>
 
       {/* Active Cash Register Summary */}
@@ -943,7 +965,13 @@ export default function Cajas() {
       </Dialog>
 
       {/* Movimiento Dialog */}
-      <Dialog open={movimientoDialogOpen} onOpenChange={setMovimientoDialogOpen}>
+      <Dialog open={movimientoDialogOpen} onOpenChange={(open) => {
+        setMovimientoDialogOpen(open);
+        if (!open) {
+          setCajaSeleccionadaMovimiento('');
+          setMovimientoData({ concepto: '', monto: '' });
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -951,6 +979,33 @@ export default function Cajas() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRegistrarMovimiento} className="space-y-4">
+            {/* Selector de caja para admin cuando hay múltiples cajas abiertas */}
+            {isAdmin && cajasAbiertas.length > 1 && (
+              <div className="space-y-2">
+                <Label htmlFor="caja_destino">Caja *</Label>
+                <Select 
+                  value={cajaSeleccionadaMovimiento || (cajaActiva?.id || '')} 
+                  onValueChange={setCajaSeleccionadaMovimiento}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar caja" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cajasAbiertas.map((caja) => (
+                      <SelectItem key={caja.id} value={caja.id}>
+                        {caja.profiles?.nombre || 'Mi caja'} - ${caja.fondo_inicial.toLocaleString('es-AR')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Mostrar info de la caja cuando solo hay una */}
+            {isAdmin && cajasAbiertas.length === 1 && cajasAbiertas[0].usuario_id !== user?.id && (
+              <div className="bg-muted/50 p-3 rounded-lg text-sm">
+                <p>Caja de: <strong>{cajasAbiertas[0].profiles?.nombre || 'Usuario'}</strong></p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="concepto">Concepto *</Label>
               <Input
