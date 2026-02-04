@@ -150,7 +150,10 @@ export default function AsociacionPagos() {
             .in('id', pagoIds)
         : { data: [] };
 
-      const pagosMap = new Map(pagosData?.map(p => [p.id, p]) || []);
+      type PagoInfo = { id: string; concepto: string | null; fecha: string | null; monto: number };
+      const pagosMap = new Map<string, PagoInfo>(
+        (pagosData || []).map(p => [p.id, p as PagoInfo])
+      );
 
       // Construir facturas con imputaciones
       const facturasResult: FacturaConImputaciones[] = facturas.map(factura => {
