@@ -719,6 +719,9 @@ export default function Cajas() {
         const canConfirm = isAdmin && 
                           item.estado === 'cerrada' && 
                           item.arqueo_pendiente_revision;
+        const canClose = isAdmin && 
+                         item.estado === 'abierta' && 
+                         item.usuario_id !== user?.id;
         
         return (
           <div className="flex items-center gap-1">
@@ -730,6 +733,23 @@ export default function Cajas() {
               </TooltipTrigger>
               <TooltipContent>Ver detalle</TooltipContent>
             </Tooltip>
+            {canClose && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => {
+                      setCajaACerrar(item);
+                      setCierreDialogOpen(true);
+                    }}
+                  >
+                    <Lock className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Cerrar caja</TooltipContent>
+              </Tooltip>
+            )}
             {canEdit && (
               <Tooltip>
                 <TooltipTrigger asChild>
