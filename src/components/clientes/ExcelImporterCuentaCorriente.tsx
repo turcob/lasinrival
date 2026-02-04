@@ -145,6 +145,56 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     return null;
   };
 
+  const processExcelData = useCallback((jsonData: ClienteRow[]) => {
+    const movimientos: MovimientoExcel[] = [];
+    const totalRows = jsonData.length;
+    
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row.Cliente) continue;
+      
+      const clienteInfo = extractClienteCode(row.Cliente);
+      if (!clienteInfo) continue;
+
+      const tipoInfo = determinarTipoMovimiento(row);
+      if (!tipoInfo) continue;
+
+      const debe = parseNumber(row.Debe);
+      const haber = parseNumber(row.Haber);
+      const importe = parseNumber(row.Importe);
+      
+      let monto: number;
+      if (tipoInfo.tipo === 'saldo_inicial') {
+        monto = importe;
+      } else if (tipoInfo.tipo === 'compra') {
+        monto = debe;
+      } else {
+        monto = haber;
+      }
+
+      if (monto === 0) continue;
+
+      movimientos.push({
+        clienteCodigo: clienteInfo.codigo,
+        clienteNombre: clienteInfo.nombre,
+        fecha: parseExcelDate(row['Fecha comprobante']),
+        tipo: tipoInfo.tipo,
+        tipoOriginal: tipoInfo.tipoOriginal,
+        nroComprobante: row['Nro. comprobante']?.toString() || '',
+        monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
+      });
+
+      // Actualizar progreso cada 500 filas
+      if (i % 500 === 0) {
+        const progressValue = 60 + Math.round((i / totalRows) * 35);
+        setProgress(progressValue);
+        setParsingMessage(`Procesando fila ${i} de ${totalRows}...`);
+      }
+    }
+
+    return movimientos;
+  }, []);
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('handleFileSelect triggered', e.target.files);
     const file = e.target.files?.[0];
@@ -155,78 +205,51 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     console.log('File selected:', file.name, file.size);
 
     setParsing(true);
-    setProgress(0);
+    setProgress(5);
+    setParsingMessage(`Cargando archivo: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
     try {
-      // Simular progreso inicial mientras carga el archivo
+      // Usar setTimeout para permitir que la UI se actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       setProgress(10);
+      setParsingMessage('Leyendo archivo...');
       
       const data = await file.arrayBuffer();
-      setProgress(30);
       
-      const workbook = XLSX.read(data);
+      setProgress(30);
+      setParsingMessage('Parseando estructura del Excel...');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const workbook = XLSX.read(data, { type: 'array' });
+      
       setProgress(50);
+      setParsingMessage('Extrayendo datos...');
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<ClienteRow>(worksheet);
-      setProgress(70);
-
-      const movimientos: MovimientoExcel[] = [];
-      const totalRows = jsonData.length;
       
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        if (!row.Cliente) continue;
-        
-        const clienteInfo = extractClienteCode(row.Cliente);
-        if (!clienteInfo) continue;
+      setProgress(60);
+      setParsingMessage(`Procesando ${jsonData.length} filas...`);
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-        const tipoInfo = determinarTipoMovimiento(row);
-        if (!tipoInfo) continue;
-
-        const debe = parseNumber(row.Debe);
-        const haber = parseNumber(row.Haber);
-        
-        const importe = parseNumber(row.Importe);
-        
-        let monto: number;
-        if (tipoInfo.tipo === 'saldo_inicial') {
-          // Para saldo inicial, usar columna Importe
-          monto = importe;
-        } else if (tipoInfo.tipo === 'compra') {
-          monto = debe;
-        } else {
-          monto = haber;
-        }
-
-        if (monto === 0) continue;
-
-        movimientos.push({
-          clienteCodigo: clienteInfo.codigo,
-          clienteNombre: clienteInfo.nombre,
-          fecha: parseExcelDate(row['Fecha comprobante']),
-          tipo: tipoInfo.tipo,
-          tipoOriginal: tipoInfo.tipoOriginal,
-          nroComprobante: row['Nro. comprobante']?.toString() || '',
-          monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
-        });
-
-        // Actualizar progreso cada 100 filas
-        if (i % 100 === 0) {
-          setProgress(70 + Math.round((i / totalRows) * 25));
-        }
-      }
+      const movimientos = processExcelData(jsonData);
 
       setProgress(100);
+      setParsingMessage(`¡Listo! ${movimientos.length} movimientos encontrados`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       setParsedMovimientos(movimientos);
       setStep('preview');
     } catch (error) {
       console.error('Error parsing Excel:', error);
-      toast.error('Error al leer el archivo Excel');
+      toast.error('Error al leer el archivo Excel: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     } finally {
       setParsing(false);
       setProgress(0);
+      setParsingMessage('');
     }
 
     if (fileInputRef.current) {
