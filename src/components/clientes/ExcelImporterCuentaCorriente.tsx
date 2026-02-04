@@ -428,17 +428,25 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     let insertados = 0;
     let errores = 0;
 
+    // Map para guardar los IDs insertados por cliente para luego imputar
+    const movimientosInsertadosPorCliente = new Map<string, Array<{
+      id: string;
+      tipo: string;
+      monto: number;
+      fecha: string;
+    }>>();
+
     for (let i = 0; i < movimientosAInsertar.length; i += batchSize) {
       const batch = movimientosAInsertar.slice(i, i + batchSize);
       
-      const { error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('cliente_movimientos')
-        .insert(batch);
+        .insert(batch)
+        .select('id, cliente_id, tipo, monto, fecha');
 
       if (error) {
         console.error('Error en batch insert:', error);
         errores += batch.length;
-        // Marcar estos como error en los resultados
         for (let j = i; j < i + batch.length && j < movimientosAInsertar.length; j++) {
           const idx = importResults.findIndex(r => 
             r.status === 'success' && 
@@ -451,7 +459,20 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         }
       } else {
         insertados += batch.length;
-        // Actualizar mensajes de éxito
+        
+        // Guardar los movimientos insertados para imputación
+        insertedData?.forEach(mov => {
+          if (!movimientosInsertadosPorCliente.has(mov.cliente_id)) {
+            movimientosInsertadosPorCliente.set(mov.cliente_id, []);
+          }
+          movimientosInsertadosPorCliente.get(mov.cliente_id)!.push({
+            id: mov.id,
+            tipo: mov.tipo,
+            monto: Number(mov.monto),
+            fecha: mov.fecha || ''
+          });
+        });
+        
         let updated = 0;
         for (let j = 0; j < importResults.length && updated < batch.length; j++) {
           if (importResults[j].status === 'success' && importResults[j].message === 'Listo para importar') {
@@ -461,8 +482,129 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         }
       }
 
+      const progressValue = Math.round(((i + batch.length) / movimientosAInsertar.length) * 70);
+      setProgress(progressValue);
+      await updateUI();
+    }
+
+    // === IMPUTACIÓN AUTOMÁTICA ===
+    // Para cada cliente, imputar pagos/notas de crédito a facturas más antiguas
+    setProgress(75);
+    await updateUI();
+    
+    let imputacionesCreadas = 0;
+    const clienteIds = Array.from(movimientosInsertadosPorCliente.keys());
+    
+    for (let clienteIdx = 0; clienteIdx < clienteIds.length; clienteIdx++) {
+      const clienteId = clienteIds[clienteIdx];
+      
+      // Obtener TODOS los movimientos del cliente (no solo los recién insertados)
+      const { data: todosMovimientos } = await supabase
+        .from('cliente_movimientos')
+        .select('id, tipo, monto, fecha')
+        .eq('cliente_id', clienteId)
+        .order('fecha', { ascending: true });
+      
+      if (!todosMovimientos || todosMovimientos.length === 0) continue;
+      
+      // Obtener imputaciones existentes para este cliente
+      const movIds = todosMovimientos.map(m => m.id);
+      const { data: imputacionesExistentes } = await supabase
+        .from('cliente_movimiento_imputaciones')
+        .select('movimiento_factura_id, monto')
+        .in('movimiento_factura_id', movIds);
+      
+      const { data: imputacionesPagos } = await supabase
+        .from('cliente_movimiento_imputaciones')
+        .select('movimiento_pago_id, monto')
+        .in('movimiento_pago_id', movIds);
+      
+      // Calcular saldo pendiente de cada factura (monto - imputaciones recibidas)
+      const saldoFacturas = new Map<string, { id: string; saldoPendiente: number; fecha: string }>();
+      todosMovimientos
+        .filter(m => m.tipo === 'compra' || m.tipo === 'saldo_inicial')
+        .forEach(factura => {
+          const imputado = imputacionesExistentes
+            ?.filter(i => i.movimiento_factura_id === factura.id)
+            .reduce((sum, i) => sum + Number(i.monto), 0) || 0;
+          const saldoPendiente = Number(factura.monto) - imputado;
+          if (saldoPendiente > 0.01) {
+            saldoFacturas.set(factura.id, {
+              id: factura.id,
+              saldoPendiente,
+              fecha: factura.fecha || ''
+            });
+          }
+        });
+      
+      // Calcular saldo disponible de cada pago (monto - imputaciones realizadas)
+      const saldoPagos = new Map<string, { id: string; saldoDisponible: number; fecha: string }>();
+      todosMovimientos
+        .filter(m => m.tipo === 'pago' || m.tipo === 'nota_credito')
+        .forEach(pago => {
+          const imputado = imputacionesPagos
+            ?.filter(i => i.movimiento_pago_id === pago.id)
+            .reduce((sum, i) => sum + Number(i.monto), 0) || 0;
+          const saldoDisponible = Number(pago.monto) - imputado;
+          if (saldoDisponible > 0.01) {
+            saldoPagos.set(pago.id, {
+              id: pago.id,
+              saldoDisponible,
+              fecha: pago.fecha || ''
+            });
+          }
+        });
+      
+      // Ordenar facturas por fecha ASC (más antiguas primero)
+      const facturasOrdenadas = Array.from(saldoFacturas.values())
+        .sort((a, b) => a.fecha.localeCompare(b.fecha));
+      
+      // Ordenar pagos por fecha ASC
+      const pagosOrdenados = Array.from(saldoPagos.values())
+        .sort((a, b) => a.fecha.localeCompare(b.fecha));
+      
+      // Imputar cada pago a las facturas más antiguas
+      const imputacionesNuevas: Array<{
+        movimiento_pago_id: string;
+        movimiento_factura_id: string;
+        monto: number;
+      }> = [];
+      
+      for (const pago of pagosOrdenados) {
+        let saldoDisponible = pago.saldoDisponible;
+        
+        for (const factura of facturasOrdenadas) {
+          if (saldoDisponible <= 0.01) break;
+          if (factura.saldoPendiente <= 0.01) continue;
+          
+          const montoImputar = Math.min(saldoDisponible, factura.saldoPendiente);
+          
+          imputacionesNuevas.push({
+            movimiento_pago_id: pago.id,
+            movimiento_factura_id: factura.id,
+            monto: montoImputar
+          });
+          
+          saldoDisponible -= montoImputar;
+          factura.saldoPendiente -= montoImputar;
+        }
+      }
+      
+      // Insertar imputaciones en batch
+      if (imputacionesNuevas.length > 0) {
+        const { error: imputError } = await supabase
+          .from('cliente_movimiento_imputaciones')
+          .insert(imputacionesNuevas);
+        
+        if (!imputError) {
+          imputacionesCreadas += imputacionesNuevas.length;
+        } else {
+          console.error('Error creando imputaciones:', imputError);
+        }
+      }
+      
       // Actualizar progreso
-      const progressValue = Math.round(((i + batch.length) / movimientosAInsertar.length) * 100);
+      const progressValue = 75 + Math.round(((clienteIdx + 1) / clienteIds.length) * 25);
       setProgress(progressValue);
       await updateUI();
     }
@@ -473,7 +615,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     
     const successCount = importResults.filter(r => r.status === 'success').length;
     if (successCount > 0) {
-      toast.success(`${successCount} movimientos importados correctamente`);
+      toast.success(`${successCount} movimientos importados. ${imputacionesCreadas} imputaciones automáticas creadas.`);
       onImportComplete?.();
     }
   };
