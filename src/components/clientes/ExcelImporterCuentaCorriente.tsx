@@ -449,6 +449,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     setParsedMovimientos([]);
     setResults([]);
     setParsing(false);
+    setParsingMessage('');
     setProgress(0);
   };
 
