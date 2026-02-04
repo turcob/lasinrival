@@ -288,7 +288,20 @@ export default function Cajas() {
 
   const handleRegistrarMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cajaActiva || !user) return;
+    if (!user) return;
+
+    // Determinar en qué caja registrar el movimiento
+    let cajaDestino: Caja | undefined;
+    if (isAdmin && cajaSeleccionadaMovimiento) {
+      cajaDestino = cajasAbiertas.find(c => c.id === cajaSeleccionadaMovimiento);
+    } else {
+      cajaDestino = cajaActiva || undefined;
+    }
+
+    if (!cajaDestino) {
+      toast.error('Debe seleccionar una caja');
+      return;
+    }
 
     const monto = parseFloat(movimientoData.monto);
     if (isNaN(monto) || monto <= 0) {
@@ -298,7 +311,7 @@ export default function Cajas() {
 
     try {
       const { error } = await supabase.from('movimientos_caja').insert([{
-        caja_id: cajaActiva.id,
+        caja_id: cajaDestino.id,
         usuario_id: user.id,
         tipo: tipoMovimiento,
         concepto: movimientoData.concepto,
@@ -310,17 +323,18 @@ export default function Cajas() {
       // Update caja totals
       const updateField = tipoMovimiento === 'ingreso' ? 'total_ventas' : 'total_egresos';
       const currentValue = tipoMovimiento === 'ingreso' 
-        ? cajaActiva.total_ventas || 0 
-        : cajaActiva.total_egresos || 0;
+        ? cajaDestino.total_ventas || 0 
+        : cajaDestino.total_egresos || 0;
 
       await supabase
         .from('cajas')
         .update({ [updateField]: currentValue + monto })
-        .eq('id', cajaActiva.id);
+        .eq('id', cajaDestino.id);
 
       toast.success('Movimiento registrado correctamente');
       setMovimientoDialogOpen(false);
       setMovimientoData({ concepto: '', monto: '' });
+      setCajaSeleccionadaMovimiento('');
       fetchData();
     } catch (error) {
       console.error('Error registering movement:', error);
