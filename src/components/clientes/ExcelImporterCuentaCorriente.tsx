@@ -317,40 +317,33 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       }
     });
 
-    for (const mov of parsedMovimientos) {
-      // Buscar cliente por código original o normalizado
-      let cliente = clienteMap.get(mov.clienteCodigo);
-      if (!cliente) {
-        cliente = clienteMap.get(normalizeCodigo(mov.clienteCodigo));
-      }
+    // Función para permitir actualización de UI
+    const updateUI = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    
+    // Procesar en lotes para mejor rendimiento y actualización de UI
+    const batchSize = 50;
+    
+    for (let i = 0; i < parsedMovimientos.length; i += batchSize) {
+      const batch = parsedMovimientos.slice(i, i + batchSize);
       
-      if (!cliente) {
-        importResults.push({
-          clienteCodigo: mov.clienteCodigo,
-          clienteNombre: mov.clienteNombre,
-          tipo: mov.tipoOriginal,
-          nroComprobante: mov.nroComprobante,
-          monto: mov.monto,
-          status: 'error',
-          message: 'Cliente no encontrado'
-        });
-      } else if (mov.tipo === 'saldo_inicial' && clientesSaldoInicial.has(cliente.id)) {
-        importResults.push({
-          clienteCodigo: mov.clienteCodigo,
-          clienteNombre: mov.clienteNombre,
-          tipo: mov.tipoOriginal,
-          nroComprobante: mov.nroComprobante,
-          monto: mov.monto,
-          status: 'skipped',
-          message: 'Ya tiene saldo inicial'
-        });
-      } else if (mov.nroComprobante) {
-        const clienteConceptos = conceptosExistentes.get(cliente.id);
-        const conceptoBuscar = mov.nroComprobante;
-        const yaExiste = clienteConceptos && 
-          Array.from(clienteConceptos).some(c => c.includes(conceptoBuscar));
+      for (const mov of batch) {
+        // Buscar cliente por código original o normalizado
+        let cliente = clienteMap.get(mov.clienteCodigo);
+        if (!cliente) {
+          cliente = clienteMap.get(normalizeCodigo(mov.clienteCodigo));
+        }
         
-        if (yaExiste) {
+        if (!cliente) {
+          importResults.push({
+            clienteCodigo: mov.clienteCodigo,
+            clienteNombre: mov.clienteNombre,
+            tipo: mov.tipoOriginal,
+            nroComprobante: mov.nroComprobante,
+            monto: mov.monto,
+            status: 'error',
+            message: 'Cliente no encontrado'
+          });
+        } else if (mov.tipo === 'saldo_inicial' && clientesSaldoInicial.has(cliente.id)) {
           importResults.push({
             clienteCodigo: mov.clienteCodigo,
             clienteNombre: mov.clienteNombre,
@@ -358,12 +351,74 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
             nroComprobante: mov.nroComprobante,
             monto: mov.monto,
             status: 'skipped',
-            message: 'Comprobante ya existe'
+            message: 'Ya tiene saldo inicial'
           });
+        } else if (mov.nroComprobante) {
+          const clienteConceptos = conceptosExistentes.get(cliente.id);
+          const conceptoBuscar = mov.nroComprobante;
+          const yaExiste = clienteConceptos && 
+            Array.from(clienteConceptos).some(c => c.includes(conceptoBuscar));
+          
+          if (yaExiste) {
+            importResults.push({
+              clienteCodigo: mov.clienteCodigo,
+              clienteNombre: mov.clienteNombre,
+              tipo: mov.tipoOriginal,
+              nroComprobante: mov.nroComprobante,
+              monto: mov.monto,
+              status: 'skipped',
+              message: 'Comprobante ya existe'
+            });
+          } else {
+            const concepto = mov.tipo === 'saldo_inicial' 
+              ? `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`
+              : `${mov.tipoOriginal} ${mov.nroComprobante}`;
+
+            const { error } = await supabase
+              .from('cliente_movimientos')
+              .insert({
+                cliente_id: cliente.id,
+                tipo: mov.tipo,
+                monto: Math.abs(mov.monto),
+                concepto,
+                estado_imputacion: 'confirmado',
+                usuario_registro_id: user.id,
+                fecha: mov.fecha || new Date().toISOString().split('T')[0]
+              });
+
+            if (error) {
+              importResults.push({
+                clienteCodigo: mov.clienteCodigo,
+                clienteNombre: mov.clienteNombre,
+                tipo: mov.tipoOriginal,
+                nroComprobante: mov.nroComprobante,
+                monto: mov.monto,
+                status: 'error',
+                message: error.message
+              });
+            } else {
+              if (!conceptosExistentes.has(cliente.id)) {
+                conceptosExistentes.set(cliente.id, new Set());
+              }
+              conceptosExistentes.get(cliente.id)!.add(concepto);
+              
+              if (mov.tipo === 'saldo_inicial') {
+                clientesSaldoInicial.add(cliente.id);
+              }
+
+              importResults.push({
+                clienteCodigo: mov.clienteCodigo,
+                clienteNombre: mov.clienteNombre,
+                tipo: mov.tipoOriginal,
+                nroComprobante: mov.nroComprobante,
+                monto: mov.monto,
+                status: 'success',
+                message: 'Importado correctamente'
+              });
+            }
+          }
         } else {
-          const concepto = mov.tipo === 'saldo_inicial' 
-            ? `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`
-            : `${mov.tipoOriginal} ${mov.nroComprobante}`;
+          const concepto = `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`;
 
           const { error } = await supabase
             .from('cliente_movimientos')
@@ -388,15 +443,9 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
               message: error.message
             });
           } else {
-            if (!conceptosExistentes.has(cliente.id)) {
-              conceptosExistentes.set(cliente.id, new Set());
-            }
-            conceptosExistentes.get(cliente.id)!.add(concepto);
-            
             if (mov.tipo === 'saldo_inicial') {
               clientesSaldoInicial.add(cliente.id);
             }
-
             importResults.push({
               clienteCodigo: mov.clienteCodigo,
               clienteNombre: mov.clienteNombre,
@@ -408,49 +457,14 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
             });
           }
         }
-      } else {
-        const concepto = `Saldo inicial importado${mov.monto < 0 ? ' (a favor)' : ''}`;
 
-        const { error } = await supabase
-          .from('cliente_movimientos')
-          .insert({
-            cliente_id: cliente.id,
-            tipo: mov.tipo,
-            monto: Math.abs(mov.monto),
-            concepto,
-            estado_imputacion: 'confirmado',
-            usuario_registro_id: user.id,
-            fecha: mov.fecha || new Date().toISOString().split('T')[0]
-          });
-
-        if (error) {
-          importResults.push({
-            clienteCodigo: mov.clienteCodigo,
-            clienteNombre: mov.clienteNombre,
-            tipo: mov.tipoOriginal,
-            nroComprobante: mov.nroComprobante,
-            monto: mov.monto,
-            status: 'error',
-            message: error.message
-          });
-        } else {
-          if (mov.tipo === 'saldo_inicial') {
-            clientesSaldoInicial.add(cliente.id);
-          }
-          importResults.push({
-            clienteCodigo: mov.clienteCodigo,
-            clienteNombre: mov.clienteNombre,
-            tipo: mov.tipoOriginal,
-            nroComprobante: mov.nroComprobante,
-            monto: mov.monto,
-            status: 'success',
-            message: 'Importado correctamente'
-          });
-        }
+        processed++;
       }
-
-      processed++;
-      setProgress(Math.round((processed / total) * 100));
+      
+      // Actualizar progreso y permitir que la UI se refresque
+      const progressValue = Math.round((processed / total) * 100);
+      setProgress(progressValue);
+      await updateUI();
     }
 
     setResults(importResults);
