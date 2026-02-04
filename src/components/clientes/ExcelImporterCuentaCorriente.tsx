@@ -458,30 +458,45 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
 
         {step === 'upload' && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Sube el archivo Excel de cuenta corriente. Se importarán todos los movimientos individuales (Saldo inicial, FAC, REC, NCR).
-            </p>
-            <div 
-              className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-              onClick={() => {
-                console.log('Container clicked, triggering file input');
-                fileInputRef.current?.click();
-              }}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <Upload className="h-10 w-10 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Click para seleccionar archivo
-                </span>
+            {parsing ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5 p-8">
+                  <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                    <FileSpreadsheet className="h-10 w-10 text-primary animate-pulse" />
+                    <div className="w-full space-y-2">
+                      <Progress value={progress} className="h-2" />
+                      <p className="text-center text-sm text-muted-foreground">
+                        Procesando archivo... {progress}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
+            ) : (
+              <>
+                <div 
+                  className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                  onClick={() => {
+                    console.log('Container clicked, triggering file input');
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-10 w-10 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Click para seleccionar archivo
+                    </span>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
