@@ -5,6 +5,7 @@ import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle } from 'luci
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -425,6 +426,9 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Importar Movimientos de Cuenta Corriente</DialogTitle>
+          <DialogDescription>
+            Sube el archivo Excel con los movimientos de cuenta corriente para importar.
+          </DialogDescription>
         </DialogHeader>
 
         {step === 'upload' && (
@@ -432,20 +436,26 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
             <p className="text-sm text-muted-foreground">
               Sube el archivo Excel de cuenta corriente. Se importarán todos los movimientos individuales (Saldo inicial, FAC, REC, NCR).
             </p>
-            <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8">
-              <label className="flex cursor-pointer flex-col items-center gap-2">
+            <div 
+              className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+              onClick={() => {
+                console.log('Container clicked, triggering file input');
+                fileInputRef.current?.click();
+              }}
+            >
+              <div className="flex flex-col items-center gap-2">
                 <Upload className="h-10 w-10 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
                   Click para seleccionar archivo
                 </span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </label>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
             </div>
           </div>
         )}
