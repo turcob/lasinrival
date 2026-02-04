@@ -74,6 +74,7 @@ const TIPO_COLORS: Record<TipoMovimiento, string> = {
 export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporterCuentaCorrienteProps) {
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'results'>('upload');
