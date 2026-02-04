@@ -426,6 +426,9 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Importar Movimientos de Cuenta Corriente</DialogTitle>
+          <DialogDescription>
+            Sube el archivo Excel con los movimientos de cuenta corriente para importar.
+          </DialogDescription>
         </DialogHeader>
 
         {step === 'upload' && (
