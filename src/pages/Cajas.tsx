@@ -99,16 +99,19 @@ interface ArqueoOtroMedio {
 export default function Cajas() {
   const { user, profile, hasRole } = useAuth();
   const isAdmin = hasRole('admin');
+  const isVendedor = hasRole('vendedor');
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [cajaActiva, setCajaActiva] = useState<Caja | null>(null);
+  const [cajasAbiertas, setCajasAbiertas] = useState<Caja[]>([]); // Todas las cajas abiertas (para admin)
   const [loading, setLoading] = useState(true);
   const [aperturaDialogOpen, setAperturaDialogOpen] = useState(false);
   const [movimientoDialogOpen, setMovimientoDialogOpen] = useState(false);
   const [cierreDialogOpen, setCierreDialogOpen] = useState(false);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [selectedCaja, setSelectedCaja] = useState<Caja | null>(null);
+  const [cajaACerrar, setCajaACerrar] = useState<Caja | null>(null); // Caja que admin quiere cerrar
   const [arqueoDetalles, setArqueoDetalles] = useState<ArqueoDetalle[]>([]);
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
   const [editarArqueoDialogOpen, setEditarArqueoDialogOpen] = useState(false);
@@ -210,6 +213,12 @@ export default function Cajas() {
         (c) => c.usuario_id === user.id && c.estado === 'abierta'
       );
       setCajaActiva(cajaAbierta || null);
+
+      // Para admins, guardar todas las cajas abiertas
+      if (isAdmin && cajasData) {
+        const todasCajasAbiertas = cajasData.filter(c => c.estado === 'abierta');
+        setCajasAbiertas(todasCajasAbiertas);
+      }
 
       // Fetch movements for active cash register
       if (cajaAbierta) {
@@ -376,7 +385,9 @@ export default function Cajas() {
 
   const handleCerrarCaja = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cajaActiva || !user) return;
+    // Usar cajaACerrar si está definida (admin cerrando otra caja), sino usar cajaActiva
+    const cajaParaCerrar = cajaACerrar || cajaActiva;
+    if (!cajaParaCerrar || !user) return;
 
     if (totalArqueo < 0) {
       toast.error('El arqueo no puede ser negativo');
@@ -384,7 +395,7 @@ export default function Cajas() {
     }
 
     try {
-      const esperado = cajaActiva.fondo_inicial + (cajaActiva.total_ventas || 0) - (cajaActiva.total_egresos || 0);
+      const esperado = cajaParaCerrar.fondo_inicial + (cajaParaCerrar.total_ventas || 0) - (cajaParaCerrar.total_egresos || 0);
       const diferencia = totalArqueo - esperado;
 
       const { error } = await supabase
@@ -396,7 +407,7 @@ export default function Cajas() {
           diferencia: diferencia,
           observaciones: cierreData.observaciones || null,
         })
-        .eq('id', cajaActiva.id);
+        .eq('id', cajaParaCerrar.id);
 
       if (error) throw error;
 
@@ -404,7 +415,7 @@ export default function Cajas() {
       const arqueoInserts = denominaciones
         .filter(d => arqueo[d.valor.toString()] > 0)
         .map(d => ({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           denominacion: d.valor,
           cantidad: arqueo[d.valor.toString()],
           subtotal: d.valor * arqueo[d.valor.toString()],
@@ -421,14 +432,14 @@ export default function Cajas() {
       const otrosMediosInserts = [];
       if (otrosMedios.posnet > 0) {
         otrosMediosInserts.push({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           tipo: 'posnet',
           monto: otrosMedios.posnet,
         });
       }
       if (otrosMedios.transferencias > 0) {
         otrosMediosInserts.push({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           tipo: 'transferencias',
           monto: otrosMedios.transferencias,
         });
@@ -443,6 +454,7 @@ export default function Cajas() {
 
       toast.success('Caja cerrada correctamente');
       setCierreDialogOpen(false);
+      setCajaACerrar(null);
       setCierreData({ observaciones: '' });
       setArqueo({
         '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
@@ -707,6 +719,9 @@ export default function Cajas() {
         const canConfirm = isAdmin && 
                           item.estado === 'cerrada' && 
                           item.arqueo_pendiente_revision;
+        const canClose = isAdmin && 
+                         item.estado === 'abierta' && 
+                         item.usuario_id !== user?.id;
         
         return (
           <div className="flex items-center gap-1">
@@ -718,6 +733,23 @@ export default function Cajas() {
               </TooltipTrigger>
               <TooltipContent>Ver detalle</TooltipContent>
             </Tooltip>
+            {canClose && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => {
+                      setCajaACerrar(item);
+                      setCierreDialogOpen(true);
+                    }}
+                  >
+                    <Lock className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Cerrar caja</TooltipContent>
+              </Tooltip>
+            )}
             {canEdit && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -759,8 +791,10 @@ export default function Cajas() {
     },
   ];
 
-  const esperado = cajaActiva
-    ? cajaActiva.fondo_inicial + (cajaActiva.total_ventas || 0) - (cajaActiva.total_egresos || 0)
+  // Calcular esperado basado en la caja a cerrar (cajaACerrar para admin o cajaActiva)
+  const cajaParaCalculos = cajaACerrar || cajaActiva;
+  const esperado = cajaParaCalculos
+    ? cajaParaCalculos.fondo_inicial + (cajaParaCalculos.total_ventas || 0) - (cajaParaCalculos.total_egresos || 0)
     : 0;
 
   return (
@@ -773,15 +807,19 @@ export default function Cajas() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            {isAdmin && (
+            {/* Vendedores no tienen acceso a Ingreso/Egreso, otros roles sí */}
+            {!isVendedor && (
               <>
-                <Button variant="outline" onClick={() => {
-                  setTipoMovimiento('egreso');
-                  setMovimientoDialogOpen(true);
-                }}>
-                  <ArrowDownCircle className="mr-2 h-4 w-4" />
-                  Egreso
-                </Button>
+                {/* Solo admin puede hacer egresos */}
+                {isAdmin && (
+                  <Button variant="outline" onClick={() => {
+                    setTipoMovimiento('egreso');
+                    setMovimientoDialogOpen(true);
+                  }}>
+                    <ArrowDownCircle className="mr-2 h-4 w-4" />
+                    Egreso
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => {
                   setTipoMovimiento('ingreso');
                   setMovimientoDialogOpen(true);
@@ -791,7 +829,10 @@ export default function Cajas() {
                 </Button>
               </>
             )}
-            <Button onClick={() => setCierreDialogOpen(true)}>
+            <Button onClick={() => {
+              setCajaACerrar(null);
+              setCierreDialogOpen(true);
+            }}>
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
             </Button>
@@ -944,12 +985,15 @@ export default function Cajas() {
       </Dialog>
 
       {/* Cierre Dialog */}
-      <Dialog open={cierreDialogOpen} onOpenChange={setCierreDialogOpen}>
+      <Dialog open={cierreDialogOpen} onOpenChange={(open) => {
+        setCierreDialogOpen(open);
+        if (!open) setCajaACerrar(null);
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Arqueo y Cierre de Caja
+              {cajaACerrar ? `Cerrar Caja de ${cajaACerrar.profiles?.nombre || 'Usuario'}` : 'Arqueo y Cierre de Caja'}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCerrarCaja} className="space-y-4">
@@ -961,15 +1005,15 @@ export default function Cajas() {
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Fondo Inicial:</span>
-                  <span>${cajaActiva?.fondo_inicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>${cajaParaCalculos?.fondo_inicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-success">
                   <span>Ingresos:</span>
-                  <span>+${(cajaActiva?.total_ventas || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>+${(cajaParaCalculos?.total_ventas || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-destructive">
                   <span>Egresos:</span>
-                  <span>-${(cajaActiva?.total_egresos || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>-${(cajaParaCalculos?.total_egresos || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-bold">
                   <span>Total Esperado:</span>
