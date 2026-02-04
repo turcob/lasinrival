@@ -958,7 +958,13 @@ export default function Cajas() {
       </Dialog>
 
       {/* Movimiento Dialog */}
-      <Dialog open={movimientoDialogOpen} onOpenChange={setMovimientoDialogOpen}>
+      <Dialog open={movimientoDialogOpen} onOpenChange={(open) => {
+        setMovimientoDialogOpen(open);
+        if (!open) {
+          setCajaSeleccionadaMovimiento('');
+          setMovimientoData({ concepto: '', monto: '' });
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -966,6 +972,33 @@ export default function Cajas() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRegistrarMovimiento} className="space-y-4">
+            {/* Selector de caja para admin cuando hay múltiples cajas abiertas */}
+            {isAdmin && cajasAbiertas.length > 1 && (
+              <div className="space-y-2">
+                <Label htmlFor="caja_destino">Caja *</Label>
+                <Select 
+                  value={cajaSeleccionadaMovimiento || (cajaActiva?.id || '')} 
+                  onValueChange={setCajaSeleccionadaMovimiento}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar caja" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cajasAbiertas.map((caja) => (
+                      <SelectItem key={caja.id} value={caja.id}>
+                        {caja.profiles?.nombre || 'Mi caja'} - ${caja.fondo_inicial.toLocaleString('es-AR')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Mostrar info de la caja cuando solo hay una */}
+            {isAdmin && cajasAbiertas.length === 1 && cajasAbiertas[0].usuario_id !== user?.id && (
+              <div className="bg-muted/50 p-3 rounded-lg text-sm">
+                <p>Caja de: <strong>{cajasAbiertas[0].profiles?.nombre || 'Usuario'}</strong></p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="concepto">Concepto *</Label>
               <Input
