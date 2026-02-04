@@ -791,8 +791,10 @@ export default function Cajas() {
     },
   ];
 
-  const esperado = cajaActiva
-    ? cajaActiva.fondo_inicial + (cajaActiva.total_ventas || 0) - (cajaActiva.total_egresos || 0)
+  // Calcular esperado basado en la caja a cerrar (cajaACerrar para admin o cajaActiva)
+  const cajaParaCalculos = cajaACerrar || cajaActiva;
+  const esperado = cajaParaCalculos
+    ? cajaParaCalculos.fondo_inicial + (cajaParaCalculos.total_ventas || 0) - (cajaParaCalculos.total_egresos || 0)
     : 0;
 
   return (
