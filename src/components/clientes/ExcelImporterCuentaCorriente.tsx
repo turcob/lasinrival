@@ -74,6 +74,7 @@ const TIPO_COLORS: Record<TipoMovimiento, string> = {
 export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporterCuentaCorrienteProps) {
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'results'>('upload');
@@ -152,16 +153,29 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     }
     console.log('File selected:', file.name, file.size);
 
+    setParsing(true);
+    setProgress(0);
+
     try {
+      // Simular progreso inicial mientras carga el archivo
+      setProgress(10);
+      
       const data = await file.arrayBuffer();
+      setProgress(30);
+      
       const workbook = XLSX.read(data);
+      setProgress(50);
+      
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<ClienteRow>(worksheet);
+      setProgress(70);
 
       const movimientos: MovimientoExcel[] = [];
+      const totalRows = jsonData.length;
       
-      for (const row of jsonData) {
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
         if (!row.Cliente) continue;
         
         const clienteInfo = extractClienteCode(row.Cliente);
@@ -196,13 +210,22 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
           nroComprobante: row['Nro. comprobante']?.toString() || '',
           monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
         });
+
+        // Actualizar progreso cada 100 filas
+        if (i % 100 === 0) {
+          setProgress(70 + Math.round((i / totalRows) * 25));
+        }
       }
 
+      setProgress(100);
       setParsedMovimientos(movimientos);
       setStep('preview');
     } catch (error) {
       console.error('Error parsing Excel:', error);
       toast.error('Error al leer el archivo Excel');
+    } finally {
+      setParsing(false);
+      setProgress(0);
     }
 
     if (fileInputRef.current) {
@@ -396,10 +419,12 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   };
 
   const handleClose = () => {
+    if (parsing) return; // No cerrar mientras se procesa
     setOpen(false);
     setStep('upload');
     setParsedMovimientos([]);
     setResults([]);
+    setParsing(false);
     setProgress(0);
   };
 
@@ -433,30 +458,45 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
 
         {step === 'upload' && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Sube el archivo Excel de cuenta corriente. Se importarán todos los movimientos individuales (Saldo inicial, FAC, REC, NCR).
-            </p>
-            <div 
-              className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-              onClick={() => {
-                console.log('Container clicked, triggering file input');
-                fileInputRef.current?.click();
-              }}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <Upload className="h-10 w-10 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Click para seleccionar archivo
-                </span>
+            {parsing ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5 p-8">
+                  <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+                    <FileSpreadsheet className="h-10 w-10 text-primary animate-pulse" />
+                    <div className="w-full space-y-2">
+                      <Progress value={progress} className="h-2" />
+                      <p className="text-center text-sm text-muted-foreground">
+                        Procesando archivo... {progress}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
+            ) : (
+              <>
+                <div 
+                  className="flex items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                  onClick={() => {
+                    console.log('Container clicked, triggering file input');
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-10 w-10 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Click para seleccionar archivo
+                    </span>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
