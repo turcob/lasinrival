@@ -153,16 +153,29 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     }
     console.log('File selected:', file.name, file.size);
 
+    setParsing(true);
+    setProgress(0);
+
     try {
+      // Simular progreso inicial mientras carga el archivo
+      setProgress(10);
+      
       const data = await file.arrayBuffer();
+      setProgress(30);
+      
       const workbook = XLSX.read(data);
+      setProgress(50);
+      
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<ClienteRow>(worksheet);
+      setProgress(70);
 
       const movimientos: MovimientoExcel[] = [];
+      const totalRows = jsonData.length;
       
-      for (const row of jsonData) {
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
         if (!row.Cliente) continue;
         
         const clienteInfo = extractClienteCode(row.Cliente);
@@ -197,13 +210,22 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
           nroComprobante: row['Nro. comprobante']?.toString() || '',
           monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
         });
+
+        // Actualizar progreso cada 100 filas
+        if (i % 100 === 0) {
+          setProgress(70 + Math.round((i / totalRows) * 25));
+        }
       }
 
+      setProgress(100);
       setParsedMovimientos(movimientos);
       setStep('preview');
     } catch (error) {
       console.error('Error parsing Excel:', error);
       toast.error('Error al leer el archivo Excel');
+    } finally {
+      setParsing(false);
+      setProgress(0);
     }
 
     if (fileInputRef.current) {
