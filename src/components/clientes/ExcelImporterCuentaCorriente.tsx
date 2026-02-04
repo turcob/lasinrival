@@ -486,12 +486,18 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
             {parsing ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5 p-8">
-                  <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                    <FileSpreadsheet className="h-10 w-10 text-primary animate-pulse" />
+                  <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+                    <div className="relative">
+                      <FileSpreadsheet className="h-12 w-12 text-primary" />
+                      <Loader2 className="h-6 w-6 text-primary animate-spin absolute -bottom-1 -right-1" />
+                    </div>
                     <div className="w-full space-y-2">
-                      <Progress value={progress} className="h-2" />
-                      <p className="text-center text-sm text-muted-foreground">
-                        Procesando archivo... {progress}%
+                      <Progress value={progress} className="h-3" />
+                      <p className="text-center text-sm font-medium text-foreground">
+                        {progress}%
+                      </p>
+                      <p className="text-center text-xs text-muted-foreground">
+                        {parsingMessage}
                       </p>
                     </div>
                   </div>
