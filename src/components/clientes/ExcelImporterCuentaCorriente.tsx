@@ -318,7 +318,11 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     });
 
     for (const mov of parsedMovimientos) {
-      const cliente = clienteMap.get(mov.clienteCodigo);
+      // Buscar cliente por código original o normalizado
+      let cliente = clienteMap.get(mov.clienteCodigo);
+      if (!cliente) {
+        cliente = clienteMap.get(normalizeCodigo(mov.clienteCodigo));
+      }
       
       if (!cliente) {
         importResults.push({
