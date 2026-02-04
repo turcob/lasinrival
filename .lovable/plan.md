@@ -1,124 +1,113 @@
 
-# Plan: Limpieza de Tablas Duplicadas
+# Plan para verificar el funcionamiento de Cuentas Corrientes
 
-## Resumen del Problema
+## Objetivo
+Probar el sistema de cuentas corrientes importando el Excel de Fernando Pereyra con el historico de facturas y recibos, verificando que los movimientos impacten correctamente en los saldos.
 
-Existen tablas duplicadas en la base de datos que generan confusión:
+## Estado actual del sistema
 
-| Tabla Actual | Registros | Estado | Acción |
-|--------------|-----------|--------|--------|
-| `hojas_ruta` | 2 | En uso activo | Mantener |
-| `hoja_ruta` | 0 | Obsoleta | Eliminar |
-| `usuarios` | 0 | Obsoleta | Eliminar |
+### Lo que ya existe:
+1. **Tabla `cliente_movimientos`**: Almacena todos los movimientos con campos:
+   - `tipo`: compra, pago, nota_credito, nota_debito, devolucion, saldo_inicial
+   - `monto`, `fecha`, `concepto`, `estado_imputacion`, etc.
 
-## Dependencias a Actualizar
+2. **Vista `cliente_saldos`**: Calcula automáticamente:
+   - `total_deuda` = suma de (compra + saldo_inicial + nota_debito)
+   - `total_pagado` = suma de (pago + nota_credito + devolucion)
+   - `saldo_actual` = total_deuda - total_pagado
 
-Las siguientes funciones de base de datos usan las tablas obsoletas y deben ser actualizadas:
+3. **Importador Excel** (`ExcelImporterCuentaCorriente`): Procesa:
+   - Columna "Fecha comprobante" para las fechas
+   - Tipos: FAC (compra), REC (pago), NCR (nota credito)
+   - Detecta "saldo inicial" en columna Estado
+   - Evita duplicados por numero de comprobante
 
-1. **`get_usuario_id()`** - Busca en tabla `usuarios` (obsoleta)
-2. **`is_route_owner()`** - Une `hoja_ruta` con `usuarios`
-3. **`is_stop_owner()`** - Une `hoja_ruta_paradas` con `hoja_ruta` y `usuarios`
+4. **Clientes de Fernando Pereyra**: Existen 30+ clientes pero sin movimientos cargados
 
-## Plan de Migración
+### Flujo de prueba:
 
-### Paso 1: Actualizar Funciones de Seguridad
-
-Modificar las funciones para usar las tablas correctas:
-
-- `get_usuario_id()` → Usar `empleados.user_id` (ya vinculado al auth user)
-- `is_route_owner()` → Usar `hojas_ruta.chofer_id` → `empleados.user_id`
-- `is_stop_owner()` → Ajustar para la nueva estructura
-
-### Paso 2: Eliminar Tabla `hoja_ruta`
-
-```sql
-DROP TABLE IF EXISTS public.hoja_ruta CASCADE;
+```
+Excel Fernando Pereyra
+        |
+        v
+[Importador CC] ---> [cliente_movimientos]
+                              |
+                              v
+                     [cliente_saldos (vista)]
+                              |
+                              v
+                  [Dialog Cuenta Corriente]
+                     - Lista movimientos ordenados por fecha
+                     - Muestra resumen de saldos
 ```
 
-### Paso 3: Eliminar Tabla `usuarios`
+## Pasos para la prueba
 
-```sql
-DROP TABLE IF EXISTS public.usuarios CASCADE;
+### Paso 1: Importar el Excel
+1. Ir a la pagina de **Clientes**
+2. Hacer clic en **"Importar Cuenta Corriente"**
+3. Seleccionar el archivo `FERNANDO_PEREYRA.xlsx`
+4. Revisar la vista previa que muestra:
+   - Cantidad por tipo (FAC, REC, NCR, Saldo Inicial)
+   - Codigo cliente, fecha, tipo, comprobante, monto
+5. Confirmar la importacion
+
+### Paso 2: Verificar resultados de importacion
+- El sistema mostrara cuantos fueron:
+  - **Exitosos**: Importados correctamente
+  - **Omitidos**: Ya existian (duplicados)
+  - **Errores**: Cliente no encontrado u otro error
+
+### Paso 3: Revisar cuenta corriente de un cliente
+1. Buscar un cliente del vendedor Fernando Pereyra
+2. Hacer clic en el icono de billetera (Cuenta Corriente)
+3. Verificar:
+   - **Orden de movimientos**: Mas recientes primero (ordenados por fecha DESC)
+   - **Total Deuda**: Suma de facturas + saldo inicial
+   - **Total Pagado**: Suma de recibos + notas de credito
+   - **Saldo Actual**: Deuda - Pagado
+
+## Puntos a observar
+
+### Durante la importacion:
+- Que el mapeo de columnas sea correcto (Fecha comprobante, no Fecha vto.)
+- Que los tipos se detecten bien (FAC, REC, NCR, saldo inicial)
+- Que los montos se tomen de las columnas correctas (Debe/Haber/Importe)
+
+### En la cuenta corriente:
+- Que el orden cronologico sea correcto
+- Que los colores sean correctos:
+  - Rojo: Compras/Facturas (deuda)
+  - Verde: Pagos/Recibos (reduce deuda)
+- Que el saldo final coincida con el esperado del Excel
+
+## Seccion tecnica
+
+### Estructura esperada del Excel:
+| Cliente | Tipo comprobante | Nro. comprobante | Fecha comprobante | Debe | Haber | Estado |
+|---------|-----------------|------------------|-------------------|------|-------|--------|
+| 080640 - CHAVEZ JUAN | FAC | B0001101163413 | 05/01/2026 | 96053.22 | 0 | |
+| 080640 - CHAVEZ JUAN | REC | X0040000108897 | 06/01/2026 | 0 | 96053.22 | |
+
+### Logica de asignacion de montos:
+```javascript
+if (tipo === 'saldo_inicial') {
+  monto = columna Importe
+} else if (tipo === 'compra') {
+  monto = columna Debe
+} else {
+  monto = columna Haber
+}
 ```
 
-### Paso 4: Actualizar Políticas RLS
-
-Las políticas que usan estas funciones se actualizarán automáticamente cuando reemplacemos las funciones.
-
-## Sección Técnica
-
-### Nueva Implementación de Funciones
-
+### Calculo del saldo en la vista SQL:
 ```sql
--- Obtener empleado_id del usuario autenticado
-CREATE OR REPLACE FUNCTION public.get_empleado_id()
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN (
-    SELECT id FROM public.empleados 
-    WHERE user_id = auth.uid() 
-    LIMIT 1
-  );
-END;
-$$;
-
--- Verificar si el usuario es dueño de la ruta (es el chofer asignado)
-CREATE OR REPLACE FUNCTION public.is_route_owner(route_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.hojas_ruta hr
-    JOIN public.empleados e ON hr.chofer_id = e.id
-    WHERE hr.id = route_id 
-    AND e.user_id = auth.uid()
-  );
-END;
-$$;
-
--- Verificar si el usuario es dueño de la parada
-CREATE OR REPLACE FUNCTION public.is_stop_owner(stop_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.hoja_ruta_paradas p
-    JOIN public.hojas_ruta hr ON p.hoja_ruta_id = hr.id
-    JOIN public.empleados e ON hr.chofer_id = e.id
-    WHERE p.id = stop_id 
-    AND e.user_id = auth.uid()
-  );
-END;
-$$;
+saldo_actual = 
+  SUM(CASE WHEN tipo IN ('compra','saldo_inicial','nota_debito') THEN monto ELSE -monto END)
 ```
 
-### Actualización de Políticas RLS
-
-Las tablas afectadas con políticas que usan estas funciones:
-- `hoja_ruta` (se eliminará)
-- `hoja_ruta_paradas` 
-- `cobros`
-- `devoluciones`
-- `rendiciones`
-
-Estas políticas usarán las nuevas funciones que apuntan a `hojas_ruta` y `empleados`.
-
-## Beneficios
-
-1. Estructura de datos limpia sin duplicaciones
-2. Relación clara: `Usuario Auth` → `Empleado` → `Chofer en Hoja de Ruta`
-3. Políticas RLS funcionando correctamente para la app del chofer
-4. Sincronización con la app externa que ya ajustaste
-
-## Verificación Post-Migración
-
-- Confirmar que las hojas de ruta existentes (2) siguen funcionando
-- Verificar que los cobros y paradas mantienen sus relaciones
-- Probar acceso del chofer a sus rutas asignadas
+## Proximos pasos sugeridos
+1. Subir el Excel y revisar la previsualizacion
+2. Confirmar importacion
+3. Verificar cuenta corriente de 2-3 clientes
+4. Reportar cualquier inconsistencia encontrada
