@@ -419,10 +419,12 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   };
 
   const handleClose = () => {
+    if (parsing) return; // No cerrar mientras se procesa
     setOpen(false);
     setStep('upload');
     setParsedMovimientos([]);
     setResults([]);
+    setParsing(false);
     setProgress(0);
   };
 
