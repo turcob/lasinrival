@@ -143,8 +143,13 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileSelect triggered', e.target.files);
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+    console.log('File selected:', file.name, file.size);
 
     try {
       const data = await file.arrayBuffer();
