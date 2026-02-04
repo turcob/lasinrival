@@ -283,10 +283,18 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
       .from('clientes')
       .select('id, codigo_cliente, nombre');
 
+    // Función para normalizar códigos (quitar ceros a la izquierda)
+    const normalizeCodigo = (codigo: string): string => {
+      return codigo.replace(/^0+/, '') || '0';
+    };
+
     const clienteMap = new Map<string, { id: string; nombre: string }>();
     clientes?.forEach(c => {
       if (c.codigo_cliente) {
+        // Guardar con código original
         clienteMap.set(c.codigo_cliente, { id: c.id, nombre: c.nombre });
+        // Guardar también con código normalizado (sin ceros a la izquierda)
+        clienteMap.set(normalizeCodigo(c.codigo_cliente), { id: c.id, nombre: c.nombre });
       }
     });
 
@@ -310,7 +318,11 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     });
 
     for (const mov of parsedMovimientos) {
-      const cliente = clienteMap.get(mov.clienteCodigo);
+      // Buscar cliente por código original o normalizado
+      let cliente = clienteMap.get(mov.clienteCodigo);
+      if (!cliente) {
+        cliente = clienteMap.get(normalizeCodigo(mov.clienteCodigo));
+      }
       
       if (!cliente) {
         importResults.push({
