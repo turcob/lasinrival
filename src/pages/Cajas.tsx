@@ -985,12 +985,15 @@ export default function Cajas() {
       </Dialog>
 
       {/* Cierre Dialog */}
-      <Dialog open={cierreDialogOpen} onOpenChange={setCierreDialogOpen}>
+      <Dialog open={cierreDialogOpen} onOpenChange={(open) => {
+        setCierreDialogOpen(open);
+        if (!open) setCajaACerrar(null);
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Arqueo y Cierre de Caja
+              {cajaACerrar ? `Cerrar Caja de ${cajaACerrar.profiles?.nombre || 'Usuario'}` : 'Arqueo y Cierre de Caja'}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCerrarCaja} className="space-y-4">
@@ -1002,15 +1005,15 @@ export default function Cajas() {
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Fondo Inicial:</span>
-                  <span>${cajaActiva?.fondo_inicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>${cajaParaCalculos?.fondo_inicial.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-success">
                   <span>Ingresos:</span>
-                  <span>+${(cajaActiva?.total_ventas || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>+${(cajaParaCalculos?.total_ventas || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-destructive">
                   <span>Egresos:</span>
-                  <span>-${(cajaActiva?.total_egresos || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>-${(cajaParaCalculos?.total_egresos || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-bold">
                   <span>Total Esperado:</span>
