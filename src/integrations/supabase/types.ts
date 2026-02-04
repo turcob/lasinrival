@@ -302,6 +302,45 @@ export type Database = {
           },
         ]
       }
+      cliente_movimiento_imputaciones: {
+        Row: {
+          created_at: string | null
+          id: string
+          monto: number
+          movimiento_factura_id: string
+          movimiento_pago_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          monto: number
+          movimiento_factura_id: string
+          movimiento_pago_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          monto?: number
+          movimiento_factura_id?: string
+          movimiento_pago_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_movimiento_imputaciones_movimiento_factura_id_fkey"
+            columns: ["movimiento_factura_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_movimiento_imputaciones_movimiento_pago_id_fkey"
+            columns: ["movimiento_pago_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_movimientos: {
         Row: {
           cliente_id: string
