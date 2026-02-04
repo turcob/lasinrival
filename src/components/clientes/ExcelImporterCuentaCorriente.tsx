@@ -75,6 +75,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [parsingMessage, setParsingMessage] = useState('');
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [step, setStep] = useState<'upload' | 'preview' | 'results'>('upload');
