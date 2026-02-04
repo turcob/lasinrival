@@ -214,6 +214,12 @@ export default function Cajas() {
       );
       setCajaActiva(cajaAbierta || null);
 
+      // Para admins, guardar todas las cajas abiertas
+      if (isAdmin && cajasData) {
+        const todasCajasAbiertas = cajasData.filter(c => c.estado === 'abierta');
+        setCajasAbiertas(todasCajasAbiertas);
+      }
+
       // Fetch movements for active cash register
       if (cajaAbierta) {
         const { data: movimientosData } = await supabase
