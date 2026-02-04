@@ -385,7 +385,9 @@ export default function Cajas() {
 
   const handleCerrarCaja = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cajaActiva || !user) return;
+    // Usar cajaACerrar si está definida (admin cerrando otra caja), sino usar cajaActiva
+    const cajaParaCerrar = cajaACerrar || cajaActiva;
+    if (!cajaParaCerrar || !user) return;
 
     if (totalArqueo < 0) {
       toast.error('El arqueo no puede ser negativo');
@@ -393,7 +395,7 @@ export default function Cajas() {
     }
 
     try {
-      const esperado = cajaActiva.fondo_inicial + (cajaActiva.total_ventas || 0) - (cajaActiva.total_egresos || 0);
+      const esperado = cajaParaCerrar.fondo_inicial + (cajaParaCerrar.total_ventas || 0) - (cajaParaCerrar.total_egresos || 0);
       const diferencia = totalArqueo - esperado;
 
       const { error } = await supabase
@@ -405,7 +407,7 @@ export default function Cajas() {
           diferencia: diferencia,
           observaciones: cierreData.observaciones || null,
         })
-        .eq('id', cajaActiva.id);
+        .eq('id', cajaParaCerrar.id);
 
       if (error) throw error;
 
@@ -413,7 +415,7 @@ export default function Cajas() {
       const arqueoInserts = denominaciones
         .filter(d => arqueo[d.valor.toString()] > 0)
         .map(d => ({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           denominacion: d.valor,
           cantidad: arqueo[d.valor.toString()],
           subtotal: d.valor * arqueo[d.valor.toString()],
@@ -430,14 +432,14 @@ export default function Cajas() {
       const otrosMediosInserts = [];
       if (otrosMedios.posnet > 0) {
         otrosMediosInserts.push({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           tipo: 'posnet',
           monto: otrosMedios.posnet,
         });
       }
       if (otrosMedios.transferencias > 0) {
         otrosMediosInserts.push({
-          caja_id: cajaActiva.id,
+          caja_id: cajaParaCerrar.id,
           tipo: 'transferencias',
           monto: otrosMedios.transferencias,
         });
@@ -452,6 +454,7 @@ export default function Cajas() {
 
       toast.success('Caja cerrada correctamente');
       setCierreDialogOpen(false);
+      setCajaACerrar(null);
       setCierreData({ observaciones: '' });
       setArqueo({
         '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
