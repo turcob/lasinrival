@@ -121,6 +121,7 @@ export default function Cajas() {
   const [fondoInicial, setFondoInicial] = useState('');
   const [tipoMovimiento, setTipoMovimiento] = useState<'ingreso' | 'egreso'>('egreso');
   const [movimientoData, setMovimientoData] = useState({ concepto: '', monto: '' });
+  const [cajaSeleccionadaMovimiento, setCajaSeleccionadaMovimiento] = useState<string>(''); // Caja seleccionada para movimientos (admin)
   const [cierreData, setCierreData] = useState({ observaciones: '' });
   
   // Filtro por usuario para admins
