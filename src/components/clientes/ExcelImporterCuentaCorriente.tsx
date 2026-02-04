@@ -543,18 +543,27 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
 
         {step === 'preview' && (
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(resumenPorTipo).map(([tipo, count]) => (
-                <Badge key={tipo} variant="outline" className={TIPO_COLORS[tipo as TipoMovimiento]}>
-                  {TIPO_LABELS[tipo as TipoMovimiento]}: {count}
-                </Badge>
-              ))}
-              <Badge variant="secondary">
-                Total: {parsedMovimientos.length}
-              </Badge>
+            <div className="p-4 rounded-lg bg-muted/50 border">
+              <h3 className="font-semibold text-lg mb-2">
+                Resumen de importación
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Se encontraron <span className="font-bold text-foreground">{parsedMovimientos.length.toLocaleString()}</span> movimientos válidos
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(resumenPorTipo).map(([tipo, count]) => (
+                  <Badge key={tipo} variant="outline" className={TIPO_COLORS[tipo as TipoMovimiento]}>
+                    {TIPO_LABELS[tipo as TipoMovimiento]}: {count.toLocaleString()}
+                  </Badge>
+                ))}
+              </div>
             </div>
             
-            <ScrollArea className="h-[400px] rounded-md border">
+            <div className="text-sm text-muted-foreground">
+              Vista previa (primeros 100 registros):
+            </div>
+            
+            <ScrollArea className="h-[300px] rounded-md border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-background">
                   <tr className="border-b">
@@ -567,7 +576,7 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
                   </tr>
                 </thead>
                 <tbody>
-                  {parsedMovimientos.map((mov, index) => (
+                  {parsedMovimientos.slice(0, 100).map((mov, index) => (
                     <tr key={index} className="border-b">
                       <td className="p-2 font-mono text-xs">{mov.clienteCodigo}</td>
                       <td className="p-2 truncate max-w-[150px]" title={mov.clienteNombre}>
@@ -589,12 +598,18 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
               </table>
             </ScrollArea>
             
+            {parsedMovimientos.length > 100 && (
+              <p className="text-sm text-muted-foreground text-center">
+                ... y {(parsedMovimientos.length - 100).toLocaleString()} registros más
+              </p>
+            )}
+            
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={handleClose}>
                 Cancelar
               </Button>
               <Button onClick={handleImport} disabled={importing}>
-                {importing ? 'Importando...' : 'Confirmar Importación'}
+                {importing ? 'Importando...' : `Importar ${parsedMovimientos.length.toLocaleString()} movimientos`}
               </Button>
             </div>
             {importing && (
