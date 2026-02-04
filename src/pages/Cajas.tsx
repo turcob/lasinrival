@@ -99,16 +99,19 @@ interface ArqueoOtroMedio {
 export default function Cajas() {
   const { user, profile, hasRole } = useAuth();
   const isAdmin = hasRole('admin');
+  const isVendedor = hasRole('vendedor');
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [cajaActiva, setCajaActiva] = useState<Caja | null>(null);
+  const [cajasAbiertas, setCajasAbiertas] = useState<Caja[]>([]); // Todas las cajas abiertas (para admin)
   const [loading, setLoading] = useState(true);
   const [aperturaDialogOpen, setAperturaDialogOpen] = useState(false);
   const [movimientoDialogOpen, setMovimientoDialogOpen] = useState(false);
   const [cierreDialogOpen, setCierreDialogOpen] = useState(false);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [selectedCaja, setSelectedCaja] = useState<Caja | null>(null);
+  const [cajaACerrar, setCajaACerrar] = useState<Caja | null>(null); // Caja que admin quiere cerrar
   const [arqueoDetalles, setArqueoDetalles] = useState<ArqueoDetalle[]>([]);
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
   const [editarArqueoDialogOpen, setEditarArqueoDialogOpen] = useState(false);
