@@ -815,35 +815,42 @@ export default function Cajas() {
   return (
     <MainLayout>
       <PageHeader title="Cajas" description="Gestión de cajas y arqueos">
-        {!cajaActiva ? (
-          <Button onClick={() => setAperturaDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Abrir Caja
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            {/* Vendedores no tienen acceso a Ingreso/Egreso, otros roles sí */}
-            {!isVendedor && (
-              <>
-                {/* Solo admin puede hacer egresos */}
-                {isAdmin && (
-                  <Button variant="outline" onClick={() => {
-                    setTipoMovimiento('egreso');
-                    setMovimientoDialogOpen(true);
-                  }}>
-                    <ArrowDownCircle className="mr-2 h-4 w-4" />
-                    Egreso
-                  </Button>
-                )}
+        <div className="flex gap-2">
+          {/* Botón Abrir Caja - solo si el usuario no tiene caja abierta */}
+          {!cajaActiva && (
+            <Button onClick={() => setAperturaDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Abrir Caja
+            </Button>
+          )}
+          
+          {/* Botones de Ingreso/Egreso para admin (si hay cualquier caja abierta) o para usuarios con caja propia */}
+          {(cajaActiva || (isAdmin && cajasAbiertas.length > 0)) && !isVendedor && (
+            <>
+              {/* Solo admin puede hacer egresos */}
+              {isAdmin && (
                 <Button variant="outline" onClick={() => {
-                  setTipoMovimiento('ingreso');
+                  setTipoMovimiento('egreso');
+                  setCajaSeleccionadaMovimiento(cajaActiva?.id || cajasAbiertas[0]?.id || '');
                   setMovimientoDialogOpen(true);
                 }}>
-                  <ArrowUpCircle className="mr-2 h-4 w-4" />
-                  Ingreso
+                  <ArrowDownCircle className="mr-2 h-4 w-4" />
+                  Egreso
                 </Button>
-              </>
-            )}
+              )}
+              <Button variant="outline" onClick={() => {
+                setTipoMovimiento('ingreso');
+                setCajaSeleccionadaMovimiento(cajaActiva?.id || cajasAbiertas[0]?.id || '');
+                setMovimientoDialogOpen(true);
+              }}>
+                <ArrowUpCircle className="mr-2 h-4 w-4" />
+                Ingreso
+              </Button>
+            </>
+          )}
+          
+          {/* Botón Cerrar Caja - solo si el usuario tiene caja abierta */}
+          {cajaActiva && (
             <Button onClick={() => {
               setCajaACerrar(null);
               setCierreDialogOpen(true);
@@ -851,8 +858,8 @@ export default function Cajas() {
               <Lock className="mr-2 h-4 w-4" />
               Cerrar Caja
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </PageHeader>
 
       {/* Active Cash Register Summary */}
