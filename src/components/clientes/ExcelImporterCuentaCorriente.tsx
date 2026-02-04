@@ -145,9 +145,8 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
     return null;
   };
 
-  const processExcelData = useCallback((jsonData: ClienteRow[]) => {
+  const processExcelData = useCallback((jsonData: ClienteRow[]): MovimientoExcel[] => {
     const movimientos: MovimientoExcel[] = [];
-    const totalRows = jsonData.length;
     
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -183,13 +182,6 @@ export function ExcelImporterCuentaCorriente({ onImportComplete }: ExcelImporter
         nroComprobante: row['Nro. comprobante']?.toString() || '',
         monto: Math.abs(monto) * (monto < 0 ? -1 : 1),
       });
-
-      // Actualizar progreso cada 500 filas
-      if (i % 500 === 0) {
-        const progressValue = 60 + Math.round((i / totalRows) * 35);
-        setProgress(progressValue);
-        setParsingMessage(`Procesando fila ${i} de ${totalRows}...`);
-      }
     }
 
     return movimientos;
