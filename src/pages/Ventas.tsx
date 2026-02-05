@@ -190,18 +190,21 @@ export default function Ventas() {
       // Fetch all payments for these sales
       if (data && data.length > 0) {
         const ventaIds = data.map(v => v.id);
-        const { data: pagosData } = await supabase
+        const { data: pagosData, error: pagosError } = await supabase
           .from('venta_pagos')
-          .select('*, formas_pago(nombre)')
+          .select('id, venta_id, monto, formas_pago(nombre)')
           .in('venta_id', ventaIds);
+
+        console.log('Pagos data:', pagosData?.length, pagosError);
 
         if (pagosData) {
           const pagosByVenta: Record<string, VentaPago[]> = {};
-          pagosData.forEach(pago => {
-            if (!pagosByVenta[pago.venta_id]) {
-              pagosByVenta[pago.venta_id] = [];
+          pagosData.forEach((pago: any) => {
+            const ventaId = pago.venta_id;
+            if (!pagosByVenta[ventaId]) {
+              pagosByVenta[ventaId] = [];
             }
-            pagosByVenta[pago.venta_id].push(pago);
+            pagosByVenta[ventaId].push(pago);
           });
           setPagosPorVenta(pagosByVenta);
         }
