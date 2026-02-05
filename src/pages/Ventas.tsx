@@ -187,27 +187,21 @@ export default function Ventas() {
         setVentas(data || []);
       }
 
-      // Fetch all payments for these sales
-      if (data && data.length > 0) {
-        const ventaIds = data.map(v => v.id);
-        const { data: pagosData, error: pagosError } = await supabase
-          .from('venta_pagos')
-          .select('id, venta_id, monto, formas_pago(nombre)')
-          .in('venta_id', ventaIds);
+      // Fetch all payments - no filter to avoid URL length issues with large datasets
+      const { data: pagosData } = await supabase
+        .from('venta_pagos')
+        .select('id, venta_id, monto, formas_pago(nombre)');
 
-        console.log('Pagos data:', pagosData?.length, pagosError);
-
-        if (pagosData) {
-          const pagosByVenta: Record<string, VentaPago[]> = {};
-          pagosData.forEach((pago: any) => {
-            const ventaId = pago.venta_id;
-            if (!pagosByVenta[ventaId]) {
-              pagosByVenta[ventaId] = [];
-            }
-            pagosByVenta[ventaId].push(pago);
-          });
-          setPagosPorVenta(pagosByVenta);
-        }
+      if (pagosData) {
+        const pagosByVenta: Record<string, VentaPago[]> = {};
+        pagosData.forEach((pago: any) => {
+          const ventaId = pago.venta_id;
+          if (!pagosByVenta[ventaId]) {
+            pagosByVenta[ventaId] = [];
+          }
+          pagosByVenta[ventaId].push(pago);
+        });
+        setPagosPorVenta(pagosByVenta);
       }
     } catch (error) {
       console.error('Error fetching ventas:', error);
