@@ -412,6 +412,13 @@ export type Database = {
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cliente_movimientos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
+          },
         ]
       }
       clientes: {
@@ -638,6 +645,13 @@ export type Database = {
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "comprobantes_afip_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
+          },
         ]
       }
       condiciones_venta: {
@@ -783,6 +797,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "descuentos_producto_rol_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "descuentos_producto_rol_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "descuentos_producto_rol_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
@@ -948,6 +983,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empleado_movimientos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
           },
         ]
       }
@@ -1426,6 +1468,27 @@ export type Database = {
             referencedRelation: "productos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lista_precio_excepciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "lista_precio_excepciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "lista_precio_excepciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
         ]
       }
       lista_precio_porcentajes: {
@@ -1574,6 +1637,13 @@ export type Database = {
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "movimientos_caja_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
+          },
         ]
       }
       movimientos_inventario: {
@@ -1622,11 +1692,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimientos_inventario_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "movimientos_inventario_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
           },
         ]
       }
@@ -1796,6 +1894,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "pedido_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "pedido_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
@@ -1987,6 +2106,13 @@ export type Database = {
             referencedRelation: "ventas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pedidos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
+          },
         ]
       }
       productos: {
@@ -2128,6 +2254,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_foco_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "productos_foco_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "productos_foco_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
@@ -2422,6 +2569,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_descuento_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "solicitudes_descuento_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "solicitudes_descuento_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
@@ -2753,11 +2921,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "venta_detalles_venta_id_fkey"
             columns: ["venta_id"]
             isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
           },
         ]
       }
@@ -2819,6 +3015,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ventas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
           },
         ]
       }
@@ -3056,6 +3259,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "ventas_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -3098,6 +3322,233 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vw_candidatos_precio: {
+        Row: {
+          facturacion_30d: number | null
+          margen_pct_prom: number | null
+          margen_total_30d: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_id: string | null
+          unidades_30d: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+        ]
+      }
+      vw_focus_final: {
+        Row: {
+          foco_detectado: string | null
+        }
+        Relationships: []
+      }
+      vw_kpis_30d_comparativo: {
+        Row: {
+          facturacion_30d: number | null
+          facturacion_prev: number | null
+          facturacion_var_pct: number | null
+          margen_30d: number | null
+          margen_pct_30d: number | null
+          margen_pct_delta: number | null
+          margen_pct_prev: number | null
+          margen_prev: number | null
+          margen_var_pct: number | null
+          unidades_30d: number | null
+          unidades_prev: number | null
+          unidades_var_pct: number | null
+        }
+        Relationships: []
+      }
+      vw_kpis_producto: {
+        Row: {
+          facturacion: number | null
+          margen_promedio: number | null
+          margen_total: number | null
+          precio_venta_prom: number | null
+          producto: string | null
+          producto_id: string | null
+          unidades: number | null
+        }
+        Relationships: []
+      }
+      vw_productos_sensibles: {
+        Row: {
+          producto: string | null
+          producto_id: string | null
+          unidades_30d: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+        ]
+      }
+      vw_quiebre_probable: {
+        Row: {
+          dias_stock_estimados: number | null
+          producto: string | null
+          producto_id: string | null
+          stock_actual: number | null
+          stock_minimo: number | null
+          unidades_30d: number | null
+        }
+        Relationships: []
+      }
+      vw_sales_line: {
+        Row: {
+          cantidad: number | null
+          categoria_id: string | null
+          cliente_id: string | null
+          descuento: number | null
+          empleado_id: string | null
+          fecha: string | null
+          marca_id: string | null
+          margen_bruto: number | null
+          margen_pct: number | null
+          precio_costo: number | null
+          precio_unitario: number | null
+          producto: string | null
+          producto_id: string | null
+          subcategoria_id: string | null
+          subtotal: number | null
+          venta_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "marcas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_subcategoria_id_fkey"
+            columns: ["subcategoria_id"]
+            isOneToOne: false
+            referencedRelation: "subcategorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "venta_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "ventas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ventas_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_stock_actual: {
+        Row: {
+          producto_id: string | null
+          stock_actual: number | null
+          stock_minimo: number | null
+        }
+        Insert: {
+          producto_id?: string | null
+          stock_actual?: never
+          stock_minimo?: never
+        }
+        Update: {
+          producto_id?: string | null
+          stock_actual?: never
+          stock_minimo?: never
+        }
+        Relationships: []
       }
     }
     Functions: {
