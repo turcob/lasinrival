@@ -133,16 +133,19 @@ export function usePedidosConsolidado(
           .from('pedidos')
           .select(`
           id, numero_pedido, total, estado, fecha_pedido,
-          cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
-        `)
-        .in('cliente_id', clienteIds)
-        .eq('estado', estado)
-        .order('numero_pedido', { ascending: true });
+            cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
+          `)
+          .in('cliente_id', chunk)
+          .eq('estado', estado as any)
+          .order('numero_pedido', { ascending: true });
 
-      if (pedidosError) throw pedidosError;
-      if (!pedidos || pedidos.length === 0) return [];
+        if (pedidoChunkError) throw pedidoChunkError;
+        if (pedidoChunk) allPedidos = allPedidos.concat(pedidoChunk);
+      }
 
-      const pedidoIds = pedidos.map(p => p.id);
+      if (allPedidos.length === 0) return [];
+      const pedidos = allPedidos;
+      const pedidoIds = pedidos.map((p: any) => p.id);
 
       // Get all detalles with product info (including es_frio)
       const { data: detalles, error: detallesError } = await supabase
