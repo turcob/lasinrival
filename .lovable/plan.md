@@ -1,113 +1,133 @@
 
-# Plan para verificar el funcionamiento de Cuentas Corrientes
 
-## Objetivo
-Probar el sistema de cuentas corrientes importando el Excel de Fernando Pereyra con el historico de facturas y recibos, verificando que los movimientos impacten correctamente en los saldos.
+# Plan: Campo "es_frio" en productos + Confirmacion masiva de pedidos
 
-## Estado actual del sistema
+## Resumen
 
-### Lo que ya existe:
-1. **Tabla `cliente_movimientos`**: Almacena todos los movimientos con campos:
-   - `tipo`: compra, pago, nota_credito, nota_debito, devolucion, saldo_inicial
-   - `monto`, `fecha`, `concepto`, `estado_imputacion`, etc.
+Dos cambios principales:
 
-2. **Vista `cliente_saldos`**: Calcula automáticamente:
-   - `total_deuda` = suma de (compra + saldo_inicial + nota_debito)
-   - `total_pagado` = suma de (pago + nota_credito + devolucion)
-   - `saldo_actual` = total_deuda - total_pagado
+1. **Nuevo campo `es_frio`** en la tabla `productos` (boolean, default false) para marcar productos frios/frescos explicitamente en vez de inferirlo por categoria.
 
-3. **Importador Excel** (`ExcelImporterCuentaCorriente`): Procesa:
-   - Columna "Fecha comprobante" para las fechas
-   - Tipos: FAC (compra), REC (pago), NCR (nota credito)
-   - Detecta "saldo inicial" en columna Estado
-   - Evita duplicados por numero de comprobante
+2. **Confirmacion masiva de pedidos** en la pestana Consolidado: separar pedidos en dos grupos segun si contienen productos pesables (KG) o no, y permitir confirmar (pasar a "preparado") masivamente los que NO tienen pesables.
 
-4. **Clientes de Fernando Pereyra**: Existen 30+ clientes pero sin movimientos cargados
+---
 
-### Flujo de prueba:
+## Parte 1: Campo `es_frio` en productos
 
-```
-Excel Fernando Pereyra
-        |
-        v
-[Importador CC] ---> [cliente_movimientos]
-                              |
-                              v
-                     [cliente_saldos (vista)]
-                              |
-                              v
-                  [Dialog Cuenta Corriente]
-                     - Lista movimientos ordenados por fecha
-                     - Muestra resumen de saldos
-```
+### Migracion SQL
 
-## Pasos para la prueba
-
-### Paso 1: Importar el Excel
-1. Ir a la pagina de **Clientes**
-2. Hacer clic en **"Importar Cuenta Corriente"**
-3. Seleccionar el archivo `FERNANDO_PEREYRA.xlsx`
-4. Revisar la vista previa que muestra:
-   - Cantidad por tipo (FAC, REC, NCR, Saldo Inicial)
-   - Codigo cliente, fecha, tipo, comprobante, monto
-5. Confirmar la importacion
-
-### Paso 2: Verificar resultados de importacion
-- El sistema mostrara cuantos fueron:
-  - **Exitosos**: Importados correctamente
-  - **Omitidos**: Ya existian (duplicados)
-  - **Errores**: Cliente no encontrado u otro error
-
-### Paso 3: Revisar cuenta corriente de un cliente
-1. Buscar un cliente del vendedor Fernando Pereyra
-2. Hacer clic en el icono de billetera (Cuenta Corriente)
-3. Verificar:
-   - **Orden de movimientos**: Mas recientes primero (ordenados por fecha DESC)
-   - **Total Deuda**: Suma de facturas + saldo inicial
-   - **Total Pagado**: Suma de recibos + notas de credito
-   - **Saldo Actual**: Deuda - Pagado
-
-## Puntos a observar
-
-### Durante la importacion:
-- Que el mapeo de columnas sea correcto (Fecha comprobante, no Fecha vto.)
-- Que los tipos se detecten bien (FAC, REC, NCR, saldo inicial)
-- Que los montos se tomen de las columnas correctas (Debe/Haber/Importe)
-
-### En la cuenta corriente:
-- Que el orden cronologico sea correcto
-- Que los colores sean correctos:
-  - Rojo: Compras/Facturas (deuda)
-  - Verde: Pagos/Recibos (reduce deuda)
-- Que el saldo final coincida con el esperado del Excel
-
-## Seccion tecnica
-
-### Estructura esperada del Excel:
-| Cliente | Tipo comprobante | Nro. comprobante | Fecha comprobante | Debe | Haber | Estado |
-|---------|-----------------|------------------|-------------------|------|-------|--------|
-| 080640 - CHAVEZ JUAN | FAC | B0001101163413 | 05/01/2026 | 96053.22 | 0 | |
-| 080640 - CHAVEZ JUAN | REC | X0040000108897 | 06/01/2026 | 0 | 96053.22 | |
-
-### Logica de asignacion de montos:
-```javascript
-if (tipo === 'saldo_inicial') {
-  monto = columna Importe
-} else if (tipo === 'compra') {
-  monto = columna Debe
-} else {
-  monto = columna Haber
-}
-```
-
-### Calculo del saldo en la vista SQL:
 ```sql
-saldo_actual = 
-  SUM(CASE WHEN tipo IN ('compra','saldo_inicial','nota_debito') THEN monto ELSE -monto END)
+ALTER TABLE productos ADD COLUMN es_frio boolean NOT NULL DEFAULT false;
+
+-- Marcar como frios los productos de categorias frias existentes
+UPDATE productos p
+SET es_frio = true
+FROM categorias c
+WHERE p.categoria_id = c.id
+AND c.codigo_familia IN ('01', '02', '05', '09');
 ```
 
-## Proximos pasos sugeridos
-1. Subir el Excel y revisar la previsualizacion
-2. Confirmar importacion
-3. Verificar cuenta corriente de 2-3 clientes
-4. Reportar cualquier inconsistencia encontrada
+Esto agrega el campo y pre-carga los valores basandose en las categorias frias actuales (FIAMBRES, QUESOS, LACTEOS Y MANTECAS, VARIOS FRIO).
+
+### Cambios en codigo
+
+- **Tipos**: El archivo `types.ts` se regenera automaticamente al agregar la columna.
+- **ExcelImporter** (`src/components/shared/ExcelImporter.tsx`): Agregar soporte para importar el campo `es_frio` si viene en el Excel (opcional).
+- **Consolidado** (componente nuevo del plan anterior): Usar `producto.es_frio` en vez de inferir por categoria para clasificar productos frios vs no frios.
+- **Pagina Productos** (`src/pages/Productos.tsx`): Si existe un formulario de edicion de productos, agregar un switch/checkbox "Es producto frio".
+
+---
+
+## Parte 2: Confirmacion masiva de pedidos sin pesables
+
+### Logica de clasificacion
+
+Un pedido "tiene pesables" si **al menos uno** de sus productos tiene `unidad_medida` en ('KG', 'KG.').
+
+### Cambios en la pestana Consolidado
+
+Dentro del componente `ConsolidadoPedidos.tsx` (del plan anterior), se agrega:
+
+1. **Dos secciones de pedidos**:
+   - "Pedidos sin pesables" -- listos para confirmar masivamente
+   - "Pedidos con pesables" -- requieren preparacion individual (porque hay que pesar)
+
+2. **Boton "Confirmar todos"** en la seccion de pedidos sin pesables:
+   - Selecciona todos los pedidos sin pesables visibles
+   - Checkboxes individuales para seleccionar/deseleccionar
+   - Al confirmar, cambia el estado de `pendiente` a `preparado` para todos los seleccionados
+   - Registra entrada en `pedido_historial` para cada uno
+
+3. **Flujo visual**:
+
+```text
++------------------------------------------+
+| Filtros: [Vendedor] [Zona] [Estado]      |
++------------------------------------------+
+|                                          |
+| --- Pedidos SIN pesables (15) ---------- |
+| [x] Seleccionar todos                   |
+| [x] #000123 - MARTINEZ JOSE - $45,000   |
+| [x] #000124 - LOPEZ ANA - $32,000       |
+| [ ] #000125 - GARCIA PEDRO - $28,000    |
+|                                          |
+| [Confirmar seleccionados (2)]            |
+|                                          |
+| --- Pedidos CON pesables (8) ----------- |
+| #000126 - RUIZ MARIA - $51,000 (3 KG)   |
+| #000127 - DIAZ CARLOS - $67,000 (1 KG)  |
+| (Estos requieren preparacion individual) |
++------------------------------------------+
+```
+
+### Hook: cambios en `usePedidos.ts`
+
+Agregar una nueva mutacion `useConfirmarPedidosMasivo()`:
+
+```typescript
+// Recibe array de pedido IDs
+// Para cada uno:
+//   1. UPDATE pedidos SET estado = 'preparado' WHERE id = X
+//   2. INSERT pedido_historial (estado_anterior: 'pendiente', estado_nuevo: 'preparado')
+// Invalida queries de pedidos
+```
+
+### Consulta para separar pedidos
+
+Para determinar si un pedido tiene pesables, la query del consolidado incluye los detalles con el producto y su `unidad_medida`:
+
+```sql
+SELECT p.id, p.numero_pedido, p.total, c.nombre,
+  EXISTS (
+    SELECT 1 FROM pedido_detalles pd
+    JOIN productos pr ON pd.producto_id = pr.id
+    WHERE pd.pedido_id = p.id
+    AND UPPER(REPLACE(pr.unidad_medida, '.', '')) IN ('KG', 'KILO', 'KILOS')
+  ) as tiene_pesables
+FROM pedidos p
+JOIN clientes c ON p.cliente_id = c.id
+WHERE p.estado = 'pendiente'
+```
+
+En codigo, esto se hace en memoria despues de cargar los pedidos con sus detalles (ya que necesitamos los detalles para el consolidado de todas formas).
+
+---
+
+## Seccion tecnica - Archivos a crear/modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| Migracion SQL | Agregar columna `es_frio` boolean default false + UPDATE masivo |
+| `src/pages/Pedidos.tsx` | Envolver en Tabs: "Pedidos" (actual) + "Consolidado" (nuevo) |
+| `src/components/pedidos/ConsolidadoPedidos.tsx` | **NUEVO** - Componente principal con filtros, clasificacion, consolidado y confirmacion masiva |
+| `src/hooks/useConsolidadoPedidos.ts` | **NUEVO** - Hooks para vendedores, zonas, pedidos con detalles, confirmacion masiva, quitar producto |
+| `src/hooks/usePedidos.ts` | Agregar `useConfirmarPedidosMasivo()` |
+
+### Orden de implementacion
+
+1. Migracion: agregar campo `es_frio`
+2. Crear hook `useConsolidadoPedidos.ts`
+3. Crear componente `ConsolidadoPedidos.tsx`
+4. Modificar `Pedidos.tsx` para agregar el tab
+5. Agregar mutacion de confirmacion masiva
+
