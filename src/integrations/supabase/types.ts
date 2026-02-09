@@ -2125,6 +2125,7 @@ export type Database = {
           created_at: string | null
           desactivado_por: string | null
           descripcion: string
+          es_frio: boolean
           fecha_desactivacion: string | null
           id: string
           marca_id: string | null
@@ -2145,6 +2146,7 @@ export type Database = {
           created_at?: string | null
           desactivado_por?: string | null
           descripcion: string
+          es_frio?: boolean
           fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
@@ -2165,6 +2167,7 @@ export type Database = {
           created_at?: string | null
           desactivado_por?: string | null
           descripcion?: string
+          es_frio?: boolean
           fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
