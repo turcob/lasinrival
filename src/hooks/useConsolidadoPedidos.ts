@@ -124,9 +124,14 @@ export function usePedidosConsolidado(
       if (clienteIds.length === 0) return [];
 
       // Get pedidos for those clients
-      const { data: pedidos, error: pedidosError } = await supabase
-        .from('pedidos')
-        .select(`
+      // Batch clienteIds in chunks to avoid URL length limits
+      const chunkSize = 100;
+      let allPedidos: any[] = [];
+      for (let i = 0; i < clienteIds.length; i += chunkSize) {
+        const chunk = clienteIds.slice(i, i + chunkSize);
+        const { data: pedidoChunk, error: pedidoChunkError } = await supabase
+          .from('pedidos')
+          .select(`
           id, numero_pedido, total, estado, fecha_pedido,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
