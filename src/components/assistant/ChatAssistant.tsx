@@ -265,7 +265,7 @@ export function ChatAssistant() {
                         ? "bg-primary text-primary-foreground" 
                         : "bg-muted"
                     )}>
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap">{renderFormattedText(message.content)}</p>
                     </div>
                   </div>
                 ))}
