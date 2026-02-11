@@ -8,6 +8,7 @@ import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, C
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
+import { ImportarHistorialDialog } from '@/components/clientes/ImportarHistorialDialog';
 import { CuentaCorrienteClienteDialog } from '@/components/clientes/CuentaCorrienteClienteDialog';
 import {
   Dialog,

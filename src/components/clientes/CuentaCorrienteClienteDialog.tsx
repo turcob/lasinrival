@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
@@ -43,6 +44,7 @@ interface Movimiento {
   numero_comprobante?: string | null;
   codigo_deposito?: string | null;
   nombre_vendedor?: string | null;
+  origen?: string | null;
 }
 
 interface Saldo {
@@ -65,6 +67,7 @@ const TIPO_LABELS: Record<string, { label: string; color: string; icon: any }> =
   nota_debito: { label: 'Nota de Débito', color: 'destructive', icon: TrendingDown },
   nota_credito: { label: 'Nota de Crédito', color: 'default', icon: TrendingUp },
   anulacion: { label: 'Anulación', color: 'default', icon: TrendingUp },
+  saldo_inicial: { label: 'Saldo Inicial', color: 'secondary', icon: TrendingDown },
 };
 
 export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMovimientoRegistrado }: CuentaCorrienteClienteDialogProps) {
@@ -72,6 +75,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   const [saldo, setSaldo] = useState<Saldo | null>(null);
   const [loading, setLoading] = useState(true);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('cuenta');
 
   useEffect(() => {
     if (open && cliente) {
@@ -110,6 +114,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
           ...mov,
           forma_pago_nombre: mov.forma_pago_id ? formasPagoMap.get(mov.forma_pago_id) : undefined,
           usuario_nombre: profilesMap.get(mov.usuario_registro_id),
+          origen: (mov as any).origen || 'sistema',
         }));
         setMovimientos(movsConNombres);
       }
@@ -129,6 +134,83 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   };
 
   const saldoActual = Number(saldo?.saldo_actual) || 0;
+
+  const movimientosCuenta = movimientos.filter(m => m.origen !== 'historico');
+  const movimientosHistorial = movimientos.filter(m => m.origen === 'historico');
+
+  const renderMovimientosTable = (movs: Movimiento[], showFormaPago = true) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-32">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      );
+    }
+    if (movs.length === 0) {
+      return (
+        <div className="text-center text-muted-foreground py-8">
+          No hay movimientos registrados
+        </div>
+      );
+    }
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Concepto</TableHead>
+            <TableHead>Depósito</TableHead>
+            <TableHead>Vendedor</TableHead>
+            {showFormaPago && <TableHead>Forma Pago</TableHead>}
+            <TableHead>Registrado por</TableHead>
+            <TableHead className="text-right">Monto</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {movs.map((mov) => {
+            const tipoInfo = TIPO_LABELS[mov.tipo] || { label: mov.tipo, color: 'secondary', icon: null };
+            const esDeuda = ['compra', 'nota_debito', 'saldo_inicial'].includes(mov.tipo);
+            const IconComponent = tipoInfo.icon;
+
+            return (
+              <TableRow key={mov.id}>
+                <TableCell className="text-sm">
+                  {format(new Date(mov.fecha), 'dd/MM/yyyy', { locale: es })}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={tipoInfo.color as any} className="flex items-center gap-1 w-fit">
+                    {IconComponent && <IconComponent className="h-3 w-3" />}
+                    {tipoInfo.label}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {mov.concepto || '-'}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {mov.codigo_deposito || '-'}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {mov.nombre_vendedor || '-'}
+                </TableCell>
+                {showFormaPago && (
+                  <TableCell className="text-sm text-muted-foreground">
+                    {mov.forma_pago_nombre || '-'}
+                  </TableCell>
+                )}
+                <TableCell className="text-sm text-muted-foreground">
+                  {mov.usuario_nombre || '-'}
+                </TableCell>
+                <TableCell className={`text-right font-medium ${esDeuda ? 'text-destructive' : 'text-green-600'}`}>
+                  {esDeuda ? '+' : '-'}${Number(mov.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
 
   return (
     <>
@@ -169,72 +251,27 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
             </div>
           </div>
 
-          {/* Movimientos */}
-          <ScrollArea className="h-[400px]">
-            {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : movimientos.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                No hay movimientos registrados
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Tipo</TableHead>
-                     <TableHead>Concepto</TableHead>
-                     <TableHead>Depósito</TableHead>
-                     <TableHead>Vendedor</TableHead>
-                     <TableHead>Forma Pago</TableHead>
-                     <TableHead>Registrado por</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {movimientos.map((mov) => {
-                    const tipoInfo = TIPO_LABELS[mov.tipo] || { label: mov.tipo, color: 'secondary', icon: null };
-                    const esDeuda = mov.tipo === 'compra';
-                    const IconComponent = tipoInfo.icon;
-                    
-                    return (
-                      <TableRow key={mov.id}>
-                        <TableCell className="text-sm">
-                          {format(new Date(mov.fecha), 'dd/MM/yyyy', { locale: es })}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={tipoInfo.color as any} className="flex items-center gap-1 w-fit">
-                            {IconComponent && <IconComponent className="h-3 w-3" />}
-                            {tipoInfo.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {mov.concepto || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {mov.codigo_deposito || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {mov.nombre_vendedor || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {mov.forma_pago_nombre || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {mov.usuario_nombre || '-'}
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${esDeuda ? 'text-destructive' : 'text-green-600'}`}>
-                          {esDeuda ? '+' : '-'}${Number(mov.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </ScrollArea>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="cuenta">
+                Cuenta Corriente ({movimientosCuenta.length})
+              </TabsTrigger>
+              <TabsTrigger value="historial">
+                Historial ({movimientosHistorial.length})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="cuenta">
+              <ScrollArea className="h-[400px]">
+                {renderMovimientosTable(movimientosCuenta)}
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="historial">
+              <ScrollArea className="h-[400px]">
+                {renderMovimientosTable(movimientosHistorial, false)}
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
