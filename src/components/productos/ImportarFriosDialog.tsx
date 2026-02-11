@@ -202,7 +202,7 @@ export function ImportarFriosDialog({ open, onOpenChange, onImportComplete }: Im
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Snowflake className="h-5 w-5 text-blue-500" />
+            <Snowflake className="h-5 w-5 text-primary" />
             Importar Productos Fríos
           </DialogTitle>
           <DialogDescription>
