@@ -318,6 +318,10 @@ export default function Clientes() {
         <div className="flex flex-wrap gap-2">
           <ExcelImporterClientes onImportComplete={fetchData} />
           <ExcelImporterCuentaCorriente onImportComplete={fetchData} />
+          <Button variant="outline" onClick={() => setImportDeudasOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Importar Deudas
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
