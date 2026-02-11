@@ -42,6 +42,7 @@ interface ExcelRow {
 
 interface ClienteAgrupado {
   codCliente: string;
+  codClienteOriginal: string;
   razonSocial: string;
   clienteId: string | null;
   clienteNombre: string | null;
