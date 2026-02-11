@@ -40,6 +40,9 @@ interface Movimiento {
   usuario_registro_id: string;
   forma_pago_nombre?: string;
   usuario_nombre?: string;
+  numero_comprobante?: string | null;
+  codigo_deposito?: string | null;
+  nombre_vendedor?: string | null;
 }
 
 interface Saldo {
