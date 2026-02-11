@@ -785,6 +785,13 @@ export default function Clientes() {
         onOpenChange={setImportDeudasOpen}
         onImportComplete={fetchData}
       />
+
+      {/* Importar Historial Dialog */}
+      <ImportarHistorialDialog
+        open={importHistorialOpen}
+        onOpenChange={setImportHistorialOpen}
+        onImportComplete={fetchData}
+      />
     </MainLayout>
   );
 }
