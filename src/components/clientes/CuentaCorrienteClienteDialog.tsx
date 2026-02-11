@@ -133,10 +133,19 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
     onMovimientoRegistrado?.();
   };
 
-  const saldoActual = Number(saldo?.saldo_actual) || 0;
-
   const movimientosCuenta = movimientos.filter(m => m.origen !== 'historico');
   const movimientosHistorial = movimientos.filter(m => m.origen === 'historico');
+
+  // Calcular saldo solo desde Cuenta Corriente (sin históricos)
+  const totalDeudaCuenta = movimientosCuenta
+    .filter(m => ['compra', 'nota_debito', 'saldo_inicial'].includes(m.tipo))
+    .reduce((sum, m) => sum + Number(m.monto), 0);
+  
+  const totalPagadoCuenta = movimientosCuenta
+    .filter(m => ['pago', 'devolucion', 'nota_credito', 'anulacion'].includes(m.tipo))
+    .reduce((sum, m) => sum + Number(m.monto), 0);
+  
+  const saldoActual = totalDeudaCuenta - totalPagadoCuenta;
 
   const renderMovimientosTable = (movs: Movimiento[], showFormaPago = true) => {
     if (loading) {
