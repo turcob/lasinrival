@@ -207,13 +207,6 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
     setStep('importing');
     setProgress(0);
 
-    const clientesConId = agrupados.filter(g => g.clienteId);
-    const totalFacturas = clientesConId.reduce((sum, g) => sum + g.facturas.length, 0);
-    let imported = 0;
-    let errors = 0;
-    let duplicates = 0;
-    let processed = 0;
-
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -221,6 +214,71 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
       setStep('preview');
       return;
     }
+
+    // Auto-create missing clients
+    const sinId = agrupados.filter(g => !g.clienteId);
+    if (sinId.length > 0) {
+      setStatusMsg(`Creando ${sinId.length} clientes nuevos...`);
+
+      // Fetch/create zones by codDeposito
+      const depositoCodes = new Set<string>();
+      for (const g of sinId) {
+        for (const f of g.facturas) {
+          if (f.codDeposito) depositoCodes.add(f.codDeposito);
+        }
+      }
+
+      const { data: existingZonas } = await supabase
+        .from('zonas')
+        .select('id, codigo');
+
+      const zonaMap = new Map<string, string>();
+      if (existingZonas) {
+        for (const z of existingZonas) {
+          zonaMap.set(z.codigo, z.id);
+        }
+      }
+
+      for (const code of depositoCodes) {
+        if (!zonaMap.has(code)) {
+          const { data: newZona } = await supabase
+            .from('zonas')
+            .insert({ codigo: code, nombre: `Depósito ${code}` })
+            .select('id, codigo')
+            .single();
+          if (newZona) {
+            zonaMap.set(newZona.codigo, newZona.id);
+          }
+        }
+      }
+
+      for (const grupo of sinId) {
+        const primerDeposito = grupo.facturas[0]?.codDeposito || '';
+        const zonaId = zonaMap.get(primerDeposito) || null;
+
+        const { data: newCliente } = await supabase
+          .from('clientes')
+          .insert({
+            nombre: grupo.razonSocial || `Cliente ${grupo.codCliente}`,
+            codigo_cliente: grupo.codCliente,
+            zona_id: zonaId,
+          })
+          .select('id')
+          .single();
+
+        if (newCliente) {
+          grupo.clienteId = newCliente.id;
+          grupo.clienteNombre = grupo.razonSocial;
+        }
+      }
+    }
+
+    const clientesConId = agrupados.filter(g => g.clienteId);
+    const totalFacturas = clientesConId.reduce((sum, g) => sum + g.facturas.length, 0);
+    let imported = 0;
+    let errors = 0;
+    let duplicates = 0;
+    let processed = 0;
 
     // Fetch existing comprobantes to detect duplicates
     setStatusMsg('Verificando duplicados...');
@@ -279,7 +337,6 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         setProgress(Math.round((processed / totalFacturas) * 100));
         setStatusMsg(`Importando... ${processed} de ${totalFacturas} facturas`);
 
-        // Small delay to keep UI responsive
         await new Promise(r => setTimeout(r, 50));
       }
     }
