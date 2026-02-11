@@ -420,9 +420,9 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
             </div>
 
             {noEncontrados > 0 && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 text-sm">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                {noEncontrados} cliente(s) no encontrados en la base. Sus facturas no se importarán.
+                {noEncontrados} cliente(s) no encontrados. Se crearán automáticamente al importar, usando el código de depósito como zona.
               </div>
             )}
 
