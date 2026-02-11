@@ -5,10 +5,11 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake } from 'lucide-react';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
 import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPreciosDialog';
+import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,7 @@ export default function Productos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actualizadorOpen, setActualizadorOpen] = useState(false);
+  const [importarFriosOpen, setImportarFriosOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
   const [formData, setFormData] = useState({
@@ -470,6 +472,10 @@ export default function Productos() {
       <PageHeader title="Productos" description="Gestión del catálogo de productos">
         <ExcelImporter />
         <ExcelImporterDesactivados onImportComplete={fetchData} />
+        <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
+          <Snowflake className="mr-2 h-4 w-4" />
+          Importar Fríos
+        </Button>
         <Button variant="outline" onClick={() => setActualizadorOpen(true)}>
           <TrendingUp className="mr-2 h-4 w-4" />
           Actualizar Precios
@@ -725,6 +731,12 @@ export default function Productos() {
         open={actualizadorOpen}
         onOpenChange={setActualizadorOpen}
         onUpdate={fetchData}
+      />
+
+      <ImportarFriosDialog
+        open={importarFriosOpen}
+        onOpenChange={setImportarFriosOpen}
+        onImportComplete={fetchData}
       />
     </MainLayout>
   );
