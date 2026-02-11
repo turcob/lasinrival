@@ -5,10 +5,11 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake } from 'lucide-react';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
 import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPreciosDialog';
+import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
 import {
   Dialog,
   DialogContent,
