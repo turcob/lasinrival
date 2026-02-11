@@ -133,7 +133,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Cuenta Corriente - {cliente.nombre}</span>
