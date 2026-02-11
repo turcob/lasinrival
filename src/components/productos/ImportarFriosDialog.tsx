@@ -247,7 +247,7 @@ export function ImportarFriosDialog({ open, onOpenChange, onImportComplete }: Im
                 <span className="font-medium">{resumen.totalFilas}</span>
 
                 <span className="text-muted-foreground">Marcados como frío:</span>
-                <span className="font-medium text-blue-600">{resumen.marcadosFrio}</span>
+                <span className="font-medium text-primary">{resumen.marcadosFrio}</span>
 
                 <span className="text-muted-foreground">Marcados como no frío:</span>
                 <span className="font-medium">{resumen.marcadosNoFrio}</span>
