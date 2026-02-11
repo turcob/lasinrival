@@ -46,6 +46,7 @@ import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
+import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
 
 // Estados principales del sistema
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
