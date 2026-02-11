@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -90,6 +91,7 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [results, setResults] = useState({ imported: 0, skipped: 0, errors: 0, duplicates: 0 });
+  const [previewTab, setPreviewTab] = useState<'todos' | 'no-encontrados'>('todos');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
@@ -426,45 +428,130 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
               </div>
             )}
 
-            <ScrollArea className="h-[350px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-center">Facturas</TableHead>
-                    <TableHead className="text-right">Deuda Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agrupados.slice(0, 100).map((g, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-sm">{g.codCliente}</TableCell>
-                      <TableCell className="text-sm">
-                        {g.clienteNombre || g.razonSocial}
-                      </TableCell>
-                      <TableCell>
-                        {g.clienteId ? (
-                          <Badge variant="default" className="bg-green-600">Encontrado</Badge>
-                        ) : (
-                          <Badge variant="destructive">No encontrado</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">{g.facturas.length}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${g.totalDeuda.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </TableCell>
+            {noEncontrados > 0 ? (
+              <Tabs value={previewTab} onValueChange={(v) => setPreviewTab(v as 'todos' | 'no-encontrados')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="todos">Todos ({agrupados.length})</TabsTrigger>
+                  <TabsTrigger value="no-encontrados">No encontrados ({noEncontrados})</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="todos">
+                  <ScrollArea className="h-[350px] border rounded-lg mt-2">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Código</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead className="text-center">Facturas</TableHead>
+                          <TableHead className="text-right">Deuda Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {agrupados.slice(0, 100).map((g, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-sm">{g.codCliente}</TableCell>
+                            <TableCell className="text-sm">
+                              {g.clienteNombre || g.razonSocial}
+                            </TableCell>
+                            <TableCell>
+                              {g.clienteId ? (
+                                <Badge variant="default" className="bg-green-600">Encontrado</Badge>
+                              ) : (
+                                <Badge variant="destructive">No encontrado</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">{g.facturas.length}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              ${g.totalDeuda.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {agrupados.length > 100 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Mostrando 100 de {agrupados.length} clientes
+                      </p>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="no-encontrados">
+                  <ScrollArea className="h-[350px] border rounded-lg mt-2">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Código</TableHead>
+                          <TableHead>Razón Social</TableHead>
+                          <TableHead className="text-center">Facturas</TableHead>
+                          <TableHead className="text-right">Deuda Total</TableHead>
+                          <TableHead>Cód. Depósito</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {agrupados.filter(g => !g.clienteId).slice(0, 100).map((g, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-sm">{g.codCliente}</TableCell>
+                            <TableCell className="text-sm">{g.razonSocial}</TableCell>
+                            <TableCell className="text-center">{g.facturas.length}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              ${g.totalDeuda.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell className="text-sm">{g.facturas[0]?.codDeposito || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {agrupados.filter(g => !g.clienteId).length > 100 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Mostrando 100 de {agrupados.filter(g => !g.clienteId).length} clientes sin coincidencia
+                      </p>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <ScrollArea className="h-[350px] border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-center">Facturas</TableHead>
+                      <TableHead className="text-right">Deuda Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {agrupados.length > 100 && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Mostrando 100 de {agrupados.length} clientes
-                </p>
-              )}
-            </ScrollArea>
+                  </TableHeader>
+                  <TableBody>
+                    {agrupados.slice(0, 100).map((g, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm">{g.codCliente}</TableCell>
+                        <TableCell className="text-sm">
+                          {g.clienteNombre || g.razonSocial}
+                        </TableCell>
+                        <TableCell>
+                          {g.clienteId ? (
+                            <Badge variant="default" className="bg-green-600">Encontrado</Badge>
+                          ) : (
+                            <Badge variant="destructive">No encontrado</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">{g.facturas.length}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${g.totalDeuda.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {agrupados.length > 100 && (
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Mostrando 100 de {agrupados.length} clientes
+                  </p>
+                )}
+              </ScrollArea>
+            )}
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => { reset(); }}>
