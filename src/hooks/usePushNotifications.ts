@@ -78,7 +78,7 @@ export function usePushNotifications() {
     }
 
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.ready as any;
       
       // Convert VAPID key to Uint8Array
       const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
