@@ -472,6 +472,10 @@ export default function Productos() {
       <PageHeader title="Productos" description="Gestión del catálogo de productos">
         <ExcelImporter />
         <ExcelImporterDesactivados onImportComplete={fetchData} />
+        <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
+          <Snowflake className="mr-2 h-4 w-4" />
+          Importar Fríos
+        </Button>
         <Button variant="outline" onClick={() => setActualizadorOpen(true)}>
           <TrendingUp className="mr-2 h-4 w-4" />
           Actualizar Precios
