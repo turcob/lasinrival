@@ -42,6 +42,7 @@ interface ExcelRow {
 
 interface ClienteAgrupado {
   codCliente: string;
+  codClienteOriginal: string;
   razonSocial: string;
   clienteId: string | null;
   clienteNombre: string | null;
@@ -154,6 +155,7 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         if (!grouped.has(code)) {
           grouped.set(code, {
             codCliente: code,
+            codClienteOriginal: row.codCliente.trim(),
             razonSocial: row.razonSocial,
             clienteId: null,
             clienteNombre: null,
@@ -261,8 +263,8 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         const { data: newCliente } = await supabase
           .from('clientes')
           .insert({
-            nombre: grupo.razonSocial || `Cliente ${grupo.codCliente}`,
-            codigo_cliente: grupo.codCliente,
+            nombre: grupo.razonSocial || `Cliente ${grupo.codClienteOriginal}`,
+            codigo_cliente: grupo.codClienteOriginal,
             zona_id: zonaId,
           })
           .select('id')
