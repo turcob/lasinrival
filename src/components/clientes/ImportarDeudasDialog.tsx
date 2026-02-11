@@ -155,6 +155,7 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         if (!grouped.has(code)) {
           grouped.set(code, {
             codCliente: code,
+            codClienteOriginal: row.codCliente.trim(),
             razonSocial: row.razonSocial,
             clienteId: null,
             clienteNombre: null,
