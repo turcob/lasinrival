@@ -1,81 +1,46 @@
 
 
-# Importar Historial de Movimientos por Vendedor
+# Importar Excel para marcar productos como "Frio"
 
 ## Objetivo
-Crear un importador para archivos Excel de historial por vendedor (ej: WILY_MOYANO.xlsx) que cargue todos los movimientos de cada cliente, y agregar una seccion "Historial" separada en la cuenta corriente del cliente.
+Crear un importador especializado que lea un archivo Excel, compare los productos por codigo de articulo (`COD_ARTIC`) y actualice unicamente el campo `es_frio` en la base de datos. No se agregan ni eliminan productos.
 
-## Columnas del Excel
-| Columna | Uso |
-|---------|-----|
-| Cliente | Formato "CODIGO - NOMBRE". Se extrae codigo para buscar en BD |
-| Fecha comprobante | Fecha del movimiento |
-| Tipo comprobante | FAC (compra), REC (pago), NCR (nota credito) |
-| Nro. comprobante | Identificador unico del comprobante |
-| Estado | Si contiene "saldo inicial", se trata como saldo_inicial |
-| Debe | Monto de facturas |
-| Haber | Monto de pagos/notas credito |
-| Importe | Monto para saldos iniciales |
-| Leyenda 1-5 | Se concatenan como observacion |
+## Logica del importador
 
-Las columnas Cod. clasificacion, Descripcion Clasificacion, Fecha vto. y Acumulado se ignoran.
+1. El usuario selecciona un archivo Excel
+2. Se lee la primera hoja del archivo
+3. Por cada fila, se toma:
+   - `COD_ARTIC` (codigo de articulo)
+   - `CATEGORIO PARA LISTAS` (si el valor es "frio", se marca como frio)
+4. Se buscan todos los productos existentes en la base de datos por `codigo_articulo`
+5. Para cada coincidencia:
+   - Si `CATEGORIO PARA LISTAS` = "frio" (case insensitive) -> `es_frio = true`
+   - Si no es "frio" -> `es_frio = false`
+6. Se actualiza en lotes de 100 para rendimiento
+7. Se muestra resumen: cantidad actualizados como frio, cantidad marcados como no frio, no encontrados
 
-## Cambios en base de datos
-
-Se agrega una columna `origen` a `cliente_movimientos` para distinguir movimientos del sistema vs importados historicamente:
-
-```sql
-ALTER TABLE cliente_movimientos 
-  ADD COLUMN origen text DEFAULT 'sistema';
-```
-
-Valores posibles:
-- `sistema` - movimientos generados por el sistema (default, retrocompatible)
-- `historico` - movimientos importados desde el Excel de historial
-
-## Nuevo componente: ImportarHistorialDialog.tsx
-
-Reutiliza la logica del importador de cuenta corriente existente, adaptado para:
-
-1. **Parsing**: Lee el Excel, extrae codigo/nombre del campo "Cliente" (formato "CODE - NAME"), determina tipo (FAC/REC/NCR/saldo_inicial), parsea montos (Debe/Haber/Importe)
-2. **Matching**: Busca clientes por codigo normalizado (sin ceros iniciales) con paginacion para superar el limite de 1000 registros
-3. **Duplicados**: Verifica comprobantes existentes por concepto para evitar reimportacion
-4. **Insercion**: Inserta en lotes de 100, marcando `origen: 'historico'`
-5. **Vista previa**: Muestra resumen por tipo de movimiento y primeros 100 registros
-
-## Modificar CuentaCorrienteClienteDialog.tsx
-
-Agregar pestanias usando Tabs:
-- **Cuenta Corriente** (tab por defecto): Muestra movimientos con `origen != 'historico'` (o todos los que no sean historicos). Es la vista actual.
-- **Historial**: Muestra solo movimientos con `origen = 'historico'`, ordenados por fecha descendente. Misma tabla pero filtrada.
-
-La consulta se modifica para traer el campo `origen` y luego filtrar en el cliente segun la tab activa.
-
-## Modificar Clientes.tsx
-
-Agregar boton "Importar Historial" junto a los botones existentes, conectado al nuevo dialog.
-
-## Resumen de archivos
+## Archivos a crear/modificar
 
 | Archivo | Accion |
 |---------|--------|
-| Migracion SQL | Agregar columna `origen` a `cliente_movimientos` |
-| `src/components/clientes/ImportarHistorialDialog.tsx` | Nuevo - importador de historial |
-| `src/components/clientes/CuentaCorrienteClienteDialog.tsx` | Modificar - agregar tabs Cuenta Corriente / Historial |
-| `src/pages/Clientes.tsx` | Modificar - agregar boton "Importar Historial" |
+| `src/components/productos/ImportarFriosDialog.tsx` | Nuevo - Dialog con el importador |
+| `src/pages/Productos.tsx` | Modificar - Agregar boton "Importar Frios" que abre el dialog |
 
 ## Detalle tecnico
 
-### Flujo del importador
-1. Usuario selecciona archivo Excel del vendedor
-2. Se parsean las filas, extrayendo codigo de cliente del campo "Cliente" (split por " - ")
-3. Se buscan todos los clientes con paginacion (batches de 1000)
-4. Se muestra resumen: cantidad de movimientos por tipo, clientes encontrados/no encontrados
-5. Al confirmar, se insertan en `cliente_movimientos` con `origen = 'historico'`
+### ImportarFriosDialog.tsx
+- Componente Dialog con input de archivo Excel
+- Usa la libreria `xlsx` ya instalada
+- Proceso:
+  1. Lee el Excel con `XLSX.read()`
+  2. Extrae `COD_ARTIC` y `CATEGORIO PARA LISTAS` de cada fila (con normalizacion de nombres de columna mediante trim)
+  3. Busca todos los productos en la DB con paginacion (batches de 1000) para superar el limite de Supabase
+  4. Crea un mapa `codigo_articulo -> id` de productos existentes
+  5. Recorre las filas del Excel, y por cada coincidencia arma un update
+  6. Ejecuta updates en lotes de 100
+  7. Muestra barra de progreso y resumen final (marcados frio, marcados no frio, no encontrados)
 
-### Vista Historial en Cuenta Corriente
-- Se usa el componente Tabs de Radix
-- Tab "Cuenta Corriente": movimientos donde `origen` es null o 'sistema'
-- Tab "Historial": movimientos donde `origen = 'historico'`
-- Ambas tabs comparten el mismo formato de tabla (fecha, tipo, concepto, monto, etc.)
+### Productos.tsx
+- Se agrega un boton "Importar Frios" (con icono de copo de nieve o similar) junto a los botones existentes de importacion
+- Al hacer clic, abre el `ImportarFriosDialog`
 
