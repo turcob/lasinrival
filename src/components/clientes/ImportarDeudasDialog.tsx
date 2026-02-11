@@ -263,8 +263,8 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         const { data: newCliente } = await supabase
           .from('clientes')
           .insert({
-            nombre: grupo.razonSocial || `Cliente ${grupo.codCliente}`,
-            codigo_cliente: grupo.codCliente,
+            nombre: grupo.razonSocial || `Cliente ${grupo.codClienteOriginal}`,
+            codigo_cliente: grupo.codClienteOriginal,
             zona_id: zonaId,
           })
           .select('id')
