@@ -253,7 +253,7 @@ export function ImportarFriosDialog({ open, onOpenChange, onImportComplete }: Im
                 <span className="font-medium">{resumen.marcadosNoFrio}</span>
 
                 <span className="text-muted-foreground">No encontrados:</span>
-                <span className="font-medium text-orange-600">{resumen.noEncontrados}</span>
+                <span className="font-medium text-destructive">{resumen.noEncontrados}</span>
               </div>
               <Button
                 className="mt-2 w-full"

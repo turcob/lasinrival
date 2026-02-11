@@ -732,6 +732,12 @@ export default function Productos() {
         onOpenChange={setActualizadorOpen}
         onUpdate={fetchData}
       />
+
+      <ImportarFriosDialog
+        open={importarFriosOpen}
+        onOpenChange={setImportarFriosOpen}
+        onImportComplete={fetchData}
+      />
     </MainLayout>
   );
 }
