@@ -252,6 +252,10 @@ export default function Pedidos() {
         <TabsContent value="consolidado">
           <ConsolidadoPedidos />
         </TabsContent>
+
+        <TabsContent value="consolidado-zona">
+          <ConsolidadoFinalZona />
+        </TabsContent>
       </Tabs>
 
       <NuevoPedidoDialog 
