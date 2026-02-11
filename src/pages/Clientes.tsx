@@ -324,6 +324,10 @@ export default function Clientes() {
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Importar Deudas
           </Button>
+          <Button variant="outline" onClick={() => setImportHistorialOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Importar Historial
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
