@@ -100,6 +100,7 @@ export default function Clientes() {
   const [ccDialogOpen, setCcDialogOpen] = useState(false);
   const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
+  const [importHistorialOpen, setImportHistorialOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     codigo_cliente: '',
