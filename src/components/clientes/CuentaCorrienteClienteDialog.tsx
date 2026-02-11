@@ -214,6 +214,12 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                           {mov.concepto || '-'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
+                          {mov.codigo_deposito || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {mov.nombre_vendedor || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
                           {mov.forma_pago_nombre || '-'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
