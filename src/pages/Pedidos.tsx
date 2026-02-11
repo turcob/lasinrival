@@ -104,6 +104,7 @@ export default function Pedidos() {
         <TabsList>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
+          <TabsTrigger value="consolidado-zona">Consolidado Final</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pedidos">
