@@ -112,39 +112,28 @@ export function usePedidosConsolidado(
   return useQuery({
     queryKey: ['pedidos-consolidado', vendedorId, zonaId, estado],
     queryFn: async () => {
-      // First get client IDs matching vendedor + zona filter
-      let clienteQuery = supabase.from('clientes').select('id');
-      if (vendedorId) clienteQuery = clienteQuery.eq('vendedor_id', vendedorId);
-      if (zonaId) clienteQuery = clienteQuery.eq('zona_id', zonaId);
-
-      const { data: clientes, error: clientesError } = await clienteQuery;
-      if (clientesError) throw clientesError;
-
-      const clienteIds = clientes.map(c => c.id);
-      if (clienteIds.length === 0) return [];
-
-      // Get pedidos for those clients
-      // Batch clienteIds in chunks to avoid URL length limits
-      const chunkSize = 100;
-      let allPedidos: any[] = [];
-      for (let i = 0; i < clienteIds.length; i += chunkSize) {
-        const chunk = clienteIds.slice(i, i + chunkSize);
-        const { data: pedidoChunk, error: pedidoChunkError } = await supabase
-          .from('pedidos')
-          .select(`
+      // Query pedidos directly by estado, then filter by vendedor/zona via the joined cliente
+      const { data: allPedidos, error: pedidosError } = await supabase
+        .from('pedidos')
+        .select(`
           id, numero_pedido, total, estado, fecha_pedido,
-            cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
-          `)
-          .in('cliente_id', chunk)
-          .eq('estado', estado as any)
-          .order('numero_pedido', { ascending: true });
+          cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
+        `)
+        .eq('estado', estado as any)
+        .order('numero_pedido', { ascending: true });
 
-        if (pedidoChunkError) throw pedidoChunkError;
-        if (pedidoChunk) allPedidos = allPedidos.concat(pedidoChunk);
-      }
+      if (pedidosError) throw pedidosError;
+      if (!allPedidos || allPedidos.length === 0) return [];
 
-      if (allPedidos.length === 0) return [];
-      const pedidos = allPedidos;
+      // Filter by vendedor/zona client-side using the joined cliente data
+      let pedidos = allPedidos.filter((p: any) => {
+        if (!p.cliente) return false;
+        if (vendedorId && p.cliente.vendedor_id !== vendedorId) return false;
+        if (zonaId && p.cliente.zona_id !== zonaId) return false;
+        return true;
+      });
+
+      if (pedidos.length === 0) return [];
       const pedidoIds = pedidos.map((p: any) => p.id);
 
       // Get all detalles with product info (including es_frio)
