@@ -168,10 +168,21 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
         g.totalDeuda += row.importePendiente;
       }
 
-      // Fetch all clients and match by code
-      const { data: clientes } = await supabase
-        .from('clientes')
-        .select('id, nombre, codigo_cliente');
+      // Fetch ALL clients using pagination (Supabase limits to 1000 per query)
+      let allClientes: { id: string; nombre: string; codigo_cliente: string | null }[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: batch } = await supabase
+          .from('clientes')
+          .select('id, nombre, codigo_cliente')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        if (!batch || batch.length === 0) break;
+        allClientes = allClientes.concat(batch);
+        if (batch.length < pageSize) break;
+        page++;
+      }
+      const clientes = allClientes;
 
       if (clientes) {
         const clienteMap = new Map<string, { id: string; nombre: string }>();
