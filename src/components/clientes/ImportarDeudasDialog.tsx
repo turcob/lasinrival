@@ -470,8 +470,8 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
               <Button variant="outline" onClick={() => { reset(); }}>
                 Cancelar
               </Button>
-              <Button onClick={handleImport} disabled={encontrados === 0}>
-                Importar {encontrados} cliente(s)
+              <Button onClick={handleImport} disabled={agrupados.length === 0}>
+                Importar {agrupados.length} cliente(s) ({noEncontrados > 0 ? `${noEncontrados} se crearán` : 'todos encontrados'})
               </Button>
             </div>
           </div>
