@@ -357,6 +357,7 @@ export type Database = {
           motivo_rechazo: string | null
           nombre_vendedor: string | null
           numero_comprobante: string | null
+          origen: string | null
           tipo: string
           usuario_registro_id: string
           venta_id: string | null
@@ -376,6 +377,7 @@ export type Database = {
           motivo_rechazo?: string | null
           nombre_vendedor?: string | null
           numero_comprobante?: string | null
+          origen?: string | null
           tipo: string
           usuario_registro_id: string
           venta_id?: string | null
@@ -395,6 +397,7 @@ export type Database = {
           motivo_rechazo?: string | null
           nombre_vendedor?: string | null
           numero_comprobante?: string | null
+          origen?: string | null
           tipo?: string
           usuario_registro_id?: string
           venta_id?: string | null
