@@ -54,6 +54,8 @@ import {
   useConfirmarPedidosMasivo,
   type ProductoConsolidadoItem,
 } from '@/hooks/useConsolidadoPedidos';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirConsolidado } from '@/lib/imprimirConsolidado';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
