@@ -46,6 +46,7 @@ import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
+import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
 
 // Estados principales del sistema
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -103,6 +104,7 @@ export default function Pedidos() {
         <TabsList>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
+          <TabsTrigger value="consolidado-zona">Consolidado Final</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pedidos">
@@ -249,6 +251,10 @@ export default function Pedidos() {
 
         <TabsContent value="consolidado">
           <ConsolidadoPedidos />
+        </TabsContent>
+
+        <TabsContent value="consolidado-zona">
+          <ConsolidadoFinalZona />
         </TabsContent>
       </Tabs>
 
