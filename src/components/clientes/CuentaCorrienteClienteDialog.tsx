@@ -185,9 +185,11 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                   <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Concepto</TableHead>
-                    <TableHead>Forma Pago</TableHead>
-                    <TableHead>Registrado por</TableHead>
+                     <TableHead>Concepto</TableHead>
+                     <TableHead>Depósito</TableHead>
+                     <TableHead>Vendedor</TableHead>
+                     <TableHead>Forma Pago</TableHead>
+                     <TableHead>Registrado por</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                   </TableRow>
                 </TableHeader>
