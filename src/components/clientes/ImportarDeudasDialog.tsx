@@ -91,6 +91,7 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState('');
   const [results, setResults] = useState({ imported: 0, skipped: 0, errors: 0, duplicates: 0 });
+  const [previewTab, setPreviewTab] = useState<'todos' | 'no-encontrados'>('todos');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
