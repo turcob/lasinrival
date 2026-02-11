@@ -4,9 +4,10 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
+import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
 import { CuentaCorrienteClienteDialog } from '@/components/clientes/CuentaCorrienteClienteDialog';
 import {
   Dialog,
@@ -97,6 +98,7 @@ export default function Clientes() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [ccDialogOpen, setCcDialogOpen] = useState(false);
   const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
+  const [importDeudasOpen, setImportDeudasOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     codigo_cliente: '',
@@ -316,6 +318,10 @@ export default function Clientes() {
         <div className="flex flex-wrap gap-2">
           <ExcelImporterClientes onImportComplete={fetchData} />
           <ExcelImporterCuentaCorriente onImportComplete={fetchData} />
+          <Button variant="outline" onClick={() => setImportDeudasOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Importar Deudas
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={resetForm}>
@@ -766,6 +772,13 @@ export default function Clientes() {
           onMovimientoRegistrado={fetchClientes}
         />
       )}
+
+      {/* Importar Deudas Dialog */}
+      <ImportarDeudasDialog
+        open={importDeudasOpen}
+        onOpenChange={setImportDeudasOpen}
+        onImportComplete={fetchData}
+      />
     </MainLayout>
   );
 }

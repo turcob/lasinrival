@@ -344,6 +344,7 @@ export type Database = {
       cliente_movimientos: {
         Row: {
           cliente_id: string
+          codigo_deposito: string | null
           concepto: string | null
           created_at: string | null
           estado_imputacion: string | null
@@ -354,12 +355,15 @@ export type Database = {
           imputado_por: string | null
           monto: number
           motivo_rechazo: string | null
+          nombre_vendedor: string | null
+          numero_comprobante: string | null
           tipo: string
           usuario_registro_id: string
           venta_id: string | null
         }
         Insert: {
           cliente_id: string
+          codigo_deposito?: string | null
           concepto?: string | null
           created_at?: string | null
           estado_imputacion?: string | null
@@ -370,12 +374,15 @@ export type Database = {
           imputado_por?: string | null
           monto: number
           motivo_rechazo?: string | null
+          nombre_vendedor?: string | null
+          numero_comprobante?: string | null
           tipo: string
           usuario_registro_id: string
           venta_id?: string | null
         }
         Update: {
           cliente_id?: string
+          codigo_deposito?: string | null
           concepto?: string | null
           created_at?: string | null
           estado_imputacion?: string | null
@@ -386,6 +393,8 @@ export type Database = {
           imputado_por?: string | null
           monto?: number
           motivo_rechazo?: string | null
+          nombre_vendedor?: string | null
+          numero_comprobante?: string | null
           tipo?: string
           usuario_registro_id?: string
           venta_id?: string | null

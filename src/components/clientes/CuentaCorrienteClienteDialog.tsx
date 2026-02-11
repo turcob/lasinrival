@@ -40,6 +40,9 @@ interface Movimiento {
   usuario_registro_id: string;
   forma_pago_nombre?: string;
   usuario_nombre?: string;
+  numero_comprobante?: string | null;
+  codigo_deposito?: string | null;
+  nombre_vendedor?: string | null;
 }
 
 interface Saldo {
@@ -130,7 +133,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Cuenta Corriente - {cliente.nombre}</span>
@@ -182,9 +185,11 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                   <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Concepto</TableHead>
-                    <TableHead>Forma Pago</TableHead>
-                    <TableHead>Registrado por</TableHead>
+                     <TableHead>Concepto</TableHead>
+                     <TableHead>Depósito</TableHead>
+                     <TableHead>Vendedor</TableHead>
+                     <TableHead>Forma Pago</TableHead>
+                     <TableHead>Registrado por</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -207,6 +212,12 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {mov.concepto || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {mov.codigo_deposito || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {mov.nombre_vendedor || '-'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {mov.forma_pago_nombre || '-'}
