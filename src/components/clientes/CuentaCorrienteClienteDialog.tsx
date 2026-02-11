@@ -133,10 +133,19 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
     onMovimientoRegistrado?.();
   };
 
-  const saldoActual = Number(saldo?.saldo_actual) || 0;
-
   const movimientosCuenta = movimientos.filter(m => m.origen !== 'historico');
   const movimientosHistorial = movimientos.filter(m => m.origen === 'historico');
+
+  // Calcular saldo solo desde Cuenta Corriente (sin históricos)
+  const totalDeudaCuenta = movimientosCuenta
+    .filter(m => ['compra', 'nota_debito', 'saldo_inicial'].includes(m.tipo))
+    .reduce((sum, m) => sum + Number(m.monto), 0);
+  
+  const totalPagadoCuenta = movimientosCuenta
+    .filter(m => ['pago', 'devolucion', 'nota_credito', 'anulacion'].includes(m.tipo))
+    .reduce((sum, m) => sum + Number(m.monto), 0);
+  
+  const saldoActual = totalDeudaCuenta - totalPagadoCuenta;
 
   const renderMovimientosTable = (movs: Movimiento[], showFormaPago = true) => {
     if (loading) {
@@ -226,30 +235,30 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
             </DialogTitle>
           </DialogHeader>
 
-          {/* Resumen */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="p-4 rounded-lg bg-muted">
-              <p className="text-sm text-muted-foreground">Total Deuda</p>
-              <p className="text-xl font-bold text-destructive">
-                ${Number(saldo?.total_deuda || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-muted">
-              <p className="text-sm text-muted-foreground">Total Pagado</p>
-              <p className="text-xl font-bold text-green-600">
-                ${Number(saldo?.total_pagado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-muted">
-              <p className="text-sm text-muted-foreground">Saldo Actual</p>
-              <p className={`text-xl font-bold ${saldoActual > 0 ? 'text-destructive' : saldoActual < 0 ? 'text-green-600' : ''}`}>
-                ${saldoActual.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {saldoActual > 0 ? 'Debe al comercio' : saldoActual < 0 ? 'A favor del cliente' : 'Sin saldo'}
-              </p>
-            </div>
-          </div>
+           {/* Resumen */}
+           <div className="grid grid-cols-3 gap-4 mb-4">
+             <div className="p-4 rounded-lg bg-muted">
+               <p className="text-sm text-muted-foreground">Total Deuda</p>
+               <p className="text-xl font-bold text-destructive">
+                 ${totalDeudaCuenta.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+               </p>
+             </div>
+             <div className="p-4 rounded-lg bg-muted">
+               <p className="text-sm text-muted-foreground">Total Pagado</p>
+               <p className="text-xl font-bold text-green-600">
+                 ${totalPagadoCuenta.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+               </p>
+             </div>
+             <div className="p-4 rounded-lg bg-muted">
+               <p className="text-sm text-muted-foreground">Saldo Actual</p>
+               <p className={`text-xl font-bold ${saldoActual > 0 ? 'text-destructive' : saldoActual < 0 ? 'text-green-600' : ''}`}>
+                 ${saldoActual.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+               </p>
+               <p className="text-xs text-muted-foreground">
+                 {saldoActual > 0 ? 'Debe al comercio' : saldoActual < 0 ? 'A favor del cliente' : 'Sin saldo'}
+               </p>
+             </div>
+           </div>
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
