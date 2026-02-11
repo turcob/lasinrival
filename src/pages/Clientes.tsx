@@ -772,6 +772,13 @@ export default function Clientes() {
           onMovimientoRegistrado={fetchClientes}
         />
       )}
+
+      {/* Importar Deudas Dialog */}
+      <ImportarDeudasDialog
+        open={importDeudasOpen}
+        onOpenChange={setImportDeudasOpen}
+        onImportComplete={fetchData}
+      />
     </MainLayout>
   );
 }
