@@ -74,6 +74,21 @@ export function ConsolidadoPedidos() {
   const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente');
   const quitarProducto = useQuitarProductoConsolidado();
   const confirmarMasivo = useConfirmarPedidosMasivo();
+  const { config } = useConfiguracionComercio();
+
+  const handleImprimir = () => {
+    const vendedorNombre = vendedorId ? vendedores?.find(v => v.id === vendedorId)?.nombre : undefined;
+    const zonaNombre = zonaId ? zonas?.find(z => z.id === zonaId)?.nombre : undefined;
+    imprimirConsolidado({
+      noPesables: consolidado.noPesables,
+      frios: consolidado.frios,
+      pesables: consolidado.pesables,
+      vendedorNombre,
+      zonaNombre,
+      totalPedidos: pedidos?.length || 0,
+      comercioNombre: config?.nombre_fantasia || config?.razon_social,
+    });
+  };
 
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
