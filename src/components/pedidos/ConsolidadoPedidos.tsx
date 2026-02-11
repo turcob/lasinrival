@@ -9,6 +9,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
+  Printer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,8 @@ import {
   useConfirmarPedidosMasivo,
   type ProductoConsolidadoItem,
 } from '@/hooks/useConsolidadoPedidos';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirConsolidado } from '@/lib/imprimirConsolidado';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -71,6 +74,21 @@ export function ConsolidadoPedidos() {
   const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente');
   const quitarProducto = useQuitarProductoConsolidado();
   const confirmarMasivo = useConfirmarPedidosMasivo();
+  const { config } = useConfiguracionComercio();
+
+  const handleImprimir = () => {
+    const vendedorNombre = vendedorId ? vendedores?.find(v => v.id === vendedorId)?.nombre : undefined;
+    const zonaNombre = zonaId ? zonas?.find(z => z.id === zonaId)?.nombre : undefined;
+    imprimirConsolidado({
+      noPesables: consolidado.noPesables,
+      frios: consolidado.frios,
+      pesables: consolidado.pesables,
+      vendedorNombre,
+      zonaNombre,
+      totalPedidos: pedidos?.length || 0,
+      comercioNombre: config?.nombre_fantasia || config?.razon_social,
+    });
+  };
 
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
@@ -226,15 +244,19 @@ export function ConsolidadoPedidos() {
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar producto en consolidado..."
-            value={busquedaProducto}
-            onChange={e => setBusquedaProducto(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar producto en consolidado..."
+              value={busquedaProducto}
+              onChange={e => setBusquedaProducto(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir
+          </Button>
       </div>
 
       {isLoading ? (
