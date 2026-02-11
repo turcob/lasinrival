@@ -90,6 +90,7 @@ export default function Productos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actualizadorOpen, setActualizadorOpen] = useState(false);
+  const [importarFriosOpen, setImportarFriosOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
   const [formData, setFormData] = useState({
