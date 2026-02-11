@@ -494,7 +494,7 @@ export function ImportarDeudasDialog({ open, onOpenChange, onImportComplete }: I
                       <TableBody>
                         {agrupados.filter(g => !g.clienteId).slice(0, 100).map((g, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-mono text-sm">{g.codCliente}</TableCell>
+                            <TableCell className="font-mono text-sm">{g.codClienteOriginal}</TableCell>
                             <TableCell className="text-sm">{g.razonSocial}</TableCell>
                             <TableCell className="text-center">{g.facturas.length}</TableCell>
                             <TableCell className="text-right font-medium">
