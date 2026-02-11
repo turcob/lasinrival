@@ -8,6 +8,7 @@ import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, C
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
+import { ImportarHistorialDialog } from '@/components/clientes/ImportarHistorialDialog';
 import { CuentaCorrienteClienteDialog } from '@/components/clientes/CuentaCorrienteClienteDialog';
 import {
   Dialog,
@@ -99,6 +100,7 @@ export default function Clientes() {
   const [ccDialogOpen, setCcDialogOpen] = useState(false);
   const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
+  const [importHistorialOpen, setImportHistorialOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     codigo_cliente: '',
@@ -321,6 +323,10 @@ export default function Clientes() {
           <Button variant="outline" onClick={() => setImportDeudasOpen(true)}>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Importar Deudas
+          </Button>
+          <Button variant="outline" onClick={() => setImportHistorialOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Importar Historial
           </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -777,6 +783,13 @@ export default function Clientes() {
       <ImportarDeudasDialog
         open={importDeudasOpen}
         onOpenChange={setImportDeudasOpen}
+        onImportComplete={fetchData}
+      />
+
+      {/* Importar Historial Dialog */}
+      <ImportarHistorialDialog
+        open={importHistorialOpen}
+        onOpenChange={setImportHistorialOpen}
         onImportComplete={fetchData}
       />
     </MainLayout>

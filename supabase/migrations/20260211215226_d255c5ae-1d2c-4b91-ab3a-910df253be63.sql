@@ -1,0 +1,1 @@
+ALTER TABLE public.cliente_movimientos ADD COLUMN origen text DEFAULT 'sistema';
