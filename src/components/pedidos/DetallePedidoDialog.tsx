@@ -314,6 +314,17 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
               {siguientesEstados.length > 0 && (
                 <div className="border-t p-4">
                   <div className="flex flex-wrap gap-2">
+                    {/* Botón editar preparación para pedidos ya preparados */}
+                    {estadoActual === 'preparado' && onPrepararPedido && pedido && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onPrepararPedido(pedido.id)}
+                      >
+                        <Package className="h-4 w-4 mr-1" />
+                        Editar Preparación
+                      </Button>
+                    )}
                     {siguientesEstados.map(estado => {
                       if (estado === 'rechazado') {
                         return (
@@ -328,7 +339,6 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
                           </Button>
                         );
                       }
-                      // Para "preparado", abrir el nuevo diálogo de preparación
                       if (estado === 'preparado') {
                         return (
                           <Button
