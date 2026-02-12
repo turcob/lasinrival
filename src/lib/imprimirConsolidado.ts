@@ -10,7 +10,7 @@ interface ConsolidadoPrintData {
   comercioNombre?: string;
 }
 
-function renderSeccion(titulo: string, items: ProductoConsolidadoItem[]): string {
+function renderSeccion(titulo: string, items: ProductoConsolidadoItem[], esUltima: boolean = false): string {
   if (items.length === 0) return '';
   const rows = items
     .map(
@@ -24,19 +24,23 @@ function renderSeccion(titulo: string, items: ProductoConsolidadoItem[]): string
     )
     .join('');
 
+  const pageBreak = !esUltima ? 'page-break-after:always;' : '';
+  
   return `
-    <h3 style="margin:16px 0 8px;font-size:16px;border-bottom:2px solid #333;padding-bottom:4px;">${titulo} (${items.length})</h3>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="background:#f0f0f0;">
-          <th style="padding:4px 8px;text-align:left;font-size:13px;">Código</th>
-          <th style="padding:4px 8px;text-align:left;font-size:13px;">Descripción</th>
-          <th style="padding:4px 8px;text-align:right;font-size:13px;">Cantidad</th>
-          <th style="padding:4px 8px;text-align:left;font-size:13px;">Unidad</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
+    <div style="${pageBreak}">
+      <h3 style="margin:16px 0 8px;font-size:16px;border-bottom:2px solid #333;padding-bottom:4px;">${titulo} (${items.length})</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th style="padding:4px 8px;text-align:left;font-size:13px;">Código</th>
+            <th style="padding:4px 8px;text-align:left;font-size:13px;">Descripción</th>
+            <th style="padding:4px 8px;text-align:right;font-size:13px;">Cantidad</th>
+            <th style="padding:4px 8px;text-align:left;font-size:13px;">Unidad</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -79,7 +83,7 @@ export function imprimirConsolidado(data: ConsolidadoPrintData) {
       </div>
       ${renderSeccion('📦 No Pesables', data.noPesables)}
       ${renderSeccion('❄️ Frescos / Fríos', data.frios)}
-      ${renderSeccion('⚖️ Pesables (KG)', data.pesables)}
+      ${renderSeccion('⚖️ Pesables (KG)', data.pesables, true)}
     </body>
     </html>
   `;
