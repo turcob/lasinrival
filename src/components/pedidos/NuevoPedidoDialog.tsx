@@ -193,6 +193,23 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
     }));
   };
 
+  const actualizarDescuento = (productoId: string, valor: string) => {
+    const num = parseFloat(valor);
+    if (isNaN(num) || num < 0) return;
+    const descuento = Math.min(100, num);
+    setCarrito(carrito.map(c =>
+      c.producto_id === productoId ? { ...c, descuento_porcentaje: descuento } : c
+    ));
+  };
+
+  const actualizarPrecio = (productoId: string, valor: string) => {
+    const num = parseFloat(valor);
+    if (isNaN(num) || num < 0) return;
+    setCarrito(carrito.map(c =>
+      c.producto_id === productoId ? { ...c, precio_unitario: num } : c
+    ));
+  };
+
   const eliminarProducto = (productoId: string) => {
     setCarrito(carrito.filter(c => c.producto_id !== productoId));
   };
@@ -373,18 +390,21 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
           {carrito.length > 0 && (
             <div className="border rounded-lg">
               <Table>
-                <TableHeader>
+                 <TableHeader>
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead className="text-center">Cantidad</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
+                    <TableHead className="text-right">Dto %</TableHead>
                     <TableHead className="text-right">Subtotal</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {carrito.map(item => (
+                  {carrito.map(item => {
+                    const subtotalItem = item.cantidad * item.precio_unitario * (1 - item.descuento_porcentaje / 100);
+                    return (
                     <TableRow key={item.producto_id}>
                       <TableCell className="font-mono">{item.codigo}</TableCell>
                       <TableCell>{item.descripcion}</TableCell>
@@ -409,9 +429,29 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.precio_unitario)}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.precio_unitario}
+                          onChange={e => actualizarPrecio(item.producto_id, e.target.value)}
+                          className="w-24 text-right h-8 ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="100"
+                          value={item.descuento_porcentaje}
+                          onChange={e => actualizarDescuento(item.producto_id, e.target.value)}
+                          className="w-20 text-right h-8 ml-auto"
+                        />
+                      </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(item.cantidad * item.precio_unitario)}
+                        {formatCurrency(subtotalItem)}
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -424,7 +464,8 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
