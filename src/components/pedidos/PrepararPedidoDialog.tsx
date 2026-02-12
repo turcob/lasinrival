@@ -89,6 +89,27 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     ));
   };
 
+  const handlePrecioChange = (detalleId: string, value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num < 0) return;
+    setLineas(prev => prev.map(l => {
+      if (l.detalleId !== detalleId) return l;
+      const precioConDescuento = num * (1 - l.descuentoPorcentaje / 100);
+      return { ...l, precioUnitario: num, subtotal: l.cantidadPreparada * precioConDescuento };
+    }));
+  };
+
+  const handleDescuentoChange = (detalleId: string, value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num < 0) return;
+    const descuento = Math.min(100, num);
+    setLineas(prev => prev.map(l => {
+      if (l.detalleId !== detalleId) return l;
+      const precioConDescuento = l.precioUnitario * (1 - descuento / 100);
+      return { ...l, descuentoPorcentaje: descuento, subtotal: l.cantidadPreparada * precioConDescuento };
+    }));
+  };
+
   // Botón calcular - actualiza cantidadPreparada y subtotal
   const handleCalcular = (detalleId: string) => {
     setLineas(prev => prev.map(l => {
@@ -214,11 +235,33 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                         )}
                       </div>
                       <p className="font-medium truncate">{linea.descripcion}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Precio: {formatCurrency(linea.precioUnitario)}
-                        {esPorPeso && '/kg'}
-                        {linea.descuentoPorcentaje > 0 && ` (-${linea.descuentoPorcentaje}%)`}
-                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">Precio:</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={linea.precioUnitario}
+                            onChange={(e) => handlePrecioChange(linea.detalleId, e.target.value)}
+                            className="w-24 h-7 text-sm text-right"
+                          />
+                          {esPorPeso && <span className="text-xs text-muted-foreground">/kg</span>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">Dto:</span>
+                          <Input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            max="100"
+                            value={linea.descuentoPorcentaje}
+                            onChange={(e) => handleDescuentoChange(linea.detalleId, e.target.value)}
+                            className="w-16 h-7 text-sm text-right"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Quantity Controls */}
