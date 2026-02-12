@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePedido, type PedidoDetalle } from '@/hooks/usePedidos';
 import { usePrepararPedido } from '@/hooks/usePrepararPedido';
-import { imprimirRemito } from '@/lib/imprimirRemito';
+
 
 interface PrepararPedidoDialogProps {
   pedidoId: string | null;
@@ -152,24 +152,6 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
     });
 
     if (resultado) {
-      imprimirRemito({
-        numeroPedido: pedido.numero_pedido,
-        fecha: new Date(),
-        cliente: {
-          nombre: pedido.cliente?.nombre || '',
-          direccion: pedido.cliente?.direccion || '',
-          cuit: pedido.cliente?.dni_cuit || '',
-        },
-        lineas: lineas.filter(l => l.cantidadPreparada > 0).map(l => ({
-          codigo: l.codigo,
-          descripcion: l.descripcion,
-          cantidad: l.cantidadPreparada,
-          precioUnitario: l.precioUnitario,
-          descuento: l.descuentoPorcentaje,
-          subtotal: l.subtotal,
-        })),
-        total: totalFinal,
-      });
       onOpenChange(false);
     }
   };
@@ -365,7 +347,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                 ) : (
                   <>
                     <Check className="h-5 w-5 mr-2" />
-                    Confirmar e Imprimir
+                    Confirmar
                   </>
                 )}
               </Button>
