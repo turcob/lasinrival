@@ -450,6 +450,7 @@ export type Database = {
           limite_credito: number | null
           lista_precio_id: string | null
           nombre: string
+          numero_terminal_clover: string | null
           provincia_id: string | null
           telefono: string | null
           telefono_contacto: string | null
@@ -473,6 +474,7 @@ export type Database = {
           limite_credito?: number | null
           lista_precio_id?: string | null
           nombre: string
+          numero_terminal_clover?: string | null
           provincia_id?: string | null
           telefono?: string | null
           telefono_contacto?: string | null
@@ -496,6 +498,7 @@ export type Database = {
           limite_credito?: number | null
           lista_precio_id?: string | null
           nombre?: string
+          numero_terminal_clover?: string | null
           provincia_id?: string | null
           telefono?: string | null
           telefono_contacto?: string | null
@@ -537,6 +540,108 @@ export type Database = {
             columns: ["zona_id"]
             isOneToOne: false
             referencedRelation: "zonas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clover_pagos: {
+        Row: {
+          asociado: boolean | null
+          cliente_id: string | null
+          codigo_autorizacion: string | null
+          created_at: string
+          dispositivo: string | null
+          factura_numero: string | null
+          fecha_pago: string
+          id: string
+          importe: number
+          importe_devolucion: number | null
+          importe_impuestos: number | null
+          importe_propinas: number | null
+          marca_tarjeta: string | null
+          medio_pago: string | null
+          moneda: string | null
+          movimiento_id: string | null
+          nombre_cliente_clover: string | null
+          numero_cuotas: number | null
+          numero_lote: string | null
+          numero_recibo: string | null
+          numero_tarjeta: string | null
+          numero_transaccion: string | null
+          pago_id_clover: string
+          resultado: string | null
+          terminal_id: string | null
+          usuario_importacion_id: string
+        }
+        Insert: {
+          asociado?: boolean | null
+          cliente_id?: string | null
+          codigo_autorizacion?: string | null
+          created_at?: string
+          dispositivo?: string | null
+          factura_numero?: string | null
+          fecha_pago: string
+          id?: string
+          importe?: number
+          importe_devolucion?: number | null
+          importe_impuestos?: number | null
+          importe_propinas?: number | null
+          marca_tarjeta?: string | null
+          medio_pago?: string | null
+          moneda?: string | null
+          movimiento_id?: string | null
+          nombre_cliente_clover?: string | null
+          numero_cuotas?: number | null
+          numero_lote?: string | null
+          numero_recibo?: string | null
+          numero_tarjeta?: string | null
+          numero_transaccion?: string | null
+          pago_id_clover: string
+          resultado?: string | null
+          terminal_id?: string | null
+          usuario_importacion_id: string
+        }
+        Update: {
+          asociado?: boolean | null
+          cliente_id?: string | null
+          codigo_autorizacion?: string | null
+          created_at?: string
+          dispositivo?: string | null
+          factura_numero?: string | null
+          fecha_pago?: string
+          id?: string
+          importe?: number
+          importe_devolucion?: number | null
+          importe_impuestos?: number | null
+          importe_propinas?: number | null
+          marca_tarjeta?: string | null
+          medio_pago?: string | null
+          moneda?: string | null
+          movimiento_id?: string | null
+          nombre_cliente_clover?: string | null
+          numero_cuotas?: number | null
+          numero_lote?: string | null
+          numero_recibo?: string | null
+          numero_tarjeta?: string | null
+          numero_transaccion?: string | null
+          pago_id_clover?: string
+          resultado?: string | null
+          terminal_id?: string | null
+          usuario_importacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clover_pagos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clover_pagos_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
             referencedColumns: ["id"]
           },
         ]

@@ -31,6 +31,7 @@ import Sugerencias from "./pages/Sugerencias";
 import Pedidos from "./pages/Pedidos";
 import Logistica from "./pages/Logistica";
 import AgendaVisitas from "./pages/AgendaVisitas";
+import Clover from "./pages/Clover";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ function AppRoutes() {
       <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
       <Route path="/logistica" element={<ProtectedRoute><Logistica /></ProtectedRoute>} />
       <Route path="/agenda-visitas" element={<ProtectedRoute><AgendaVisitas /></ProtectedRoute>} />
+      <Route path="/clover" element={<ProtectedRoute><Clover /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -112,6 +112,7 @@ export default function Clientes() {
     lista_precio_id: '',
     zona_id: '',
     vendedor_id: '',
+    numero_terminal_clover: '',
     activo: true,
   });
 
@@ -233,6 +234,7 @@ export default function Clientes() {
         lista_precio_id: formData.lista_precio_id || null,
         zona_id: formData.zona_id || null,
         vendedor_id: formData.vendedor_id || null,
+        numero_terminal_clover: formData.numero_terminal_clover || null,
       };
 
       if (selectedCliente) {
@@ -290,6 +292,7 @@ export default function Clientes() {
       lista_precio_id: cliente.lista_precio_id || '',
       zona_id: cliente.zona_id || '',
       vendedor_id: cliente.vendedor_id || '',
+      numero_terminal_clover: (cliente as any).numero_terminal_clover || '',
       activo: cliente.activo,
     });
     setDialogOpen(true);
@@ -307,6 +310,7 @@ export default function Clientes() {
       lista_precio_id: '',
       zona_id: '',
       vendedor_id: '',
+      numero_terminal_clover: '',
       activo: true,
     });
   };
@@ -467,15 +471,28 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="direccion">Dirección</Label>
-                <Input
-                  id="direccion"
-                  value={formData.direccion}
-                  onChange={(e) =>
-                    setFormData({ ...formData, direccion: e.target.value })
-                  }
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="direccion">Dirección</Label>
+                  <Input
+                    id="direccion"
+                    value={formData.direccion}
+                    onChange={(e) =>
+                      setFormData({ ...formData, direccion: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="numero_terminal_clover">Nº Terminal Clover</Label>
+                  <Input
+                    id="numero_terminal_clover"
+                    value={formData.numero_terminal_clover}
+                    onChange={(e) =>
+                      setFormData({ ...formData, numero_terminal_clover: e.target.value })
+                    }
+                    placeholder="Ej: 69404603"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
