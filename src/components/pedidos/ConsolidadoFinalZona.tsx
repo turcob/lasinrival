@@ -193,6 +193,98 @@ export function ConsolidadoFinalZona() {
     printWindow.print();
   };
 
+  const handleImprimirRemitos = () => {
+    if (!pedidos || pedidos.length === 0) return;
+    const ventana = window.open('', '_blank', 'width=800,height=600');
+    if (!ventana) {
+      alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
+      return;
+    }
+
+    const remitosHTML = pedidos.map((pedido, index) => {
+      const numeroRemito = pedido.numero_pedido.toString().padStart(6, '0');
+      const fecha = new Date(pedido.fecha_pedido);
+      const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      const lineasHTML = pedido.detalles.map(d => {
+        if (!d.producto) return '';
+        const desc = d.descuento_porcentaje ?? 0;
+        return `
+          <tr>
+            <td style="padding:6px;border-bottom:1px solid #eee;font-family:monospace;font-size:11px;">${d.producto.codigo_articulo}</td>
+            <td style="padding:6px;border-bottom:1px solid #eee;font-size:11px;">${d.producto.descripcion}</td>
+            <td style="padding:6px;border-bottom:1px solid #eee;text-align:center;">${d.cantidad_pedida}</td>
+            <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(d.precio_unitario)}</td>
+            <td style="padding:6px;border-bottom:1px solid #eee;text-align:center;">${desc > 0 ? desc + '%' : '-'}</td>
+            <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:500;">${formatCurrency(d.subtotal)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const pageBreak = index < pedidos.length - 1 ? 'page-break-after:always;' : '';
+
+      return `
+        <div style="${pageBreak}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:16px;">
+            <div>
+              <h1 style="margin:0;font-size:22px;">REMITO</h1>
+              <p style="margin:4px 0 0;color:#666;font-size:11px;">Documento no válido como factura</p>
+            </div>
+            <div style="text-align:right;">
+              <h2 style="margin:0;font-size:16px;color:#d32f2f;">R #${numeroRemito}</h2>
+              <p style="margin:4px 0 0;font-size:12px;"><strong>Fecha:</strong> ${fechaStr}</p>
+            </div>
+          </div>
+          <div style="background:#f5f5f5;padding:12px;border-radius:4px;margin-bottom:16px;">
+            <h3 style="margin:0 0 6px;font-size:13px;color:#666;">DATOS DEL CLIENTE</h3>
+            <p style="margin:2px 0;font-size:12px;"><strong>Razón Social:</strong> ${pedido.cliente?.nombre || '-'}</p>
+            ${pedido.cliente?.codigo_cliente ? `<p style="margin:2px 0;font-size:12px;"><strong>Código:</strong> ${pedido.cliente.codigo_cliente}</p>` : ''}
+          </div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;">
+            <thead>
+              <tr>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:left;font-weight:500;width:100px;">Código</th>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:left;font-weight:500;">Descripción</th>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:center;font-weight:500;width:60px;">Cant.</th>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:right;font-weight:500;width:90px;">P. Unit.</th>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:center;font-weight:500;width:50px;">Dto.</th>
+                <th style="background:#333;color:white;padding:8px 6px;text-align:right;font-weight:500;width:90px;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>${lineasHTML}</tbody>
+          </table>
+          <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+            <div style="background:#333;color:white;padding:12px 20px;border-radius:4px;">
+              <span style="font-size:13px;">TOTAL:</span>
+              <strong style="font-size:18px;margin-left:12px;">${formatCurrency(pedido.total)}</strong>
+            </div>
+          </div>
+          <div style="margin-top:40px;padding-top:16px;border-top:1px solid #ddd;display:flex;justify-content:space-between;">
+            <div style="width:180px;text-align:center;"><div style="border-top:1px solid #333;margin-top:50px;padding-top:4px;font-size:11px;">Firma del Cliente</div></div>
+            <div style="width:180px;text-align:center;"><div style="border-top:1px solid #333;margin-top:50px;padding-top:4px;font-size:11px;">Aclaración</div></div>
+            <div style="width:180px;text-align:center;"><div style="border-top:1px solid #333;margin-top:50px;padding-top:4px;font-size:11px;">DNI</div></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Remitos - Zona ${zonaNombre}</title>
+      <style>
+        @media print { body { margin:0; padding:15px; } .no-print { display:none !important; } }
+        body { font-family:Arial,sans-serif;font-size:12px;color:#333;max-width:800px;margin:0 auto;padding:20px; }
+        .print-button { position:fixed;bottom:20px;right:20px;padding:12px 24px;background:#1976d2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+        .print-button:hover { background:#1565c0; }
+      </style>
+      </head><body>
+        ${remitosHTML}
+        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir Remitos</button>
+      </body></html>
+    `);
+    ventana.document.close();
+  };
+
   const renderProductTable = (items: ProductoConsolidadoItem[]) => {
     const filtered = filtrarItems(items);
     if (filtered.length === 0) {
@@ -251,7 +343,12 @@ export function ConsolidadoFinalZona() {
 
         <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
-          Imprimir
+          Imprimir Consolidado
+        </Button>
+
+        <Button onClick={handleImprimirRemitos} disabled={!pedidos || pedidos.length === 0}>
+          <Printer className="h-4 w-4 mr-2" />
+          Imprimir Remitos
         </Button>
       </div>
 
