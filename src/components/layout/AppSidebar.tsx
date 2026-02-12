@@ -22,7 +22,8 @@ import {
   Lightbulb,
   ClipboardList,
   Truck,
-  Calendar
+  Calendar,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,6 +65,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Imputación', href: '/imputacion', icon: CreditCard, module: 'clientes' },
   { title: 'Asociar Pagos', href: '/asociacion-pagos', icon: CreditCard, module: 'clientes' },
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
+  { title: 'Clover', href: '/clover', icon: Smartphone, module: 'clientes' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
   { title: 'Inventario', href: '/inventario', icon: Archive, module: 'inventario' },
   { title: 'Reportes', href: '/reportes', icon: BarChart3, module: 'reportes' },
