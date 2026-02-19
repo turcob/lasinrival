@@ -189,7 +189,7 @@ export default function Ventas() {
     };
 
     fetchTotales();
-  }, [filtroUsuario, filtroEstado, fechaDesde, fechaHasta]);
+  }, [filtroUsuario, filtroEstado, fechaDesde, fechaHasta, refreshTotales]);
 
   const fetchUsuarios = async () => {
     const { data } = await supabase
