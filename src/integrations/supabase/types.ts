@@ -3674,6 +3674,21 @@ export type Database = {
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
       get_empleado_id: { Args: never; Returns: string }
+      get_ventas_totales_por_medio_pago: {
+        Args: {
+          p_estado?: string
+          p_fecha_desde?: string
+          p_fecha_hasta?: string
+          p_usuario_id?: string
+        }
+        Returns: {
+          count_pedidos: number
+          count_ventas: number
+          forma_pago_nombre: string
+          total: number
+          total_general: number
+        }[]
+      }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_permission: {
         Args: {
