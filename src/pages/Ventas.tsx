@@ -283,29 +283,8 @@ export default function Ventas() {
     });
   }, [ventas, filtroUsuario, filtroEstado, fechaDesde, fechaHasta]);
 
-  // Calcular totales por medio de pago (solo ventas confirmadas, no pedidos)
-  const totalesPorMedioPago = useMemo(() => {
-    const totales: Record<string, number> = {};
-    let totalGeneral = 0;
-    let countVentas = 0;
-    let countPedidos = 0;
-    
-    ventasFiltradas.forEach(venta => {
-      if (venta.estado === 'pedido' && !venta.anulada) {
-        countPedidos++;
-      } else if (!venta.anulada && venta.estado === 'confirmada') {
-        countVentas++;
-        totalGeneral += venta.total;
-        const pagosVenta = pagosPorVenta[venta.id] || [];
-        pagosVenta.forEach(pago => {
-          const nombreMedio = pago.formas_pago?.nombre || 'Otro';
-          totales[nombreMedio] = (totales[nombreMedio] || 0) + pago.monto;
-        });
-      }
-    });
-    
-    return { totales, totalGeneral, countVentas, countPedidos };
-  }, [ventasFiltradas, pagosPorVenta]);
+  // Use RPC-based totals instead of client-side calculation
+  const totalesPorMedioPago = rpcTotales;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
