@@ -133,6 +133,11 @@ export default function Ventas() {
   const [fechaDesde, setFechaDesde] = useState<Date | undefined>(undefined);
   const [fechaHasta, setFechaHasta] = useState<Date | undefined>(undefined);
 
+  // RPC-based payment breakdown
+  const [rpcTotales, setRpcTotales] = useState<{ totales: Record<string, number>; totalGeneral: number; countVentas: number; countPedidos: number }>({
+    totales: {}, totalGeneral: 0, countVentas: 0, countPedidos: 0,
+  });
+
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
 
