@@ -414,6 +414,7 @@ export default function Ventas() {
       setMotivoAnulacion('');
       setSelectedVenta(null);
       fetchVentas(isAdmin);
+      setRefreshTotales(prev => prev + 1);
     } catch (error) {
       console.error('Error anulando venta:', error);
       toast.error('Error al anular la venta');
