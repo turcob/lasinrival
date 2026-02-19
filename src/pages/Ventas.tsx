@@ -133,6 +133,12 @@ export default function Ventas() {
   const [fechaDesde, setFechaDesde] = useState<Date | undefined>(undefined);
   const [fechaHasta, setFechaHasta] = useState<Date | undefined>(undefined);
 
+  // RPC-based payment breakdown
+  const [rpcTotales, setRpcTotales] = useState<{ totales: Record<string, number>; totalGeneral: number; countVentas: number; countPedidos: number }>({
+    totales: {}, totalGeneral: 0, countVentas: 0, countPedidos: 0,
+  });
+  const [refreshTotales, setRefreshTotales] = useState(0);
+
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
 
@@ -145,6 +151,45 @@ export default function Ventas() {
       fetchUsuarios();
     }
   }, [isAdmin]);
+
+  // Fetch payment breakdown via RPC whenever filters change
+  useEffect(() => {
+    const fetchTotales = async () => {
+      const params: Record<string, any> = {
+        p_estado: filtroEstado,
+      };
+      if (filtroUsuario !== 'todos') params.p_usuario_id = filtroUsuario;
+      if (fechaDesde) params.p_fecha_desde = startOfDay(fechaDesde).toISOString();
+      if (fechaHasta) params.p_fecha_hasta = endOfDay(fechaHasta).toISOString();
+
+      const { data, error } = await supabase.rpc('get_ventas_totales_por_medio_pago', params);
+      
+      if (error) {
+        console.error('Error fetching totales:', error);
+        return;
+      }
+
+      const totales: Record<string, number> = {};
+      let totalGeneral = 0;
+      let countVentas = 0;
+      let countPedidos = 0;
+
+      if (data && data.length > 0) {
+        totalGeneral = Number(data[0].total_general) || 0;
+        countVentas = Number(data[0].count_ventas) || 0;
+        countPedidos = Number(data[0].count_pedidos) || 0;
+        data.forEach((row: any) => {
+          if (row.forma_pago_nombre) {
+            totales[row.forma_pago_nombre] = Number(row.total) || 0;
+          }
+        });
+      }
+
+      setRpcTotales({ totales, totalGeneral, countVentas, countPedidos });
+    };
+
+    fetchTotales();
+  }, [filtroUsuario, filtroEstado, fechaDesde, fechaHasta, refreshTotales]);
 
   const fetchUsuarios = async () => {
     const { data } = await supabase
@@ -239,29 +284,8 @@ export default function Ventas() {
     });
   }, [ventas, filtroUsuario, filtroEstado, fechaDesde, fechaHasta]);
 
-  // Calcular totales por medio de pago (solo ventas confirmadas, no pedidos)
-  const totalesPorMedioPago = useMemo(() => {
-    const totales: Record<string, number> = {};
-    let totalGeneral = 0;
-    let countVentas = 0;
-    let countPedidos = 0;
-    
-    ventasFiltradas.forEach(venta => {
-      if (venta.estado === 'pedido' && !venta.anulada) {
-        countPedidos++;
-      } else if (!venta.anulada && venta.estado === 'confirmada') {
-        countVentas++;
-        totalGeneral += venta.total;
-        const pagosVenta = pagosPorVenta[venta.id] || [];
-        pagosVenta.forEach(pago => {
-          const nombreMedio = pago.formas_pago?.nombre || 'Otro';
-          totales[nombreMedio] = (totales[nombreMedio] || 0) + pago.monto;
-        });
-      }
-    });
-    
-    return { totales, totalGeneral, countVentas, countPedidos };
-  }, [ventasFiltradas, pagosPorVenta]);
+  // Use RPC-based totals instead of client-side calculation
+  const totalesPorMedioPago = rpcTotales;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -390,6 +414,7 @@ export default function Ventas() {
       setMotivoAnulacion('');
       setSelectedVenta(null);
       fetchVentas(isAdmin);
+      setRefreshTotales(prev => prev + 1);
     } catch (error) {
       console.error('Error anulando venta:', error);
       toast.error('Error al anular la venta');
