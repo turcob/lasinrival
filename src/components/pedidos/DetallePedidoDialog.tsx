@@ -46,6 +46,7 @@ interface DetallePedidoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPrepararPedido?: (pedidoId: string) => void;
+  onEditarPedido?: (pedidoId: string) => void;
 }
 
 // Configuración visual de estados (incluye legacy para historial)
