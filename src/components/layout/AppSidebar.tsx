@@ -24,7 +24,8 @@ import {
   Truck,
   Calendar,
   Smartphone,
-  FileCheck
+  FileCheck,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
