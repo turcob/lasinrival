@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette, ShieldAlert } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -41,6 +41,8 @@ interface ConfiguracionComercio {
   afip_modo: 'homologacion' | 'produccion';
   nombre_sistema: string;
   texto_login_footer: string;
+  facturas_adeudadas_bloqueo: number;
+  bloqueo_automatico_activo: boolean;
 }
 
 const CONDICIONES_IVA = [
@@ -92,6 +94,8 @@ const initialFormData: ConfiguracionComercio = {
   afip_modo: 'homologacion',
   nombre_sistema: 'GestiónPro',
   texto_login_footer: 'Sistema de Gestión Comercial © 2024',
+  facturas_adeudadas_bloqueo: 3,
+  bloqueo_automatico_activo: true,
 };
 
 export default function Configuracion() {
@@ -136,6 +140,8 @@ export default function Configuracion() {
           afip_modo: (data as any).afip_modo || 'homologacion',
           nombre_sistema: (data as any).nombre_sistema || 'GestiónPro',
           texto_login_footer: (data as any).texto_login_footer || 'Sistema de Gestión Comercial © 2024',
+          facturas_adeudadas_bloqueo: (data as any).facturas_adeudadas_bloqueo ?? 3,
+          bloqueo_automatico_activo: (data as any).bloqueo_automatico_activo ?? true,
         });
       }
     } catch (error) {
@@ -196,6 +202,8 @@ export default function Configuracion() {
         afip_modo: formData.afip_modo,
         nombre_sistema: formData.nombre_sistema.trim() || 'GestiónPro',
         texto_login_footer: formData.texto_login_footer.trim() || 'Sistema de Gestión Comercial © 2024',
+        facturas_adeudadas_bloqueo: formData.facturas_adeudadas_bloqueo,
+        bloqueo_automatico_activo: formData.bloqueo_automatico_activo,
       };
 
       if (configId) {
@@ -542,6 +550,58 @@ export default function Configuracion() {
                   Este texto aparece en la parte inferior de la pantalla de inicio de sesión
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Bloqueo Automático de Clientes */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Bloqueo Automático de Clientes
+              </CardTitle>
+              <CardDescription>
+                Bloquea automáticamente a los clientes que superen un número de facturas adeudadas
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">
+                    {formData.bloqueo_automatico_activo ? 'Bloqueo automático activado' : 'Bloqueo automático desactivado'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.bloqueo_automatico_activo
+                      ? 'Los clientes se bloquearán automáticamente al superar el límite de facturas adeudadas.'
+                      : 'Los clientes no serán bloqueados automáticamente.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.bloqueo_automatico_activo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, bloqueo_automatico_activo: checked })}
+                  disabled={!isAdmin}
+                />
+              </div>
+
+              {formData.bloqueo_automatico_activo && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="facturas_adeudadas_bloqueo">Cantidad de facturas adeudadas para bloquear</Label>
+                    <Input
+                      id="facturas_adeudadas_bloqueo"
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={formData.facturas_adeudadas_bloqueo}
+                      onChange={(e) => setFormData({ ...formData, facturas_adeudadas_bloqueo: parseInt(e.target.value) || 3 })}
+                      disabled={!isAdmin}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Este es el valor global. Se puede configurar un valor diferente por cliente.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

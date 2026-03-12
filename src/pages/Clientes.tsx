@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
@@ -66,6 +66,8 @@ interface Cliente {
   zona_id: string | null;
   vendedor_id: string | null;
   activo: boolean;
+  bloqueado: boolean;
+  facturas_adeudadas_bloqueo_override: number | null;
   listas_precios?: { nombre: string } | null;
   zonas?: { codigo: string; nombre: string } | null;
   vendedores?: { codigo: string; nombre: string } | null;
@@ -102,6 +104,8 @@ export default function Clientes() {
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
   const [importHistorialOpen, setImportHistorialOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
+  const [clienteFacturasAdeudadas, setClienteFacturasAdeudadas] = useState<Record<string, number>>({});
+  const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true });
   const [formData, setFormData] = useState({
     codigo_cliente: '',
     nombre: '',
@@ -114,6 +118,7 @@ export default function Clientes() {
     vendedor_id: '',
     numero_terminal_clover: '',
     activo: true,
+    facturas_adeudadas_bloqueo_override: '',
   });
 
   // Filters
@@ -145,14 +150,19 @@ export default function Clientes() {
   }, [currentPage, pageSize, debouncedSearch, filterZona, filterVendedor]);
 
   const fetchCatalogs = async () => {
-    const [listasRes, zonasRes, vendedoresRes] = await Promise.all([
+    const [listasRes, zonasRes, vendedoresRes, configRes] = await Promise.all([
       supabase.from('listas_precios').select('id, nombre').eq('activo', true),
       supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
       supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
+      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo').limit(1).maybeSingle(),
     ]);
     if (listasRes.data) setListasPrecios(listasRes.data);
     if (zonasRes.data) setZonas(zonasRes.data);
     if (vendedoresRes.data) setVendedores(vendedoresRes.data);
+    if (configRes.data) setBloqueoConfig({
+      facturas_adeudadas_bloqueo: (configRes.data as any).facturas_adeudadas_bloqueo ?? 3,
+      bloqueo_automatico_activo: (configRes.data as any).bloqueo_automatico_activo ?? true,
+    });
   };
 
   const fetchClientes = useCallback(async () => {
@@ -191,20 +201,44 @@ export default function Clientes() {
       setClientes(data || []);
       setTotalCount(count || 0);
 
-      // Fetch saldos for all clients in this page
+      // Fetch saldos and unpaid invoice counts for all clients in this page
       if (data && data.length > 0) {
         const clienteIds = data.map(c => c.id);
-        const { data: saldosData } = await supabase
-          .from('cliente_saldos')
-          .select('cliente_id, saldo_actual')
-          .in('cliente_id', clienteIds);
+        const [saldosRes, facturasRes] = await Promise.all([
+          supabase.from('cliente_saldos').select('cliente_id, saldo_actual').in('cliente_id', clienteIds),
+          supabase.from('cliente_facturas_adeudadas').select('cliente_id, cantidad_facturas_adeudadas').in('cliente_id', clienteIds),
+        ]);
         
-        if (saldosData) {
+        if (saldosRes.data) {
           const saldosMap: Record<string, number> = {};
-          saldosData.forEach(s => {
+          saldosRes.data.forEach(s => {
             saldosMap[s.cliente_id] = Number(s.saldo_actual) || 0;
           });
           setClienteSaldos(saldosMap);
+        }
+
+        if (facturasRes.data) {
+          const facturasMap: Record<string, number> = {};
+          (facturasRes.data as any[]).forEach((f: any) => {
+            facturasMap[f.cliente_id] = Number(f.cantidad_facturas_adeudadas) || 0;
+          });
+          setClienteFacturasAdeudadas(facturasMap);
+
+          // Auto-block/unblock clients
+          if (bloqueoConfig.bloqueo_automatico_activo) {
+            for (const cliente of data) {
+              const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const adeudadas = facturasMap[cliente.id] || 0;
+              const shouldBlock = adeudadas >= limit;
+              if (shouldBlock !== cliente.bloqueado) {
+                await supabase.from('clientes').update({ 
+                  bloqueado: shouldBlock,
+                  motivo_bloqueo: shouldBlock ? `Tiene ${adeudadas} facturas adeudadas (límite: ${limit})` : null
+                }).eq('id', cliente.id);
+                cliente.bloqueado = shouldBlock;
+              }
+            }
+          }
         }
       }
     } catch (error) {
@@ -235,6 +269,7 @@ export default function Clientes() {
         zona_id: formData.zona_id || null,
         vendedor_id: formData.vendedor_id || null,
         numero_terminal_clover: formData.numero_terminal_clover || null,
+        facturas_adeudadas_bloqueo_override: formData.facturas_adeudadas_bloqueo_override ? parseInt(formData.facturas_adeudadas_bloqueo_override) : null,
       };
 
       if (selectedCliente) {
@@ -294,6 +329,7 @@ export default function Clientes() {
       vendedor_id: cliente.vendedor_id || '',
       numero_terminal_clover: (cliente as any).numero_terminal_clover || '',
       activo: cliente.activo,
+      facturas_adeudadas_bloqueo_override: cliente.facturas_adeudadas_bloqueo_override?.toString() || '',
     });
     setDialogOpen(true);
   };
@@ -312,6 +348,7 @@ export default function Clientes() {
       vendedor_id: '',
       numero_terminal_clover: '',
       activo: true,
+      facturas_adeudadas_bloqueo_override: '',
     });
   };
 
@@ -495,15 +532,33 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="activo"
-                  checked={formData.activo}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, activo: checked })
-                  }
-                />
-                <Label htmlFor="activo">Cliente activo</Label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="activo"
+                    checked={formData.activo}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, activo: checked })
+                    }
+                  />
+                  <Label htmlFor="activo">Cliente activo</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="facturas_bloqueo_override">Límite facturas adeudadas (particular)</Label>
+                  <Input
+                    id="facturas_bloqueo_override"
+                    type="number"
+                    min={1}
+                    value={formData.facturas_adeudadas_bloqueo_override}
+                    onChange={(e) =>
+                      setFormData({ ...formData, facturas_adeudadas_bloqueo_override: e.target.value })
+                    }
+                    placeholder={`Global: ${bloqueoConfig.facturas_adeudadas_bloqueo}`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dejar vacío para usar el valor global ({bloqueoConfig.facturas_adeudadas_bloqueo})
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3">
@@ -610,6 +665,7 @@ export default function Clientes() {
                 <TableHead className="font-semibold">Zona</TableHead>
                 <TableHead className="font-semibold">Vendedor</TableHead>
                 <TableHead className="font-semibold">Saldo CC</TableHead>
+                <TableHead className="font-semibold">Fact. Adeud.</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="font-semibold">Acciones</TableHead>
               </TableRow>
@@ -617,7 +673,7 @@ export default function Clientes() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center">
+                  <TableCell colSpan={10} className="h-32 text-center">
                     <div className="flex items-center justify-center">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     </div>
@@ -625,7 +681,7 @@ export default function Clientes() {
                 </TableRow>
               ) : clientes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                     No se encontraron clientes
                   </TableCell>
                 </TableRow>
@@ -679,7 +735,37 @@ export default function Clientes() {
                         {saldo !== 0 ? `$${saldo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
                       </span>
                     </TableCell>
-                    <TableCell><StatusBadge status={cliente.activo} /></TableCell>
+                    <TableCell>
+                      {(() => {
+                        const adeudadas = clienteFacturasAdeudadas[cliente.id] || 0;
+                        const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+                        return (
+                          <span className={`font-medium ${adeudadas >= limit ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {adeudadas}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <StatusBadge status={cliente.activo} />
+                        {cliente.bloqueado && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="destructive" className="text-xs gap-1">
+                                  <ShieldAlert className="h-3 w-3" />
+                                  Bloqueado
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {(cliente as any).motivo_bloqueo || 'Bloqueado por facturas adeudadas'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <TooltipProvider>

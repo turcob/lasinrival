@@ -576,6 +576,7 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean | null
+          bloqueado: boolean
           codigo_cliente: string | null
           codigo_postal: string | null
           condicion_iva: number | null
@@ -585,10 +586,12 @@ export type Database = {
           direccion: string | null
           dni_cuit: string | null
           email: string | null
+          facturas_adeudadas_bloqueo_override: number | null
           fecha_alta: string | null
           id: string
           limite_credito: number | null
           lista_precio_id: string | null
+          motivo_bloqueo: string | null
           nombre: string
           numero_terminal_clover: string | null
           provincia_id: string | null
@@ -600,6 +603,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean | null
+          bloqueado?: boolean
           codigo_cliente?: string | null
           codigo_postal?: string | null
           condicion_iva?: number | null
@@ -609,10 +613,12 @@ export type Database = {
           direccion?: string | null
           dni_cuit?: string | null
           email?: string | null
+          facturas_adeudadas_bloqueo_override?: number | null
           fecha_alta?: string | null
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          motivo_bloqueo?: string | null
           nombre: string
           numero_terminal_clover?: string | null
           provincia_id?: string | null
@@ -624,6 +630,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean | null
+          bloqueado?: boolean
           codigo_cliente?: string | null
           codigo_postal?: string | null
           condicion_iva?: number | null
@@ -633,10 +640,12 @@ export type Database = {
           direccion?: string | null
           dni_cuit?: string | null
           email?: string | null
+          facturas_adeudadas_bloqueo_override?: number | null
           fecha_alta?: string | null
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          motivo_bloqueo?: string | null
           nombre?: string
           numero_terminal_clover?: string | null
           provincia_id?: string | null
@@ -938,12 +947,14 @@ export type Database = {
       configuracion_comercio: {
         Row: {
           afip_modo: string
+          bloqueo_automatico_activo: boolean
           codigo_postal: string | null
           condicion_iva: string
           created_at: string
           cuit: string
           direccion: string
           email: string | null
+          facturas_adeudadas_bloqueo: number
           id: string
           inicio_actividades: string | null
           localidad: string | null
@@ -958,12 +969,14 @@ export type Database = {
         }
         Insert: {
           afip_modo?: string
+          bloqueo_automatico_activo?: boolean
           codigo_postal?: string | null
           condicion_iva?: string
           created_at?: string
           cuit: string
           direccion: string
           email?: string | null
+          facturas_adeudadas_bloqueo?: number
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
@@ -978,12 +991,14 @@ export type Database = {
         }
         Update: {
           afip_modo?: string
+          bloqueo_automatico_activo?: boolean
           codigo_postal?: string | null
           condicion_iva?: string
           created_at?: string
           cuit?: string
           direccion?: string
           email?: string | null
+          facturas_adeudadas_bloqueo?: number
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
@@ -3789,6 +3804,21 @@ export type Database = {
       }
     }
     Views: {
+      cliente_facturas_adeudadas: {
+        Row: {
+          cantidad_facturas_adeudadas: number | null
+          cliente_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_productos_frecuentes: {
         Row: {
           cantidad_total: number | null
