@@ -2097,6 +2097,137 @@ export type Database = {
           },
         ]
       }
+      orden_compra_detalles: {
+        Row: {
+          cantidad: number
+          cantidad_recibida: number | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          orden_compra_id: string
+          precio_unitario: number
+          producto_id: string | null
+          subtotal: number
+        }
+        Insert: {
+          cantidad?: number
+          cantidad_recibida?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          orden_compra_id: string
+          precio_unitario?: number
+          producto_id?: string | null
+          subtotal?: number
+        }
+        Update: {
+          cantidad?: number
+          cantidad_recibida?: number | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          orden_compra_id?: string
+          precio_unitario?: number
+          producto_id?: string | null
+          subtotal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orden_compra_detalles_orden_compra_id_fkey"
+            columns: ["orden_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordenes_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orden_compra_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orden_compra_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "orden_compra_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "orden_compra_detalles_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+        ]
+      }
+      ordenes_compra: {
+        Row: {
+          created_at: string | null
+          descuento: number | null
+          estado: Database["public"]["Enums"]["orden_compra_estado"]
+          fecha_entrega_estimada: string | null
+          fecha_orden: string
+          fecha_recepcion: string | null
+          id: string
+          numero_orden: number
+          observaciones: string | null
+          proveedor_id: string
+          subtotal: number
+          total: number
+          updated_at: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          descuento?: number | null
+          estado?: Database["public"]["Enums"]["orden_compra_estado"]
+          fecha_entrega_estimada?: string | null
+          fecha_orden?: string
+          fecha_recepcion?: string | null
+          id?: string
+          numero_orden?: never
+          observaciones?: string | null
+          proveedor_id: string
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string | null
+          descuento?: number | null
+          estado?: Database["public"]["Enums"]["orden_compra_estado"]
+          fecha_entrega_estimada?: string | null
+          fecha_orden?: string
+          fecha_recepcion?: string | null
+          id?: string
+          numero_orden?: never
+          observaciones?: string | null
+          proveedor_id?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordenes_compra_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_detalles: {
         Row: {
           cantidad_devuelta: number | null
@@ -2606,6 +2737,120 @@ export type Database = {
           id?: string
           nombre?: string
           sucursal?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      proveedor_movimientos: {
+        Row: {
+          concepto: string | null
+          created_at: string | null
+          fecha_emision: string | null
+          fecha_vencimiento: string | null
+          forma_pago_id: string | null
+          id: string
+          monto: number
+          numero_comprobante: string | null
+          observaciones: string | null
+          proveedor_id: string
+          saldo_pendiente: number
+          tipo: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
+          tipo_comprobante: string | null
+          usuario_registro_id: string
+        }
+        Insert: {
+          concepto?: string | null
+          created_at?: string | null
+          fecha_emision?: string | null
+          fecha_vencimiento?: string | null
+          forma_pago_id?: string | null
+          id?: string
+          monto?: number
+          numero_comprobante?: string | null
+          observaciones?: string | null
+          proveedor_id: string
+          saldo_pendiente?: number
+          tipo: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
+          tipo_comprobante?: string | null
+          usuario_registro_id: string
+        }
+        Update: {
+          concepto?: string | null
+          created_at?: string | null
+          fecha_emision?: string | null
+          fecha_vencimiento?: string | null
+          forma_pago_id?: string | null
+          id?: string
+          monto?: number
+          numero_comprobante?: string | null
+          observaciones?: string | null
+          proveedor_id?: string
+          saldo_pendiente?: number
+          tipo?: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
+          tipo_comprobante?: string | null
+          usuario_registro_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proveedor_movimientos_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proveedor_movimientos_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proveedores: {
+        Row: {
+          activo: boolean | null
+          codigo_proveedor: string
+          condicion_iva: string | null
+          contacto: string | null
+          created_at: string | null
+          cuit: string | null
+          direccion: string | null
+          email: string | null
+          id: string
+          observaciones: string | null
+          razon_social: string
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          codigo_proveedor: string
+          condicion_iva?: string | null
+          contacto?: string | null
+          created_at?: string | null
+          cuit?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          observaciones?: string | null
+          razon_social: string
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          codigo_proveedor?: string
+          condicion_iva?: string | null
+          contacto?: string | null
+          created_at?: string | null
+          cuit?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          observaciones?: string | null
+          razon_social?: string
+          telefono?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -3873,6 +4118,12 @@ export type Database = {
         | "vencido"
         | "anulado"
       cheque_tipo: "terceros" | "propio"
+      orden_compra_estado:
+        | "borrador"
+        | "confirmada"
+        | "parcial"
+        | "recibida"
+        | "anulada"
       pedido_estado:
         | "pendiente"
         | "confirmado"
@@ -3883,6 +4134,12 @@ export type Database = {
         | "devuelto"
         | "anulado"
         | "rechazado"
+      proveedor_movimiento_tipo:
+        | "factura"
+        | "pago"
+        | "nota_credito"
+        | "nota_debito"
+        | "ajuste"
       solicitud_descuento_estado:
         | "pendiente"
         | "aprobada"
@@ -4043,6 +4300,13 @@ export const Constants = {
         "anulado",
       ],
       cheque_tipo: ["terceros", "propio"],
+      orden_compra_estado: [
+        "borrador",
+        "confirmada",
+        "parcial",
+        "recibida",
+        "anulada",
+      ],
       pedido_estado: [
         "pendiente",
         "confirmado",
@@ -4053,6 +4317,13 @@ export const Constants = {
         "devuelto",
         "anulado",
         "rechazado",
+      ],
+      proveedor_movimiento_tipo: [
+        "factura",
+        "pago",
+        "nota_credito",
+        "nota_debito",
+        "ajuste",
       ],
       solicitud_descuento_estado: [
         "pendiente",
