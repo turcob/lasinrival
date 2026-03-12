@@ -532,15 +532,33 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="activo"
-                  checked={formData.activo}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, activo: checked })
-                  }
-                />
-                <Label htmlFor="activo">Cliente activo</Label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="activo"
+                    checked={formData.activo}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, activo: checked })
+                    }
+                  />
+                  <Label htmlFor="activo">Cliente activo</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="facturas_bloqueo_override">Límite facturas adeudadas (particular)</Label>
+                  <Input
+                    id="facturas_bloqueo_override"
+                    type="number"
+                    min={1}
+                    value={formData.facturas_adeudadas_bloqueo_override}
+                    onChange={(e) =>
+                      setFormData({ ...formData, facturas_adeudadas_bloqueo_override: e.target.value })
+                    }
+                    placeholder={`Global: ${bloqueoConfig.facturas_adeudadas_bloqueo}`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dejar vacío para usar el valor global ({bloqueoConfig.facturas_adeudadas_bloqueo})
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3">
