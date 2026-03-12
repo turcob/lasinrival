@@ -302,6 +302,146 @@ export type Database = {
           },
         ]
       }
+      cheque_historial: {
+        Row: {
+          cheque_id: string
+          created_at: string
+          estado_anterior: Database["public"]["Enums"]["cheque_estado"] | null
+          estado_nuevo: Database["public"]["Enums"]["cheque_estado"]
+          id: string
+          observaciones: string | null
+          usuario_id: string
+        }
+        Insert: {
+          cheque_id: string
+          created_at?: string
+          estado_anterior?: Database["public"]["Enums"]["cheque_estado"] | null
+          estado_nuevo: Database["public"]["Enums"]["cheque_estado"]
+          id?: string
+          observaciones?: string | null
+          usuario_id: string
+        }
+        Update: {
+          cheque_id?: string
+          created_at?: string
+          estado_anterior?: Database["public"]["Enums"]["cheque_estado"] | null
+          estado_nuevo?: Database["public"]["Enums"]["cheque_estado"]
+          id?: string
+          observaciones?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheque_historial_cheque_id_fkey"
+            columns: ["cheque_id"]
+            isOneToOne: false
+            referencedRelation: "cheques"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cheques: {
+        Row: {
+          banco: string
+          banco_deposito: string | null
+          beneficiario: string | null
+          cliente_id: string | null
+          cliente_movimiento_id: string | null
+          created_at: string
+          cuenta_deposito: string | null
+          cuit_emisor: string | null
+          emisor: string
+          endosado_a: string | null
+          estado: Database["public"]["Enums"]["cheque_estado"]
+          fecha_cobro: string | null
+          fecha_deposito: string | null
+          fecha_emision: string
+          fecha_endoso: string | null
+          fecha_rechazo: string | null
+          fecha_vencimiento: string
+          id: string
+          monto: number
+          motivo_rechazo: string | null
+          numero_cheque: string
+          observaciones: string | null
+          sucursal_banco: string | null
+          tipo: Database["public"]["Enums"]["cheque_tipo"]
+          updated_at: string
+          usuario_registro_id: string
+        }
+        Insert: {
+          banco: string
+          banco_deposito?: string | null
+          beneficiario?: string | null
+          cliente_id?: string | null
+          cliente_movimiento_id?: string | null
+          created_at?: string
+          cuenta_deposito?: string | null
+          cuit_emisor?: string | null
+          emisor: string
+          endosado_a?: string | null
+          estado?: Database["public"]["Enums"]["cheque_estado"]
+          fecha_cobro?: string | null
+          fecha_deposito?: string | null
+          fecha_emision: string
+          fecha_endoso?: string | null
+          fecha_rechazo?: string | null
+          fecha_vencimiento: string
+          id?: string
+          monto?: number
+          motivo_rechazo?: string | null
+          numero_cheque: string
+          observaciones?: string | null
+          sucursal_banco?: string | null
+          tipo?: Database["public"]["Enums"]["cheque_tipo"]
+          updated_at?: string
+          usuario_registro_id: string
+        }
+        Update: {
+          banco?: string
+          banco_deposito?: string | null
+          beneficiario?: string | null
+          cliente_id?: string | null
+          cliente_movimiento_id?: string | null
+          created_at?: string
+          cuenta_deposito?: string | null
+          cuit_emisor?: string | null
+          emisor?: string
+          endosado_a?: string | null
+          estado?: Database["public"]["Enums"]["cheque_estado"]
+          fecha_cobro?: string | null
+          fecha_deposito?: string | null
+          fecha_emision?: string
+          fecha_endoso?: string | null
+          fecha_rechazo?: string | null
+          fecha_vencimiento?: string
+          id?: string
+          monto?: number
+          motivo_rechazo?: string | null
+          numero_cheque?: string
+          observaciones?: string | null
+          sucursal_banco?: string | null
+          tipo?: Database["public"]["Enums"]["cheque_tipo"]
+          updated_at?: string
+          usuario_registro_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheques_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_cliente_movimiento_id_fkey"
+            columns: ["cliente_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_movimiento_imputaciones: {
         Row: {
           created_at: string | null
@@ -3724,6 +3864,15 @@ export type Database = {
         | "deposito"
         | "chofer"
       cash_register_status: "abierta" | "cerrada"
+      cheque_estado:
+        | "en_cartera"
+        | "depositado"
+        | "cobrado"
+        | "rechazado"
+        | "endosado"
+        | "vencido"
+        | "anulado"
+      cheque_tipo: "terceros" | "propio"
       pedido_estado:
         | "pendiente"
         | "confirmado"
@@ -3884,6 +4033,16 @@ export const Constants = {
         "chofer",
       ],
       cash_register_status: ["abierta", "cerrada"],
+      cheque_estado: [
+        "en_cartera",
+        "depositado",
+        "cobrado",
+        "rechazado",
+        "endosado",
+        "vencido",
+        "anulado",
+      ],
+      cheque_tipo: ["terceros", "propio"],
       pedido_estado: [
         "pendiente",
         "confirmado",
