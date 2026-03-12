@@ -280,6 +280,33 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {/* Alerta de pedido existente hoy */}
+          {pedidoExistenteHoy && (
+            <Alert className="border-yellow-300 bg-yellow-50">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800">
+                <span className="font-medium">
+                  Este cliente ya tiene un pedido pendiente hoy (#{pedidoExistenteHoy.numero_pedido.toString().padStart(6, '0')}).
+                </span>
+                <span className="block mt-1">Podés editarlo en lugar de crear uno nuevo para evitar duplicar facturas.</span>
+                {onEditarPedidoExistente && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 border-yellow-400 text-yellow-800 hover:bg-yellow-100"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onEditarPedidoExistente(pedidoExistenteHoy.id);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar pedido existente
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Alerta de saldo vencido */}
           {saldoVencido?.tieneVencido && (
             <Alert variant="destructive">
