@@ -305,6 +305,7 @@ export default function Clientes() {
       vendedor_id: cliente.vendedor_id || '',
       numero_terminal_clover: (cliente as any).numero_terminal_clover || '',
       activo: cliente.activo,
+      facturas_adeudadas_bloqueo_override: cliente.facturas_adeudadas_bloqueo_override?.toString() || '',
     });
     setDialogOpen(true);
   };
