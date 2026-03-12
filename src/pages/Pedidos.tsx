@@ -273,6 +273,10 @@ export default function Pedidos() {
           setPedidoSeleccionado(null);
           setPrepararPedidoId(pedidoId);
         }}
+        onEditarPedido={(pedidoId) => {
+          setPedidoSeleccionado(null);
+          setEditarPedidoId(pedidoId);
+        }}
       />
 
       <PrepararPedidoDialog
