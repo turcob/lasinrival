@@ -33,6 +33,7 @@ import Logistica from "./pages/Logistica";
 import AgendaVisitas from "./pages/AgendaVisitas";
 import Clover from "./pages/Clover";
 import Cheques from "./pages/Cheques";
+import Proveedores from "./pages/Proveedores";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
