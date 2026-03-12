@@ -23,7 +23,8 @@ import {
   ClipboardList,
   Truck,
   Calendar,
-  Smartphone
+  Smartphone,
+  FileCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
