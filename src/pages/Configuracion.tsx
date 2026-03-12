@@ -94,6 +94,8 @@ const initialFormData: ConfiguracionComercio = {
   afip_modo: 'homologacion',
   nombre_sistema: 'GestiónPro',
   texto_login_footer: 'Sistema de Gestión Comercial © 2024',
+  facturas_adeudadas_bloqueo: 3,
+  bloqueo_automatico_activo: true,
 };
 
 export default function Configuracion() {
