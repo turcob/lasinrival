@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette, ShieldAlert } from 'lucide-react';
 import {
   Card,
   CardContent,
