@@ -140,6 +140,8 @@ export default function Configuracion() {
           afip_modo: (data as any).afip_modo || 'homologacion',
           nombre_sistema: (data as any).nombre_sistema || 'GestiónPro',
           texto_login_footer: (data as any).texto_login_footer || 'Sistema de Gestión Comercial © 2024',
+          facturas_adeudadas_bloqueo: (data as any).facturas_adeudadas_bloqueo ?? 3,
+          bloqueo_automatico_activo: (data as any).bloqueo_automatico_activo ?? true,
         });
       }
     } catch (error) {
