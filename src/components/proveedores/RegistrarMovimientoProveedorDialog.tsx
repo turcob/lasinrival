@@ -115,7 +115,7 @@ export default function RegistrarMovimientoProveedorDialog({ open, onOpenChange,
         .from('cheques')
         .select('id, numero_cheque, banco, emisor, monto, fecha_vencimiento, estado')
         .eq('estado', 'en_cartera')
-        .eq('tipo', 'tercero')
+        .eq('tipo', 'terceros')
         .order('fecha_vencimiento');
       
       setChequesEnCartera((data as any[]) || []);
