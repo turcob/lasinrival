@@ -150,14 +150,19 @@ export default function Clientes() {
   }, [currentPage, pageSize, debouncedSearch, filterZona, filterVendedor]);
 
   const fetchCatalogs = async () => {
-    const [listasRes, zonasRes, vendedoresRes] = await Promise.all([
+    const [listasRes, zonasRes, vendedoresRes, configRes] = await Promise.all([
       supabase.from('listas_precios').select('id, nombre').eq('activo', true),
       supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
       supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
+      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo').limit(1).maybeSingle(),
     ]);
     if (listasRes.data) setListasPrecios(listasRes.data);
     if (zonasRes.data) setZonas(zonasRes.data);
     if (vendedoresRes.data) setVendedores(vendedoresRes.data);
+    if (configRes.data) setBloqueoConfig({
+      facturas_adeudadas_bloqueo: (configRes.data as any).facturas_adeudadas_bloqueo ?? 3,
+      bloqueo_automatico_activo: (configRes.data as any).bloqueo_automatico_activo ?? true,
+    });
   };
 
   const fetchClientes = useCallback(async () => {
