@@ -118,6 +118,7 @@ export default function Clientes() {
     vendedor_id: '',
     numero_terminal_clover: '',
     activo: true,
+    facturas_adeudadas_bloqueo_override: '',
   });
 
   // Filters
