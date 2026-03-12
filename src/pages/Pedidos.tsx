@@ -284,6 +284,14 @@ export default function Pedidos() {
         open={!!prepararPedidoId}
         onOpenChange={(open) => !open && setPrepararPedidoId(null)}
       />
+
+      <EditarPedidoDialog
+        pedidoId={editarPedidoId}
+        open={!!editarPedidoId}
+        onOpenChange={(open) => !open && setEditarPedidoId(null)}
+      />
     </MainLayout>
+  );
+}
   );
 }

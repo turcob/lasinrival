@@ -16,21 +16,6 @@ import {
   RotateCcw,
   Edit
 } from 'lucide-react';
-import { es } from 'date-fns/locale';
-import { 
-  Package, 
-  User, 
-  Calendar, 
-  Clock, 
-  MapPin,
-  Phone,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-  Truck,
-  XCircle,
-  RotateCcw
-} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
