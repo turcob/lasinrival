@@ -129,6 +129,15 @@ export default function Proveedores() {
                       <TableCell>{p.contacto || '-'}</TableCell>
                       <TableCell>{p.telefono || '-'}</TableCell>
                       <TableCell>{p.cuit || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        {p.saldo !== undefined && p.saldo !== 0 ? (
+                          <span className={p.saldo > 0 ? 'text-destructive font-medium' : 'text-green-600 font-medium'}>
+                            {formatMoney(p.saldo)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={p.activo ? 'default' : 'secondary'}>
                           {p.activo ? 'Activo' : 'Inactivo'}

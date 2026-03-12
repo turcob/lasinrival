@@ -17,6 +17,7 @@ export interface Proveedor {
   observaciones: string | null;
   created_at: string;
   updated_at: string;
+  saldo?: number;
 }
 
 export interface ProveedorMovimiento {
