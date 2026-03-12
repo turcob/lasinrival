@@ -66,6 +66,8 @@ interface Cliente {
   zona_id: string | null;
   vendedor_id: string | null;
   activo: boolean;
+  bloqueado: boolean;
+  facturas_adeudadas_bloqueo_override: number | null;
   listas_precios?: { nombre: string } | null;
   zonas?: { codigo: string; nombre: string } | null;
   vendedores?: { codigo: string; nombre: string } | null;
