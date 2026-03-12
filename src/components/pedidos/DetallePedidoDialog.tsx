@@ -328,9 +328,23 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
               </ScrollArea>
 
               {/* Acciones */}
-              {siguientesEstados.length > 0 && (
+              {(siguientesEstados.length > 0 || estadoActual === 'pendiente') && (
                 <div className="border-t p-4">
                   <div className="flex flex-wrap gap-2">
+                    {/* Botón editar pedido pendiente */}
+                    {estadoActual === 'pendiente' && onEditarPedido && pedido && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          onOpenChange(false);
+                          onEditarPedido(pedido.id);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Editar Pedido
+                      </Button>
+                    )}
                     {/* Botón editar preparación para pedidos ya preparados */}
                     {estadoActual === 'preparado' && onPrepararPedido && pedido && (
                       <Button
