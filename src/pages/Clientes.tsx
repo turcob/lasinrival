@@ -201,20 +201,44 @@ export default function Clientes() {
       setClientes(data || []);
       setTotalCount(count || 0);
 
-      // Fetch saldos for all clients in this page
+      // Fetch saldos and unpaid invoice counts for all clients in this page
       if (data && data.length > 0) {
         const clienteIds = data.map(c => c.id);
-        const { data: saldosData } = await supabase
-          .from('cliente_saldos')
-          .select('cliente_id, saldo_actual')
-          .in('cliente_id', clienteIds);
+        const [saldosRes, facturasRes] = await Promise.all([
+          supabase.from('cliente_saldos').select('cliente_id, saldo_actual').in('cliente_id', clienteIds),
+          supabase.from('cliente_facturas_adeudadas').select('cliente_id, cantidad_facturas_adeudadas').in('cliente_id', clienteIds),
+        ]);
         
-        if (saldosData) {
+        if (saldosRes.data) {
           const saldosMap: Record<string, number> = {};
-          saldosData.forEach(s => {
+          saldosRes.data.forEach(s => {
             saldosMap[s.cliente_id] = Number(s.saldo_actual) || 0;
           });
           setClienteSaldos(saldosMap);
+        }
+
+        if (facturasRes.data) {
+          const facturasMap: Record<string, number> = {};
+          (facturasRes.data as any[]).forEach((f: any) => {
+            facturasMap[f.cliente_id] = Number(f.cantidad_facturas_adeudadas) || 0;
+          });
+          setClienteFacturasAdeudadas(facturasMap);
+
+          // Auto-block/unblock clients
+          if (bloqueoConfig.bloqueo_automatico_activo) {
+            for (const cliente of data) {
+              const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const adeudadas = facturasMap[cliente.id] || 0;
+              const shouldBlock = adeudadas >= limit;
+              if (shouldBlock !== cliente.bloqueado) {
+                await supabase.from('clientes').update({ 
+                  bloqueado: shouldBlock,
+                  motivo_bloqueo: shouldBlock ? `Tiene ${adeudadas} facturas adeudadas (límite: ${limit})` : null
+                }).eq('id', cliente.id);
+                cliente.bloqueado = shouldBlock;
+              }
+            }
+          }
         }
       }
     } catch (error) {
