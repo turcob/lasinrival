@@ -104,6 +104,8 @@ export default function Clientes() {
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
   const [importHistorialOpen, setImportHistorialOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
+  const [clienteFacturasAdeudadas, setClienteFacturasAdeudadas] = useState<Record<string, number>>({});
+  const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true });
   const [formData, setFormData] = useState({
     codigo_cliente: '',
     nombre: '',
