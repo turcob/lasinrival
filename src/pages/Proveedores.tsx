@@ -64,10 +64,10 @@ export default function Proveedores() {
       <PageHeader title="Proveedores" description="Gestión integral de proveedores, compras y pagos" />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <KPICard title="Total Proveedores" value={proveedores.length} icon={Users} />
-        <KPICard title="Activos" value={proveedores.filter(p => p.activo).length} icon={Users} />
-        <KPICard title="Órdenes Abiertas" value={ordenes.filter(o => o.estado !== 'recibida' && o.estado !== 'anulada').length} icon={ClipboardList} />
-        <KPICard title="Total Órdenes" value={ordenes.length} icon={Package} />
+        <KPICard title="Total Proveedores" value={proveedores.length} icon={<Users className="h-5 w-5" />} />
+        <KPICard title="Activos" value={proveedores.filter(p => p.activo).length} icon={<Users className="h-5 w-5" />} />
+        <KPICard title="Órdenes Abiertas" value={ordenes.filter(o => o.estado !== 'recibida' && o.estado !== 'anulada').length} icon={<ClipboardList className="h-5 w-5" />} />
+        <KPICard title="Total Órdenes" value={ordenes.length} icon={<Package className="h-5 w-5" />} />
       </div>
 
       <Tabs defaultValue="proveedores">
