@@ -67,6 +67,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Asociar Pagos', href: '/asociacion-pagos', icon: CreditCard, module: 'clientes' },
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
   { title: 'Clover', href: '/clover', icon: Smartphone, module: 'clientes' },
+  { title: 'Cheques', href: '/cheques', icon: FileCheck, module: 'cheques' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
   { title: 'Inventario', href: '/inventario', icon: Archive, module: 'inventario' },
   { title: 'Reportes', href: '/reportes', icon: BarChart3, module: 'reportes' },
