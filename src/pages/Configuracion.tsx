@@ -41,6 +41,8 @@ interface ConfiguracionComercio {
   afip_modo: 'homologacion' | 'produccion';
   nombre_sistema: string;
   texto_login_footer: string;
+  facturas_adeudadas_bloqueo: number;
+  bloqueo_automatico_activo: boolean;
 }
 
 const CONDICIONES_IVA = [
