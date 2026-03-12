@@ -41,6 +41,7 @@ import {
   type PedidoConsolidado,
   type DetalleConsolidado,
 } from '@/hooks/useConsolidadoPedidos';
+import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
