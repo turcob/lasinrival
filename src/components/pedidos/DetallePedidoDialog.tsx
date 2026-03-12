@@ -81,7 +81,7 @@ const flujoEstados: Record<string, PedidoEstado[]> = {
   anulado: [],
 };
 
-export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPedido }: DetallePedidoDialogProps) {
+export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPedido, onEditarPedido }: DetallePedidoDialogProps) {
   const [cambiarEstadoDialog, setCambiarEstadoDialog] = useState<PedidoEstado | null>(null);
 
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
