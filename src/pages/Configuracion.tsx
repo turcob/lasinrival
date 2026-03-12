@@ -202,6 +202,8 @@ export default function Configuracion() {
         afip_modo: formData.afip_modo,
         nombre_sistema: formData.nombre_sistema.trim() || 'GestiónPro',
         texto_login_footer: formData.texto_login_footer.trim() || 'Sistema de Gestión Comercial © 2024',
+        facturas_adeudadas_bloqueo: formData.facturas_adeudadas_bloqueo,
+        bloqueo_automatico_activo: formData.bloqueo_automatico_activo,
       };
 
       if (configId) {
