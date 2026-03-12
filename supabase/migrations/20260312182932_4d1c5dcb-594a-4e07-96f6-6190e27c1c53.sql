@@ -1,0 +1,1 @@
+ALTER TABLE public.proveedores ADD CONSTRAINT proveedores_codigo_proveedor_key UNIQUE (codigo_proveedor);
