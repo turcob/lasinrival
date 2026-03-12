@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
