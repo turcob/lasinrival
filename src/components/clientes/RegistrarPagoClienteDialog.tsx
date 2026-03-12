@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -83,6 +84,13 @@ interface ChequeData {
   observaciones: string;
 }
 
+interface MedioPagoLinea {
+  id: string; // internal key
+  forma_pago_id: string;
+  monto: string;
+  chequeData?: ChequeData;
+}
+
 const TIPOS_MOVIMIENTO = [
   { value: 'pago', label: 'Pago' },
   { value: 'devolucion', label: 'Devolución' },
@@ -91,31 +99,26 @@ const TIPOS_MOVIMIENTO = [
   { value: 'anulacion', label: 'Anulación de Compra' },
 ];
 
-// Tipos que requieren forma de pago
 const TIPOS_CON_FORMA_PAGO = ['pago'];
-
-// Formas de pago que requieren imputación
 const FORMAS_PAGO_PENDIENTES_IMPUTACION = ['cheque', 'transferencia'];
+
+let lineaIdCounter = 0;
+const nuevaLinea = (): MedioPagoLinea => ({
+  id: `linea-${++lineaIdCounter}`,
+  forma_pago_id: '',
+  monto: '',
+});
 
 export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSuccess }: RegistrarPagoClienteDialogProps) {
   const { user } = useAuth();
   const [tipo, setTipo] = useState('pago');
   const [monto, setMonto] = useState('');
   const [concepto, setConcepto] = useState('');
-  const [formaPagoId, setFormaPagoId] = useState('');
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Estados para datos de cheque
-  const [chequeData, setChequeData] = useState<ChequeData>({
-    numero_cheque: '',
-    banco: '',
-    emisor: '',
-    fecha_emision: undefined,
-    fecha_vencimiento: undefined,
-    cuit_emisor: '',
-    observaciones: '',
-  });
+  // Multi-payment lines
+  const [lineasPago, setLineasPago] = useState<MedioPagoLinea[]>([nuevaLinea()]);
 
   // Estados para Nota de Crédito
   const [comprasCliente, setComprasCliente] = useState<CompraCliente[]>([]);
@@ -131,7 +134,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   }, [open]);
 
-  // Cargar compras cuando se selecciona nota_credito
   useEffect(() => {
     if (tipo === 'nota_credito' && open) {
       fetchComprasCliente();
@@ -143,7 +145,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   }, [tipo, open, clienteId]);
 
-  // Cargar productos cuando se selecciona una compra
   useEffect(() => {
     if (compraSeleccionada) {
       const compra = comprasCliente.find(c => c.id === compraSeleccionada);
@@ -170,20 +171,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     try {
       const { data, error } = await supabase
         .from('cliente_movimientos')
-        .select(`
-          id,
-          venta_id,
-          monto,
-          fecha,
-          ventas!inner(numero_comprobante)
-        `)
+        .select(`id, venta_id, monto, fecha, ventas!inner(numero_comprobante)`)
         .eq('cliente_id', clienteId)
         .eq('tipo', 'compra')
         .not('venta_id', 'is', null)
         .order('fecha', { ascending: false });
-
       if (error) throw error;
-
       const compras: CompraCliente[] = (data || []).map((item: any) => ({
         id: item.id,
         venta_id: item.venta_id,
@@ -191,7 +184,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         fecha: item.fecha,
         numero_comprobante: item.ventas?.numero_comprobante || 0,
       }));
-
       setComprasCliente(compras);
     } catch (error) {
       console.error('Error fetching purchases:', error);
@@ -206,19 +198,9 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     try {
       const { data, error } = await supabase
         .from('venta_detalles')
-        .select(`
-          id,
-          producto_id,
-          cantidad,
-          precio_unitario,
-          subtotal,
-          producto_temporal_nombre,
-          productos(descripcion, codigo_articulo)
-        `)
+        .select(`id, producto_id, cantidad, precio_unitario, subtotal, producto_temporal_nombre, productos(descripcion, codigo_articulo)`)
         .eq('venta_id', ventaId);
-
       if (error) throw error;
-
       const productos: ProductoVenta[] = (data || []).map((d: any) => ({
         id: d.id,
         producto_id: d.producto_id,
@@ -228,10 +210,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         precio_unitario: d.precio_unitario,
         subtotal: d.subtotal,
       }));
-
       setProductosVenta(productos);
-
-      // Inicializar nota de credito con cantidad 0
       setProductosNotaCredito(productos.map(p => ({
         detalle_id: p.id,
         cantidad_seleccionada: 0,
@@ -249,24 +228,70 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
 
   const requiereFormaPago = TIPOS_CON_FORMA_PAGO.includes(tipo);
   const esNotaCredito = tipo === 'nota_credito';
-  
-  // Determinar si la forma de pago seleccionada es cheque
-  const formaPagoSeleccionada = formasPago.find(fp => fp.id === formaPagoId);
-  const esCheque = formaPagoSeleccionada?.nombre.toLowerCase().includes('cheque');
-  const esTransferencia = formaPagoSeleccionada?.nombre.toLowerCase().includes('transferencia');
-  const requiereImputacion = esCheque || esTransferencia;
 
-  // Calcular total de nota de crédito
   const totalNotaCredito = useMemo(() => {
-    return productosNotaCredito.reduce((sum, p) => 
+    return productosNotaCredito.reduce((sum, p) =>
       sum + (p.cantidad_seleccionada * p.precio_unitario), 0);
   }, [productosNotaCredito]);
+
+  // Helpers for multi-payment
+  const getFormaPagoNombre = (formaPagoId: string) => {
+    return formasPago.find(fp => fp.id === formaPagoId)?.nombre?.toLowerCase() || '';
+  };
+
+  const esChequeFP = (formaPagoId: string) => getFormaPagoNombre(formaPagoId).includes('cheque');
+  const esTransferenciaFP = (formaPagoId: string) => getFormaPagoNombre(formaPagoId).includes('transferencia');
+
+  const totalLineas = useMemo(() => {
+    return lineasPago.reduce((sum, l) => {
+      const val = parseFloat(l.monto.replace(',', '.'));
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+  }, [lineasPago]);
+
+  const montoTotal = parseFloat(monto.replace(',', '.')) || 0;
+  const restanteEnCuenta = requiereFormaPago ? Math.max(0, montoTotal - totalLineas) : 0;
+
+  const agregarLinea = () => {
+    setLineasPago([...lineasPago, nuevaLinea()]);
+  };
+
+  const eliminarLinea = (id: string) => {
+    if (lineasPago.length <= 1) return;
+    setLineasPago(lineasPago.filter(l => l.id !== id));
+  };
+
+  const actualizarLinea = (id: string, campo: keyof MedioPagoLinea, valor: any) => {
+    setLineasPago(lineasPago.map(l => {
+      if (l.id !== id) return l;
+      const updated = { ...l, [campo]: valor };
+      // Reset cheque data if forma_pago changed
+      if (campo === 'forma_pago_id') {
+        if (!esChequeFP(valor)) {
+          updated.chequeData = undefined;
+        } else if (!updated.chequeData) {
+          updated.chequeData = {
+            numero_cheque: '', banco: '', emisor: '',
+            fecha_emision: undefined, fecha_vencimiento: undefined,
+            cuit_emisor: '', observaciones: '',
+          };
+        }
+      }
+      return updated;
+    }));
+  };
+
+  const actualizarChequeLinea = (lineaId: string, chequeUpdate: Partial<ChequeData>) => {
+    setLineasPago(lineasPago.map(l => {
+      if (l.id !== lineaId || !l.chequeData) return l;
+      return { ...l, chequeData: { ...l.chequeData, ...chequeUpdate } };
+    }));
+  };
 
   const handleCantidadChange = (detalleId: string, cantidad: number) => {
     setProductosNotaCredito(prev => prev.map(p => {
       if (p.detalle_id === detalleId) {
-        const cantidadValida = Math.max(0, Math.min(cantidad, p.cantidad_max));
-        return { ...p, cantidad_seleccionada: cantidadValida };
+        return { ...p, cantidad_seleccionada: Math.max(0, Math.min(cantidad, p.cantidad_max)) };
       }
       return p;
     }));
@@ -275,20 +300,14 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const handleCheckboxChange = (detalleId: string, checked: boolean) => {
     setProductosNotaCredito(prev => prev.map(p => {
       if (p.detalle_id === detalleId) {
-        return { 
-          ...p, 
-          cantidad_seleccionada: checked ? p.cantidad_max : 0 
-        };
+        return { ...p, cantidad_seleccionada: checked ? p.cantidad_max : 0 };
       }
       return p;
     }));
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-    }).format(value);
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -300,112 +319,145 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     let ventaIdRef: string | null = null;
 
     if (esNotaCredito) {
-      // Validaciones para nota de crédito
       if (!compraSeleccionada) {
         toast.error('Seleccione una compra para la nota de crédito');
         return;
       }
-
       if (totalNotaCredito <= 0) {
         toast.error('Seleccione al menos un producto con cantidad mayor a 0');
         return;
       }
-
       montoFinal = totalNotaCredito;
-      
       const compra = comprasCliente.find(c => c.id === compraSeleccionada);
       ventaIdRef = compra?.venta_id || null;
-      
-      // Generar concepto automático
       const productosSeleccionados = productosNotaCredito
         .filter(p => p.cantidad_seleccionada > 0)
         .map(p => `${p.descripcion} (${p.cantidad_seleccionada})`)
         .join(', ');
-      
       conceptoFinal = `NC - Venta #${compra?.numero_comprobante || ''} - ${productosSeleccionados}`;
+    } else if (requiereFormaPago) {
+      // Pago con múltiples medios
+      montoFinal = montoTotal;
+      if (isNaN(montoFinal) || montoFinal <= 0) {
+        toast.error('Ingrese un monto total válido');
+        return;
+      }
+
+      // Validate each line
+      for (const linea of lineasPago) {
+        if (!linea.forma_pago_id) {
+          toast.error('Seleccione la forma de pago en todas las líneas');
+          return;
+        }
+        const lineaMonto = parseFloat(linea.monto.replace(',', '.'));
+        if (isNaN(lineaMonto) || lineaMonto <= 0) {
+          toast.error('Ingrese un monto válido en todas las líneas de pago');
+          return;
+        }
+        if (esChequeFP(linea.forma_pago_id) && linea.chequeData) {
+          const cd = linea.chequeData;
+          if (!cd.numero_cheque.trim() || !cd.banco.trim() || !cd.emisor.trim() || !cd.fecha_emision || !cd.fecha_vencimiento) {
+            toast.error('Complete todos los datos obligatorios del cheque');
+            return;
+          }
+        }
+      }
+
+      if (totalLineas > montoFinal) {
+        toast.error('La suma de los pagos no puede superar el monto total');
+        return;
+      }
     } else {
-      // Validación para otros tipos
       montoFinal = parseFloat(monto.replace(',', '.'));
       if (isNaN(montoFinal) || montoFinal <= 0) {
         toast.error('Ingrese un monto válido');
         return;
       }
-
-      if (requiereFormaPago && !formaPagoId) {
-        toast.error('Seleccione una forma de pago');
-        return;
-      }
-
-      // Validaciones para cheque
-      if (esCheque) {
-        if (!chequeData.numero_cheque.trim()) {
-          toast.error('Ingrese el número de cheque');
-          return;
-        }
-        if (!chequeData.banco.trim()) {
-          toast.error('Ingrese el banco del cheque');
-          return;
-        }
-        if (!chequeData.emisor.trim()) {
-          toast.error('Ingrese el emisor del cheque');
-          return;
-        }
-        if (!chequeData.fecha_emision) {
-          toast.error('Seleccione la fecha de emisión del cheque');
-          return;
-        }
-        if (!chequeData.fecha_vencimiento) {
-          toast.error('Seleccione la fecha de vencimiento del cheque');
-          return;
-        }
-      }
     }
 
     setLoading(true);
     try {
-      // Determinar estado de imputación
-      const estadoImputacion = requiereImputacion ? 'pendiente' : 'confirmado';
+      if (requiereFormaPago && !esNotaCredito) {
+        // Insert one movement per payment line
+        for (const linea of lineasPago) {
+          const lineaMonto = parseFloat(linea.monto.replace(',', '.'));
+          const esChequeLinea = esChequeFP(linea.forma_pago_id);
+          const esTransferenciaLinea = esTransferenciaFP(linea.forma_pago_id);
+          const requiereImputacionLinea = esChequeLinea || esTransferenciaLinea;
+          const estadoImputacion = requiereImputacionLinea ? 'pendiente' : 'confirmado';
 
-      // Insertar movimiento
-      const { data: movimientoData, error: movError } = await supabase
-        .from('cliente_movimientos')
-        .insert([{
-          cliente_id: clienteId,
-          tipo,
-          monto: montoFinal,
-          concepto: conceptoFinal,
-          usuario_registro_id: user.id,
-          forma_pago_id: requiereFormaPago ? formaPagoId : null,
-          venta_id: ventaIdRef,
-          estado_imputacion: estadoImputacion,
-        }])
-        .select('id')
-        .single();
+          const fpNombre = getFormaPagoNombre(linea.forma_pago_id);
+          const conceptoLinea = lineasPago.length > 1
+            ? `${concepto ? concepto + ' - ' : ''}Pago parcial (${fpNombre})`
+            : conceptoFinal;
 
-      if (movError) throw movError;
+          const { data: movimientoData, error: movError } = await supabase
+            .from('cliente_movimientos')
+            .insert([{
+              cliente_id: clienteId,
+              tipo: 'pago',
+              monto: lineaMonto,
+              concepto: conceptoLinea,
+              usuario_registro_id: user.id,
+              forma_pago_id: linea.forma_pago_id,
+              venta_id: null,
+              estado_imputacion: estadoImputacion,
+            }])
+            .select('id')
+            .single();
 
-      // Si es cheque, guardar los detalles del cheque
-      if (esCheque && movimientoData) {
-        const { error: chequeError } = await supabase
-          .from('cheque_detalles')
+          if (movError) throw movError;
+
+          // Save cheque details if applicable
+          if (esChequeLinea && linea.chequeData && movimientoData) {
+            const cd = linea.chequeData;
+            const { error: chequeError } = await supabase
+              .from('cheque_detalles')
+              .insert([{
+                cliente_movimiento_id: movimientoData.id,
+                numero_cheque: cd.numero_cheque.trim(),
+                banco: cd.banco.trim(),
+                emisor: cd.emisor.trim(),
+                fecha_emision: cd.fecha_emision!.toISOString().split('T')[0],
+                fecha_vencimiento: cd.fecha_vencimiento!.toISOString().split('T')[0],
+                cuit_emisor: cd.cuit_emisor.trim() || null,
+                observaciones: cd.observaciones.trim() || null,
+              }]);
+            if (chequeError) throw chequeError;
+          }
+        }
+
+        const hasPendientes = lineasPago.some(l => esChequeFP(l.forma_pago_id) || esTransferenciaFP(l.forma_pago_id));
+        const mensaje = hasPendientes
+          ? 'Pago registrado (algunos medios pendientes de imputación)'
+          : 'Pago registrado correctamente';
+
+        if (restanteEnCuenta > 0) {
+          toast.success(`${mensaje}. Queda ${formatCurrency(restanteEnCuenta)} pendiente en cuenta corriente.`);
+        } else {
+          toast.success(mensaje);
+        }
+      } else {
+        // Non-payment or nota de crédito: single movement
+        const { data: movimientoData, error: movError } = await supabase
+          .from('cliente_movimientos')
           .insert([{
-            cliente_movimiento_id: movimientoData.id,
-            numero_cheque: chequeData.numero_cheque.trim(),
-            banco: chequeData.banco.trim(),
-            emisor: chequeData.emisor.trim(),
-            fecha_emision: chequeData.fecha_emision!.toISOString().split('T')[0],
-            fecha_vencimiento: chequeData.fecha_vencimiento!.toISOString().split('T')[0],
-            cuit_emisor: chequeData.cuit_emisor.trim() || null,
-            observaciones: chequeData.observaciones.trim() || null,
-          }]);
+            cliente_id: clienteId,
+            tipo,
+            monto: montoFinal,
+            concepto: conceptoFinal,
+            usuario_registro_id: user.id,
+            forma_pago_id: null,
+            venta_id: ventaIdRef,
+            estado_imputacion: 'confirmado',
+          }])
+          .select('id')
+          .single();
 
-        if (chequeError) throw chequeError;
+        if (movError) throw movError;
+        toast.success('Movimiento registrado correctamente');
       }
 
-      const mensaje = requiereImputacion 
-        ? 'Movimiento registrado (pendiente de imputación)'
-        : 'Movimiento registrado correctamente';
-      toast.success(mensaje);
       resetForm();
       onSuccess();
     } catch (error) {
@@ -420,41 +472,18 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setTipo('pago');
     setMonto('');
     setConcepto('');
-    setFormaPagoId('');
+    setLineasPago([nuevaLinea()]);
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
-    setChequeData({
-      numero_cheque: '',
-      banco: '',
-      emisor: '',
-      fecha_emision: undefined,
-      fecha_vencimiento: undefined,
-      cuit_emisor: '',
-      observaciones: '',
-    });
   };
 
   const handleTipoChange = (value: string) => {
     setTipo(value);
-    setFormaPagoId('');
+    setLineasPago([nuevaLinea()]);
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
-  };
-
-  const handleFormaPagoChange = (value: string) => {
-    setFormaPagoId(value);
-    // Reset cheque data when changing payment method
-    setChequeData({
-      numero_cheque: '',
-      banco: '',
-      emisor: '',
-      fecha_emision: undefined,
-      fecha_vencimiento: undefined,
-      cuit_emisor: '',
-      observaciones: '',
-    });
   };
 
   return (
@@ -480,13 +509,13 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </Select>
           </div>
 
-          {/* UI específica para Nota de Crédito */}
+          {/* Nota de Crédito UI */}
           {esNotaCredito && (
             <>
               <div className="space-y-2">
                 <Label>Seleccionar compra a acreditar</Label>
-                <Select 
-                  value={compraSeleccionada || ''} 
+                <Select
+                  value={compraSeleccionada || ''}
                   onValueChange={setCompraSeleccionada}
                   disabled={loadingCompras}
                 >
@@ -533,13 +562,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                             const productoNC = productosNotaCredito.find(p => p.detalle_id === producto.id);
                             const subtotal = (productoNC?.cantidad_seleccionada || 0) * producto.precio_unitario;
                             const isSelected = (productoNC?.cantidad_seleccionada || 0) > 0;
-                            
                             return (
                               <TableRow key={producto.id}>
                                 <TableCell>
                                   <Checkbox
                                     checked={isSelected}
-                                    onCheckedChange={(checked) => 
+                                    onCheckedChange={(checked) =>
                                       handleCheckboxChange(producto.id, checked as boolean)
                                     }
                                   />
@@ -548,18 +576,14 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                                   <div>
                                     <span className="font-medium">{producto.descripcion}</span>
                                     {producto.codigo && (
-                                      <span className="text-xs text-muted-foreground ml-2">
-                                        ({producto.codigo})
-                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-2">({producto.codigo})</span>
                                     )}
                                   </div>
                                   <span className="text-xs text-muted-foreground">
                                     {formatCurrency(producto.precio_unitario)} c/u
                                   </span>
                                 </TableCell>
-                                <TableCell className="text-center">
-                                  {producto.cantidad_original}
-                                </TableCell>
+                                <TableCell className="text-center">{producto.cantidad_original}</TableCell>
                                 <TableCell>
                                   <Input
                                     type="number"
@@ -568,7 +592,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                                     min="0"
                                     max={producto.cantidad_original}
                                     value={productoNC?.cantidad_seleccionada || 0}
-                                    onChange={(e) => 
+                                    onChange={(e) =>
                                       handleCantidadChange(producto.id, parseFloat(e.target.value) || 0)
                                     }
                                     className="w-20 text-center"
@@ -598,10 +622,10 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </>
           )}
 
-          {/* UI para otros tipos de movimiento */}
+          {/* Monto total */}
           {!esNotaCredito && (
             <div className="space-y-2">
-              <Label>Monto</Label>
+              <Label>{requiereFormaPago ? 'Monto total a pagar' : 'Monto'}</Label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -610,143 +634,214 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                 placeholder="0.00"
                 required
               />
-            </div>
-          )}
-
-          {requiereFormaPago && (
-            <div className="space-y-2">
-              <Label>Forma de Pago</Label>
-              <Select value={formaPagoId} onValueChange={handleFormaPagoChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar forma de pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  {formasPago.map((fp) => (
-                    <SelectItem key={fp.id} value={fp.id}>
-                      {fp.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {requiereImputacion && (
-                <p className="text-xs text-warning">
-                  ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
+              {requiereFormaPago && (
+                <p className="text-xs text-muted-foreground">
+                  Ingresá el monto total. Podés dividirlo en varios medios de pago abajo. Si la suma es menor, el resto queda en cuenta corriente.
                 </p>
               )}
             </div>
           )}
 
-          {/* Campos adicionales para Cheque */}
-          {esCheque && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <h4 className="font-medium text-sm">Datos del Cheque</h4>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Número de Cheque *</Label>
-                  <Input
-                    value={chequeData.numero_cheque}
-                    onChange={(e) => setChequeData({ ...chequeData, numero_cheque: e.target.value })}
-                    placeholder="Ej: 12345678"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Banco *</Label>
-                  <Input
-                    value={chequeData.banco}
-                    onChange={(e) => setChequeData({ ...chequeData, banco: e.target.value })}
-                    placeholder="Ej: Banco Nación"
-                  />
-                </div>
+          {/* Multi-payment lines */}
+          {requiereFormaPago && !esNotaCredito && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Medios de pago</Label>
+                <Button type="button" variant="outline" size="sm" onClick={agregarLinea}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Agregar medio
+                </Button>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Emisor / Librador *</Label>
-                  <Input
-                    value={chequeData.emisor}
-                    onChange={(e) => setChequeData({ ...chequeData, emisor: e.target.value })}
-                    placeholder="Nombre del emisor"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>CUIT del Emisor</Label>
-                  <Input
-                    value={chequeData.cuit_emisor}
-                    onChange={(e) => setChequeData({ ...chequeData, cuit_emisor: e.target.value })}
-                    placeholder="XX-XXXXXXXX-X"
-                  />
-                </div>
-              </div>
+              {lineasPago.map((linea, idx) => {
+                const esChequeL = esChequeFP(linea.forma_pago_id);
+                return (
+                  <div key={linea.id} className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Forma de pago {lineasPago.length > 1 ? `#${idx + 1}` : ''}</Label>
+                        <Select
+                          value={linea.forma_pago_id}
+                          onValueChange={(v) => actualizarLinea(linea.id, 'forma_pago_id', v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {formasPago.map((fp) => (
+                              <SelectItem key={fp.id} value={fp.id}>{fp.nombre}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-36 space-y-1">
+                        <Label className="text-xs">Monto</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={linea.monto}
+                          onChange={(e) => actualizarLinea(linea.id, 'monto', e.target.value)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {lineasPago.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-destructive"
+                          onClick={() => eliminarLinea(linea.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Fecha de Emisión *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !chequeData.fecha_emision && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {chequeData.fecha_emision 
-                          ? format(chequeData.fecha_emision, "dd/MM/yyyy", { locale: es })
-                          : "Seleccionar fecha"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={chequeData.fecha_emision}
-                        onSelect={(date) => setChequeData({ ...chequeData, fecha_emision: date })}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label>Fecha de Vencimiento *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !chequeData.fecha_vencimiento && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {chequeData.fecha_vencimiento 
-                          ? format(chequeData.fecha_vencimiento, "dd/MM/yyyy", { locale: es })
-                          : "Seleccionar fecha"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={chequeData.fecha_vencimiento}
-                        onSelect={(date) => setChequeData({ ...chequeData, fecha_vencimiento: date })}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
+                    {(esChequeFP(linea.forma_pago_id) || esTransferenciaFP(linea.forma_pago_id)) && (
+                      <p className="text-xs text-amber-600">
+                        ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
+                      </p>
+                    )}
 
-              <div className="space-y-2">
-                <Label>Observaciones</Label>
-                <Textarea
-                  value={chequeData.observaciones}
-                  onChange={(e) => setChequeData({ ...chequeData, observaciones: e.target.value })}
-                  placeholder="Observaciones adicionales..."
-                  rows={2}
-                />
-              </div>
+                    {/* Cheque details inline */}
+                    {esChequeL && linea.chequeData && (
+                      <div className="space-y-3 pt-2 border-t">
+                        <h4 className="font-medium text-xs">Datos del Cheque</h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Número de Cheque *</Label>
+                            <Input
+                              value={linea.chequeData.numero_cheque}
+                              onChange={(e) => actualizarChequeLinea(linea.id, { numero_cheque: e.target.value })}
+                              placeholder="12345678"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Banco *</Label>
+                            <Input
+                              value={linea.chequeData.banco}
+                              onChange={(e) => actualizarChequeLinea(linea.id, { banco: e.target.value })}
+                              placeholder="Banco Nación"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Emisor *</Label>
+                            <Input
+                              value={linea.chequeData.emisor}
+                              onChange={(e) => actualizarChequeLinea(linea.id, { emisor: e.target.value })}
+                              placeholder="Nombre del emisor"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">CUIT Emisor</Label>
+                            <Input
+                              value={linea.chequeData.cuit_emisor}
+                              onChange={(e) => actualizarChequeLinea(linea.id, { cuit_emisor: e.target.value })}
+                              placeholder="XX-XXXXXXXX-X"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Fecha Emisión *</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className={cn("w-full justify-start text-left font-normal text-sm",
+                                    !linea.chequeData.fecha_emision && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-3 w-3" />
+                                  {linea.chequeData.fecha_emision
+                                    ? format(linea.chequeData.fecha_emision, "dd/MM/yyyy", { locale: es })
+                                    : "Seleccionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={linea.chequeData.fecha_emision}
+                                  onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_emision: date })}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Fecha Vencimiento *</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className={cn("w-full justify-start text-left font-normal text-sm",
+                                    !linea.chequeData.fecha_vencimiento && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-3 w-3" />
+                                  {linea.chequeData.fecha_vencimiento
+                                    ? format(linea.chequeData.fecha_vencimiento, "dd/MM/yyyy", { locale: es })
+                                    : "Seleccionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={linea.chequeData.fecha_vencimiento}
+                                  onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_vencimiento: date })}
+                                  initialFocus
+                                  className={cn("p-3 pointer-events-auto")}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Observaciones</Label>
+                          <Textarea
+                            value={linea.chequeData.observaciones}
+                            onChange={(e) => actualizarChequeLinea(linea.id, { observaciones: e.target.value })}
+                            placeholder="Observaciones..."
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Summary */}
+              {montoTotal > 0 && (
+                <div className="bg-muted rounded-lg p-3 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>Monto total:</span>
+                    <span className="font-medium">{formatCurrency(montoTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Suma de medios de pago:</span>
+                    <span className={cn("font-medium", totalLineas > montoTotal && "text-destructive")}>
+                      {formatCurrency(totalLineas)}
+                    </span>
+                  </div>
+                  {restanteEnCuenta > 0 && (
+                    <div className="flex justify-between text-sm border-t pt-1 mt-1">
+                      <span className="text-amber-600 font-medium">Queda en cuenta corriente:</span>
+                      <span className="text-amber-600 font-bold">{formatCurrency(restanteEnCuenta)}</span>
+                    </div>
+                  )}
+                  {totalLineas > montoTotal && (
+                    <p className="text-xs text-destructive mt-1">
+                      ⚠️ La suma de pagos supera el monto total
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -766,9 +861,9 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || (esNotaCredito && totalNotaCredito <= 0)}
+            <Button
+              type="submit"
+              disabled={loading || (esNotaCredito && totalNotaCredito <= 0) || (requiereFormaPago && totalLineas > montoTotal)}
             >
               {loading ? 'Guardando...' : 'Registrar'}
             </Button>
