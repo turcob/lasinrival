@@ -129,6 +129,26 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
   const clienteSeleccionado = clientes?.find(c => c.id === clienteId);
   const listaClienteId = clienteSeleccionado?.lista_precio_id || listasPrecios?.listas?.[0]?.id;
 
+  // Detectar pedido pendiente existente del mismo cliente hoy
+  const { data: pedidoExistenteHoy } = useQuery({
+    queryKey: ['pedido-existente-hoy', clienteId],
+    queryFn: async () => {
+      if (!clienteId) return null;
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, numero_pedido')
+        .eq('cliente_id', clienteId)
+        .eq('estado', 'pendiente')
+        .gte('fecha_pedido', `${hoy}T00:00:00`)
+        .lte('fecha_pedido', `${hoy}T23:59:59`)
+        .limit(1);
+      if (error) throw error;
+      return data && data.length > 0 ? data[0] : null;
+    },
+    enabled: !!clienteId,
+  });
+
   const productosFiltrados = useMemo(() => {
     if (!busquedaProducto || !productos) return [];
     const term = busquedaProducto.toLowerCase();
