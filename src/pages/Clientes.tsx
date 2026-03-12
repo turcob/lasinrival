@@ -245,6 +245,7 @@ export default function Clientes() {
         zona_id: formData.zona_id || null,
         vendedor_id: formData.vendedor_id || null,
         numero_terminal_clover: formData.numero_terminal_clover || null,
+        facturas_adeudadas_bloqueo_override: formData.facturas_adeudadas_bloqueo_override ? parseInt(formData.facturas_adeudadas_bloqueo_override) : null,
       };
 
       if (selectedCliente) {
