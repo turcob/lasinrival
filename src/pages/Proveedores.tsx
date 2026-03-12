@@ -61,7 +61,7 @@ export default function Proveedores() {
 
   return (
     <MainLayout>
-      <PageHeader title="Proveedores" subtitle="Gestión integral de proveedores, compras y pagos" />
+      <PageHeader title="Proveedores" description="Gestión integral de proveedores, compras y pagos" />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <KPICard title="Total Proveedores" value={proveedores.length} icon={Users} />
