@@ -47,6 +47,7 @@ interface CarritoItem {
 interface NuevoPedidoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEditarPedidoExistente?: (pedidoId: string) => void;
 }
 
 export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps) {
