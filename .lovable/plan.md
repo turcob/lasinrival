@@ -1,46 +1,42 @@
 
 
-# Importar Excel para marcar productos como "Frio"
+## Análisis: Pedidos duplicados del mismo vendedor/cliente/día
 
-## Objetivo
-Crear un importador especializado que lea un archivo Excel, compare los productos por codigo de articulo (`COD_ARTIC`) y actualice unicamente el campo `es_frio` en la base de datos. No se agregan ni eliminan productos.
+### Estado actual
 
-## Logica del importador
+Revisé la lógica completa del módulo de pedidos y encontré lo siguiente:
 
-1. El usuario selecciona un archivo Excel
-2. Se lee la primera hoja del archivo
-3. Por cada fila, se toma:
-   - `COD_ARTIC` (codigo de articulo)
-   - `CATEGORIO PARA LISTAS` (si el valor es "frio", se marca como frio)
-4. Se buscan todos los productos existentes en la base de datos por `codigo_articulo`
-5. Para cada coincidencia:
-   - Si `CATEGORIO PARA LISTAS` = "frio" (case insensitive) -> `es_frio = true`
-   - Si no es "frio" -> `es_frio = false`
-6. Se actualiza en lotes de 100 para rendimiento
-7. Se muestra resumen: cantidad actualizados como frio, cantidad marcados como no frio, no encontrados
+1. **No existe ninguna validación ni unificación automática** de pedidos. Cuando un vendedor crea un pedido, se inserta directamente sin verificar si ya existe otro pedido pendiente del mismo cliente en el mismo día.
 
-## Archivos a crear/modificar
+2. **No existe funcionalidad de edición de pedidos pendientes.** Un vendedor solo puede "Editar Preparación" cuando el pedido ya está en estado `preparado`, pero no puede agregar productos a un pedido `pendiente` existente.
 
-| Archivo | Accion |
-|---------|--------|
-| `src/components/productos/ImportarFriosDialog.tsx` | Nuevo - Dialog con el importador |
-| `src/pages/Productos.tsx` | Modificar - Agregar boton "Importar Frios" que abre el dialog |
+3. **Consecuencia directa:** Si un vendedor carga 2 pedidos del mismo cliente el mismo día, se generan 2 pedidos independientes → 2 ventas → 2 movimientos en cuenta corriente → potencialmente activa el bloqueo automático por facturas adeudadas.
 
-## Detalle tecnico
+### Plan de implementación
 
-### ImportarFriosDialog.tsx
-- Componente Dialog con input de archivo Excel
-- Usa la libreria `xlsx` ya instalada
-- Proceso:
-  1. Lee el Excel con `XLSX.read()`
-  2. Extrae `COD_ARTIC` y `CATEGORIO PARA LISTAS` de cada fila (con normalizacion de nombres de columna mediante trim)
-  3. Busca todos los productos en la DB con paginacion (batches de 1000) para superar el limite de Supabase
-  4. Crea un mapa `codigo_articulo -> id` de productos existentes
-  5. Recorre las filas del Excel, y por cada coincidencia arma un update
-  6. Ejecuta updates en lotes de 100
-  7. Muestra barra de progreso y resumen final (marcados frio, marcados no frio, no encontrados)
+Se proponen **dos mecanismos complementarios**:
 
-### Productos.tsx
-- Se agrega un boton "Importar Frios" (con icono de copo de nieve o similar) junto a los botones existentes de importacion
-- Al hacer clic, abre el `ImportarFriosDialog`
+#### 1. Detección y alerta al crear pedido
+Al seleccionar un cliente en `NuevoPedidoDialog`, consultar si ya existe un pedido `pendiente` del mismo cliente en el día de hoy. Si existe:
+- Mostrar un alert amarillo: "Este cliente ya tiene un pedido pendiente (#XXX) cargado hoy. Podés editarlo en lugar de crear uno nuevo."
+- Ofrecer un botón "Editar pedido existente" que abra el pedido existente para agregar productos.
+- Permitir igualmente crear uno nuevo si el usuario lo desea (con confirmación).
+
+#### 2. Edición de pedidos pendientes (agregar/quitar productos)
+Crear la funcionalidad para que un vendedor pueda modificar un pedido en estado `pendiente`:
+- Nuevo componente `EditarPedidoDialog` que cargue los detalles actuales del pedido y permita agregar productos, cambiar cantidades o eliminar líneas.
+- Al guardar: actualizar `pedido_detalles` (insert nuevos, update existentes, delete eliminados) y recalcular `subtotal`/`total` del pedido.
+- Accesible desde `DetallePedidoDialog` cuando el estado es `pendiente`.
+
+#### Archivos a modificar
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/pedidos/NuevoPedidoDialog.tsx` | Query de pedido existente del mismo cliente hoy + alerta + botón |
+| `src/components/pedidos/EditarPedidoDialog.tsx` | **Nuevo** - Dialog para editar pedido pendiente (agregar/quitar productos) |
+| `src/hooks/usePedidos.ts` | Nuevo hook `useEditarPedido` para actualizar detalles |
+| `src/components/pedidos/DetallePedidoDialog.tsx` | Botón "Editar Pedido" para estado `pendiente` |
+| `src/pages/Pedidos.tsx` | Integrar `EditarPedidoDialog` |
+
+No se requieren cambios de base de datos, la estructura actual de `pedidos` y `pedido_detalles` ya soporta estas operaciones.
 
