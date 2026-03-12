@@ -665,6 +665,7 @@ export default function Clientes() {
                 <TableHead className="font-semibold">Zona</TableHead>
                 <TableHead className="font-semibold">Vendedor</TableHead>
                 <TableHead className="font-semibold">Saldo CC</TableHead>
+                <TableHead className="font-semibold">Fact. Adeud.</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="font-semibold">Acciones</TableHead>
               </TableRow>
