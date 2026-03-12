@@ -72,7 +72,7 @@ export default function Pedidos() {
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
-
+  const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
   );
