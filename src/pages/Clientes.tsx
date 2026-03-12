@@ -735,7 +735,37 @@ export default function Clientes() {
                         {saldo !== 0 ? `$${saldo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : '-'}
                       </span>
                     </TableCell>
-                    <TableCell><StatusBadge status={cliente.activo} /></TableCell>
+                    <TableCell>
+                      {(() => {
+                        const adeudadas = clienteFacturasAdeudadas[cliente.id] || 0;
+                        const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+                        return (
+                          <span className={`font-medium ${adeudadas >= limit ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {adeudadas}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <StatusBadge status={cliente.activo} />
+                        {cliente.bloqueado && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="destructive" className="text-xs gap-1">
+                                  <ShieldAlert className="h-3 w-3" />
+                                  Bloqueado
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {(cliente as any).motivo_bloqueo || 'Bloqueado por facturas adeudadas'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <TooltipProvider>
