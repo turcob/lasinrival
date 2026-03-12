@@ -2743,54 +2743,98 @@ export type Database = {
       }
       proveedor_movimientos: {
         Row: {
+          banco_transferencia: string | null
+          caja_id: string | null
+          cheque_id: string | null
+          cheque_propio_banco: string | null
+          cheque_propio_fecha_emision: string | null
+          cheque_propio_fecha_vencimiento: string | null
+          cheque_propio_monto: number | null
+          cheque_propio_numero: string | null
           concepto: string | null
           created_at: string | null
           fecha_emision: string | null
           fecha_vencimiento: string | null
           forma_pago_id: string | null
           id: string
+          medio_pago: string | null
           monto: number
           numero_comprobante: string | null
           observaciones: string | null
           proveedor_id: string
+          referencia_transferencia: string | null
           saldo_pendiente: number
           tipo: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
           tipo_comprobante: string | null
           usuario_registro_id: string
         }
         Insert: {
+          banco_transferencia?: string | null
+          caja_id?: string | null
+          cheque_id?: string | null
+          cheque_propio_banco?: string | null
+          cheque_propio_fecha_emision?: string | null
+          cheque_propio_fecha_vencimiento?: string | null
+          cheque_propio_monto?: number | null
+          cheque_propio_numero?: string | null
           concepto?: string | null
           created_at?: string | null
           fecha_emision?: string | null
           fecha_vencimiento?: string | null
           forma_pago_id?: string | null
           id?: string
+          medio_pago?: string | null
           monto?: number
           numero_comprobante?: string | null
           observaciones?: string | null
           proveedor_id: string
+          referencia_transferencia?: string | null
           saldo_pendiente?: number
           tipo: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
           tipo_comprobante?: string | null
           usuario_registro_id: string
         }
         Update: {
+          banco_transferencia?: string | null
+          caja_id?: string | null
+          cheque_id?: string | null
+          cheque_propio_banco?: string | null
+          cheque_propio_fecha_emision?: string | null
+          cheque_propio_fecha_vencimiento?: string | null
+          cheque_propio_monto?: number | null
+          cheque_propio_numero?: string | null
           concepto?: string | null
           created_at?: string | null
           fecha_emision?: string | null
           fecha_vencimiento?: string | null
           forma_pago_id?: string | null
           id?: string
+          medio_pago?: string | null
           monto?: number
           numero_comprobante?: string | null
           observaciones?: string | null
           proveedor_id?: string
+          referencia_transferencia?: string | null
           saldo_pendiente?: number
           tipo?: Database["public"]["Enums"]["proveedor_movimiento_tipo"]
           tipo_comprobante?: string | null
           usuario_registro_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "proveedor_movimientos_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proveedor_movimientos_cheque_id_fkey"
+            columns: ["cheque_id"]
+            isOneToOne: false
+            referencedRelation: "cheques"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proveedor_movimientos_forma_pago_id_fkey"
             columns: ["forma_pago_id"]
