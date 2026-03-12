@@ -50,7 +50,7 @@ interface NuevoPedidoDialogProps {
   onEditarPedidoExistente?: (pedidoId: string) => void;
 }
 
-export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps) {
+export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente }: NuevoPedidoDialogProps) {
   const [clienteId, setClienteId] = useState<string>('');
   const [vendedorId, setVendedorId] = useState<string>('');
   const [fechaEntrega, setFechaEntrega] = useState<string>('');
