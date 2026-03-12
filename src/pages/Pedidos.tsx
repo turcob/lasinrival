@@ -261,7 +261,8 @@ export default function Pedidos() {
 
       <NuevoPedidoDialog 
         open={nuevoDialogOpen} 
-        onOpenChange={setNuevoDialogOpen} 
+        onOpenChange={setNuevoDialogOpen}
+        onEditarPedidoExistente={(pedidoId) => setEditarPedidoId(pedidoId)}
       />
 
       <DetallePedidoDialog
