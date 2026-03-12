@@ -112,6 +112,7 @@ export default function Proveedores() {
                     <TableHead>Contacto</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>CUIT</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
