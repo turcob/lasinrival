@@ -552,6 +552,58 @@ export default function Configuracion() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Bloqueo Automático de Clientes */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Bloqueo Automático de Clientes
+              </CardTitle>
+              <CardDescription>
+                Bloquea automáticamente a los clientes que superen un número de facturas adeudadas
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">
+                    {formData.bloqueo_automatico_activo ? 'Bloqueo automático activado' : 'Bloqueo automático desactivado'}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.bloqueo_automatico_activo
+                      ? 'Los clientes se bloquearán automáticamente al superar el límite de facturas adeudadas.'
+                      : 'Los clientes no serán bloqueados automáticamente.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.bloqueo_automatico_activo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, bloqueo_automatico_activo: checked })}
+                  disabled={!isAdmin}
+                />
+              </div>
+
+              {formData.bloqueo_automatico_activo && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="facturas_adeudadas_bloqueo">Cantidad de facturas adeudadas para bloquear</Label>
+                    <Input
+                      id="facturas_adeudadas_bloqueo"
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={formData.facturas_adeudadas_bloqueo}
+                      onChange={(e) => setFormData({ ...formData, facturas_adeudadas_bloqueo: parseInt(e.target.value) || 3 })}
+                      disabled={!isAdmin}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Este es el valor global. Se puede configurar un valor diferente por cliente.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {isAdmin && (
