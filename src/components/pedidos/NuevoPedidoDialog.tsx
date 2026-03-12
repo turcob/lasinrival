@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -47,9 +47,10 @@ interface CarritoItem {
 interface NuevoPedidoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEditarPedidoExistente?: (pedidoId: string) => void;
 }
 
-export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps) {
+export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente }: NuevoPedidoDialogProps) {
   const [clienteId, setClienteId] = useState<string>('');
   const [vendedorId, setVendedorId] = useState<string>('');
   const [fechaEntrega, setFechaEntrega] = useState<string>('');
@@ -127,6 +128,26 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
 
   const clienteSeleccionado = clientes?.find(c => c.id === clienteId);
   const listaClienteId = clienteSeleccionado?.lista_precio_id || listasPrecios?.listas?.[0]?.id;
+
+  // Detectar pedido pendiente existente del mismo cliente hoy
+  const { data: pedidoExistenteHoy } = useQuery({
+    queryKey: ['pedido-existente-hoy', clienteId],
+    queryFn: async () => {
+      if (!clienteId) return null;
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, numero_pedido')
+        .eq('cliente_id', clienteId)
+        .eq('estado', 'pendiente')
+        .gte('fecha_pedido', `${hoy}T00:00:00`)
+        .lte('fecha_pedido', `${hoy}T23:59:59`)
+        .limit(1);
+      if (error) throw error;
+      return data && data.length > 0 ? data[0] : null;
+    },
+    enabled: !!clienteId,
+  });
 
   const productosFiltrados = useMemo(() => {
     if (!busquedaProducto || !productos) return [];
@@ -259,6 +280,33 @@ export function NuevoPedidoDialog({ open, onOpenChange }: NuevoPedidoDialogProps
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {/* Alerta de pedido existente hoy */}
+          {pedidoExistenteHoy && (
+            <Alert className="border-yellow-300 bg-yellow-50">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800">
+                <span className="font-medium">
+                  Este cliente ya tiene un pedido pendiente hoy (#{pedidoExistenteHoy.numero_pedido.toString().padStart(6, '0')}).
+                </span>
+                <span className="block mt-1">Podés editarlo en lugar de crear uno nuevo para evitar duplicar facturas.</span>
+                {onEditarPedidoExistente && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 border-yellow-400 text-yellow-800 hover:bg-yellow-100"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onEditarPedidoExistente(pedidoExistenteHoy.id);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar pedido existente
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Alerta de saldo vencido */}
           {saldoVencido?.tieneVencido && (
             <Alert variant="destructive">

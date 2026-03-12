@@ -45,6 +45,7 @@ import { usePedidos, type PedidoEstado } from '@/hooks/usePedidos';
 import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
+import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
 import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
 
@@ -71,7 +72,7 @@ export default function Pedidos() {
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
-
+  const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
   );
@@ -260,7 +261,8 @@ export default function Pedidos() {
 
       <NuevoPedidoDialog 
         open={nuevoDialogOpen} 
-        onOpenChange={setNuevoDialogOpen} 
+        onOpenChange={setNuevoDialogOpen}
+        onEditarPedidoExistente={(pedidoId) => setEditarPedidoId(pedidoId)}
       />
 
       <DetallePedidoDialog
@@ -271,12 +273,22 @@ export default function Pedidos() {
           setPedidoSeleccionado(null);
           setPrepararPedidoId(pedidoId);
         }}
+        onEditarPedido={(pedidoId) => {
+          setPedidoSeleccionado(null);
+          setEditarPedidoId(pedidoId);
+        }}
       />
 
       <PrepararPedidoDialog
         pedidoId={prepararPedidoId}
         open={!!prepararPedidoId}
         onOpenChange={(open) => !open && setPrepararPedidoId(null)}
+      />
+
+      <EditarPedidoDialog
+        pedidoId={editarPedidoId}
+        open={!!editarPedidoId}
+        onOpenChange={(open) => !open && setEditarPedidoId(null)}
       />
     </MainLayout>
   );
