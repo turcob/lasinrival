@@ -681,7 +681,7 @@ export default function Clientes() {
                 </TableRow>
               ) : clientes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                     No se encontraron clientes
                   </TableCell>
                 </TableRow>
