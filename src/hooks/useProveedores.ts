@@ -17,6 +17,7 @@ export interface Proveedor {
   observaciones: string | null;
   created_at: string;
   updated_at: string;
+  saldo?: number;
 }
 
 export interface ProveedorMovimiento {
@@ -79,9 +80,31 @@ export function useProveedores() {
 
     if (error) {
       toast({ title: 'Error', description: 'No se pudieron cargar los proveedores', variant: 'destructive' });
-    } else {
-      setProveedores((data as any[]) || []);
+      setLoading(false);
+      return;
     }
+
+    // Fetch saldos for all proveedores
+    const { data: movData } = await supabase
+      .from('proveedor_movimientos')
+      .select('proveedor_id, tipo, monto, saldo_pendiente');
+
+    const saldoMap: Record<string, number> = {};
+    ((movData as any[]) || []).forEach((m: any) => {
+      if (!saldoMap[m.proveedor_id]) saldoMap[m.proveedor_id] = 0;
+      if (m.tipo === 'factura' || m.tipo === 'nota_debito') {
+        saldoMap[m.proveedor_id] += m.saldo_pendiente;
+      } else if (m.tipo === 'pago' || m.tipo === 'nota_credito') {
+        saldoMap[m.proveedor_id] -= m.monto;
+      }
+    });
+
+    const provWithSaldo = ((data as any[]) || []).map(p => ({
+      ...p,
+      saldo: saldoMap[p.id] || 0,
+    }));
+
+    setProveedores(provWithSaldo);
     setLoading(false);
   }, [toast]);
 

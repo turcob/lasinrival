@@ -112,15 +112,16 @@ export default function Proveedores() {
                     <TableHead>Contacto</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>CUIT</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron proveedores</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No se encontraron proveedores</TableCell></TableRow>
                   ) : filtered.map(p => (
                     <TableRow key={p.id}>
                       <TableCell className="font-mono text-xs">{p.codigo_proveedor}</TableCell>
@@ -128,6 +129,15 @@ export default function Proveedores() {
                       <TableCell>{p.contacto || '-'}</TableCell>
                       <TableCell>{p.telefono || '-'}</TableCell>
                       <TableCell>{p.cuit || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        {p.saldo !== undefined && p.saldo !== 0 ? (
+                          <span className={p.saldo > 0 ? 'text-destructive font-medium' : 'text-green-600 font-medium'}>
+                            {formatMoney(p.saldo)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={p.activo ? 'default' : 'secondary'}>
                           {p.activo ? 'Activo' : 'Inactivo'}
