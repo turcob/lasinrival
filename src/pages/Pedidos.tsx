@@ -45,6 +45,7 @@ import { usePedidos, type PedidoEstado } from '@/hooks/usePedidos';
 import { NuevoPedidoDialog } from '@/components/pedidos/NuevoPedidoDialog';
 import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
+import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
 import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
 
