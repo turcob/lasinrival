@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette, ShieldAlert } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette, ShieldAlert, FileText, Printer } from 'lucide-react';
+import { imprimirWorkflowVentas, imprimirWorkflowCobros, imprimirWorkflowLogistica } from '@/lib/imprimirWorkflows';
 import {
   Card,
   CardContent,
@@ -602,6 +603,37 @@ export default function Configuracion() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+          {/* Documentación de Procesos */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Documentación de Procesos
+              </CardTitle>
+              <CardDescription>
+                Genera diagramas de flujo de los procesos del sistema en formato PDF para impresión o descarga
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={imprimirWorkflowVentas}>
+                  <Printer className="h-5 w-5" />
+                  <span className="font-medium">Venta a Clientes</span>
+                  <span className="text-xs text-muted-foreground text-center">Pedido → Preparación → Despacho → Entrega</span>
+                </Button>
+                <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={imprimirWorkflowCobros}>
+                  <Printer className="h-5 w-5" />
+                  <span className="font-medium">Cobros y Cta. Cte.</span>
+                  <span className="text-xs text-muted-foreground text-center">Pago → Imputación → Bloqueo automático</span>
+                </Button>
+                <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" onClick={imprimirWorkflowLogistica}>
+                  <Printer className="h-5 w-5" />
+                  <span className="font-medium">Rendición Logística</span>
+                  <span className="text-xs text-muted-foreground text-center">Hoja de ruta → Cobros → Devoluciones → Cierre</span>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
