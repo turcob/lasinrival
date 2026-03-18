@@ -35,6 +35,7 @@ import Clover from "./pages/Clover";
 import Cheques from "./pages/Cheques";
 import Proveedores from "./pages/Proveedores";
 import NotFound from "./pages/NotFound";
+import ReportePagos from "./pages/ReportePagos";
 
 const queryClient = new QueryClient();
 
