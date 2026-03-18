@@ -162,6 +162,7 @@ export default function Clientes() {
     if (configRes.data) setBloqueoConfig({
       facturas_adeudadas_bloqueo: (configRes.data as any).facturas_adeudadas_bloqueo ?? 3,
       bloqueo_automatico_activo: (configRes.data as any).bloqueo_automatico_activo ?? true,
+      monto_adeudado_bloqueo: (configRes.data as any).monto_adeudado_bloqueo ?? 0,
     });
   };
 
