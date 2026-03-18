@@ -8,8 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,15 @@ interface ProductoNotaCredito {
   descripcion: string;
 }
 
+interface ProductoManualNC {
+  id: string;
+  producto_id: string | null;
+  descripcion: string;
+  codigo: string;
+  cantidad: number;
+  precio_unitario: number;
+}
+
 interface ChequeData {
   numero_cheque: string;
   banco: string;
@@ -85,10 +95,16 @@ interface ChequeData {
 }
 
 interface MedioPagoLinea {
-  id: string; // internal key
+  id: string;
   forma_pago_id: string;
   monto: string;
   chequeData?: ChequeData;
+}
+
+interface ProductoBusqueda {
+  id: string;
+  descripcion: string;
+  codigo_articulo: string;
 }
 
 const TIPOS_MOVIMIENTO = [
@@ -100,13 +116,23 @@ const TIPOS_MOVIMIENTO = [
 ];
 
 const TIPOS_CON_FORMA_PAGO = ['pago'];
-const FORMAS_PAGO_PENDIENTES_IMPUTACION = ['cheque', 'transferencia'];
+const TIPOS_CON_SELECTOR_COMPRA = ['nota_credito', 'devolucion', 'anulacion'];
 
 let lineaIdCounter = 0;
 const nuevaLinea = (): MedioPagoLinea => ({
   id: `linea-${++lineaIdCounter}`,
   forma_pago_id: '',
   monto: '',
+});
+
+let manualIdCounter = 0;
+const nuevoProductoManual = (): ProductoManualNC => ({
+  id: `manual-${++manualIdCounter}`,
+  producto_id: null,
+  descripcion: '',
+  codigo: '',
+  cantidad: 1,
+  precio_unitario: 0,
 });
 
 export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSuccess }: RegistrarPagoClienteDialogProps) {
@@ -120,13 +146,21 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   // Multi-payment lines
   const [lineasPago, setLineasPago] = useState<MedioPagoLinea[]>([nuevaLinea()]);
 
-  // Estados para Nota de Crédito
+  // Estados para NC/Devolucion/Anulacion con compra asociada
   const [comprasCliente, setComprasCliente] = useState<CompraCliente[]>([]);
   const [compraSeleccionada, setCompraSeleccionada] = useState<string | null>(null);
   const [productosVenta, setProductosVenta] = useState<ProductoVenta[]>([]);
   const [productosNotaCredito, setProductosNotaCredito] = useState<ProductoNotaCredito[]>([]);
   const [loadingCompras, setLoadingCompras] = useState(false);
   const [loadingProductos, setLoadingProductos] = useState(false);
+
+  // NC libre (sin factura)
+  const [ncLibre, setNcLibre] = useState(false);
+  const [productosManualNC, setProductosManualNC] = useState<ProductoManualNC[]>([nuevoProductoManual()]);
+  const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<ProductoBusqueda[]>([]);
+  const [buscandoProductos, setBuscandoProductos] = useState(false);
+  const [lineaBuscandoId, setLineaBuscandoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -135,7 +169,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   }, [open]);
 
   useEffect(() => {
-    if (tipo === 'nota_credito' && open) {
+    if (TIPOS_CON_SELECTOR_COMPRA.includes(tipo) && open && !ncLibre) {
       fetchComprasCliente();
     } else {
       setComprasCliente([]);
@@ -143,7 +177,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       setProductosVenta([]);
       setProductosNotaCredito([]);
     }
-  }, [tipo, open, clienteId]);
+  }, [tipo, open, clienteId, ncLibre]);
 
   useEffect(() => {
     if (compraSeleccionada) {
@@ -211,9 +245,11 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         subtotal: d.subtotal,
       }));
       setProductosVenta(productos);
+      // For anulacion, select all by default
+      const esAnulacion = tipo === 'anulacion';
       setProductosNotaCredito(productos.map(p => ({
         detalle_id: p.id,
-        cantidad_seleccionada: 0,
+        cantidad_seleccionada: esAnulacion ? p.cantidad_original : 0,
         cantidad_max: p.cantidad_original,
         precio_unitario: p.precio_unitario,
         descripcion: p.descripcion,
@@ -226,15 +262,40 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   };
 
+  const buscarProductos = async (term: string) => {
+    if (term.length < 2) {
+      setResultadosBusqueda([]);
+      return;
+    }
+    setBuscandoProductos(true);
+    try {
+      const { data } = await supabase
+        .from('productos')
+        .select('id, descripcion, codigo_articulo')
+        .or(`descripcion.ilike.%${term}%,codigo_articulo.ilike.%${term}%`)
+        .limit(10);
+      setResultadosBusqueda(data || []);
+    } catch {
+      setResultadosBusqueda([]);
+    } finally {
+      setBuscandoProductos(false);
+    }
+  };
+
   const requiereFormaPago = TIPOS_CON_FORMA_PAGO.includes(tipo);
   const esNotaCredito = tipo === 'nota_credito';
+  const esDevolucion = tipo === 'devolucion';
+  const esAnulacion = tipo === 'anulacion';
+  const requiereSelectorCompra = TIPOS_CON_SELECTOR_COMPRA.includes(tipo) && !ncLibre;
 
   const totalNotaCredito = useMemo(() => {
+    if (ncLibre && esNotaCredito) {
+      return productosManualNC.reduce((sum, p) => sum + (p.cantidad * p.precio_unitario), 0);
+    }
     return productosNotaCredito.reduce((sum, p) =>
       sum + (p.cantidad_seleccionada * p.precio_unitario), 0);
-  }, [productosNotaCredito]);
+  }, [productosNotaCredito, productosManualNC, ncLibre, esNotaCredito]);
 
-  // Helpers for multi-payment
   const getFormaPagoNombre = (formaPagoId: string) => {
     return formasPago.find(fp => fp.id === formaPagoId)?.nombre?.toLowerCase() || '';
   };
@@ -252,9 +313,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const montoTotal = parseFloat(monto.replace(',', '.')) || 0;
   const restanteEnCuenta = requiereFormaPago ? Math.max(0, montoTotal - totalLineas) : 0;
 
-  const agregarLinea = () => {
-    setLineasPago([...lineasPago, nuevaLinea()]);
-  };
+  const agregarLinea = () => setLineasPago([...lineasPago, nuevaLinea()]);
 
   const eliminarLinea = (id: string) => {
     if (lineasPago.length <= 1) return;
@@ -265,7 +324,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setLineasPago(lineasPago.map(l => {
       if (l.id !== id) return l;
       const updated = { ...l, [campo]: valor };
-      // Reset cheque data if forma_pago changed
       if (campo === 'forma_pago_id') {
         if (!esChequeFP(valor)) {
           updated.chequeData = undefined;
@@ -306,8 +364,63 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }));
   };
 
+  // NC Libre product management
+  const agregarProductoManual = () => setProductosManualNC([...productosManualNC, nuevoProductoManual()]);
+
+  const eliminarProductoManual = (id: string) => {
+    if (productosManualNC.length <= 1) return;
+    setProductosManualNC(productosManualNC.filter(p => p.id !== id));
+  };
+
+  const seleccionarProductoBusqueda = (lineaId: string, prod: ProductoBusqueda) => {
+    setProductosManualNC(prev => prev.map(p => {
+      if (p.id !== lineaId) return p;
+      return { ...p, producto_id: prod.id, descripcion: prod.descripcion, codigo: prod.codigo_articulo };
+    }));
+    setResultadosBusqueda([]);
+    setBusquedaProducto('');
+    setLineaBuscandoId(null);
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
+  };
+
+  // Stock restoration for anulacion/devolucion
+  const restituirStock = async (ventaId: string, productosParaRestituir: { producto_id: string | null; cantidad: number }[]) => {
+    for (const item of productosParaRestituir) {
+      if (!item.producto_id) continue;
+
+      // Get current stock
+      const { data: prod } = await supabase
+        .from('productos')
+        .select('stock_actual')
+        .eq('id', item.producto_id)
+        .single();
+
+      const stockAnterior = prod?.stock_actual || 0;
+      const stockNuevo = stockAnterior + item.cantidad;
+
+      // Update product stock
+      await supabase
+        .from('productos')
+        .update({ stock_actual: stockNuevo })
+        .eq('id', item.producto_id);
+
+      // Register inventory movement
+      await supabase
+        .from('movimientos_inventario')
+        .insert({
+          producto_id: item.producto_id,
+          tipo: 'entrada',
+          cantidad: item.cantidad,
+          stock_anterior: stockAnterior,
+          stock_nuevo: stockNuevo,
+          motivo: tipo === 'anulacion' ? 'Anulación de compra' : 'Devolución de producto',
+          venta_id: ventaId,
+          usuario_id: user!.id,
+        });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -318,9 +431,20 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     let conceptoFinal: string | null = concepto || null;
     let ventaIdRef: string | null = null;
 
-    if (esNotaCredito) {
+    if (esNotaCredito && ncLibre) {
+      // NC libre
+      const productosValidos = productosManualNC.filter(p => p.descripcion && p.cantidad > 0 && p.precio_unitario > 0);
+      if (productosValidos.length === 0) {
+        toast.error('Agregue al menos un producto con cantidad y precio');
+        return;
+      }
+      montoFinal = productosValidos.reduce((sum, p) => sum + (p.cantidad * p.precio_unitario), 0);
+      const resumen = productosValidos.map(p => `${p.descripcion} (${p.cantidad})`).join(', ');
+      conceptoFinal = `NC Manual - ${resumen}`;
+    } else if (requiereSelectorCompra) {
+      // NC con factura, devolucion, anulacion
       if (!compraSeleccionada) {
-        toast.error('Seleccione una compra para la nota de crédito');
+        toast.error('Seleccione una compra');
         return;
       }
       if (totalNotaCredito <= 0) {
@@ -334,16 +458,14 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         .filter(p => p.cantidad_seleccionada > 0)
         .map(p => `${p.descripcion} (${p.cantidad_seleccionada})`)
         .join(', ');
-      conceptoFinal = `NC - Venta #${compra?.numero_comprobante || ''} - ${productosSeleccionados}`;
+      const tipoLabel = esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : 'NC';
+      conceptoFinal = `${tipoLabel} - Venta #${compra?.numero_comprobante || ''} - ${productosSeleccionados}`;
     } else if (requiereFormaPago) {
-      // Pago con múltiples medios
       montoFinal = montoTotal;
       if (isNaN(montoFinal) || montoFinal <= 0) {
         toast.error('Ingrese un monto total válido');
         return;
       }
-
-      // Validate each line
       for (const linea of lineasPago) {
         if (!linea.forma_pago_id) {
           toast.error('Seleccione la forma de pago en todas las líneas');
@@ -362,7 +484,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           }
         }
       }
-
       if (totalLineas > montoFinal) {
         toast.error('La suma de los pagos no puede superar el monto total');
         return;
@@ -377,7 +498,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
 
     setLoading(true);
     try {
-      if (requiereFormaPago && !esNotaCredito) {
+      if (requiereFormaPago && !requiereSelectorCompra && !(esNotaCredito && ncLibre)) {
         // Insert one movement per payment line
         for (const linea of lineasPago) {
           const lineaMonto = parseFloat(linea.monto.replace(',', '.'));
@@ -408,7 +529,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
 
           if (movError) throw movError;
 
-          // Save cheque details if applicable
           if (esChequeLinea && linea.chequeData && movimientoData) {
             const cd = linea.chequeData;
             const { error: chequeError } = await supabase
@@ -438,8 +558,8 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           toast.success(mensaje);
         }
       } else {
-        // Non-payment or nota de crédito: single movement
-        const { data: movimientoData, error: movError } = await supabase
+        // NC (con o sin factura), devolucion, anulacion, nota_debito
+        const { error: movError } = await supabase
           .from('cliente_movimientos')
           .insert([{
             cliente_id: clienteId,
@@ -450,12 +570,31 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             forma_pago_id: null,
             venta_id: ventaIdRef,
             estado_imputacion: 'confirmado',
-          }])
-          .select('id')
-          .single();
+          }]);
 
         if (movError) throw movError;
-        toast.success('Movimiento registrado correctamente');
+
+        // Restituir stock para anulacion y devolucion
+        if ((esAnulacion || esDevolucion) && ventaIdRef) {
+          const productosParaRestituir = productosNotaCredito
+            .filter(p => p.cantidad_seleccionada > 0)
+            .map(p => {
+              const prodVenta = productosVenta.find(pv => pv.id === p.detalle_id);
+              return { producto_id: prodVenta?.producto_id || null, cantidad: p.cantidad_seleccionada };
+            });
+          await restituirStock(ventaIdRef, productosParaRestituir);
+        }
+
+        // For anulacion, also mark the original sale as anulada
+        if (esAnulacion && ventaIdRef) {
+          await supabase
+            .from('ventas')
+            .update({ anulada: true, anulada_por: user.id, fecha_anulacion: new Date().toISOString(), motivo_anulacion: conceptoFinal })
+            .eq('id', ventaIdRef);
+        }
+
+        const tipoLabel = esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : esNotaCredito ? 'Nota de Crédito' : 'Movimiento';
+        toast.success(`${tipoLabel} registrad${esNotaCredito ? 'a' : 'o'} correctamente`);
       }
 
       resetForm();
@@ -476,6 +615,10 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
+    setNcLibre(false);
+    setProductosManualNC([nuevoProductoManual()]);
+    setBusquedaProducto('');
+    setResultadosBusqueda([]);
   };
 
   const handleTipoChange = (value: string) => {
@@ -484,7 +627,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setCompraSeleccionada(null);
     setProductosVenta([]);
     setProductosNotaCredito([]);
+    setNcLibre(false);
+    setProductosManualNC([nuevoProductoManual()]);
   };
+
+  const showProductSelector = requiereSelectorCompra || (esNotaCredito && ncLibre);
+  const montoDesdeProductos = requiereSelectorCompra || (esNotaCredito && ncLibre);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -509,11 +657,33 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </Select>
           </div>
 
-          {/* Nota de Crédito UI */}
+          {/* NC libre toggle */}
           {esNotaCredito && (
+            <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+              <Switch checked={ncLibre} onCheckedChange={setNcLibre} />
+              <div>
+                <Label className="cursor-pointer">NC sin factura asociada</Label>
+                <p className="text-xs text-muted-foreground">Generar nota de crédito buscando productos manualmente</p>
+              </div>
+            </div>
+          )}
+
+          {/* Anulacion/Devolucion info */}
+          {(esAnulacion || esDevolucion) && (
+            <Alert>
+              <AlertDescription>
+                {esAnulacion
+                  ? 'La anulación revertirá la compra completa, marcará la venta como anulada y restituirá el stock de todos los productos.'
+                  : 'La devolución permite seleccionar productos específicos para restituir al stock.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Selector de compra para NC con factura, devolucion, anulacion */}
+          {requiereSelectorCompra && (
             <>
               <div className="space-y-2">
-                <Label>Seleccionar compra a acreditar</Label>
+                <Label>Seleccionar compra</Label>
                 <Select
                   value={compraSeleccionada || ''}
                   onValueChange={setCompraSeleccionada}
@@ -553,7 +723,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                             <TableHead className="w-12"></TableHead>
                             <TableHead>Producto</TableHead>
                             <TableHead className="w-24 text-center">Cant. Orig.</TableHead>
-                            <TableHead className="w-28 text-center">Cantidad NC</TableHead>
+                            <TableHead className="w-28 text-center">Cantidad</TableHead>
                             <TableHead className="w-28 text-right">Subtotal</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -570,6 +740,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                                     onCheckedChange={(checked) =>
                                       handleCheckboxChange(producto.id, checked as boolean)
                                     }
+                                    disabled={esAnulacion}
                                   />
                                 </TableCell>
                                 <TableCell>
@@ -596,6 +767,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                                       handleCantidadChange(producto.id, parseFloat(e.target.value) || 0)
                                     }
                                     className="w-20 text-center"
+                                    disabled={esAnulacion}
                                   />
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
@@ -612,7 +784,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                   {productosVenta.length > 0 && (
                     <div className="flex justify-end pt-2">
                       <div className="bg-muted px-4 py-2 rounded-md">
-                        <span className="text-sm text-muted-foreground mr-2">Total Nota de Crédito:</span>
+                        <span className="text-sm text-muted-foreground mr-2">Total:</span>
                         <span className="text-lg font-bold">{formatCurrency(totalNotaCredito)}</span>
                       </div>
                     </div>
@@ -622,10 +794,117 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </>
           )}
 
-          {/* Monto total */}
-          {!esNotaCredito && (
+          {/* NC libre: búsqueda manual de productos */}
+          {esNotaCredito && ncLibre && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Productos para la Nota de Crédito</Label>
+                <Button type="button" variant="outline" size="sm" onClick={agregarProductoManual}>
+                  <Plus className="h-3 w-3 mr-1" /> Agregar
+                </Button>
+              </div>
+
+              {productosManualNC.map((prod, idx) => (
+                <div key={prod.id} className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 space-y-1 relative">
+                      <Label className="text-xs">Producto {idx + 1}</Label>
+                      {prod.descripcion ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{prod.descripcion}</span>
+                          {prod.codigo && <span className="text-xs text-muted-foreground">({prod.codigo})</span>}
+                          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs"
+                            onClick={() => {
+                              setProductosManualNC(prev => prev.map(p =>
+                                p.id === prod.id ? { ...p, producto_id: null, descripcion: '', codigo: '' } : p
+                              ));
+                            }}>
+                            Cambiar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <div className="flex items-center gap-1">
+                            <Search className="h-3 w-3 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 z-10" />
+                            <Input
+                              placeholder="Buscar producto..."
+                              className="pl-7"
+                              value={lineaBuscandoId === prod.id ? busquedaProducto : ''}
+                              onChange={(e) => {
+                                setBusquedaProducto(e.target.value);
+                                setLineaBuscandoId(prod.id);
+                                buscarProductos(e.target.value);
+                              }}
+                              onFocus={() => setLineaBuscandoId(prod.id)}
+                            />
+                          </div>
+                          {lineaBuscandoId === prod.id && resultadosBusqueda.length > 0 && (
+                            <div className="absolute z-20 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                              {resultadosBusqueda.map(r => (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                                  onClick={() => seleccionarProductoBusqueda(prod.id, r)}
+                                >
+                                  <span className="font-medium">{r.descripcion}</span>
+                                  {r.codigo_articulo && <span className="text-muted-foreground ml-2">({r.codigo_articulo})</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-20 space-y-1">
+                      <Label className="text-xs">Cantidad</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={prod.cantidad}
+                        onChange={(e) => setProductosManualNC(prev => prev.map(p =>
+                          p.id === prod.id ? { ...p, cantidad: parseInt(e.target.value) || 0 } : p
+                        ))}
+                      />
+                    </div>
+                    <div className="w-28 space-y-1">
+                      <Label className="text-xs">Precio unit.</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={prod.precio_unitario || ''}
+                        onChange={(e) => setProductosManualNC(prev => prev.map(p =>
+                          p.id === prod.id ? { ...p, precio_unitario: parseFloat(e.target.value.replace(',', '.')) || 0 } : p
+                        ))}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    {productosManualNC.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 mt-5 text-destructive"
+                        onClick={() => eliminarProductoManual(prod.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="text-right text-sm text-muted-foreground">
+                    Subtotal: {formatCurrency(prod.cantidad * prod.precio_unitario)}
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex justify-end pt-2">
+                <div className="bg-muted px-4 py-2 rounded-md">
+                  <span className="text-sm text-muted-foreground mr-2">Total NC:</span>
+                  <span className="text-lg font-bold">{formatCurrency(totalNotaCredito)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Monto total - only for types that don't derive amount from products */}
+          {!montoDesdeProductos && !requiereFormaPago && tipo !== 'nota_debito' && (
             <div className="space-y-2">
-              <Label>{requiereFormaPago ? 'Monto total a pagar' : 'Monto'}</Label>
+              <Label>Monto</Label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -634,218 +913,242 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                 placeholder="0.00"
                 required
               />
-              {requiereFormaPago && (
+            </div>
+          )}
+
+          {tipo === 'nota_debito' && (
+            <div className="space-y-2">
+              <Label>Monto</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                placeholder="0.00"
+                required
+              />
+            </div>
+          )}
+
+          {/* Pago: monto total + multi-payment */}
+          {requiereFormaPago && (
+            <>
+              <div className="space-y-2">
+                <Label>Monto total a pagar</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
                 <p className="text-xs text-muted-foreground">
                   Ingresá el monto total. Podés dividirlo en varios medios de pago abajo. Si la suma es menor, el resto queda en cuenta corriente.
                 </p>
-              )}
-            </div>
-          )}
-
-          {/* Multi-payment lines */}
-          {requiereFormaPago && !esNotaCredito && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Medios de pago</Label>
-                <Button type="button" variant="outline" size="sm" onClick={agregarLinea}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Agregar medio
-                </Button>
               </div>
 
-              {lineasPago.map((linea, idx) => {
-                const esChequeL = esChequeFP(linea.forma_pago_id);
-                return (
-                  <div key={linea.id} className="space-y-3 p-3 border rounded-lg bg-muted/30">
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Forma de pago {lineasPago.length > 1 ? `#${idx + 1}` : ''}</Label>
-                        <Select
-                          value={linea.forma_pago_id}
-                          onValueChange={(v) => actualizarLinea(linea.id, 'forma_pago_id', v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formasPago.map((fp) => (
-                              <SelectItem key={fp.id} value={fp.id}>{fp.nombre}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs">Monto</Label>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={linea.monto}
-                          onChange={(e) => actualizarLinea(linea.id, 'monto', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      {lineasPago.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 text-destructive"
-                          onClick={() => eliminarLinea(linea.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Medios de pago</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={agregarLinea}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Agregar medio
+                  </Button>
+                </div>
 
-                    {(esChequeFP(linea.forma_pago_id) || esTransferenciaFP(linea.forma_pago_id)) && (
-                      <p className="text-xs text-amber-600">
-                        ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
-                      </p>
-                    )}
-
-                    {/* Cheque details inline */}
-                    {esChequeL && linea.chequeData && (
-                      <div className="space-y-3 pt-2 border-t">
-                        <h4 className="font-medium text-xs">Datos del Cheque</h4>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Número de Cheque *</Label>
-                            <Input
-                              value={linea.chequeData.numero_cheque}
-                              onChange={(e) => actualizarChequeLinea(linea.id, { numero_cheque: e.target.value })}
-                              placeholder="12345678"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Banco *</Label>
-                            <Input
-                              value={linea.chequeData.banco}
-                              onChange={(e) => actualizarChequeLinea(linea.id, { banco: e.target.value })}
-                              placeholder="Banco Nación"
-                            />
-                          </div>
+                {lineasPago.map((linea, idx) => {
+                  const esChequeL = esChequeFP(linea.forma_pago_id);
+                  return (
+                    <div key={linea.id} className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Forma de pago {lineasPago.length > 1 ? `#${idx + 1}` : ''}</Label>
+                          <Select
+                            value={linea.forma_pago_id}
+                            onValueChange={(v) => actualizarLinea(linea.id, 'forma_pago_id', v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {formasPago.map((fp) => (
+                                <SelectItem key={fp.id} value={fp.id}>{fp.nombre}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Emisor *</Label>
-                            <Input
-                              value={linea.chequeData.emisor}
-                              onChange={(e) => actualizarChequeLinea(linea.id, { emisor: e.target.value })}
-                              placeholder="Nombre del emisor"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">CUIT Emisor</Label>
-                            <Input
-                              value={linea.chequeData.cuit_emisor}
-                              onChange={(e) => actualizarChequeLinea(linea.id, { cuit_emisor: e.target.value })}
-                              placeholder="XX-XXXXXXXX-X"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Fecha Emisión *</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className={cn("w-full justify-start text-left font-normal text-sm",
-                                    !linea.chequeData.fecha_emision && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-3 w-3" />
-                                  {linea.chequeData.fecha_emision
-                                    ? format(linea.chequeData.fecha_emision, "dd/MM/yyyy", { locale: es })
-                                    : "Seleccionar"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={linea.chequeData.fecha_emision}
-                                  onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_emision: date })}
-                                  initialFocus
-                                  className={cn("p-3 pointer-events-auto")}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Fecha Vencimiento *</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className={cn("w-full justify-start text-left font-normal text-sm",
-                                    !linea.chequeData.fecha_vencimiento && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-3 w-3" />
-                                  {linea.chequeData.fecha_vencimiento
-                                    ? format(linea.chequeData.fecha_vencimiento, "dd/MM/yyyy", { locale: es })
-                                    : "Seleccionar"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={linea.chequeData.fecha_vencimiento}
-                                  onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_vencimiento: date })}
-                                  initialFocus
-                                  className={cn("p-3 pointer-events-auto")}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Observaciones</Label>
-                          <Textarea
-                            value={linea.chequeData.observaciones}
-                            onChange={(e) => actualizarChequeLinea(linea.id, { observaciones: e.target.value })}
-                            placeholder="Observaciones..."
-                            rows={2}
+                        <div className="w-36 space-y-1">
+                          <Label className="text-xs">Monto</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={linea.monto}
+                            onChange={(e) => actualizarLinea(linea.id, 'monto', e.target.value)}
+                            placeholder="0.00"
                           />
                         </div>
+                        {lineasPago.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-destructive"
+                            onClick={() => eliminarLinea(linea.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {(esChequeFP(linea.forma_pago_id) || esTransferenciaFP(linea.forma_pago_id)) && (
+                        <p className="text-xs text-amber-600">
+                          ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
+                        </p>
+                      )}
+
+                      {esChequeL && linea.chequeData && (
+                        <div className="space-y-3 pt-2 border-t">
+                          <h4 className="font-medium text-xs">Datos del Cheque</h4>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Número de Cheque *</Label>
+                              <Input
+                                value={linea.chequeData.numero_cheque}
+                                onChange={(e) => actualizarChequeLinea(linea.id, { numero_cheque: e.target.value })}
+                                placeholder="12345678"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Banco *</Label>
+                              <Input
+                                value={linea.chequeData.banco}
+                                onChange={(e) => actualizarChequeLinea(linea.id, { banco: e.target.value })}
+                                placeholder="Banco Nación"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Emisor *</Label>
+                              <Input
+                                value={linea.chequeData.emisor}
+                                onChange={(e) => actualizarChequeLinea(linea.id, { emisor: e.target.value })}
+                                placeholder="Nombre del emisor"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">CUIT Emisor</Label>
+                              <Input
+                                value={linea.chequeData.cuit_emisor}
+                                onChange={(e) => actualizarChequeLinea(linea.id, { cuit_emisor: e.target.value })}
+                                placeholder="XX-XXXXXXXX-X"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Fecha Emisión *</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className={cn("w-full justify-start text-left font-normal text-sm",
+                                      !linea.chequeData.fecha_emision && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-3 w-3" />
+                                    {linea.chequeData.fecha_emision
+                                      ? format(linea.chequeData.fecha_emision, "dd/MM/yyyy", { locale: es })
+                                      : "Seleccionar"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={linea.chequeData.fecha_emision}
+                                    onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_emision: date })}
+                                    initialFocus
+                                    className={cn("p-3 pointer-events-auto")}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Fecha Vencimiento *</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className={cn("w-full justify-start text-left font-normal text-sm",
+                                      !linea.chequeData.fecha_vencimiento && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-3 w-3" />
+                                    {linea.chequeData.fecha_vencimiento
+                                      ? format(linea.chequeData.fecha_vencimiento, "dd/MM/yyyy", { locale: es })
+                                      : "Seleccionar"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={linea.chequeData.fecha_vencimiento}
+                                    onSelect={(date) => actualizarChequeLinea(linea.id, { fecha_vencimiento: date })}
+                                    initialFocus
+                                    className={cn("p-3 pointer-events-auto")}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Observaciones</Label>
+                            <Textarea
+                              value={linea.chequeData.observaciones}
+                              onChange={(e) => actualizarChequeLinea(linea.id, { observaciones: e.target.value })}
+                              placeholder="Observaciones..."
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {montoTotal > 0 && (
+                  <div className="bg-muted rounded-lg p-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Monto total:</span>
+                      <span className="font-medium">{formatCurrency(montoTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Suma de medios de pago:</span>
+                      <span className={cn("font-medium", totalLineas > montoTotal && "text-destructive")}>
+                        {formatCurrency(totalLineas)}
+                      </span>
+                    </div>
+                    {restanteEnCuenta > 0 && (
+                      <div className="flex justify-between text-sm border-t pt-1 mt-1">
+                        <span className="text-amber-600 font-medium">Queda en cuenta corriente:</span>
+                        <span className="text-amber-600 font-bold">{formatCurrency(restanteEnCuenta)}</span>
                       </div>
                     )}
+                    {totalLineas > montoTotal && (
+                      <p className="text-xs text-destructive mt-1">
+                        ⚠️ La suma de pagos supera el monto total
+                      </p>
+                    )}
                   </div>
-                );
-              })}
-
-              {/* Summary */}
-              {montoTotal > 0 && (
-                <div className="bg-muted rounded-lg p-3 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Monto total:</span>
-                    <span className="font-medium">{formatCurrency(montoTotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Suma de medios de pago:</span>
-                    <span className={cn("font-medium", totalLineas > montoTotal && "text-destructive")}>
-                      {formatCurrency(totalLineas)}
-                    </span>
-                  </div>
-                  {restanteEnCuenta > 0 && (
-                    <div className="flex justify-between text-sm border-t pt-1 mt-1">
-                      <span className="text-amber-600 font-medium">Queda en cuenta corriente:</span>
-                      <span className="text-amber-600 font-bold">{formatCurrency(restanteEnCuenta)}</span>
-                    </div>
-                  )}
-                  {totalLineas > montoTotal && (
-                    <p className="text-xs text-destructive mt-1">
-                      ⚠️ La suma de pagos supera el monto total
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </>
           )}
 
-          {!esNotaCredito && (
+          {!montoDesdeProductos && (
             <div className="space-y-2">
               <Label>Concepto (opcional)</Label>
               <Textarea
@@ -863,7 +1166,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </Button>
             <Button
               type="submit"
-              disabled={loading || (esNotaCredito && totalNotaCredito <= 0) || (requiereFormaPago && totalLineas > montoTotal)}
+              disabled={loading || (montoDesdeProductos && totalNotaCredito <= 0) || (requiereFormaPago && totalLineas > montoTotal)}
             >
               {loading ? 'Guardando...' : 'Registrar'}
             </Button>
