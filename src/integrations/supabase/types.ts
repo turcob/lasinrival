@@ -591,6 +591,7 @@ export type Database = {
           id: string
           limite_credito: number | null
           lista_precio_id: string | null
+          monto_adeudado_bloqueo_override: number | null
           motivo_bloqueo: string | null
           nombre: string
           numero_terminal_clover: string | null
@@ -618,6 +619,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          monto_adeudado_bloqueo_override?: number | null
           motivo_bloqueo?: string | null
           nombre: string
           numero_terminal_clover?: string | null
@@ -645,6 +647,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          monto_adeudado_bloqueo_override?: number | null
           motivo_bloqueo?: string | null
           nombre?: string
           numero_terminal_clover?: string | null
@@ -958,6 +961,7 @@ export type Database = {
           id: string
           inicio_actividades: string | null
           localidad: string | null
+          monto_adeudado_bloqueo: number
           nombre_fantasia: string | null
           nombre_sistema: string | null
           provincia: string | null
@@ -980,6 +984,7 @@ export type Database = {
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
+          monto_adeudado_bloqueo?: number
           nombre_fantasia?: string | null
           nombre_sistema?: string | null
           provincia?: string | null
@@ -1002,6 +1007,7 @@ export type Database = {
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
+          monto_adeudado_bloqueo?: number
           nombre_fantasia?: string | null
           nombre_sistema?: string | null
           provincia?: string | null
