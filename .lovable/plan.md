@@ -1,50 +1,46 @@
 
 
-## Plan: Corregir devoluciones/anulaciones, NC libre, y reporte de pagos
+# Importar Excel para marcar productos como "Frio"
 
-Hay tres problemas a resolver:
+## Objetivo
+Crear un importador especializado que lea un archivo Excel, compare los productos por codigo de articulo (`COD_ARTIC`) y actualice unicamente el campo `es_frio` en la base de datos. No se agregan ni eliminan productos.
 
-### 1. Devolución y Anulación no eliminan/revierten correctamente
+## Logica del importador
 
-**Problema**: Al registrar una "devolución" o "anulación de compra" en la cuenta corriente del cliente, solo se crea un movimiento nuevo en `cliente_movimientos`. Pero:
-- La vista `cliente_saldos` **no incluye `anulacion`** en el cálculo de `total_pagado` (solo `pago`, `nota_credito`, `devolucion`), por lo que las anulaciones no impactan el saldo.
-- No se restituye stock de los productos involucrados.
-- El movimiento original de compra persiste.
+1. El usuario selecciona un archivo Excel
+2. Se lee la primera hoja del archivo
+3. Por cada fila, se toma:
+   - `COD_ARTIC` (codigo de articulo)
+   - `CATEGORIO PARA LISTAS` (si el valor es "frio", se marca como frio)
+4. Se buscan todos los productos existentes en la base de datos por `codigo_articulo`
+5. Para cada coincidencia:
+   - Si `CATEGORIO PARA LISTAS` = "frio" (case insensitive) -> `es_frio = true`
+   - Si no es "frio" -> `es_frio = false`
+6. Se actualiza en lotes de 100 para rendimiento
+7. Se muestra resumen: cantidad actualizados como frio, cantidad marcados como no frio, no encontrados
 
-**Solución**:
-| Cambio | Detalle |
-|---|---|
-| **Migración DB** | Actualizar la vista `cliente_saldos` para incluir `anulacion` en `total_pagado` |
-| `RegistrarPagoClienteDialog.tsx` | Para tipo `anulacion`: buscar la venta asociada, restituir stock de cada producto, registrar movimientos de inventario. Agregar selector de compra similar a nota de crédito para que el usuario elija qué compra anula. |
-| `RegistrarPagoClienteDialog.tsx` | Para tipo `devolucion`: agregar selector de compra y productos (similar a NC) para restituir stock de los items devueltos |
+## Archivos a crear/modificar
 
-### 2. Nota de Crédito libre (sin factura asociada)
+| Archivo | Accion |
+|---------|--------|
+| `src/components/productos/ImportarFriosDialog.tsx` | Nuevo - Dialog con el importador |
+| `src/pages/Productos.tsx` | Modificar - Agregar boton "Importar Frios" que abre el dialog |
 
-**Problema**: Actualmente la NC solo permite seleccionar una compra existente. Si la factura ya fue cancelada o no existe en el sistema, no hay forma de generar una NC.
+## Detalle tecnico
 
-**Solución**:
-| Cambio | Detalle |
-|---|---|
-| `RegistrarPagoClienteDialog.tsx` | Agregar un toggle/opción "NC sin factura asociada" que permita buscar productos manualmente (buscador de productos), ingresar cantidad y precio, y generar la NC libre. El concepto indicará "NC Manual" + productos seleccionados |
+### ImportarFriosDialog.tsx
+- Componente Dialog con input de archivo Excel
+- Usa la libreria `xlsx` ya instalada
+- Proceso:
+  1. Lee el Excel con `XLSX.read()`
+  2. Extrae `COD_ARTIC` y `CATEGORIO PARA LISTAS` de cada fila (con normalizacion de nombres de columna mediante trim)
+  3. Busca todos los productos en la DB con paginacion (batches de 1000) para superar el limite de Supabase
+  4. Crea un mapa `codigo_articulo -> id` de productos existentes
+  5. Recorre las filas del Excel, y por cada coincidencia arma un update
+  6. Ejecuta updates en lotes de 100
+  7. Muestra barra de progreso y resumen final (marcados frio, marcados no frio, no encontrados)
 
-### 3. Reporte de Pagos de Clientes
-
-**Problema**: No existe un reporte de pagos filtrable. La ruta `/reportes` redirige al Dashboard.
-
-**Solución**:
-| Cambio | Detalle |
-|---|---|
-| `src/pages/ReportePagos.tsx` | **Nuevo** - Página con tabla de pagos de clientes (`cliente_movimientos` tipo `pago`), con filtros por: tipo/medio de pago (efectivo, cheque, transferencia, tarjeta), zona del cliente, rango de fechas, cliente específico. Incluir totales por medio de pago y exportación |
-| `src/App.tsx` | Agregar ruta `/reporte-pagos` |
-| `AppSidebar.tsx` | Agregar link "Reporte Pagos" en la sección de operaciones |
-
-### Archivos afectados
-
-| Archivo | Acción |
-|---|---|
-| **Migración SQL** | Actualizar vista `cliente_saldos` (agregar `anulacion`) |
-| `src/components/clientes/RegistrarPagoClienteDialog.tsx` | Corregir anulación (selector compra + stock), devolucion (selector + stock), NC libre |
-| `src/pages/ReportePagos.tsx` | **Nuevo** - Reporte filtrable de pagos |
-| `src/App.tsx` | Nueva ruta |
-| `src/components/layout/AppSidebar.tsx` | Nuevo link sidebar |
+### Productos.tsx
+- Se agrega un boton "Importar Frios" (con icono de copo de nieve o similar) junto a los botones existentes de importacion
+- Al hacer clic, abre el `ImportarFriosDialog`
 

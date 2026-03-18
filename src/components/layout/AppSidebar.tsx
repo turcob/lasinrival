@@ -71,6 +71,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Clover', href: '/clover', icon: Smartphone, module: 'clientes' },
   { title: 'Cheques', href: '/cheques', icon: FileCheck, module: 'cheques' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
+  { title: 'Reporte Pagos', href: '/reporte-pagos', icon: BarChart3, module: 'clientes' },
   { title: 'Inventario', href: '/inventario', icon: Archive, module: 'inventario' },
   { title: 'Reportes', href: '/reportes', icon: BarChart3, module: 'reportes' },
 ];
