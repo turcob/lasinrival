@@ -98,6 +98,7 @@ const initialFormData: ConfiguracionComercio = {
   texto_login_footer: 'Sistema de Gestión Comercial © 2024',
   facturas_adeudadas_bloqueo: 3,
   bloqueo_automatico_activo: true,
+  monto_adeudado_bloqueo: 0,
 };
 
 export default function Configuracion() {
