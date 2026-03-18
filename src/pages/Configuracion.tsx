@@ -145,6 +145,7 @@ export default function Configuracion() {
           texto_login_footer: (data as any).texto_login_footer || 'Sistema de Gestión Comercial © 2024',
           facturas_adeudadas_bloqueo: (data as any).facturas_adeudadas_bloqueo ?? 3,
           bloqueo_automatico_activo: (data as any).bloqueo_automatico_activo ?? true,
+          monto_adeudado_bloqueo: (data as any).monto_adeudado_bloqueo ?? 0,
         });
       }
     } catch (error) {
