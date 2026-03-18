@@ -105,7 +105,7 @@ export default function Clientes() {
   const [importHistorialOpen, setImportHistorialOpen] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [clienteFacturasAdeudadas, setClienteFacturasAdeudadas] = useState<Record<string, number>>({});
-  const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true });
+  const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean; monto_adeudado_bloqueo: number }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true, monto_adeudado_bloqueo: 0 });
   const [formData, setFormData] = useState({
     codigo_cliente: '',
     nombre: '',
@@ -154,7 +154,7 @@ export default function Clientes() {
       supabase.from('listas_precios').select('id, nombre').eq('activo', true),
       supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
       supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
-      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo').limit(1).maybeSingle(),
+      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo, monto_adeudado_bloqueo').limit(1).maybeSingle(),
     ]);
     if (listasRes.data) setListasPrecios(listasRes.data);
     if (zonasRes.data) setZonas(zonasRes.data);
@@ -162,6 +162,7 @@ export default function Clientes() {
     if (configRes.data) setBloqueoConfig({
       facturas_adeudadas_bloqueo: (configRes.data as any).facturas_adeudadas_bloqueo ?? 3,
       bloqueo_automatico_activo: (configRes.data as any).bloqueo_automatico_activo ?? true,
+      monto_adeudado_bloqueo: (configRes.data as any).monto_adeudado_bloqueo ?? 0,
     });
   };
 
@@ -209,8 +210,8 @@ export default function Clientes() {
           supabase.from('cliente_facturas_adeudadas').select('cliente_id, cantidad_facturas_adeudadas').in('cliente_id', clienteIds),
         ]);
         
+        const saldosMap: Record<string, number> = {};
         if (saldosRes.data) {
-          const saldosMap: Record<string, number> = {};
           saldosRes.data.forEach(s => {
             saldosMap[s.cliente_id] = Number(s.saldo_actual) || 0;
           });
@@ -227,13 +228,26 @@ export default function Clientes() {
           // Auto-block/unblock clients
           if (bloqueoConfig.bloqueo_automatico_activo) {
             for (const cliente of data) {
-              const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const limitFacturas = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const limitMonto = (cliente as any).monto_adeudado_bloqueo_override ?? bloqueoConfig.monto_adeudado_bloqueo;
               const adeudadas = facturasMap[cliente.id] || 0;
-              const shouldBlock = adeudadas >= limit;
+              const saldoActual = saldosMap[cliente.id] || 0;
+              
+              const bloqueoPorFacturas = adeudadas >= limitFacturas;
+              const bloqueoPorMonto = limitMonto > 0 && saldoActual >= limitMonto;
+              const shouldBlock = bloqueoPorFacturas || bloqueoPorMonto;
+              
               if (shouldBlock !== cliente.bloqueado) {
+                let motivo: string | null = null;
+                if (shouldBlock) {
+                  const razones: string[] = [];
+                  if (bloqueoPorFacturas) razones.push(`${adeudadas} facturas adeudadas (límite: ${limitFacturas})`);
+                  if (bloqueoPorMonto) razones.push(`Deuda: $${saldoActual.toLocaleString('es-AR')} (límite: $${limitMonto.toLocaleString('es-AR')})`);
+                  motivo = razones.join(' | ');
+                }
                 await supabase.from('clientes').update({ 
                   bloqueado: shouldBlock,
-                  motivo_bloqueo: shouldBlock ? `Tiene ${adeudadas} facturas adeudadas (límite: ${limit})` : null
+                  motivo_bloqueo: motivo
                 }).eq('id', cliente.id);
                 cliente.bloqueado = shouldBlock;
               }

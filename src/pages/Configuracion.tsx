@@ -44,6 +44,7 @@ interface ConfiguracionComercio {
   texto_login_footer: string;
   facturas_adeudadas_bloqueo: number;
   bloqueo_automatico_activo: boolean;
+  monto_adeudado_bloqueo: number;
 }
 
 const CONDICIONES_IVA = [
@@ -97,6 +98,7 @@ const initialFormData: ConfiguracionComercio = {
   texto_login_footer: 'Sistema de Gestión Comercial © 2024',
   facturas_adeudadas_bloqueo: 3,
   bloqueo_automatico_activo: true,
+  monto_adeudado_bloqueo: 0,
 };
 
 export default function Configuracion() {
@@ -143,6 +145,7 @@ export default function Configuracion() {
           texto_login_footer: (data as any).texto_login_footer || 'Sistema de Gestión Comercial © 2024',
           facturas_adeudadas_bloqueo: (data as any).facturas_adeudadas_bloqueo ?? 3,
           bloqueo_automatico_activo: (data as any).bloqueo_automatico_activo ?? true,
+          monto_adeudado_bloqueo: (data as any).monto_adeudado_bloqueo ?? 0,
         });
       }
     } catch (error) {
@@ -205,6 +208,7 @@ export default function Configuracion() {
         texto_login_footer: formData.texto_login_footer.trim() || 'Sistema de Gestión Comercial © 2024',
         facturas_adeudadas_bloqueo: formData.facturas_adeudadas_bloqueo,
         bloqueo_automatico_activo: formData.bloqueo_automatico_activo,
+        monto_adeudado_bloqueo: formData.monto_adeudado_bloqueo,
       };
 
       if (configId) {
@@ -599,6 +603,21 @@ export default function Configuracion() {
                     />
                     <p className="text-xs text-muted-foreground">
                       Este es el valor global. Se puede configurar un valor diferente por cliente.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monto_adeudado_bloqueo">Monto máximo de deuda permitido ($)</Label>
+                    <Input
+                      id="monto_adeudado_bloqueo"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={formData.monto_adeudado_bloqueo}
+                      onChange={(e) => setFormData({ ...formData, monto_adeudado_bloqueo: parseFloat(e.target.value) || 0 })}
+                      disabled={!isAdmin}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      0 = desactivado. Si el saldo deudor supera este monto, el cliente se bloquea.
                     </p>
                   </div>
                 </div>
