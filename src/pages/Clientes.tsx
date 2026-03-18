@@ -210,8 +210,8 @@ export default function Clientes() {
           supabase.from('cliente_facturas_adeudadas').select('cliente_id, cantidad_facturas_adeudadas').in('cliente_id', clienteIds),
         ]);
         
+        const saldosMap: Record<string, number> = {};
         if (saldosRes.data) {
-          const saldosMap: Record<string, number> = {};
           saldosRes.data.forEach(s => {
             saldosMap[s.cliente_id] = Number(s.saldo_actual) || 0;
           });
