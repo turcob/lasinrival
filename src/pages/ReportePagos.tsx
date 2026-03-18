@@ -146,7 +146,7 @@ export default function ReportePagos() {
 
   return (
     <MainLayout>
-      <PageHeader title="Reporte de Pagos" subtitle="Visualizá y filtrá los pagos realizados por clientes" />
+      <PageHeader title="Reporte de Pagos" description="Visualizá y filtrá los pagos realizados por clientes" />
 
       {/* Filters */}
       <Card className="mb-6">
