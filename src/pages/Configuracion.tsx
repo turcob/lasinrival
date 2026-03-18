@@ -44,6 +44,7 @@ interface ConfiguracionComercio {
   texto_login_footer: string;
   facturas_adeudadas_bloqueo: number;
   bloqueo_automatico_activo: boolean;
+  monto_adeudado_bloqueo: number;
 }
 
 const CONDICIONES_IVA = [
