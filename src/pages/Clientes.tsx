@@ -228,13 +228,26 @@ export default function Clientes() {
           // Auto-block/unblock clients
           if (bloqueoConfig.bloqueo_automatico_activo) {
             for (const cliente of data) {
-              const limit = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const limitFacturas = cliente.facturas_adeudadas_bloqueo_override ?? bloqueoConfig.facturas_adeudadas_bloqueo;
+              const limitMonto = (cliente as any).monto_adeudado_bloqueo_override ?? bloqueoConfig.monto_adeudado_bloqueo;
               const adeudadas = facturasMap[cliente.id] || 0;
-              const shouldBlock = adeudadas >= limit;
+              const saldoActual = saldosMap[cliente.id] || 0;
+              
+              const bloqueoPorFacturas = adeudadas >= limitFacturas;
+              const bloqueoPorMonto = limitMonto > 0 && saldoActual >= limitMonto;
+              const shouldBlock = bloqueoPorFacturas || bloqueoPorMonto;
+              
               if (shouldBlock !== cliente.bloqueado) {
+                let motivo: string | null = null;
+                if (shouldBlock) {
+                  const razones: string[] = [];
+                  if (bloqueoPorFacturas) razones.push(`${adeudadas} facturas adeudadas (límite: ${limitFacturas})`);
+                  if (bloqueoPorMonto) razones.push(`Deuda: $${saldoActual.toLocaleString('es-AR')} (límite: $${limitMonto.toLocaleString('es-AR')})`);
+                  motivo = razones.join(' | ');
+                }
                 await supabase.from('clientes').update({ 
                   bloqueado: shouldBlock,
-                  motivo_bloqueo: shouldBlock ? `Tiene ${adeudadas} facturas adeudadas (límite: ${limit})` : null
+                  motivo_bloqueo: motivo
                 }).eq('id', cliente.id);
                 cliente.bloqueado = shouldBlock;
               }
