@@ -154,7 +154,7 @@ export default function Clientes() {
       supabase.from('listas_precios').select('id, nombre').eq('activo', true),
       supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
       supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
-      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo').limit(1).maybeSingle(),
+      supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo, monto_adeudado_bloqueo').limit(1).maybeSingle(),
     ]);
     if (listasRes.data) setListasPrecios(listasRes.data);
     if (zonasRes.data) setZonas(zonasRes.data);
