@@ -1,46 +1,38 @@
 
 
-# Importar Excel para marcar productos como "Frio"
+## Plan: Corregir workflows y agregar bloqueo por monto
 
-## Objetivo
-Crear un importador especializado que lea un archivo Excel, compare los productos por codigo de articulo (`COD_ARTIC`) y actualice unicamente el campo `es_frio` en la base de datos. No se agregan ni eliminan productos.
+Hay dos correcciones necesarias:
 
-## Logica del importador
+### 1. Corregir workflow de cobros en los PDFs
 
-1. El usuario selecciona un archivo Excel
-2. Se lee la primera hoja del archivo
-3. Por cada fila, se toma:
-   - `COD_ARTIC` (codigo de articulo)
-   - `CATEGORIO PARA LISTAS` (si el valor es "frio", se marca como frio)
-4. Se buscan todos los productos existentes en la base de datos por `codigo_articulo`
-5. Para cada coincidencia:
-   - Si `CATEGORIO PARA LISTAS` = "frio" (case insensitive) -> `es_frio = true`
-   - Si no es "frio" -> `es_frio = false`
-6. Se actualiza en lotes de 100 para rendimiento
-7. Se muestra resumen: cantidad actualizados como frio, cantidad marcados como no frio, no encontrados
+**Problema actual**: El workflow no distingue correctamente que:
+- **Efectivo**: se imputa solo una vez aprobada la rendición de caja/logística
+- **Transferencias y cheques**: se imputan manualmente desde el módulo Imputación
 
-## Archivos a crear/modificar
+**Cambio**: Actualizar `src/lib/imprimirWorkflows.ts` en las secciones de cobros y logística para reflejar este flujo diferenciado con pasos claros por medio de pago.
 
-| Archivo | Accion |
-|---------|--------|
-| `src/components/productos/ImportarFriosDialog.tsx` | Nuevo - Dialog con el importador |
-| `src/pages/Productos.tsx` | Modificar - Agregar boton "Importar Frios" que abre el dialog |
+### 2. Agregar bloqueo por monto adeudado
 
-## Detalle tecnico
+**Problema actual**: Solo se bloquea por cantidad de facturas adeudadas (`facturas_adeudadas_bloqueo`). Falta bloqueo por monto.
 
-### ImportarFriosDialog.tsx
-- Componente Dialog con input de archivo Excel
-- Usa la libreria `xlsx` ya instalada
-- Proceso:
-  1. Lee el Excel con `XLSX.read()`
-  2. Extrae `COD_ARTIC` y `CATEGORIO PARA LISTAS` de cada fila (con normalizacion de nombres de columna mediante trim)
-  3. Busca todos los productos en la DB con paginacion (batches de 1000) para superar el limite de Supabase
-  4. Crea un mapa `codigo_articulo -> id` de productos existentes
-  5. Recorre las filas del Excel, y por cada coincidencia arma un update
-  6. Ejecuta updates en lotes de 100
-  7. Muestra barra de progreso y resumen final (marcados frio, marcados no frio, no encontrados)
+**Cambios necesarios**:
 
-### Productos.tsx
-- Se agrega un boton "Importar Frios" (con icono de copo de nieve o similar) junto a los botones existentes de importacion
-- Al hacer clic, abre el `ImportarFriosDialog`
+| Archivo / Recurso | Cambio |
+|---|---|
+| **Migración DB** | Agregar columna `monto_adeudado_bloqueo` (numeric, default 0 = desactivado) a `configuracion_comercio`, y `monto_adeudado_bloqueo_override` (numeric, nullable) a `clientes` |
+| `src/pages/Configuracion.tsx` | Agregar campo para configurar monto máximo de deuda permitido |
+| `src/pages/Clientes.tsx` | Actualizar lógica de auto-bloqueo para también evaluar saldo actual vs monto límite |
+| `src/lib/imprimirWorkflows.ts` | Actualizar workflow de cobros para mencionar ambos criterios de bloqueo (facturas Y monto) y el flujo diferenciado efectivo vs transferencia/cheque |
+
+### Lógica de bloqueo actualizada
+
+```
+shouldBlock = 
+  (adeudadas >= limiteFacturas) 
+  OR 
+  (montoLimite > 0 AND saldoActual >= montoLimite)
+```
+
+El motivo de bloqueo indicará cuál criterio se activó.
 
