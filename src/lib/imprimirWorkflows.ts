@@ -77,11 +77,11 @@ export function imprimirWorkflowVentas() {
         ${arrow}
         ${decision('¿Pedido duplicado?', 'El sistema detecta si ya existe un pedido similar del mismo día para el cliente')}
         ${arrow}
+        ${decision('¿Cliente bloqueado?', 'Se verifica si el cliente está bloqueado por facturas adeudadas o monto de deuda')}
+        ${arrow}
+        ${note('Cliente bloqueado: no se puede generar pedido', 'Debe regularizar su situación de cuenta corriente (facturas o monto adeudado)')}
+        ${arrow}
         ${step('Confirmación del pedido', 'Estado: PENDIENTE. Se registra vendedor, fecha, zona y condición de venta')}
-        ${arrow}
-        ${decision('¿Cliente bloqueado?', 'Se verifica el estado del cliente antes de permitir la venta')}
-        ${arrow}
-        ${note('Cliente bloqueado: no se puede generar pedido', 'Debe regularizar su situación de cuenta corriente')}
       </div>
     </div>
 
@@ -150,31 +150,44 @@ export function imprimirWorkflowCobros() {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Workflow - Cobros y Cuenta Corriente</title>${baseStyles}</head><body>
     <div class="header">
       <h1>Workflow: Cobros y Cuenta Corriente</h1>
-      <p>Registro de pagos, imputación de facturas y sistema de bloqueo automático</p>
+      <p>Registro de pagos diferenciado por medio de pago, imputación y sistema de bloqueo automático</p>
     </div>
     ${legend()}
 
     <div class="section">
-      <div class="section-title">1. Registro de Pago</div>
+      <div class="section-title">1. Registro de Pago en Ruta</div>
       <div class="flow">
-        ${step('Seleccionar cliente', 'Se busca el cliente en la lista y se accede a su cuenta corriente')}
+        ${step('Chofer registra cobro en parada', 'Se indica monto cobrado y forma de pago: efectivo, transferencia, cheque, QR')}
         ${arrow}
-        ${step('Ver saldo y movimientos', 'Se muestra el saldo actual, facturas pendientes y pagos anteriores')}
+        ${decision('¿Qué medio de pago?', 'El flujo de imputación depende del medio de pago utilizado')}
         ${arrow}
-        ${step('Registrar nuevo pago', 'Se indica monto, forma de pago (efectivo, transferencia, cheque, tarjeta) y concepto')}
-        ${arrow}
-        ${decision('¿Pago con cheque?', 'Si el medio es cheque se registran datos adicionales: banco, número, vencimiento')}
-        ${arrow}
-        ${success('Pago registrado', 'Se crea movimiento tipo CREDITO (haber) en la cuenta corriente')}
+        ${note('IMPORTANTE: Flujo diferenciado por medio de pago', 'Efectivo → se imputa con la rendición. Transferencias y cheques → se imputan desde el módulo Imputación')}
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">2. Imputación de Pagos</div>
+      <div class="section-title">2A. Flujo Efectivo → Rendición</div>
       <div class="flow">
-        ${step('Acceder a módulo de Imputación', 'Se listan los pagos pendientes de imputar y las facturas adeudadas')}
+        ${step('Efectivo cobrado en ruta', 'El chofer recauda el efectivo durante las entregas')}
         ${arrow}
-        ${step('Seleccionar pago y facturas', 'Se vincula un pago con una o más facturas que cancela')}
+        ${step('Rendición de la hoja de ruta', 'Al finalizar el recorrido, el chofer rinde el dinero recaudado')}
+        ${arrow}
+        ${decision('¿Rendición aprobada?', 'Un supervisor revisa montos y aprueba la rendición')}
+        ${arrow}
+        ${success('Efectivo imputado automáticamente', 'Al aprobarse la rendición, los cobros en efectivo se imputan a las facturas correspondientes')}
+        ${arrow}
+        ${step('Efectivo ingresa a caja', 'El dinero rendido se vincula al cierre de caja del día')}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">2B. Flujo Transferencias y Cheques → Imputación Manual</div>
+      <div class="flow">
+        ${step('Transferencia o cheque registrado', 'Se registra el pago con estado "pendiente de imputación"')}
+        ${arrow}
+        ${step('Acceder al módulo Imputación', 'Se listan los pagos pendientes de imputar y las facturas adeudadas del cliente')}
+        ${arrow}
+        ${step('Seleccionar pago y facturas', 'Se vincula el pago (transferencia o cheque) con una o más facturas que cancela')}
         ${arrow}
         ${decision('¿Pago cubre toda la factura?', 'Si el pago es parcial, la factura queda con saldo pendiente')}
         ${arrow}
@@ -187,15 +200,17 @@ export function imprimirWorkflowCobros() {
     <div class="section">
       <div class="section-title">3. Bloqueo Automático de Clientes</div>
       <div class="flow">
-        ${step('Sistema verifica facturas adeudadas', 'Se cuentan las facturas pendientes de pago de cada cliente')}
+        ${step('Sistema verifica criterios de bloqueo', 'Se evalúan dos criterios independientes para cada cliente')}
         ${arrow}
-        ${decision('¿Supera el límite configurado?', 'Se compara contra el valor global o el override del cliente')}
+        ${decision('¿Supera facturas adeudadas?', 'Se compara cantidad de facturas impagas contra el límite configurado (global o particular del cliente)')}
         ${arrow}
-        ${note('Cliente BLOQUEADO automáticamente', 'No se pueden generar nuevos pedidos hasta regularizar')}
+        ${decision('¿Supera monto adeudado?', 'Se compara el saldo deudor total contra el monto máximo permitido (global o particular del cliente)')}
         ${arrow}
-        ${step('Regularización', 'El cliente paga las facturas adeudadas')}
+        ${note('Cliente BLOQUEADO automáticamente', 'Se activa si se cumple CUALQUIERA de los dos criterios. No se pueden generar nuevos pedidos')}
         ${arrow}
-        ${step('Desbloqueo manual o automático', 'Un administrador puede desbloquear o se desbloquea al imputar pagos')}
+        ${step('Regularización', 'El cliente paga las facturas adeudadas o reduce su saldo por debajo del límite')}
+        ${arrow}
+        ${step('Desbloqueo automático', 'Al imputar pagos y quedar dentro de los límites, el sistema desbloquea al cliente')}
         ${arrow}
         ${success('Cliente habilitado', 'Puede volver a recibir pedidos')}
       </div>
@@ -210,7 +225,7 @@ export function imprimirWorkflowCobros() {
         ${arrow}
         ${step('Exportación', 'Se puede imprimir o exportar el estado de cuenta')}
         ${arrow}
-        ${decision('¿Hay pagos sin imputar?', 'Se identifican pagos que no fueron asociados a facturas')}
+        ${decision('¿Hay pagos sin imputar?', 'Se identifican pagos (transferencias/cheques) que no fueron asociados a facturas')}
         ${arrow}
         ${note('Pagos pendientes de imputación', 'Requieren asociación manual desde el módulo de Imputación')}
       </div>
@@ -253,7 +268,7 @@ export function imprimirWorkflowLogistica() {
         ${arrow}
         ${decision('¿Entrega exitosa?', 'El cliente puede aceptar, rechazar parcial o totalmente')}
         ${arrow}
-        ${step('Registrar cobro en parada', 'Se indica monto cobrado y forma de pago: efectivo, transferencia, QR, tarjeta')}
+        ${step('Registrar cobro en parada', 'Se indica monto cobrado y forma de pago: efectivo, transferencia, QR, cheque')}
         ${arrow}
         ${step('Registrar devoluciones', 'Productos rechazados con motivo: dañado, vencido, no solicitado, sobrante')}
         ${arrow}
@@ -266,28 +281,30 @@ export function imprimirWorkflowLogistica() {
       <div class="flow">
         ${step('Finalizar recorrido', 'Se registra km final, hora de regreso')}
         ${arrow}
-        ${step('Iniciar rendición', 'Se totaliza por forma de pago: efectivo, transferencias, QR, tarjeta')}
+        ${step('Iniciar rendición', 'Se totaliza por forma de pago: efectivo, transferencias, QR, cheque')}
         ${arrow}
-        ${decision('¿Hay diferencias?', 'Se compara lo cobrado vs lo que debía cobrarse')}
+        ${decision('¿Hay diferencias en efectivo?', 'Se compara el efectivo recaudado vs lo que debía cobrarse en efectivo')}
         ${arrow}
         ${note('Diferencia detectada', 'Se registra el monto de diferencia y observaciones')}
         ${arrow}
         ${step('Aprobación de rendición', 'Un supervisor revisa y aprueba la rendición')}
         ${arrow}
-        ${success('Rendición aprobada', 'Se cierran los movimientos de la hoja de ruta')}
+        ${success('Rendición aprobada', 'El efectivo se imputa a las facturas correspondientes de los clientes')}
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">4. Impacto en Stock y Cuenta Corriente</div>
+      <div class="section-title">4. Impacto en Stock, Cta. Cte. y Caja</div>
       <div class="flow">
         ${step('Devoluciones reingresan stock', 'Los productos devueltos se suman nuevamente al inventario')}
         ${arrow}
-        ${step('Cobros impactan cuenta corriente', 'Los pagos registrados en ruta se reflejan como créditos del cliente')}
+        ${step('Efectivo: imputado con la rendición', 'Los cobros en efectivo se imputan automáticamente al aprobarse la rendición')}
+        ${arrow}
+        ${step('Transferencias y cheques: módulo Imputación', 'Los cobros por transferencia o cheque quedan pendientes para imputación manual')}
         ${arrow}
         ${step('Efectivo ingresa a caja', 'El efectivo cobrado se vincula al cierre de caja del día')}
         ${arrow}
-        ${decision('¿Todo conciliado?', 'Se verifica que no haya diferencias sin resolver')}
+        ${decision('¿Todo conciliado?', 'Se verifica que no haya diferencias sin resolver ni pagos sin imputar')}
         ${arrow}
         ${success('Proceso logístico completo', 'Hoja de ruta cerrada y conciliada')}
       </div>

@@ -605,6 +605,21 @@ export default function Configuracion() {
                       Este es el valor global. Se puede configurar un valor diferente por cliente.
                     </p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monto_adeudado_bloqueo">Monto máximo de deuda permitido ($)</Label>
+                    <Input
+                      id="monto_adeudado_bloqueo"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={formData.monto_adeudado_bloqueo}
+                      onChange={(e) => setFormData({ ...formData, monto_adeudado_bloqueo: parseFloat(e.target.value) || 0 })}
+                      disabled={!isAdmin}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      0 = desactivado. Si el saldo deudor supera este monto, el cliente se bloquea.
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
