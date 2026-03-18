@@ -208,6 +208,7 @@ export default function Configuracion() {
         texto_login_footer: formData.texto_login_footer.trim() || 'Sistema de Gestión Comercial © 2024',
         facturas_adeudadas_bloqueo: formData.facturas_adeudadas_bloqueo,
         bloqueo_automatico_activo: formData.bloqueo_automatico_activo,
+        monto_adeudado_bloqueo: formData.monto_adeudado_bloqueo,
       };
 
       if (configId) {
