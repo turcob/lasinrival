@@ -460,6 +460,49 @@ export function ConsolidadoFinalZona() {
               ))}
             </div>
           </div>
+
+          {/* Pedidos con pesables */}
+          {pedidosConPesables.length > 0 && (
+            <div className="space-y-2 border rounded-lg p-4 bg-amber-50 dark:bg-amber-950/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Scale className="h-5 w-5" />
+                  Pedidos con Pesables ({pedidosConPesables.length})
+                </h3>
+                <Button variant="outline" size="sm" onClick={handleImprimirPesables}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir Pesables por Cliente
+                </Button>
+              </div>
+              <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                {pedidosConPesables.map(pedido => {
+                  const pesables = pedido.detalles.filter(d => {
+                    if (!d.producto) return false;
+                    const u = (d.producto.unidad_medida || '').toUpperCase().replace(/\./g, '').trim();
+                    return ['KG', 'KILO', 'KILOS'].includes(u);
+                  });
+                  return (
+                    <div key={pedido.id} className="p-2 rounded border bg-background">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="font-mono text-sm">#{pedido.numero_pedido.toString().padStart(6, '0')}</span>
+                        <span className="font-medium">{pedido.cliente?.nombre}</span>
+                        <Badge variant="secondary" className="text-xs">{pesables.length} pesables</Badge>
+                      </div>
+                      <div className="pl-6 space-y-0.5">
+                        {pesables.map(d => (
+                          <div key={d.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-mono">{d.producto?.codigo_articulo}</span>
+                            <span className="flex-1">{d.producto?.descripcion}</span>
+                            <span className="font-medium text-foreground">{d.cantidad_pedida} {d.producto?.unidad_medida || 'KG'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
