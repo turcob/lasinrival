@@ -36,6 +36,7 @@ import {
   FileCheck,
   Banknote,
   PackageX,
+  Printer,
   RotateCcw
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
