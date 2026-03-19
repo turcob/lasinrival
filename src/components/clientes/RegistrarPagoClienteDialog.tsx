@@ -704,6 +704,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </Alert>
           )}
 
+          {/* Bonificación: monto libre + concepto */}
+          {esBonificacion && (
+            <Alert>
+              <AlertDescription>
+                La bonificación se registra como nota de crédito a favor del cliente. Ingrese el monto y un concepto descriptivo.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Selector de compra para NC con factura, devolucion, anulacion */}
           {requiereSelectorCompra && (
             <>
