@@ -44,102 +44,110 @@ const isShortDocument = (lineas: LineaRemito[]) => lineas.length <= 8;
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
   const pageSize = useA5 ? 'size: 148mm 210mm;' : 'size: A4;';
+  const pageMargin = useA5 ? 'margin: 4mm;' : 'margin: 6mm;';
   return `
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none !important; }
-      @page { ${pageSize} margin: 6mm; }
+      @page { ${pageSize} ${pageMargin} }
+      .factura-container { height: 100vh; display: flex; flex-direction: column; }
+      .items-table-wrapper { flex: 1; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 700;
       line-height: 1.35;
       color: #1a1a1a;
-      max-width: ${useA5 ? '520px' : '780px'};
+      max-width: ${useA5 ? '540px' : '780px'};
       margin: 0 auto;
-      padding: 10px;
+      padding: 6px;
     }
     .factura-container {
-      border: 1.5px solid #333;
-      border-radius: 4px;
+      border: 2px solid #222;
+      border-radius: 3px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     /* Header */
     .header {
       display: flex;
       align-items: stretch;
-      border-bottom: 1.5px solid #333;
-      background: #f8f8f8;
+      border-bottom: 2px solid #222;
+      background: #f5f5f5;
     }
     .header-logo {
-      width: 60px;
+      width: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 6px;
-      border-right: 1px solid #ccc;
+      padding: 5px;
+      border-right: 1px solid #bbb;
     }
     .header-logo img {
-      max-width: 48px;
-      max-height: 48px;
+      max-width: 44px;
+      max-height: 44px;
       object-fit: contain;
     }
     .header-center {
       flex: 1;
-      padding: 6px 10px;
+      padding: 5px 8px;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
     .header-center .empresa-nombre {
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 800;
       letter-spacing: 0.5px;
-      color: #111;
+      color: #000;
     }
     .header-center .empresa-detalle {
-      font-size: 9px;
-      color: #555;
-      margin-top: 2px;
+      font-size: 10px;
+      color: #333;
+      font-weight: 700;
+      margin-top: 1px;
     }
     .header-right {
-      width: 130px;
-      border-left: 1.5px solid #333;
+      width: 125px;
+      border-left: 2px solid #222;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 6px;
+      padding: 5px;
     }
     .header-right .doc-tipo {
-      font-size: 13px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 900;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: #111;
+      color: #000;
     }
     .header-right .doc-numero {
-      font-size: 16px;
-      font-weight: 700;
-      color: #333;
+      font-size: 17px;
+      font-weight: 800;
+      color: #222;
       margin-top: 2px;
       font-family: 'Courier New', monospace;
     }
     .header-right .doc-fecha {
-      font-size: 10px;
-      color: #666;
-      margin-top: 3px;
+      font-size: 11px;
+      color: #333;
+      font-weight: 700;
+      margin-top: 2px;
     }
     /* Client info bar */
     .client-bar {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 5px 10px;
-      border-bottom: 1px solid #ddd;
+      gap: 10px;
+      padding: 5px 8px;
+      border-bottom: 1px solid #ccc;
       background: #fff;
-      font-size: 11px;
+      font-size: 12px;
       flex-wrap: wrap;
     }
     .client-bar .cb-item {
@@ -148,30 +156,30 @@ function getStyles(useA5: boolean) {
       gap: 3px;
     }
     .cb-label {
-      font-size: 9px;
-      color: #888;
+      font-size: 10px;
+      color: #555;
       text-transform: uppercase;
-      font-weight: 600;
+      font-weight: 800;
     }
     .cb-value {
-      font-weight: 700;
-      color: #111;
-      font-size: 12px;
+      font-weight: 800;
+      color: #000;
+      font-size: 13px;
     }
     .client-bar .cb-separator {
       width: 1px;
       height: 14px;
-      background: #ccc;
+      background: #bbb;
     }
     /* Secondary info row */
     .info-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 4px 10px;
-      border-bottom: 1.5px solid #333;
-      font-size: 10px;
-      color: #555;
+      gap: 8px;
+      padding: 4px 8px;
+      border-bottom: 2px solid #222;
+      font-size: 11px;
+      color: #333;
       background: #fafafa;
     }
     .info-bar .ib-item {
@@ -179,112 +187,116 @@ function getStyles(useA5: boolean) {
       gap: 3px;
     }
     .info-bar .ib-label {
-      font-weight: 600;
-      color: #888;
+      font-weight: 800;
+      color: #555;
       text-transform: uppercase;
-      font-size: 9px;
+      font-size: 10px;
     }
     .info-bar .ib-value {
-      font-weight: 600;
-      color: #333;
+      font-weight: 700;
+      color: #222;
     }
     .info-bar .spacer { flex: 1; }
     /* Table */
+    .items-table-wrapper { flex: 1; }
     .items-table {
       width: 100%;
       border-collapse: collapse;
     }
     .items-table thead th {
-      background: #2c2c2c;
+      background: #222;
       color: #fff;
-      padding: 4px 6px;
+      padding: 5px 6px;
       text-align: left;
-      font-size: 9px;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .items-table thead th.center { text-align: center; }
     .items-table thead th.right { text-align: right; }
     .cell {
-      padding: 3px 6px;
-      border-bottom: 1px solid #e0e0e0;
-      font-size: 10px;
+      padding: 4px 6px;
+      border-bottom: 1px solid #d0d0d0;
+      font-size: 11px;
+      font-weight: 700;
       vertical-align: middle;
     }
     .cell.mono {
       font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 11px;
+      font-weight: 700;
     }
     .center { text-align: center; }
     .right { text-align: right; }
-    .bold { font-weight: 700; }
+    .bold { font-weight: 800; }
     tr:nth-child(even) .cell {
-      background: #fafafa;
+      background: #f7f7f7;
     }
     /* Total */
     .total-row {
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      border-top: 1.5px solid #333;
-      background: #f0f0f0;
+      border-top: 2px solid #222;
+      background: #eee;
     }
     .total-label {
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 800;
+      padding: 7px 12px;
+      font-size: 14px;
+      font-weight: 900;
       letter-spacing: 2px;
-      color: #333;
+      color: #222;
     }
     .total-value {
-      padding: 6px 12px;
-      font-size: 15px;
-      font-weight: 800;
-      border-left: 1.5px solid #333;
+      padding: 7px 12px;
+      font-size: 16px;
+      font-weight: 900;
+      border-left: 2px solid #222;
       min-width: 120px;
       text-align: right;
-      color: #111;
+      color: #000;
       font-family: 'Courier New', monospace;
     }
     /* Footer */
     .footer-section {
-      padding: 8px 10px 6px;
-      border-top: 1px solid #ddd;
+      padding: 8px 8px 6px;
+      border-top: 1px solid #ccc;
     }
     .recibi-conforme {
-      font-size: 10px;
-      font-weight: 700;
-      color: #333;
-      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #222;
+      margin-bottom: 4px;
     }
     .firmas-row {
       display: flex;
       justify-content: space-between;
-      margin-top: 8px;
+      margin-top: 6px;
     }
     .firma-block {
       width: 28%;
       text-align: center;
     }
     .firma-dots {
-      border-bottom: 1px dotted #999;
-      height: 30px;
+      border-bottom: 1px dotted #666;
+      height: 28px;
       margin-bottom: 3px;
     }
     .firma-label {
-      font-size: 9px;
-      color: #888;
+      font-size: 10px;
+      color: #555;
+      font-weight: 700;
       text-transform: uppercase;
     }
     .disclaimer {
-      margin-top: 10px;
-      font-size: 8px;
+      margin-top: 8px;
+      font-size: 11px;
       text-align: center;
-      font-weight: 600;
-      color: #666;
+      font-weight: 800;
+      color: #333;
       letter-spacing: 0.3px;
-      border-top: 1px solid #ddd;
+      border-top: 1px solid #ccc;
       padding-top: 6px;
     }
     .print-button {
