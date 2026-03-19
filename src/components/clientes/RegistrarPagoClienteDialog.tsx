@@ -98,6 +98,7 @@ interface MedioPagoLinea {
   id: string;
   forma_pago_id: string;
   monto: string;
+  numero_operacion?: string;
   chequeData?: ChequeData;
 }
 
