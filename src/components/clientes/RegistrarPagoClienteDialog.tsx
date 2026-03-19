@@ -1195,13 +1195,13 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </>
           )}
 
-          {!montoDesdeProductos && (
+          {(!montoDesdeProductos || esBonificacion) && (
             <div className="space-y-2">
-              <Label>Concepto (opcional)</Label>
+              <Label>{esBonificacion ? 'Concepto de la bonificación' : 'Concepto (opcional)'}</Label>
               <Textarea
                 value={concepto}
                 onChange={(e) => setConcepto(e.target.value)}
-                placeholder="Descripción del movimiento"
+                placeholder={esBonificacion ? 'Ej: Bonificación por diferencia de cobro' : 'Descripción del movimiento'}
                 rows={2}
               />
             </div>
