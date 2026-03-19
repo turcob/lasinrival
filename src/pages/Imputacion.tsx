@@ -406,17 +406,21 @@ export default function Imputacion() {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search + Import */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por cliente, nº cheque o banco..."
+              placeholder="Buscar por cliente, nº cheque, banco o nº operación..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
+          <Button variant="outline" onClick={() => setImportarBancoOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Importar Extracto Bancario
+          </Button>
         </div>
 
         {/* Tabs */}
