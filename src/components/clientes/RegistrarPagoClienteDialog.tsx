@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, Trash2, Search } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Search, Upload } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
