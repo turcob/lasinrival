@@ -314,3 +314,78 @@ export function imprimirWorkflowLogistica() {
   </body></html>`;
   openPrintWindow(html);
 }
+
+export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[]) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Devoluciones - HR #${hojaRuta.numero_hoja}</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; font-size: 12px; }
+    .header { text-align: center; border-bottom: 3px solid #d97706; padding-bottom: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 20px; font-weight: 800; color: #92400e; }
+    .header p { font-size: 11px; color: #78716c; margin-top: 4px; }
+    .info-bar { display: flex; gap: 24px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; font-weight: 600; }
+    .info-bar span { color: #78716c; font-weight: 400; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { background: #f59e0b; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
+    tr:nth-child(even) { background: #fffbeb; }
+    .motivo { color: #92400e; font-weight: 600; }
+    .detalle { color: #78716c; font-style: italic; }
+    .total-row { background: #fef3c7 !important; font-weight: 700; }
+    .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
+    .firma-section { display: flex; justify-content: space-between; margin-top: 40px; padding: 0 40px; }
+    .firma-box { text-align: center; width: 200px; }
+    .firma-line { border-top: 1px solid #1a1a1a; margin-bottom: 4px; }
+    .firma-label { font-size: 10px; color: #6b7280; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body>
+    <div class="header">
+      <h1>DEVOLUCIONES — Hoja de Ruta #${hojaRuta.numero_hoja}</h1>
+      <p>Fecha: ${new Date(hojaRuta.fecha).toLocaleDateString('es-AR')} | Chofer: ${hojaRuta.chofer?.nombre || '-'} | Vehículo: ${hojaRuta.vehiculo?.patente || '-'}</p>
+    </div>
+
+    <div class="info-bar">
+      <div>Total devoluciones: <span>${devoluciones.length} ítems</span></div>
+      <div>Total unidades: <span>${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Motivo</th>
+          <th>Detalle</th>
+          <th>Fecha/Hora</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${devoluciones.map((d: any, i: number) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${d.pedido_detalle?.producto?.descripcion || 'Producto'}</td>
+            <td style="text-align:center;font-weight:700;">${d.cantidad}</td>
+            <td class="motivo">${(d.motivo || 'Sin motivo').replace(/_/g, ' ')}</td>
+            <td class="detalle">${d.detalle_motivo || '-'}</td>
+            <td>${new Date(d.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+          </tr>
+        `).join('')}
+        <tr class="total-row">
+          <td colspan="2" style="text-align:right;">TOTAL</td>
+          <td style="text-align:center;">${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</td>
+          <td colspan="3"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="firma-section">
+      <div class="firma-box"><div class="firma-line"></div><div class="firma-label">Chofer</div></div>
+      <div class="firma-box"><div class="firma-line"></div><div class="firma-label">Responsable</div></div>
+    </div>
+
+    <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+  </body></html>`;
+  openPrintWindow(html);
+}
