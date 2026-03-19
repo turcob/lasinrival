@@ -139,6 +139,7 @@ export default function Imputacion() {
         cliente_nombre: clientesMap.get(m.cliente_id) || 'Cliente desconocido',
         forma_pago_nombre: m.forma_pago_id ? formasPagoMap.get(m.forma_pago_id) || null : null,
         usuario_registro_nombre: usuariosMap.get(m.usuario_registro_id) || null,
+        numero_operacion: (m as any).numero_operacion || null,
         cheque: chequesMap.get(m.id) || null,
       }));
 
