@@ -51,10 +51,11 @@ interface FormaPago {
 
 interface CompraCliente {
   id: string;
-  venta_id: string;
+  venta_id: string | null;
   monto: number;
   fecha: string;
-  numero_comprobante: number;
+  numero_comprobante: number | string;
+  concepto: string | null;
 }
 
 interface ProductoVenta {
