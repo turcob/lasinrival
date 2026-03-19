@@ -287,6 +287,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const esNotaCredito = tipo === 'nota_credito';
   const esDevolucion = tipo === 'devolucion';
   const esAnulacion = tipo === 'anulacion';
+  const esBonificacion = tipo === 'bonificacion';
   const requiereSelectorCompra = TIPOS_CON_SELECTOR_COMPRA.includes(tipo) && !ncLibre;
 
   const totalNotaCredito = useMemo(() => {
