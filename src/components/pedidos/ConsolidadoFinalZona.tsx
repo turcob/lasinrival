@@ -348,7 +348,12 @@ export function ConsolidadoFinalZona() {
 
         <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
-          Imprimir Consolidado
+          Consolidado por Tipo
+        </Button>
+
+        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidos || pedidos.length === 0}>
+          <Printer className="h-4 w-4 mr-2" />
+          Consolidado Completo
         </Button>
 
         <Button variant="outline" onClick={() => handleImprimirRemitosFiltrados(pedidosCortos)} disabled={pedidosCortos.length === 0}>
