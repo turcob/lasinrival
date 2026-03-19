@@ -582,12 +582,13 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           toast.success(mensaje);
         }
       } else {
-        // NC (con o sin factura), devolucion, anulacion, nota_debito
+        // NC (con o sin factura), devolucion, anulacion, nota_debito, bonificacion
+        const tipoDb = esBonificacion ? 'nota_credito' : tipo;
         const { error: movError } = await supabase
           .from('cliente_movimientos')
           .insert([{
             cliente_id: clienteId,
-            tipo,
+            tipo: tipoDb,
             monto: montoFinal,
             concepto: conceptoFinal,
             usuario_registro_id: user.id,
