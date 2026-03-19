@@ -374,10 +374,20 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             {/* Sección de Devoluciones Registradas */}
             {devoluciones && devoluciones.length > 0 && (
               <div className="space-y-3">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <RotateCcw className="h-4 w-4 text-amber-600" />
-                  Devoluciones Registradas ({devoluciones.length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <RotateCcw className="h-4 w-4 text-amber-600" />
+                    Devoluciones Registradas ({devoluciones.length})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, devoluciones)}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Imprimir
+                  </Button>
+                </div>
                 
                 <div className="border border-amber-200 rounded-lg divide-y bg-amber-50/50 max-h-[200px] overflow-y-auto">
                   {devoluciones.map((devolucion: any) => (
