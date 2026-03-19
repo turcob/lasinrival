@@ -119,6 +119,7 @@ const TIPOS_MOVIMIENTO = [
 
 const TIPOS_CON_FORMA_PAGO = ['pago'];
 const TIPOS_CON_SELECTOR_COMPRA = ['nota_credito', 'devolucion', 'anulacion'];
+const TIPOS_CON_SELECTOR_FACTURA_PAGO = ['pago'];
 
 let lineaIdCounter = 0;
 const nuevaLinea = (): MedioPagoLinea => ({
