@@ -546,6 +546,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
               forma_pago_id: linea.forma_pago_id,
               venta_id: null,
               estado_imputacion: estadoImputacion,
+              numero_operacion: esTransferenciaLinea ? (linea.numero_operacion?.trim() || null) : null,
             }])
             .select('id')
             .single();
