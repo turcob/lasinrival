@@ -699,6 +699,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setProductosNotaCredito([]);
     setNcLibre(false);
     setProductosManualNC([nuevoProductoManual()]);
+    setFacturasPagoSeleccionadas([]);
   };
 
   const showProductSelector = requiereSelectorCompra || (esNotaCredito && ncLibre);
