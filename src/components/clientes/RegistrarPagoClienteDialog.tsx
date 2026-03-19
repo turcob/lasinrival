@@ -1004,8 +1004,21 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                         )}
                       </div>
 
+                      {esTransferenciaFP(linea.forma_pago_id) && (
+                        <div className="space-y-2 pt-2 border-t">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nro. Operación / Transferencia</Label>
+                            <Input
+                              value={linea.numero_operacion || ''}
+                              onChange={(e) => actualizarLinea(linea.id, 'numero_operacion', e.target.value)}
+                              placeholder="Ej: 0001234567"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {(esChequeFP(linea.forma_pago_id) || esTransferenciaFP(linea.forma_pago_id)) && (
-                        <p className="text-xs text-amber-600">
+                        <p className="text-xs text-warning">
                           ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
                         </p>
                       )}
