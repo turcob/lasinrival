@@ -156,7 +156,8 @@ export default function Imputacion() {
     const matchesSearch = 
       m.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase());
+      m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.numero_operacion?.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (selectedTab === 'pendientes') {
       return matchesSearch && m.estado_imputacion === 'pendiente';
