@@ -194,16 +194,19 @@ export function ConsolidadoFinalZona() {
     printWindow.print();
   };
 
-  const handleImprimirRemitos = () => {
-    if (!pedidos || pedidos.length === 0) return;
+  const pedidosCortos = useMemo(() => pedidos?.filter(p => p.detalles.length <= 10) || [], [pedidos]);
+  const pedidosLargos = useMemo(() => pedidos?.filter(p => p.detalles.length > 10) || [], [pedidos]);
+
+  const handleImprimirRemitosFiltrados = (pedidosFiltrados: PedidoConsolidado[]) => {
+    if (pedidosFiltrados.length === 0) return;
     const ventana = window.open('', '_blank', 'width=800,height=600');
     if (!ventana) {
       alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
       return;
     }
 
-    const remitosHTML = pedidos.map((pedido, index) => {
-      const isLast = index === pedidos.length - 1;
+    const remitosHTML = pedidosFiltrados.map((pedido, index) => {
+      const isLast = index === pedidosFiltrados.length - 1;
       return generarRemitoHTML({
         numeroPedido: pedido.numero_pedido,
         fecha: new Date(pedido.fecha_pedido),
