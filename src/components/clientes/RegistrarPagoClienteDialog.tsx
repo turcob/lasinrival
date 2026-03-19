@@ -166,6 +166,11 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [lineaBuscandoId, setLineaBuscandoId] = useState<string | null>(null);
 
+  // Factura asociada al pago
+  const [comprasPago, setComprasPago] = useState<CompraCliente[]>([]);
+  const [facturasPagoSeleccionadas, setFacturasPagoSeleccionadas] = useState<string[]>([]);
+  const [loadingComprasPago, setLoadingComprasPago] = useState(false);
+
   useEffect(() => {
     if (open) {
       fetchFormasPago();
