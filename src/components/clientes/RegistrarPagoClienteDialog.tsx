@@ -188,10 +188,20 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   }, [tipo, open, clienteId, ncLibre]);
 
+  // Fetch compras for payment factura association
+  useEffect(() => {
+    if (TIPOS_CON_SELECTOR_FACTURA_PAGO.includes(tipo) && open) {
+      fetchComprasPago();
+    } else {
+      setComprasPago([]);
+      setFacturasPagoSeleccionadas([]);
+    }
+  }, [tipo, open, clienteId]);
+
   useEffect(() => {
     if (compraSeleccionada) {
       const compra = comprasCliente.find(c => c.id === compraSeleccionada);
-      if (compra) {
+      if (compra && compra.venta_id) {
         fetchProductosVenta(compra.venta_id);
       }
     } else {
