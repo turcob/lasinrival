@@ -268,8 +268,17 @@ export default function Pedidos() {
                     pedidosFiltrados.map((pedido) => {
                       const config = estadoConfig[pedido.estado];
                       const Icon = config.icon;
-                      const isExpanded = expandidos.has(pedido.id);
+                      const isExpandedBySearch = !!busquedaProducto;
+                      const isExpanded = isExpandedBySearch || expandidos.has(pedido.id);
                       const cantProductos = pedido.detalles?.length || 0;
+
+                      const termProd = busquedaProducto?.toLowerCase();
+                      const detallesVisibles = isExpandedBySearch && termProd
+                        ? pedido.detalles?.filter(d =>
+                            d.producto?.descripcion?.toLowerCase().includes(termProd) ||
+                            d.producto?.codigo_articulo?.toLowerCase().includes(termProd)
+                          )
+                        : pedido.detalles;
 
                       return (
                         <>
@@ -320,7 +329,7 @@ export default function Pedidos() {
                               </Button>
                             </TableCell>
                           </TableRow>
-                          {isExpanded && pedido.detalles && pedido.detalles.length > 0 && (
+                          {isExpanded && detallesVisibles && detallesVisibles.length > 0 && (
                             <TableRow key={`${pedido.id}-details`}>
                               <TableCell colSpan={9} className="p-0">
                                 <div className="bg-muted/30 px-6 py-3 border-t">
@@ -336,22 +345,16 @@ export default function Pedidos() {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {pedido.detalles.map((d) => {
-                                        const isHighlighted = busquedaProducto && (
-                                          d.producto?.descripcion?.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-                                          d.producto?.codigo_articulo?.toLowerCase().includes(busquedaProducto.toLowerCase())
-                                        );
-                                        return (
-                                          <tr key={d.id} className={isHighlighted ? 'bg-primary/10 font-semibold' : ''}>
-                                            <td className="py-1 pr-4 font-mono text-xs">{d.producto?.codigo_articulo || '-'}</td>
-                                            <td className="py-1">{d.producto?.descripcion || 'Producto eliminado'}</td>
-                                            <td className="py-1 text-right">{d.cantidad_pedida}</td>
-                                            <td className="py-1 text-right">{formatCurrency(d.precio_unitario)}</td>
-                                            <td className="py-1 text-right">{d.descuento_porcentaje > 0 ? `${d.descuento_porcentaje}%` : '-'}</td>
-                                            <td className="py-1 text-right">{formatCurrency(d.subtotal)}</td>
-                                          </tr>
-                                        );
-                                      })}
+                                      {detallesVisibles.map((d) => (
+                                        <tr key={d.id} className={isExpandedBySearch ? 'bg-primary/10 font-semibold' : ''}>
+                                          <td className="py-1 pr-4 font-mono text-xs">{d.producto?.codigo_articulo || '-'}</td>
+                                          <td className="py-1">{d.producto?.descripcion || 'Producto eliminado'}</td>
+                                          <td className="py-1 text-right">{d.cantidad_pedida}</td>
+                                          <td className="py-1 text-right">{formatCurrency(d.precio_unitario)}</td>
+                                          <td className="py-1 text-right">{d.descuento_porcentaje > 0 ? `${d.descuento_porcentaje}%` : '-'}</td>
+                                          <td className="py-1 text-right">{formatCurrency(d.subtotal)}</td>
+                                        </tr>
+                                      ))}
                                     </tbody>
                                   </table>
                                 </div>
