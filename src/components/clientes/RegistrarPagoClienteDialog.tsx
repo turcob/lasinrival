@@ -563,6 +563,23 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       }
     }
 
+    // Build factura reference for concepto if facturas selected
+    const facturasRef = facturasPagoSeleccionadas.length > 0
+      ? facturasPagoSeleccionadas.map(fId => {
+          const comp = comprasPago.find(c => c.id === fId);
+          return comp ? `#${comp.numero_comprobante}` : '';
+        }).filter(Boolean).join(', ')
+      : null;
+    const ventaIdFromFactura = facturasPagoSeleccionadas.length === 1
+      ? comprasPago.find(c => c.id === facturasPagoSeleccionadas[0])?.venta_id || null
+      : null;
+
+    if (facturasRef && !conceptoFinal) {
+      conceptoFinal = `Pago imputado a Fact. ${facturasRef}`;
+    } else if (facturasRef && conceptoFinal) {
+      conceptoFinal = `${conceptoFinal} - Fact. ${facturasRef}`;
+    }
+
     setLoading(true);
     try {
       if (requiereFormaPago && !requiereSelectorCompra && !(esNotaCredito && ncLibre)) {
