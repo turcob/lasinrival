@@ -90,7 +90,7 @@ export default function Imputacion() {
   const [selectedVentas, setSelectedVentas] = useState<string[]>([]);
   const [loadingVentas, setLoadingVentas] = useState(false);
   const [conceptoImputacion, setConceptoImputacion] = useState('');
-
+  const [importarBancoOpen, setImportarBancoOpen] = useState(false);
   useEffect(() => {
     fetchMovimientos();
   }, []);
