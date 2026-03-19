@@ -51,10 +51,11 @@ interface FormaPago {
 
 interface CompraCliente {
   id: string;
-  venta_id: string;
+  venta_id: string | null;
   monto: number;
   fecha: string;
-  numero_comprobante: number;
+  numero_comprobante: number | string;
+  concepto: string | null;
 }
 
 interface ProductoVenta {
@@ -119,6 +120,7 @@ const TIPOS_MOVIMIENTO = [
 
 const TIPOS_CON_FORMA_PAGO = ['pago'];
 const TIPOS_CON_SELECTOR_COMPRA = ['nota_credito', 'devolucion', 'anulacion'];
+const TIPOS_CON_SELECTOR_FACTURA_PAGO = ['pago'];
 
 let lineaIdCounter = 0;
 const nuevaLinea = (): MedioPagoLinea => ({
@@ -164,6 +166,11 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [lineaBuscandoId, setLineaBuscandoId] = useState<string | null>(null);
 
+  // Factura asociada al pago
+  const [comprasPago, setComprasPago] = useState<CompraCliente[]>([]);
+  const [facturasPagoSeleccionadas, setFacturasPagoSeleccionadas] = useState<string[]>([]);
+  const [loadingComprasPago, setLoadingComprasPago] = useState(false);
+
   useEffect(() => {
     if (open) {
       fetchFormasPago();
@@ -181,10 +188,20 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   }, [tipo, open, clienteId, ncLibre]);
 
+  // Fetch compras for payment factura association
+  useEffect(() => {
+    if (TIPOS_CON_SELECTOR_FACTURA_PAGO.includes(tipo) && open) {
+      fetchComprasPago();
+    } else {
+      setComprasPago([]);
+      setFacturasPagoSeleccionadas([]);
+    }
+  }, [tipo, open, clienteId]);
+
   useEffect(() => {
     if (compraSeleccionada) {
       const compra = comprasCliente.find(c => c.id === compraSeleccionada);
-      if (compra) {
+      if (compra && compra.venta_id) {
         fetchProductosVenta(compra.venta_id);
       }
     } else {
@@ -205,12 +222,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const fetchComprasCliente = async () => {
     setLoadingCompras(true);
     try {
+      // Fetch compras - include those with and without venta_id
       const { data, error } = await supabase
         .from('cliente_movimientos')
-        .select(`id, venta_id, monto, fecha, ventas!inner(numero_comprobante)`)
+        .select(`id, venta_id, monto, fecha, concepto, ventas(numero_comprobante)`)
         .eq('cliente_id', clienteId)
         .eq('tipo', 'compra')
-        .not('venta_id', 'is', null)
         .order('fecha', { ascending: false });
       if (error) throw error;
       const compras: CompraCliente[] = (data || []).map((item: any) => ({
@@ -218,7 +235,8 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         venta_id: item.venta_id,
         monto: item.monto,
         fecha: item.fecha,
-        numero_comprobante: item.ventas?.numero_comprobante || 0,
+        numero_comprobante: item.ventas?.numero_comprobante || (item.concepto ? item.concepto.substring(0, 30) : 'S/N'),
+        concepto: item.concepto,
       }));
       setComprasCliente(compras);
     } catch (error) {
@@ -226,6 +244,32 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       toast.error('Error al cargar las compras del cliente');
     } finally {
       setLoadingCompras(false);
+    }
+  };
+
+  const fetchComprasPago = async () => {
+    setLoadingComprasPago(true);
+    try {
+      const { data, error } = await supabase
+        .from('cliente_movimientos')
+        .select(`id, venta_id, monto, fecha, concepto, ventas(numero_comprobante)`)
+        .eq('cliente_id', clienteId)
+        .eq('tipo', 'compra')
+        .order('fecha', { ascending: false });
+      if (error) throw error;
+      const compras: CompraCliente[] = (data || []).map((item: any) => ({
+        id: item.id,
+        venta_id: item.venta_id,
+        monto: item.monto,
+        fecha: item.fecha,
+        numero_comprobante: item.ventas?.numero_comprobante || (item.concepto ? item.concepto.substring(0, 30) : 'S/N'),
+        concepto: item.concepto,
+      }));
+      setComprasPago(compras);
+    } catch (error) {
+      console.error('Error fetching compras for pago:', error);
+    } finally {
+      setLoadingComprasPago(false);
     }
   };
 
@@ -519,6 +563,23 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       }
     }
 
+    // Build factura reference for concepto if facturas selected
+    const facturasRef = facturasPagoSeleccionadas.length > 0
+      ? facturasPagoSeleccionadas.map(fId => {
+          const comp = comprasPago.find(c => c.id === fId);
+          return comp ? `#${comp.numero_comprobante}` : '';
+        }).filter(Boolean).join(', ')
+      : null;
+    const ventaIdFromFactura = facturasPagoSeleccionadas.length === 1
+      ? comprasPago.find(c => c.id === facturasPagoSeleccionadas[0])?.venta_id || null
+      : null;
+
+    if (facturasRef && !conceptoFinal) {
+      conceptoFinal = `Pago imputado a Fact. ${facturasRef}`;
+    } else if (facturasRef && conceptoFinal) {
+      conceptoFinal = `${conceptoFinal} - Fact. ${facturasRef}`;
+    }
+
     setLoading(true);
     try {
       if (requiereFormaPago && !requiereSelectorCompra && !(esNotaCredito && ncLibre)) {
@@ -544,7 +605,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
               concepto: conceptoLinea,
               usuario_registro_id: user.id,
               forma_pago_id: linea.forma_pago_id,
-              venta_id: null,
+              venta_id: ventaIdFromFactura,
               estado_imputacion: estadoImputacion,
               numero_operacion: esTransferenciaLinea ? (linea.numero_operacion?.trim() || null) : null,
             }])
@@ -644,6 +705,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setProductosManualNC([nuevoProductoManual()]);
     setBusquedaProducto('');
     setResultadosBusqueda([]);
+    setFacturasPagoSeleccionadas([]);
   };
 
   const handleTipoChange = (value: string) => {
@@ -654,6 +716,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setProductosNotaCredito([]);
     setNcLibre(false);
     setProductosManualNC([nuevoProductoManual()]);
+    setFacturasPagoSeleccionadas([]);
   };
 
   const showProductSelector = requiereSelectorCompra || (esNotaCredito && ncLibre);
@@ -734,7 +797,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                     ) : (
                       comprasCliente.map((compra) => (
                         <SelectItem key={compra.id} value={compra.id}>
-                          Venta #{compra.numero_comprobante} - {format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es })} - {formatCurrency(compra.monto)}
+                          {typeof compra.numero_comprobante === 'number' ? `Venta #${compra.numero_comprobante}` : compra.numero_comprobante} - {format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es })} - {formatCurrency(compra.monto)}
                         </SelectItem>
                       ))
                     )}
@@ -961,6 +1024,68 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                 placeholder="0.00"
                 required
               />
+            </div>
+          )}
+
+          {/* Pago: factura association */}
+          {requiereFormaPago && comprasPago.length > 0 && (
+            <div className="space-y-2">
+              <Label>Imputar a factura(s) <span className="text-xs text-muted-foreground font-normal">(opcional)</span></Label>
+              <div className="border rounded-md max-h-40 overflow-y-auto">
+                {loadingComprasPago ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10"></TableHead>
+                        <TableHead>Factura</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comprasPago.map((compra) => {
+                        const isSelected = facturasPagoSeleccionadas.includes(compra.id);
+                        return (
+                          <TableRow key={compra.id} className={isSelected ? 'bg-primary/5' : ''}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setFacturasPagoSeleccionadas(prev => [...prev, compra.id]);
+                                  } else {
+                                    setFacturasPagoSeleccionadas(prev => prev.filter(id => id !== compra.id));
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">
+                              {typeof compra.numero_comprobante === 'number' ? `Venta #${compra.numero_comprobante}` : compra.numero_comprobante}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {compra.fecha ? format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatCurrency(compra.monto)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+              {facturasPagoSeleccionadas.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {facturasPagoSeleccionadas.length} factura(s) seleccionada(s) - Total: {formatCurrency(
+                    comprasPago.filter(c => facturasPagoSeleccionadas.includes(c.id)).reduce((s, c) => s + c.monto, 0)
+                  )}
+                </p>
+              )}
             </div>
           )}
 
