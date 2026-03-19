@@ -306,9 +306,20 @@ export function ConsolidadoFinalZona() {
           Imprimir Consolidado
         </Button>
 
-        <Button onClick={handleImprimirRemitos} disabled={!pedidos || pedidos.length === 0}>
+        <Button variant="outline" onClick={() => handleImprimirRemitosFiltrados(pedidosCortos)} disabled={pedidosCortos.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
-          Imprimir Remitos
+          Remitos Cortos
+          {pedidosCortos.length > 0 && (
+            <Badge variant="secondary" className="ml-1">{pedidosCortos.length}</Badge>
+          )}
+        </Button>
+
+        <Button onClick={() => handleImprimirRemitosFiltrados(pedidosLargos)} disabled={pedidosLargos.length === 0}>
+          <Printer className="h-4 w-4 mr-2" />
+          Remitos Largos
+          {pedidosLargos.length > 0 && (
+            <Badge variant="secondary" className="ml-1">{pedidosLargos.length}</Badge>
+          )}
         </Button>
       </div>
 

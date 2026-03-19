@@ -113,6 +113,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'nota_debito', label: 'Nota de Débito' },
   { value: 'nota_credito', label: 'Nota de Crédito' },
   { value: 'anulacion', label: 'Anulación de Compra' },
+  { value: 'bonificacion', label: 'Bonificación' },
 ];
 
 const TIPOS_CON_FORMA_PAGO = ['pago'];
