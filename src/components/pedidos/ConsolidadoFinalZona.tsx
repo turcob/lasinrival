@@ -129,12 +129,13 @@ export function ConsolidadoFinalZona() {
   const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
 
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [] };
+    if (!pedidos) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
     const items = generarConsolidado(pedidos);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
+      todos: items,
     };
   }, [pedidos]);
 
