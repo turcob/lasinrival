@@ -1222,7 +1222,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                                   }}
                                 />
                                 <Button type="button" variant="outline" size="icon" className="h-9 w-9" title="Importar comprobante (PDF/imagen)">
-                                  <Search className="h-4 w-4" />
+                                  <Upload className="h-4 w-4" />
                                 </Button>
                               </div>
                             </div>
