@@ -389,6 +389,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
 
       ${infoItems.length > 0 ? `<div class="info-bar">${infoItems.join('')}<div class="spacer"></div></div>` : ''}
 
+      <div class="items-table-wrapper">
       <table class="items-table">
         <thead>
           <tr>
@@ -406,6 +407,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
           ${filasVaciasHTML}
         </tbody>
       </table>
+      </div>
 
       <div class="total-row">
         <div class="total-label">TOTAL</div>
