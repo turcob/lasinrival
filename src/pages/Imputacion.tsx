@@ -51,6 +51,7 @@ interface MovimientoPendiente {
   cliente_nombre: string;
   forma_pago_nombre: string | null;
   usuario_registro_nombre: string | null;
+  numero_operacion: string | null;
   cheque?: {
     numero_cheque: string;
     banco: string;
