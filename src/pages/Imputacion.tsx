@@ -481,6 +481,11 @@ export default function Imputacion() {
                               <div><span className="text-muted-foreground">Emisor:</span> {mov.cheque.emisor}</div>
                               <div><span className="text-muted-foreground">Vto:</span> {format(new Date(mov.cheque.fecha_vencimiento), 'dd/MM/yyyy')}</div>
                             </div>
+                          ) : mov.numero_operacion ? (
+                            <div className="text-xs space-y-0.5">
+                              <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
+                              {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
+                            </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">{mov.concepto || '-'}</span>
                           )}
