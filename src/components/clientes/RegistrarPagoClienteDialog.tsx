@@ -1027,6 +1027,68 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </div>
           )}
 
+          {/* Pago: factura association */}
+          {requiereFormaPago && comprasPago.length > 0 && (
+            <div className="space-y-2">
+              <Label>Imputar a factura(s) <span className="text-xs text-muted-foreground font-normal">(opcional)</span></Label>
+              <div className="border rounded-md max-h-40 overflow-y-auto">
+                {loadingComprasPago ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10"></TableHead>
+                        <TableHead>Factura</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comprasPago.map((compra) => {
+                        const isSelected = facturasPagoSeleccionadas.includes(compra.id);
+                        return (
+                          <TableRow key={compra.id} className={isSelected ? 'bg-primary/5' : ''}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setFacturasPagoSeleccionadas(prev => [...prev, compra.id]);
+                                  } else {
+                                    setFacturasPagoSeleccionadas(prev => prev.filter(id => id !== compra.id));
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">
+                              {typeof compra.numero_comprobante === 'number' ? `Venta #${compra.numero_comprobante}` : compra.numero_comprobante}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {compra.fecha ? format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatCurrency(compra.monto)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+              {facturasPagoSeleccionadas.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {facturasPagoSeleccionadas.length} factura(s) seleccionada(s) - Total: {formatCurrency(
+                    comprasPago.filter(c => facturasPagoSeleccionadas.includes(c.id)).reduce((s, c) => s + c.monto, 0)
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Pago: monto total + multi-payment */}
           {requiereFormaPago && (
             <>
