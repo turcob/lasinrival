@@ -272,8 +272,6 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       setLoadingComprasPago(false);
     }
   };
-    }
-  };
 
   const fetchProductosVenta = async (ventaId: string) => {
     setLoadingProductos(true);
