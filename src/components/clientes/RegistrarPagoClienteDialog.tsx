@@ -950,7 +950,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </div>
           )}
 
-          {tipo === 'nota_debito' && (
+          {(tipo === 'nota_debito' || esBonificacion) && (
             <div className="space-y-2">
               <Label>Monto</Label>
               <Input
