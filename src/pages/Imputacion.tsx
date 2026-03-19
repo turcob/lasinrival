@@ -32,10 +32,11 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Search, Clock, CreditCard, Building2 } from 'lucide-react';
+import { Check, X, Search, Clock, CreditCard, Building2, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ImportarBancoDialog } from '@/components/clientes/ImportarBancoDialog';
 
 interface MovimientoPendiente {
   id: string;
@@ -50,6 +51,7 @@ interface MovimientoPendiente {
   cliente_nombre: string;
   forma_pago_nombre: string | null;
   usuario_registro_nombre: string | null;
+  numero_operacion: string | null;
   cheque?: {
     numero_cheque: string;
     banco: string;
@@ -88,7 +90,7 @@ export default function Imputacion() {
   const [selectedVentas, setSelectedVentas] = useState<string[]>([]);
   const [loadingVentas, setLoadingVentas] = useState(false);
   const [conceptoImputacion, setConceptoImputacion] = useState('');
-
+  const [importarBancoOpen, setImportarBancoOpen] = useState(false);
   useEffect(() => {
     fetchMovimientos();
   }, []);
@@ -137,6 +139,7 @@ export default function Imputacion() {
         cliente_nombre: clientesMap.get(m.cliente_id) || 'Cliente desconocido',
         forma_pago_nombre: m.forma_pago_id ? formasPagoMap.get(m.forma_pago_id) || null : null,
         usuario_registro_nombre: usuariosMap.get(m.usuario_registro_id) || null,
+        numero_operacion: (m as any).numero_operacion || null,
         cheque: chequesMap.get(m.id) || null,
       }));
 
@@ -153,7 +156,8 @@ export default function Imputacion() {
     const matchesSearch = 
       m.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase());
+      m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.numero_operacion?.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (selectedTab === 'pendientes') {
       return matchesSearch && m.estado_imputacion === 'pendiente';
@@ -402,17 +406,21 @@ export default function Imputacion() {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search + Import */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por cliente, nº cheque o banco..."
+              placeholder="Buscar por cliente, nº cheque, banco o nº operación..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
+          <Button variant="outline" onClick={() => setImportarBancoOpen(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Importar Extracto Bancario
+          </Button>
         </div>
 
         {/* Tabs */}
@@ -472,6 +480,11 @@ export default function Imputacion() {
                               <div><span className="text-muted-foreground">Banco:</span> {mov.cheque.banco}</div>
                               <div><span className="text-muted-foreground">Emisor:</span> {mov.cheque.emisor}</div>
                               <div><span className="text-muted-foreground">Vto:</span> {format(new Date(mov.cheque.fecha_vencimiento), 'dd/MM/yyyy')}</div>
+                            </div>
+                          ) : mov.numero_operacion ? (
+                            <div className="text-xs space-y-0.5">
+                              <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
+                              {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">{mov.concepto || '-'}</span>
@@ -670,6 +683,12 @@ export default function Imputacion() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ImportarBancoDialog
+          open={importarBancoOpen}
+          onOpenChange={setImportarBancoOpen}
+          onSuccess={fetchMovimientos}
+        />
       </div>
     </MainLayout>
   );

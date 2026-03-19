@@ -1,58 +1,46 @@
 
 
-## Plan: Remitos por tamaño, validación de transferencias duplicadas, cruce bancario, y bonificación en NC
+# Importar Excel para marcar productos como "Frio"
 
-### 1. Separar remitos por cantidad de productos (≤10 y >10)
+## Objetivo
+Crear un importador especializado que lea un archivo Excel, compare los productos por codigo de articulo (`COD_ARTIC`) y actualice unicamente el campo `es_frio` en la base de datos. No se agregan ni eliminan productos.
 
-**Archivo**: `src/components/pedidos/ConsolidadoFinalZona.tsx`
+## Logica del importador
 
-Reemplazar el botón único "Imprimir Remitos" por dos botones:
-- **"Remitos Cortos (≤10 prod.)"**: filtra pedidos con ≤10 líneas de producto y abre ventana de impresión solo con esos
-- **"Remitos Largos (>10 prod.)"**: filtra pedidos con >10 líneas
+1. El usuario selecciona un archivo Excel
+2. Se lee la primera hoja del archivo
+3. Por cada fila, se toma:
+   - `COD_ARTIC` (codigo de articulo)
+   - `CATEGORIO PARA LISTAS` (si el valor es "frio", se marca como frio)
+4. Se buscan todos los productos existentes en la base de datos por `codigo_articulo`
+5. Para cada coincidencia:
+   - Si `CATEGORIO PARA LISTAS` = "frio" (case insensitive) -> `es_frio = true`
+   - Si no es "frio" -> `es_frio = false`
+6. Se actualiza en lotes de 100 para rendimiento
+7. Se muestra resumen: cantidad actualizados como frio, cantidad marcados como no frio, no encontrados
 
-Agregar un indicador visual (badge) que muestre cuántos remitos hay en cada grupo. La lógica de `handleImprimirRemitos` se parametriza con un filtro `maxItems` / `minItems`.
+## Archivos a crear/modificar
 
-### 2. Validación de transferencias duplicadas
+| Archivo | Accion |
+|---------|--------|
+| `src/components/productos/ImportarFriosDialog.tsx` | Nuevo - Dialog con el importador |
+| `src/pages/Productos.tsx` | Modificar - Agregar boton "Importar Frios" que abre el dialog |
 
-**Migración DB**: Agregar columna `numero_operacion` (text, nullable) a `cliente_movimientos` para almacenar el número de operación/transferencia.
+## Detalle tecnico
 
-**Archivo**: `src/components/clientes/RegistrarPagoClienteDialog.tsx`
-- Agregar campo "Nro. Operación" visible cuando la forma de pago es transferencia
-- Al guardar, antes de insertar, consultar si ya existe un movimiento con ese `numero_operacion` → mostrar advertencia/bloqueo si está duplicado
+### ImportarFriosDialog.tsx
+- Componente Dialog con input de archivo Excel
+- Usa la libreria `xlsx` ya instalada
+- Proceso:
+  1. Lee el Excel con `XLSX.read()`
+  2. Extrae `COD_ARTIC` y `CATEGORIO PARA LISTAS` de cada fila (con normalizacion de nombres de columna mediante trim)
+  3. Busca todos los productos en la DB con paginacion (batches de 1000) para superar el limite de Supabase
+  4. Crea un mapa `codigo_articulo -> id` de productos existentes
+  5. Recorre las filas del Excel, y por cada coincidencia arma un update
+  6. Ejecuta updates en lotes de 100
+  7. Muestra barra de progreso y resumen final (marcados frio, marcados no frio, no encontrados)
 
-**Archivo**: `src/pages/Imputacion.tsx`
-- Mostrar el `numero_operacion` en la tabla de movimientos pendientes para facilitar la verificación
-
-### 3. Importar reporte bancario para cruce de transferencias
-
-**Archivo nuevo**: `src/components/clientes/ImportarBancoDialog.tsx`
-
-Crear un diálogo que permita:
-- Importar un Excel/CSV del banco (columnas típicas: fecha, descripción, monto, referencia/operación)
-- Mapear columnas del archivo a los campos esperados
-- Cruzar automáticamente por `numero_operacion` contra transferencias cargadas en `cliente_movimientos`
-- Mostrar resultados: matcheadas (confirmar automáticamente), no encontradas en sistema, cargadas pero no en banco
-
-**Archivo**: `src/pages/Imputacion.tsx`
-- Agregar botón "Importar Extracto Bancario" que abra el diálogo
-
-### 4. Bonificación en Nota de Crédito
-
-**Archivo**: `src/components/clientes/RegistrarPagoClienteDialog.tsx`
-
-Agregar al tipo de movimiento una opción **"Bonificación"** que funcione como NC pero con concepto específico:
-- Agregar `{ value: 'bonificacion', label: 'Bonificación' }` al array `TIPOS_MOVIMIENTO`
-- La bonificación se registra como tipo `nota_credito` internamente con concepto "Bonificación" + detalle
-- Permite ingresar monto libre y concepto descriptivo (ej: "Bonificación por diferencia de cobro")
-- No requiere seleccionar factura ni productos
-
-### Archivos afectados
-
-| Archivo | Cambio |
-|---|---|
-| **Migración SQL** | Agregar `numero_operacion` a `cliente_movimientos` |
-| `src/components/pedidos/ConsolidadoFinalZona.tsx` | Separar botón de remitos en dos (≤10 / >10 productos) |
-| `src/components/clientes/RegistrarPagoClienteDialog.tsx` | Campo nro. operación + validación duplicados + tipo bonificación |
-| `src/components/clientes/ImportarBancoDialog.tsx` | **Nuevo** - Importador de extracto bancario |
-| `src/pages/Imputacion.tsx` | Mostrar nro. operación + botón importar extracto |
+### Productos.tsx
+- Se agrega un boton "Importar Frios" (con icono de copo de nieve o similar) junto a los botones existentes de importacion
+- Al hacer clic, abre el `ImportarFriosDialog`
 

@@ -98,6 +98,7 @@ interface MedioPagoLinea {
   id: string;
   forma_pago_id: string;
   monto: string;
+  numero_operacion?: string;
   chequeData?: ChequeData;
 }
 
@@ -113,6 +114,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'nota_debito', label: 'Nota de Débito' },
   { value: 'nota_credito', label: 'Nota de Crédito' },
   { value: 'anulacion', label: 'Anulación de Compra' },
+  { value: 'bonificacion', label: 'Bonificación' },
 ];
 
 const TIPOS_CON_FORMA_PAGO = ['pago'];
@@ -286,6 +288,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const esNotaCredito = tipo === 'nota_credito';
   const esDevolucion = tipo === 'devolucion';
   const esAnulacion = tipo === 'anulacion';
+  const esBonificacion = tipo === 'bonificacion';
   const requiereSelectorCompra = TIPOS_CON_SELECTOR_COMPRA.includes(tipo) && !ncLibre;
 
   const totalNotaCredito = useMemo(() => {
@@ -431,7 +434,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     let conceptoFinal: string | null = concepto || null;
     let ventaIdRef: string | null = null;
 
-    if (esNotaCredito && ncLibre) {
+    if (esBonificacion) {
+      // Bonificación: monto libre + concepto
+      montoFinal = parseFloat(monto.replace(',', '.'));
+      if (isNaN(montoFinal) || montoFinal <= 0) {
+        toast.error('Ingrese un monto válido para la bonificación');
+        return;
+      }
+      conceptoFinal = `Bonificación - ${concepto || 'Sin detalle'}`;
+    } else if (esNotaCredito && ncLibre) {
       // NC libre
       const productosValidos = productosManualNC.filter(p => p.descripcion && p.cantidad > 0 && p.precio_unitario > 0);
       if (productosValidos.length === 0) {
@@ -483,6 +494,18 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             return;
           }
         }
+        // Validate transfer duplicate
+        if (esTransferenciaFP(linea.forma_pago_id) && linea.numero_operacion?.trim()) {
+          const { data: duplicado } = await supabase
+            .from('cliente_movimientos')
+            .select('id')
+            .eq('numero_operacion', linea.numero_operacion.trim())
+            .limit(1);
+          if (duplicado && duplicado.length > 0) {
+            toast.error(`El nro. de operación "${linea.numero_operacion.trim()}" ya fue registrado. Verifique si es un duplicado.`);
+            return;
+          }
+        }
       }
       if (totalLineas > montoFinal) {
         toast.error('La suma de los pagos no puede superar el monto total');
@@ -523,6 +546,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
               forma_pago_id: linea.forma_pago_id,
               venta_id: null,
               estado_imputacion: estadoImputacion,
+              numero_operacion: esTransferenciaLinea ? (linea.numero_operacion?.trim() || null) : null,
             }])
             .select('id')
             .single();
@@ -558,12 +582,13 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           toast.success(mensaje);
         }
       } else {
-        // NC (con o sin factura), devolucion, anulacion, nota_debito
+        // NC (con o sin factura), devolucion, anulacion, nota_debito, bonificacion
+        const tipoDb = esBonificacion ? 'nota_credito' : tipo;
         const { error: movError } = await supabase
           .from('cliente_movimientos')
           .insert([{
             cliente_id: clienteId,
-            tipo,
+            tipo: tipoDb,
             monto: montoFinal,
             concepto: conceptoFinal,
             usuario_registro_id: user.id,
@@ -593,8 +618,8 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             .eq('id', ventaIdRef);
         }
 
-        const tipoLabel = esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : esNotaCredito ? 'Nota de Crédito' : 'Movimiento';
-        toast.success(`${tipoLabel} registrad${esNotaCredito ? 'a' : 'o'} correctamente`);
+        const tipoLabel = esBonificacion ? 'Bonificación' : esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : esNotaCredito ? 'Nota de Crédito' : 'Movimiento';
+        toast.success(`${tipoLabel} registrad${esNotaCredito || esBonificacion ? 'a' : 'o'} correctamente`);
       }
 
       resetForm();
@@ -675,6 +700,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                 {esAnulacion
                   ? 'La anulación revertirá la compra completa, marcará la venta como anulada y restituirá el stock de todos los productos.'
                   : 'La devolución permite seleccionar productos específicos para restituir al stock.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Bonificación: monto libre + concepto */}
+          {esBonificacion && (
+            <Alert>
+              <AlertDescription>
+                La bonificación se registra como nota de crédito a favor del cliente. Ingrese el monto y un concepto descriptivo.
               </AlertDescription>
             </Alert>
           )}
@@ -916,7 +950,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </div>
           )}
 
-          {tipo === 'nota_debito' && (
+          {(tipo === 'nota_debito' || esBonificacion) && (
             <div className="space-y-2">
               <Label>Monto</Label>
               <Input
@@ -1001,8 +1035,21 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                         )}
                       </div>
 
+                      {esTransferenciaFP(linea.forma_pago_id) && (
+                        <div className="space-y-2 pt-2 border-t">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nro. Operación / Transferencia</Label>
+                            <Input
+                              value={linea.numero_operacion || ''}
+                              onChange={(e) => actualizarLinea(linea.id, 'numero_operacion', e.target.value)}
+                              placeholder="Ej: 0001234567"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {(esChequeFP(linea.forma_pago_id) || esTransferenciaFP(linea.forma_pago_id)) && (
-                        <p className="text-xs text-amber-600">
+                        <p className="text-xs text-warning">
                           ⚠️ Este pago quedará pendiente de imputación hasta ser confirmado
                         </p>
                       )}
@@ -1148,13 +1195,13 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             </>
           )}
 
-          {!montoDesdeProductos && (
+          {(!montoDesdeProductos || esBonificacion) && (
             <div className="space-y-2">
-              <Label>Concepto (opcional)</Label>
+              <Label>{esBonificacion ? 'Concepto de la bonificación' : 'Concepto (opcional)'}</Label>
               <Textarea
                 value={concepto}
                 onChange={(e) => setConcepto(e.target.value)}
-                placeholder="Descripción del movimiento"
+                placeholder={esBonificacion ? 'Ej: Bonificación por diferencia de cobro' : 'Descripción del movimiento'}
                 rows={2}
               />
             </div>
