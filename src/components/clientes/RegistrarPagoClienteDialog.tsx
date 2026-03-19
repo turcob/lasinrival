@@ -222,12 +222,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const fetchComprasCliente = async () => {
     setLoadingCompras(true);
     try {
+      // Fetch compras - include those with and without venta_id
       const { data, error } = await supabase
         .from('cliente_movimientos')
-        .select(`id, venta_id, monto, fecha, ventas!inner(numero_comprobante)`)
+        .select(`id, venta_id, monto, fecha, concepto, ventas(numero_comprobante)`)
         .eq('cliente_id', clienteId)
         .eq('tipo', 'compra')
-        .not('venta_id', 'is', null)
         .order('fecha', { ascending: false });
       if (error) throw error;
       const compras: CompraCliente[] = (data || []).map((item: any) => ({
@@ -235,7 +235,8 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
         venta_id: item.venta_id,
         monto: item.monto,
         fecha: item.fecha,
-        numero_comprobante: item.ventas?.numero_comprobante || 0,
+        numero_comprobante: item.ventas?.numero_comprobante || (item.concepto ? item.concepto.substring(0, 30) : 'S/N'),
+        concepto: item.concepto,
       }));
       setComprasCliente(compras);
     } catch (error) {
@@ -243,6 +244,34 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       toast.error('Error al cargar las compras del cliente');
     } finally {
       setLoadingCompras(false);
+    }
+  };
+
+  const fetchComprasPago = async () => {
+    setLoadingComprasPago(true);
+    try {
+      const { data, error } = await supabase
+        .from('cliente_movimientos')
+        .select(`id, venta_id, monto, fecha, concepto, ventas(numero_comprobante)`)
+        .eq('cliente_id', clienteId)
+        .eq('tipo', 'compra')
+        .order('fecha', { ascending: false });
+      if (error) throw error;
+      const compras: CompraCliente[] = (data || []).map((item: any) => ({
+        id: item.id,
+        venta_id: item.venta_id,
+        monto: item.monto,
+        fecha: item.fecha,
+        numero_comprobante: item.ventas?.numero_comprobante || (item.concepto ? item.concepto.substring(0, 30) : 'S/N'),
+        concepto: item.concepto,
+      }));
+      setComprasPago(compras);
+    } catch (error) {
+      console.error('Error fetching compras for pago:', error);
+    } finally {
+      setLoadingComprasPago(false);
+    }
+  };
     }
   };
 
