@@ -105,7 +105,8 @@ export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string
         .select(`
           *,
           cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono),
-          vendedor:vendedores(id, nombre, codigo)
+          vendedor:vendedores(id, nombre, codigo),
+          detalles:pedido_detalles(id, producto_id, cantidad_pedida, cantidad_entregada, cantidad_devuelta, precio_unitario, descuento_porcentaje, subtotal, observaciones, producto:productos(id, descripcion, codigo_articulo, stock_actual, unidad_medida))
         `)
         .order('fecha_pedido', { ascending: false });
 
