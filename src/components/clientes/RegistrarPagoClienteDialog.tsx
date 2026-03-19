@@ -797,7 +797,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                     ) : (
                       comprasCliente.map((compra) => (
                         <SelectItem key={compra.id} value={compra.id}>
-                          Venta #{compra.numero_comprobante} - {format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es })} - {formatCurrency(compra.monto)}
+                          {typeof compra.numero_comprobante === 'number' ? `Venta #${compra.numero_comprobante}` : compra.numero_comprobante} - {format(new Date(compra.fecha), 'dd/MM/yyyy', { locale: es })} - {formatCurrency(compra.monto)}
                         </SelectItem>
                       ))
                     )}
