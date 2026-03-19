@@ -334,8 +334,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
     </tr>
   `).join('');
 
-  const minFilas = isShortDocument(datos.lineas) ? 6 : 12;
-  const filasVacias = Math.max(0, minFilas - datos.lineas.length);
+  const filasVacias = Math.max(0, 10 - datos.lineas.length);
   const filasVaciasHTML = Array(filasVacias).fill('').map(() =>
     `<tr><td class="cell">&nbsp;</td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td></tr>`
   ).join('');
