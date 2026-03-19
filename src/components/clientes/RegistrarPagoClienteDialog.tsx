@@ -618,8 +618,8 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
             .eq('id', ventaIdRef);
         }
 
-        const tipoLabel = esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : esNotaCredito ? 'Nota de Crédito' : 'Movimiento';
-        toast.success(`${tipoLabel} registrad${esNotaCredito ? 'a' : 'o'} correctamente`);
+        const tipoLabel = esBonificacion ? 'Bonificación' : esAnulacion ? 'Anulación' : esDevolucion ? 'Devolución' : esNotaCredito ? 'Nota de Crédito' : 'Movimiento';
+        toast.success(`${tipoLabel} registrad${esNotaCredito || esBonificacion ? 'a' : 'o'} correctamente`);
       }
 
       resetForm();
