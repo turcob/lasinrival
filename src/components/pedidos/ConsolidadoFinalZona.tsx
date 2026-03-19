@@ -129,12 +129,13 @@ export function ConsolidadoFinalZona() {
   const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
 
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [] };
+    if (!pedidos) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
     const items = generarConsolidado(pedidos);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
+      todos: items,
     };
   }, [pedidos]);
 
@@ -188,6 +189,47 @@ export function ConsolidadoFinalZona() {
         ${renderTable(consolidado.frios, 'Frescos / Fríos')}
         <div style="page-break-before:always;"></div>
         ${renderTable(consolidado.pesables, 'Pesables (KG)')}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleImprimirTodos = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const allItems = consolidado.todos;
+    const rows = allItems.map(item => `
+      <tr>
+        <td style="border:1px solid #ddd;padding:4px;font-family:monospace;">${item.codigo_articulo}</td>
+        <td style="border:1px solid #ddd;padding:4px;">${item.descripcion}</td>
+        <td style="border:1px solid #ddd;padding:4px;text-align:right;font-weight:bold;">${item.cantidad_total}</td>
+        <td style="border:1px solid #ddd;padding:4px;">${item.unidad_medida || '-'}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html><head><title>Consolidado Completo - ${zonaNombre}</title>
+      <style>
+        @media print { body { margin:0; padding:10mm; } }
+        body { font-family:Arial,sans-serif; font-size:14px; color:#111; }
+        @page { size:A4; margin:10mm; }
+      </style>
+      </head><body>
+        <h1 style="font-size:18px;text-align:center;">Consolidado Completo - Zona: ${zonaNombre}</h1>
+        <p style="color:#666;font-size:12px;text-align:center;">${pedidos?.length || 0} pedidos preparados | ${allItems.length} productos</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;">
+          <thead>
+            <tr style="background:#f3f4f6;">
+              <th style="border:1px solid #ddd;padding:6px;text-align:left;">Código</th>
+              <th style="border:1px solid #ddd;padding:6px;text-align:left;">Descripción</th>
+              <th style="border:1px solid #ddd;padding:6px;text-align:right;">Cantidad</th>
+              <th style="border:1px solid #ddd;padding:6px;text-align:left;">Unidad</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
       </body></html>
     `);
     printWindow.document.close();
@@ -306,7 +348,12 @@ export function ConsolidadoFinalZona() {
 
         <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
-          Imprimir Consolidado
+          Consolidado por Tipo
+        </Button>
+
+        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidos || pedidos.length === 0}>
+          <Printer className="h-4 w-4 mr-2" />
+          Consolidado Completo
         </Button>
 
         <Button variant="outline" onClick={() => handleImprimirRemitosFiltrados(pedidosCortos)} disabled={pedidosCortos.length === 0}>
