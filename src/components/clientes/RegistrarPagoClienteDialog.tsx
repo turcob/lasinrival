@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Plus, Trash2, Search } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Search, Upload } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -1164,11 +1164,71 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                         <div className="space-y-2 pt-2 border-t">
                           <div className="space-y-1">
                             <Label className="text-xs">Nro. Operación / Transferencia</Label>
-                            <Input
-                              value={linea.numero_operacion || ''}
-                              onChange={(e) => actualizarLinea(linea.id, 'numero_operacion', e.target.value)}
-                              placeholder="Ej: 0001234567"
-                            />
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={linea.numero_operacion || ''}
+                                onChange={(e) => actualizarLinea(linea.id, 'numero_operacion', e.target.value)}
+                                placeholder="Ej: 0001234567"
+                                className="flex-1"
+                              />
+                              <div className="relative">
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast.error('El archivo no debe superar 10MB');
+                                      return;
+                                    }
+                                    const lineaId = linea.id;
+                                    toast.info('Analizando comprobante...');
+                                    try {
+                                      let base64: string;
+                                      let mimeType = file.type;
+
+                                      if (file.type === 'application/pdf') {
+                                        // For PDF, we still send as-is, the AI can handle base64 PDF as image
+                                        const buffer = await file.arrayBuffer();
+                                        base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+                                        mimeType = 'application/pdf';
+                                      } else {
+                                        // For images, compress/resize if needed
+                                        const buffer = await file.arrayBuffer();
+                                        base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+                                      }
+
+                                      const { data, error } = await supabase.functions.invoke('extraer-numero-operacion', {
+                                        body: { imageBase64: base64, mimeType },
+                                      });
+
+                                      if (error) throw error;
+
+                                      if (data?.numero_operacion) {
+                                        actualizarLinea(lineaId, 'numero_operacion', data.numero_operacion);
+                                        const confianzaMsg = data.confianza === 'alta' ? '' : ` (confianza: ${data.confianza})`;
+                                        const montoMsg = data.monto ? ` | Monto detectado: ${data.monto}` : '';
+                                        toast.success(`Nro. operación extraído: ${data.numero_operacion}${confianzaMsg}${montoMsg}`);
+                                      } else {
+                                        toast.warning('No se pudo extraer el número de operación. Ingresalo manualmente.');
+                                      }
+                                    } catch (err) {
+                                      console.error('Error extracting:', err);
+                                      toast.error('Error al analizar el comprobante');
+                                    }
+                                    e.target.value = '';
+                                  }}
+                                />
+                                <Button type="button" variant="outline" size="icon" className="h-9 w-9" title="Importar comprobante (PDF/imagen)">
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Podés subir un PDF o imagen del comprobante para extraer el nro. automáticamente
+                            </p>
                           </div>
                         </div>
                       )}
