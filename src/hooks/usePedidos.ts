@@ -119,7 +119,7 @@ export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Pedido[];
+      return data as unknown as Pedido[];
     },
   });
 }
