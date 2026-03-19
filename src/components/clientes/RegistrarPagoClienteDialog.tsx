@@ -688,6 +688,7 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     setProductosManualNC([nuevoProductoManual()]);
     setBusquedaProducto('');
     setResultadosBusqueda([]);
+    setFacturasPagoSeleccionadas([]);
   };
 
   const handleTipoChange = (value: string) => {
