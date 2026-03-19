@@ -99,6 +99,65 @@ export function ConsolidadoPedidos() {
     };
   }, [pedidos]);
 
+  const handleImprimirPesablesPorCliente = () => {
+    if (conPesables.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const vendedorNombre = vendedorId ? vendedores?.find(v => v.id === vendedorId)?.nombre : undefined;
+    const zonaNombrePrint = zonaId ? zonas?.find(z => z.id === zonaId)?.nombre : undefined;
+
+    const bloques = conPesables.map(pedido => {
+      const pesables = pedido.detalles.filter(d => {
+        if (!d.producto) return false;
+        const u = (d.producto.unidad_medida || '').toUpperCase().replace(/\./g, '').trim();
+        return ['KG', 'KILO', 'KILOS'].includes(u);
+      });
+      const rows = pesables.map(d => `
+        <tr>
+          <td style="border:1px solid #ccc;padding:4px 8px;font-family:monospace;font-size:12px;">${d.producto?.codigo_articulo || '-'}</td>
+          <td style="border:1px solid #ccc;padding:4px 8px;font-size:12px;">${d.producto?.descripcion || '-'}</td>
+          <td style="border:1px solid #ccc;padding:4px 8px;text-align:right;font-weight:bold;font-size:12px;">${d.cantidad_pedida}</td>
+          <td style="border:1px solid #ccc;padding:4px 8px;font-size:12px;">${d.producto?.unidad_medida || 'KG'}</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div style="margin-bottom:16px;">
+          <h3 style="margin:0 0 4px;font-size:14px;">
+            #${pedido.numero_pedido.toString().padStart(6, '0')} — ${pedido.cliente?.nombre || '-'}
+          </h3>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="border:1px solid #ccc;padding:4px 8px;text-align:left;">Código</th>
+                <th style="border:1px solid #ccc;padding:4px 8px;text-align:left;">Producto</th>
+                <th style="border:1px solid #ccc;padding:4px 8px;text-align:right;">Cantidad</th>
+                <th style="border:1px solid #ccc;padding:4px 8px;text-align:left;">Unidad</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }).join('');
+
+    const fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const filtros = [vendedorNombre ? `Vendedor: ${vendedorNombre}` : null, zonaNombrePrint ? `Zona: ${zonaNombrePrint}` : null].filter(Boolean).join(' | ');
+
+    printWindow.document.write(`
+      <html><head><title>Pesables por Cliente</title>
+      <style>@media print { body { margin:0; padding:10mm; } } body { font-family:Arial,sans-serif; } @page { size:A4; margin:10mm; }</style>
+      </head><body>
+        <h1 style="font-size:18px;margin:0 0 4px;">Consolidado Pesables por Cliente</h1>
+        <p style="font-size:12px;color:#666;margin:0 0 16px;">${conPesables.length} pedidos | ${fecha}${filtros ? ' | ' + filtros : ''}</p>
+        ${bloques}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+  };
+
   // Generate consolidado from ALL pedidos
   const consolidado = useMemo(() => {
     if (!pedidos) return { noPesables: [], frios: [], pesables: [] };
@@ -362,29 +421,46 @@ export function ConsolidadoPedidos() {
             </div>
           )}
 
-          {/* Pedidos con pesables */}
+          {/* Pedidos con pesables - detalle por cliente */}
           {conPesables.length > 0 && (
-            <div className="space-y-3 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Scale className="h-5 w-5 text-amber-600" />
-                Pedidos con pesables ({conPesables.length})
-              </h3>
+            <div className="space-y-3 border rounded-lg p-4 bg-amber-50 dark:bg-amber-950/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Scale className="h-5 w-5 text-amber-600" />
+                  Pedidos con pesables ({conPesables.length})
+                </h3>
+                <Button variant="outline" size="sm" onClick={handleImprimirPesablesPorCliente}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir Pesables por Cliente
+                </Button>
+              </div>
               <p className="text-sm text-muted-foreground">
                 Estos pedidos requieren preparación individual porque contienen productos que se pesan.
               </p>
-              <div className="space-y-1 max-h-[300px] overflow-y-auto">
+              <div className="space-y-1 max-h-[400px] overflow-y-auto">
                 {conPesables.map(pedido => {
-                  const cantPesables = pedido.detalles.filter(
-                    d => d.producto && ['KG', 'KG.'].includes((d.producto.unidad_medida || '').toUpperCase())
-                  ).length;
+                  const pesables = pedido.detalles.filter(d => {
+                    if (!d.producto) return false;
+                    const u = (d.producto.unidad_medida || '').toUpperCase().replace(/\./g, '').trim();
+                    return ['KG', 'KILO', 'KILOS'].includes(u);
+                  });
                   return (
-                    <div key={pedido.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50">
-                      <span className="font-mono text-sm">#{pedido.numero_pedido.toString().padStart(6, '0')}</span>
-                      <span className="flex-1 truncate">{pedido.cliente?.nombre}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {cantPesables} pesable{cantPesables > 1 ? 's' : ''}
-                      </Badge>
-                      <span className="font-medium">{formatCurrency(pedido.total)}</span>
+                    <div key={pedido.id} className="p-2 rounded border bg-background">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="font-mono text-sm">#{pedido.numero_pedido.toString().padStart(6, '0')}</span>
+                        <span className="font-medium">{pedido.cliente?.nombre}</span>
+                        <Badge variant="outline" className="text-xs">{pesables.length} pesable{pesables.length > 1 ? 's' : ''}</Badge>
+                        <span className="font-medium ml-auto">{formatCurrency(pedido.total)}</span>
+                      </div>
+                      <div className="pl-6 space-y-0.5">
+                        {pesables.map(d => (
+                          <div key={d.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-mono">{d.producto?.codigo_articulo}</span>
+                            <span className="flex-1">{d.producto?.descripcion}</span>
+                            <span className="font-medium text-foreground">{d.cantidad_pedida} {d.producto?.unidad_medida || 'KG'}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
