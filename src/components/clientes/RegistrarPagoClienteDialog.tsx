@@ -434,7 +434,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     let conceptoFinal: string | null = concepto || null;
     let ventaIdRef: string | null = null;
 
-    if (esNotaCredito && ncLibre) {
+    if (esBonificacion) {
+      // Bonificación: monto libre + concepto
+      montoFinal = parseFloat(monto.replace(',', '.'));
+      if (isNaN(montoFinal) || montoFinal <= 0) {
+        toast.error('Ingrese un monto válido para la bonificación');
+        return;
+      }
+      conceptoFinal = `Bonificación - ${concepto || 'Sin detalle'}`;
+    } else if (esNotaCredito && ncLibre) {
       // NC libre
       const productosValidos = productosManualNC.filter(p => p.descripcion && p.cantidad > 0 && p.precio_unitario > 0);
       if (productosValidos.length === 0) {
@@ -483,6 +491,18 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
           const cd = linea.chequeData;
           if (!cd.numero_cheque.trim() || !cd.banco.trim() || !cd.emisor.trim() || !cd.fecha_emision || !cd.fecha_vencimiento) {
             toast.error('Complete todos los datos obligatorios del cheque');
+            return;
+          }
+        }
+        // Validate transfer duplicate
+        if (esTransferenciaFP(linea.forma_pago_id) && linea.numero_operacion?.trim()) {
+          const { data: duplicado } = await supabase
+            .from('cliente_movimientos')
+            .select('id')
+            .eq('numero_operacion', linea.numero_operacion.trim())
+            .limit(1);
+          if (duplicado && duplicado.length > 0) {
+            toast.error(`El nro. de operación "${linea.numero_operacion.trim()}" ya fue registrado. Verifique si es un duplicado.`);
             return;
           }
         }
