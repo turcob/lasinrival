@@ -32,10 +32,11 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Search, Clock, CreditCard, Building2 } from 'lucide-react';
+import { Check, X, Search, Clock, CreditCard, Building2, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ImportarBancoDialog } from '@/components/clientes/ImportarBancoDialog';
 
 interface MovimientoPendiente {
   id: string;
