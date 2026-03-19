@@ -683,6 +683,12 @@ export default function Imputacion() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ImportarBancoDialog
+          open={importarBancoOpen}
+          onOpenChange={setImportarBancoOpen}
+          onSuccess={fetchMovimientos}
+        />
       </div>
     </MainLayout>
   );
