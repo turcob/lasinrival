@@ -163,10 +163,13 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     const formatCurrency = (v: number) =>
       new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-    const filasHTML = (hoja.paradas || []).map((parada: any, i: number) => {
+    const paradas = (hoja.paradas || []).filter((p: any) => p.pedido);
+    const FILAS_POR_PAGINA = 50;
+
+    const generarFilas = (items: any[], startIndex: number) => items.map((parada: any, i: number) => {
       const pedido = parada.pedido;
-      if (!pedido) return '';
       const cliente = pedido.cliente;
+      const idx = startIndex + i;
       const fechaRemito = format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy', { locale: es });
       const nroRemito = formatNumero(pedido.numero_pedido);
       const codCliente = cliente?.codigo_cliente || '-';
@@ -176,20 +179,74 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       const importe = formatCurrency(pedido.total || 0);
 
       return `
-        <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; text-align:center;">${i + 1}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${fechaRemito}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; font-family:'Courier New',monospace;">${nroRemito}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; font-family:'Courier New',monospace;">${codCliente}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${razonSocial}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${vendedor}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${zona}</td>
-          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:12px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${importe}</td>
+        <tr${idx % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; text-align:center;">${idx + 1}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${fechaRemito}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; font-family:'Courier New',monospace;">${nroRemito}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; font-family:'Courier New',monospace;">${codCliente}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${razonSocial}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${vendedor}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${zona}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${importe}</td>
         </tr>
       `;
     }).join('');
 
-    const totalGeneral = (hoja.paradas || []).reduce((sum: number, p: any) => sum + (p.pedido?.total || 0), 0);
+    const totalGeneral = paradas.reduce((sum: number, p: any) => sum + (p.pedido?.total || 0), 0);
+
+    // Dividir en páginas de 50 filas
+    const paginas: any[][] = [];
+    for (let i = 0; i < paradas.length; i += FILAS_POR_PAGINA) {
+      paginas.push(paradas.slice(i, i + FILAS_POR_PAGINA));
+    }
+
+    const theadHTML = `
+      <thead>
+        <tr>
+          <th class="center" style="width:25px;">#</th>
+          <th style="width:70px;">Fecha</th>
+          <th style="width:120px;">Nº Remito</th>
+          <th style="width:60px;">Cód. Cli.</th>
+          <th>Razón Social</th>
+          <th style="width:100px;">Vendedor</th>
+          <th style="width:80px;">Zona</th>
+          <th class="right" style="width:90px;">Importe</th>
+        </tr>
+      </thead>`;
+
+    const headerHTML = `
+      <div class="header">
+        <div class="header-title">LISTADO DE PARADAS</div>
+        <div class="header-info">
+          <span>Hoja de Ruta #${hoja.numero_hoja}</span>
+          <span>Fecha: ${fechaHoja}</span>
+          <span>Chofer: ${hoja.chofer?.nombre || '-'} | Vehículo: ${hoja.vehiculo?.patente || '-'}</span>
+        </div>
+      </div>`;
+
+    const paginasHTML = paginas.map((pagina, pIdx) => {
+      const isLast = pIdx === paginas.length - 1;
+      return `
+        <div class="page-container${!isLast ? ' page-break' : ''}">
+          <div class="container">
+            ${headerHTML}
+            ${paginas.length > 1 ? `<div style="text-align:right;padding:2px 8px;font-size:9px;color:#666;">Página ${pIdx + 1} de ${paginas.length}</div>` : ''}
+            <table>
+              ${theadHTML}
+              <tbody>
+                ${generarFilas(pagina, pIdx * FILAS_POR_PAGINA)}
+              </tbody>
+            </table>
+            ${isLast ? `
+              <div class="total-row">
+                <span>TOTAL:</span>
+                <span>$ ${formatCurrency(totalGeneral)}</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     const html = `
       <!DOCTYPE html>
@@ -201,39 +258,41 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             body { margin: 0; padding: 0; }
             .no-print { display: none !important; }
             @page { size: A4 portrait; margin: 8mm; }
+            .page-break { page-break-after: always; }
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: #1a1a1a;
-            max-width: 1100px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 8px;
           }
+          .page-container { margin-bottom: 16px; }
           .container { border: 2px solid #222; border-radius: 3px; overflow: hidden; }
           .header {
             display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 2px solid #222; background: #f5f5f5; padding: 8px 12px;
+            border-bottom: 2px solid #222; background: #f5f5f5; padding: 6px 10px;
           }
-          .header-title { font-size: 18px; font-weight: 900; letter-spacing: 1px; }
-          .header-info { font-size: 12px; font-weight: 800; text-align: right; }
+          .header-title { font-size: 16px; font-weight: 900; letter-spacing: 1px; }
+          .header-info { font-size: 11px; font-weight: 800; text-align: right; }
           .header-info span { display: block; }
           table { width: 100%; border-collapse: collapse; }
           thead th {
-            background: #222; color: #fff; padding: 5px 6px; text-align: left;
-            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+            background: #222; color: #fff; padding: 3px 4px; text-align: left;
+            font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
           }
           thead th.right { text-align: right; }
           thead th.center { text-align: center; }
           .total-row {
             display: flex; justify-content: flex-end; align-items: center;
-            border-top: 2px solid #222; background: #eee; padding: 8px 12px;
+            border-top: 2px solid #222; background: #eee; padding: 6px 10px;
           }
-          .total-row span:first-child { font-size: 14px; font-weight: 900; letter-spacing: 2px; }
+          .total-row span:first-child { font-size: 13px; font-weight: 900; letter-spacing: 2px; }
           .total-row span:last-child {
-            margin-left: 16px; font-size: 16px; font-weight: 900;
+            margin-left: 16px; font-size: 14px; font-weight: 900;
             font-family: 'Courier New', monospace;
           }
           .print-button {
@@ -246,37 +305,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <div class="header-title">LISTADO DE PARADAS</div>
-            <div class="header-info">
-              <span>Hoja de Ruta #${hoja.numero_hoja}</span>
-              <span>Fecha: ${fechaHoja}</span>
-              <span>Chofer: ${hoja.chofer?.nombre || '-'} | Vehículo: ${hoja.vehiculo?.patente || '-'}</span>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th class="center" style="width:30px;">#</th>
-                <th style="width:80px;">Fecha</th>
-                <th style="width:140px;">Nº Remito</th>
-                <th style="width:70px;">Cód. Cliente</th>
-                <th>Razón Social</th>
-                <th style="width:110px;">Vendedor</th>
-                <th style="width:90px;">Zona</th>
-                <th class="right" style="width:100px;">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filasHTML}
-            </tbody>
-          </table>
-          <div class="total-row">
-            <span>TOTAL:</span>
-            <span>$ ${formatCurrency(totalGeneral)}</span>
-          </div>
-        </div>
+        ${paginasHTML}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>
