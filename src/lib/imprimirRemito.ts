@@ -374,7 +374,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
     <div class="factura-container">
       <div class="header">
         <div class="header-logo">
-          <img src="/favicon.ico" alt="Logo" />
+          <img src="/logo-empresa.jpg" alt="Logo" />
         </div>
         <div class="header-center">
           <div class="empresa-nombre">${datos.empresa?.razonSocial || 'FACTURA'}</div>
