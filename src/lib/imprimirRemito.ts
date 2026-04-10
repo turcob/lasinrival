@@ -38,8 +38,12 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 };
 
-/** Determine if the document is short enough for A5 */
-const isShortDocument = (lineas: LineaRemito[]) => lineas.length <= 8;
+/** Format invoice number as B XXXXX-XXXXXXXX */
+const formatNumeroFactura = (numero: number) => {
+  const puntoVenta = '00001';
+  const nroComprobante = numero.toString().padStart(8, '0');
+  return `B ${puntoVenta}-${nroComprobante}`;
+};
 
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
