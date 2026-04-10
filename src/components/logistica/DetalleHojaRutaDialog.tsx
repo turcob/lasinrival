@@ -220,10 +220,22 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
             {/* Paradas */}
             <div className="space-y-3">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Paradas ({hojaRuta.paradas?.length || 0})
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Paradas ({hojaRuta.paradas?.length || 0})
+                </h3>
+                {hojaRuta.paradas && hojaRuta.paradas.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => imprimirListadoParadas(hojaRuta)}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Imprimir Listado
+                  </Button>
+                )}
+              </div>
               
               <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
                 {!hojaRuta.paradas || hojaRuta.paradas.length === 0 ? (
