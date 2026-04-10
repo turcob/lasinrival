@@ -572,6 +572,10 @@ export function RendicionHojaRutaDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
+            <Button variant="outline" onClick={imprimirRendicion}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
             <Button onClick={handleSubmit} disabled={loading}>
               {rendicionExistente ? 'Actualizar Rendición' : 'Registrar Rendición'}
             </Button>
