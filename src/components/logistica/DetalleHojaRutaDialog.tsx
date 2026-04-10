@@ -200,7 +200,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           @media print {
             body { margin: 0; padding: 0; }
             .no-print { display: none !important; }
-            @page { size: A4 landscape; margin: 8mm; }
+            @page { size: A4 portrait; margin: 8mm; }
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
