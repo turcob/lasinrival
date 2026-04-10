@@ -224,8 +224,9 @@ export function useHojaRuta(id: string | undefined) {
         .select(`
           *,
           pedido:pedidos(
-            id, numero_pedido, total,
-            cliente:clientes(id, nombre, direccion, telefono),
+            id, numero_pedido, total, fecha_pedido,
+            cliente:clientes(id, nombre, codigo_cliente, direccion, telefono, zona:zonas(nombre)),
+            vendedor:vendedores(id, nombre),
             detalles:pedido_detalles(
               id, producto_id, cantidad_pedida, cantidad_entregada,
               producto:productos(descripcion, codigo_articulo)
@@ -237,7 +238,7 @@ export function useHojaRuta(id: string | undefined) {
 
       if (paradasError) throw paradasError;
 
-      return { ...hojaRuta, paradas } as HojaRuta;
+      return { ...hojaRuta, paradas } as unknown as HojaRuta;
     },
     enabled: !!id,
   });

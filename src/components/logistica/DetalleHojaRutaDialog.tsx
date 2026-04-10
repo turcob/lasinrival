@@ -145,6 +145,147 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     }
   };
 
+  const imprimirListadoParadas = (hoja: any) => {
+    const ventana = window.open('', '_blank', 'width=900,height=600');
+    if (!ventana) {
+      alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
+      return;
+    }
+
+    const fechaHoja = format(new Date(hoja.fecha), 'dd/MM/yyyy', { locale: es });
+
+    const formatNumero = (num: number) => {
+      const pv = '00001';
+      const nro = num.toString().padStart(8, '0');
+      return `B ${pv}-${nro}`;
+    };
+
+    const formatCurrency = (v: number) =>
+      new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+    const filasHTML = (hoja.paradas || []).map((parada: any, i: number) => {
+      const pedido = parada.pedido;
+      if (!pedido) return '';
+      const cliente = pedido.cliente;
+      const fechaRemito = format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy', { locale: es });
+      const nroRemito = formatNumero(pedido.numero_pedido);
+      const codCliente = cliente?.codigo_cliente || '-';
+      const razonSocial = cliente?.nombre || '-';
+      const vendedor = pedido.vendedor?.nombre || '-';
+      const zona = cliente?.zona?.nombre || '-';
+      const importe = formatCurrency(pedido.total || 0);
+
+      return `
+        <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; text-align:center;">${i + 1}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${fechaRemito}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; font-family:'Courier New',monospace;">${nroRemito}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700; font-family:'Courier New',monospace;">${codCliente}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${razonSocial}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${vendedor}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:11px; font-weight:700;">${zona}</td>
+          <td style="padding:5px 6px; border-bottom:1px solid #d0d0d0; font-size:12px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${importe}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const totalGeneral = (hoja.paradas || []).reduce((sum: number, p: any) => sum + (p.pedido?.total || 0), 0);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Listado Paradas - Ruta #${hoja.numero_hoja}</title>
+        <style>
+          @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            @page { size: A4 landscape; margin: 8mm; }
+          }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1a1a1a;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 8px;
+          }
+          .container { border: 2px solid #222; border-radius: 3px; overflow: hidden; }
+          .header {
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #222; background: #f5f5f5; padding: 8px 12px;
+          }
+          .header-title { font-size: 18px; font-weight: 900; letter-spacing: 1px; }
+          .header-info { font-size: 12px; font-weight: 800; text-align: right; }
+          .header-info span { display: block; }
+          table { width: 100%; border-collapse: collapse; }
+          thead th {
+            background: #222; color: #fff; padding: 5px 6px; text-align: left;
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+          }
+          thead th.right { text-align: right; }
+          thead th.center { text-align: center; }
+          .total-row {
+            display: flex; justify-content: flex-end; align-items: center;
+            border-top: 2px solid #222; background: #eee; padding: 8px 12px;
+          }
+          .total-row span:first-child { font-size: 14px; font-weight: 900; letter-spacing: 2px; }
+          .total-row span:last-child {
+            margin-left: 16px; font-size: 16px; font-weight: 900;
+            font-family: 'Courier New', monospace;
+          }
+          .print-button {
+            position: fixed; bottom: 20px; right: 20px; padding: 10px 20px;
+            background: #2563eb; color: white; border: none; border-radius: 6px;
+            cursor: pointer; font-size: 13px; font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          }
+          .print-button:hover { background: #1d4ed8; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="header-title">LISTADO DE PARADAS</div>
+            <div class="header-info">
+              <span>Hoja de Ruta #${hoja.numero_hoja}</span>
+              <span>Fecha: ${fechaHoja}</span>
+              <span>Chofer: ${hoja.chofer?.nombre || '-'} | Vehículo: ${hoja.vehiculo?.patente || '-'}</span>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th class="center" style="width:30px;">#</th>
+                <th style="width:80px;">Fecha</th>
+                <th style="width:140px;">Nº Remito</th>
+                <th style="width:70px;">Cód. Cliente</th>
+                <th>Razón Social</th>
+                <th style="width:110px;">Vendedor</th>
+                <th style="width:90px;">Zona</th>
+                <th class="right" style="width:100px;">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filasHTML}
+            </tbody>
+          </table>
+          <div class="total-row">
+            <span>TOTAL:</span>
+            <span>$ ${formatCurrency(totalGeneral)}</span>
+          </div>
+        </div>
+        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
+      </body>
+      </html>
+    `;
+
+    ventana.document.write(html);
+    ventana.document.close();
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
@@ -220,10 +361,22 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
             {/* Paradas */}
             <div className="space-y-3">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Paradas ({hojaRuta.paradas?.length || 0})
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Paradas ({hojaRuta.paradas?.length || 0})
+                </h3>
+                {hojaRuta.paradas && hojaRuta.paradas.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => imprimirListadoParadas(hojaRuta)}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Imprimir Listado
+                  </Button>
+                )}
+              </div>
               
               <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
                 {!hojaRuta.paradas || hojaRuta.paradas.length === 0 ? (
