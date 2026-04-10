@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { FileCheck, Banknote, Smartphone, CreditCard, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FileCheck, Banknote, Smartphone, CreditCard, AlertTriangle, CheckCircle, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
