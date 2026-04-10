@@ -225,7 +225,7 @@ export function useHojaRuta(id: string | undefined) {
           *,
           pedido:pedidos(
             id, numero_pedido, total, fecha_pedido,
-            cliente:clientes(id, nombre, codigo_cliente, direccion, telefono),
+            cliente:clientes(id, nombre, codigo_cliente, direccion, telefono, zona:zonas(nombre)),
             vendedor:vendedores(id, nombre),
             detalles:pedido_detalles(
               id, producto_id, cantidad_pedida, cantidad_entregada,
