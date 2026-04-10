@@ -323,7 +323,7 @@ function getStyles(useA5: boolean) {
 
 /** Build the inner HTML for a single factura document */
 function buildFacturaHTML(datos: DatosRemito): string {
-  const numeroFactura = datos.numeroPedido.toString().padStart(6, '0');
+  const numeroFactura = formatNumeroFactura(datos.numeroPedido);
   const fechaFormateada = format(datos.fecha, "dd/MM/yyyy", { locale: es });
 
   const lineasHTML = datos.lineas.map(linea => `
@@ -383,9 +383,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
           ${datos.empresa ? `<div class="empresa-detalle">CUIT: ${datos.empresa.cuit}</div>` : ''}
         </div>
         <div class="header-right">
-          <div class="doc-tipo">Factura</div>
-          <div class="doc-numero">#${numeroFactura}</div>
-          <div class="doc-fecha">${fechaFormateada}</div>
+          <div class="doc-numero">${numeroFactura}</div>
         </div>
       </div>
 
@@ -438,17 +436,21 @@ export function imprimirRemito(datos: DatosRemito) {
     return;
   }
 
-  const useA5 = isShortDocument(datos.lineas);
+  const useA5 = true; // Always A5
+
+  const facturaHTML = buildFacturaHTML(datos);
 
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Factura #${datos.numeroPedido.toString().padStart(6, '0')}</title>
+      <title>Factura ${formatNumeroFactura(datos.numeroPedido)}</title>
       <style>${getStyles(useA5)}</style>
     </head>
     <body>
-      ${buildFacturaHTML(datos)}
+      ${facturaHTML}
+      <div style="page-break-after:always;"></div>
+      ${facturaHTML}
       <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
     </body>
     </html>
