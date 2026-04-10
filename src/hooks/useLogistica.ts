@@ -238,7 +238,7 @@ export function useHojaRuta(id: string | undefined) {
 
       if (paradasError) throw paradasError;
 
-      return { ...hojaRuta, paradas } as HojaRuta;
+      return { ...hojaRuta, paradas } as unknown as HojaRuta;
     },
     enabled: !!id,
   });
