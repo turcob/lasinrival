@@ -45,7 +45,7 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = '210mm 148mm';
+const REMITO_PAGE_SIZE = '148mm 210mm';
 const REMITO_BODY_MAX_WIDTH = '780px';
 
 /** Common styles shared by single and batch printing */
