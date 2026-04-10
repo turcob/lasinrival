@@ -45,16 +45,29 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
+const REMITO_PAGE_SIZE = '210mm 148mm';
+const REMITO_BODY_MAX_WIDTH = '780px';
+
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
-  const pageSize = useA5 ? 'size: 148mm 210mm;' : 'size: A4;';
-  const pageMargin = useA5 ? 'margin: 4mm;' : 'margin: 6mm;';
+  const pageSize = useA5 ? `size: ${REMITO_PAGE_SIZE};` : `size: ${REMITO_PAGE_SIZE};`;
+  const pageMargin = useA5 ? 'margin: 4mm;' : 'margin: 4mm;';
   return `
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
-      .factura-container { height: 100vh; display: flex; flex-direction: column; }
+      .factura-page {
+        width: 202mm;
+        min-height: 140mm;
+        page-break-after: always;
+        break-after: page;
+      }
+      .factura-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .factura-container { min-height: 140mm; display: flex; flex-direction: column; }
       .items-table-wrapper { flex: 1; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,9 +77,15 @@ function getStyles(useA5: boolean) {
       font-weight: 700;
       line-height: 1.35;
       color: #1a1a1a;
-      max-width: ${useA5 ? '540px' : '780px'};
+      max-width: ${REMITO_BODY_MAX_WIDTH};
       margin: 0 auto;
-      padding: 6px;
+      padding: 4mm;
+      background: #fff;
+    }
+    .factura-page {
+      width: 100%;
+      max-width: ${REMITO_BODY_MAX_WIDTH};
+      margin: 0 auto 0;
     }
     .factura-container {
       border: 2px solid #222;
@@ -438,9 +457,12 @@ export function imprimirRemito(datos: DatosRemito) {
     return;
   }
 
-  const useA5 = true; // Always A5
+  const useA5 = true; // Always A5 horizontal
 
   const facturaHTML = buildFacturaHTML(datos);
+  const copiasHTML = [facturaHTML, facturaHTML]
+    .map((html, index) => `<div class="factura-page" data-copy="${index + 1}">${html}</div>`)
+    .join('');
 
   const html = `
     <!DOCTYPE html>
@@ -450,9 +472,7 @@ export function imprimirRemito(datos: DatosRemito) {
       <style>${getStyles(useA5)}</style>
     </head>
     <body>
-      ${facturaHTML}
-      <div style="page-break-after:always;"></div>
-      ${facturaHTML}
+      ${copiasHTML}
       <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
     </body>
     </html>
@@ -467,9 +487,17 @@ export function imprimirRemito(datos: DatosRemito) {
  * Each factura gets its own page via page-break-after.
  */
 export function generarRemitoHTML(datos: DatosRemito, isLast: boolean = false): string {
-  const pageBreak = !isLast ? ' style="page-break-after:always;"' : '';
-  return `<div${pageBreak}>${buildFacturaHTML(datos)}</div>`;
+  const copiaUno = `<div class="factura-page">${buildFacturaHTML(datos)}</div>`;
+  const copiaDos = `<div class="factura-page">${buildFacturaHTML(datos)}</div>`;
+  const pageBreak = !isLast ? '<div class="remito-batch-separator"></div>' : '';
+
+  return `${copiaUno}${copiaDos}${pageBreak}`;
 }
 
 /** Shared CSS styles for facturas (used in batch printing) */
-export const REMITO_STYLES = getStyles(false);
+export const REMITO_STYLES = `${getStyles(true)}
+  .remito-batch-separator {
+    page-break-after: auto;
+    break-after: auto;
+  }
+`;
