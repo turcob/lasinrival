@@ -182,6 +182,131 @@ export function RendicionHojaRutaDialog({
     return null;
   };
 
+  const imprimirRendicion = () => {
+    const ventana = window.open('', '_blank', 'width=800,height=600');
+    if (!ventana) {
+      alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
+      return;
+    }
+
+    const formatCurrency = (v: number) =>
+      new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+    const filaCobros = cobros.map((c, i) => `
+      <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
+        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.forma_pago?.nombre || '-'}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.pedido?.numero_pedido ? '#' + c.pedido.numero_pedido : '-'}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.referencia || '-'}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(c.monto)}</td>
+      </tr>
+    `).join('');
+
+    const diferenciaColor = diferencia === 0 ? '#16a34a' : diferencia > 0 ? '#2563eb' : '#dc2626';
+    const diferenciaTexto = diferencia === 0 ? '✓ Sin diferencia' : diferencia > 0 ? `+ $ ${formatCurrency(diferencia)} (Sobrante)` : `- $ ${formatCurrency(Math.abs(diferencia))} (Faltante)`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Rendición - Hoja de Ruta #${numeroHoja}</title>
+        <style>
+          @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            @page { size: A4 portrait; margin: 12mm; }
+          }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; max-width: 700px; margin: 0 auto; padding: 16px; }
+          .header { text-align: center; border-bottom: 3px solid #222; padding-bottom: 12px; margin-bottom: 16px; }
+          .header h1 { font-size: 20px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
+          .header p { font-size: 13px; color: #555; }
+          .section { margin-bottom: 16px; }
+          .section-title { font-size: 14px; font-weight: 800; border-bottom: 2px solid #333; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+          table { width: 100%; border-collapse: collapse; }
+          thead th { background: #222; color: #fff; padding: 6px 10px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+          thead th.right { text-align: right; }
+          .resumen-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+          .resumen-row .label { display: flex; align-items: center; gap: 6px; }
+          .resumen-row .value { font-family: 'Courier New', monospace; font-weight: 700; }
+          .total-box { background: #f0f0f0; border: 2px solid #222; border-radius: 4px; padding: 12px 16px; margin-top: 12px; }
+          .total-box .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
+          .total-box .row.main { font-size: 18px; font-weight: 900; border-top: 2px solid #222; padding-top: 8px; margin-top: 8px; }
+          .diferencia { font-size: 16px; font-weight: 800; text-align: center; padding: 10px; margin-top: 12px; border-radius: 4px; }
+          .obs { margin-top: 12px; padding: 8px 12px; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+          .firma { margin-top: 40px; display: flex; justify-content: space-around; }
+          .firma-box { text-align: center; width: 200px; }
+          .firma-box .linea { border-top: 1px solid #333; margin-top: 50px; padding-top: 4px; font-size: 11px; font-weight: 600; }
+          .print-button { position: fixed; bottom: 20px; right: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+          .print-button:hover { background: #1d4ed8; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>RENDICIÓN DE COBRANZA</h1>
+          <p>Hoja de Ruta #${numeroHoja} — ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}</p>
+        </div>
+
+        ${cobros.length > 0 ? `
+        <div class="section">
+          <div class="section-title">Detalle de Cobros</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Forma de Pago</th>
+                <th>Pedido</th>
+                <th>Referencia</th>
+                <th class="right">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filaCobros}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        <div class="section">
+          <div class="section-title">Resumen por Medio de Pago</div>
+          ${resumen.map(r => `
+            <div class="resumen-row">
+              <span class="label">${r.nombre}</span>
+              <span class="value">$ ${formatCurrency(r.total)}</span>
+            </div>
+          `).join('')}
+          <div class="resumen-row" style="border-top:2px solid #333; font-weight:800; padding-top:8px; margin-top:4px;">
+            <span>Total Sistema</span>
+            <span class="value">$ ${formatCurrency(totalSistema)}</span>
+          </div>
+        </div>
+
+        <div class="total-box">
+          <div class="row"><span>Efectivo declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(efectivoDeclarado)}</span></div>
+          <div class="row"><span>Transferencias declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(transferenciasDeclarado)}</span></div>
+          <div class="row"><span>QR / Mercado Pago declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(qrDeclarado)}</span></div>
+          <div class="row"><span>Tarjeta declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(tarjetaDeclarado)}</span></div>
+          <div class="row main"><span>TOTAL DECLARADO:</span><span style="font-family:'Courier New',monospace;">$ ${formatCurrency(totalDeclarado)}</span></div>
+        </div>
+
+        <div class="diferencia" style="background:${diferencia === 0 ? '#dcfce7' : diferencia > 0 ? '#dbeafe' : '#fee2e2'}; color:${diferenciaColor}; border:2px solid ${diferenciaColor};">
+          ${diferenciaTexto}
+        </div>
+
+        ${observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${observaciones}</div>` : ''}
+
+        <div class="firma">
+          <div class="firma-box"><div class="linea">Chofer / Repartidor</div></div>
+          <div class="firma-box"><div class="linea">Responsable</div></div>
+        </div>
+
+        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
+      </body>
+      </html>
+    `;
+
+    ventana.document.write(html);
+    ventana.document.close();
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
 
