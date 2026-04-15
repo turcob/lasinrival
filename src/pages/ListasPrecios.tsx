@@ -754,10 +754,12 @@ export default function ListasPrecios() {
                     listas.map(lista => (
                       <TableRow key={lista.id}>
                         <TableCell className="font-medium sticky left-0 bg-background">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {lista.codigo && <Badge variant="outline" className="font-mono">{lista.codigo}</Badge>}
                             <span>{lista.nombre}</span>
                             {!lista.activo && <Badge variant="secondary">Inactiva</Badge>}
+                            {lista.destino === 'paladini' && <Badge className="bg-blue-600 text-white text-xs">Paladini</Badge>}
+                            {lista.destino === 'ambos' && <Badge className="bg-purple-600 text-white text-xs">Ambos</Badge>}
                           </div>
                         </TableCell>
                         {columnasActivas.map(col => (
