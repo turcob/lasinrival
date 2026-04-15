@@ -952,6 +952,25 @@ export default function Clientes() {
         onOpenChange={setImportHistorialOpen}
         onImportComplete={fetchData}
       />
+
+      {/* Replicar en Paladini Dialog */}
+      <AlertDialog open={replicarDialogOpen} onOpenChange={setReplicarDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Replicar cliente en Paladini Pedidos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se creará el cliente{replicarCliente && ` "${replicarCliente.nombre}" (${replicarCliente.codigo_cliente || 'sin código'})`} en el sistema de Paladini Pedidos.
+              Si ya existe, se informará sin duplicar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={replicando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReplicarPaladini} disabled={replicando}>
+              {replicando ? 'Replicando...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
