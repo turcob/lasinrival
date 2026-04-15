@@ -604,6 +604,20 @@ export default function ListasPrecios() {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>Destino</Label>
+                  <Select
+                    value={listaFormData.destino}
+                    onValueChange={(v) => setListaFormData({ ...listaFormData, destino: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sin_rival">La Sin Rival</SelectItem>
+                      <SelectItem value="paladini">Paladini Pedidos</SelectItem>
+                      <SelectItem value="ambos">Ambos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Orden</Label>
