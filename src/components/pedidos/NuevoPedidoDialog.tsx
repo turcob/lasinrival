@@ -109,7 +109,8 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
       const { data: listas, error: listasError } = await supabase
         .from('listas_precios')
         .select('id, nombre, codigo')
-        .eq('activo', true);
+        .eq('activo', true)
+        .neq('destino', 'paladini');
       if (listasError) throw listasError;
 
       const { data: porcentajes, error: porcError } = await supabase
