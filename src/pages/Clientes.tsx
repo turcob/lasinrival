@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet, ShieldAlert, ShieldCheck, Upload } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
@@ -103,6 +103,9 @@ export default function Clientes() {
   const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
   const [importHistorialOpen, setImportHistorialOpen] = useState(false);
+  const [replicarDialogOpen, setReplicarDialogOpen] = useState(false);
+  const [replicarCliente, setReplicarCliente] = useState<Cliente | null>(null);
+  const [replicando, setReplicando] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [clienteFacturasAdeudadas, setClienteFacturasAdeudadas] = useState<Record<string, number>>({});
   const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean; monto_adeudado_bloqueo: number }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true, monto_adeudado_bloqueo: 0 });
@@ -326,6 +329,29 @@ export default function Clientes() {
     } catch (error) {
       console.error('Error deleting cliente:', error);
       toast.error('Error al eliminar el cliente');
+    }
+  };
+
+  const handleReplicarPaladini = async () => {
+    if (!replicarCliente) return;
+    setReplicando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-cliente-paladini', {
+        body: { cliente_id: replicarCliente.id },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success(data?.message || 'Cliente replicado en Paladini Pedidos');
+      }
+    } catch (error: any) {
+      console.error('Error replicando cliente:', error);
+      toast.error(error?.message || 'Error al replicar cliente');
+    } finally {
+      setReplicando(false);
+      setReplicarDialogOpen(false);
+      setReplicarCliente(null);
     }
   };
 
@@ -799,6 +825,23 @@ export default function Clientes() {
                             <TooltipContent>Ver Cuenta Corriente</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setReplicarCliente(cliente);
+                                  setReplicarDialogOpen(true);
+                                }}
+                              >
+                                <Upload className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Replicar en Paladini</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(cliente)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -909,6 +952,25 @@ export default function Clientes() {
         onOpenChange={setImportHistorialOpen}
         onImportComplete={fetchData}
       />
+
+      {/* Replicar en Paladini Dialog */}
+      <AlertDialog open={replicarDialogOpen} onOpenChange={setReplicarDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Replicar cliente en Paladini Pedidos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se creará el cliente{replicarCliente && ` "${replicarCliente.nombre}" (${replicarCliente.codigo_cliente || 'sin código'})`} en el sistema de Paladini Pedidos.
+              Si ya existe, se informará sin duplicar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={replicando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReplicarPaladini} disabled={replicando}>
+              {replicando ? 'Replicando...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
