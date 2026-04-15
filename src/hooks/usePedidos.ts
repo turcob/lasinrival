@@ -542,8 +542,28 @@ export function useRendirPedido() {
         usuario_registro_id: user.id
       });
 
-      // Update pedido
+      // Generate automatic NCR for returned items
       const hayDevoluciones = devoluciones.some(d => d.cantidad > 0);
+      if (hayDevoluciones) {
+        const totalOriginal = pedido.detalles.reduce((sum: number, d: any) => {
+          const precio = d.precio_unitario * (1 - (d.descuento_porcentaje || 0) / 100);
+          return sum + (d.cantidad_pedida * precio);
+        }, 0);
+        const montoNCR = totalOriginal - totalFinal;
+
+        if (montoNCR > 0) {
+          await supabase.from('cliente_movimientos').insert({
+            cliente_id: pedido.cliente_id,
+            tipo: 'NCR',
+            monto: montoNCR,
+            concepto: `NC por devolución - Pedido #${pedido.numero_pedido}`,
+            venta_id: venta.id,
+            usuario_registro_id: user.id
+          });
+        }
+      }
+
+      // Update pedido
       await supabase
         .from('pedidos')
         .update({

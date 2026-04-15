@@ -597,6 +597,13 @@ export function useRegistrarDevolucion() {
     }) => {
       if (!user) throw new Error('Usuario no autenticado');
 
+      // Fetch detalle info for price calculation and client
+      const { data: detalleInfo } = await supabase
+        .from('pedido_detalles')
+        .select('producto_id, precio_unitario, descuento_porcentaje, pedido:pedidos(cliente_id, numero_pedido)')
+        .eq('id', data.pedido_detalle_id)
+        .single();
+
       const { error: devError } = await supabase
         .from('hoja_ruta_devoluciones')
         .insert({
@@ -614,27 +621,21 @@ export function useRegistrarDevolucion() {
 
       // Reingress stock if needed
       if (data.reingresarStock) {
-        const { data: detalle } = await supabase
-          .from('pedido_detalles')
-          .select('producto_id')
-          .eq('id', data.pedido_detalle_id)
-          .single();
-
-        if (detalle?.producto_id) {
+        if (detalleInfo?.producto_id) {
           const { data: producto } = await supabase
             .from('productos')
             .select('stock_actual')
-            .eq('id', detalle.producto_id)
+            .eq('id', detalleInfo.producto_id)
             .single();
 
           if (producto) {
             await supabase
               .from('productos')
               .update({ stock_actual: (producto.stock_actual || 0) + data.cantidad })
-              .eq('id', detalle.producto_id);
+              .eq('id', detalleInfo.producto_id);
 
             await supabase.from('movimientos_inventario').insert({
-              producto_id: detalle.producto_id,
+              producto_id: detalleInfo.producto_id,
               tipo: 'entrada',
               cantidad: data.cantidad,
               stock_anterior: producto.stock_actual || 0,
@@ -643,6 +644,23 @@ export function useRegistrarDevolucion() {
               usuario_id: user.id
             });
           }
+        }
+      }
+
+      // Generate automatic NCR (Nota de Crédito) in cuenta corriente
+      if (detalleInfo?.precio_unitario && detalleInfo.pedido) {
+        const pedidoData = detalleInfo.pedido as any;
+        const precioNeto = detalleInfo.precio_unitario * (1 - (detalleInfo.descuento_porcentaje || 0) / 100);
+        const montoNCR = data.cantidad * precioNeto;
+
+        if (montoNCR > 0 && pedidoData.cliente_id) {
+          await supabase.from('cliente_movimientos').insert({
+            cliente_id: pedidoData.cliente_id,
+            tipo: 'NCR',
+            monto: montoNCR,
+            concepto: `NC por devolución - Pedido #${pedidoData.numero_pedido} - ${data.motivo}`,
+            usuario_registro_id: user.id
+          });
         }
       }
     },
