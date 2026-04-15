@@ -103,6 +103,9 @@ export default function Clientes() {
   const [ccCliente, setCcCliente] = useState<Cliente | null>(null);
   const [importDeudasOpen, setImportDeudasOpen] = useState(false);
   const [importHistorialOpen, setImportHistorialOpen] = useState(false);
+  const [replicarDialogOpen, setReplicarDialogOpen] = useState(false);
+  const [replicarCliente, setReplicarCliente] = useState<Cliente | null>(null);
+  const [replicando, setReplicando] = useState(false);
   const [clienteSaldos, setClienteSaldos] = useState<Record<string, number>>({});
   const [clienteFacturasAdeudadas, setClienteFacturasAdeudadas] = useState<Record<string, number>>({});
   const [bloqueoConfig, setBloqueoConfig] = useState<{ facturas_adeudadas_bloqueo: number; bloqueo_automatico_activo: boolean; monto_adeudado_bloqueo: number }>({ facturas_adeudadas_bloqueo: 3, bloqueo_automatico_activo: true, monto_adeudado_bloqueo: 0 });
