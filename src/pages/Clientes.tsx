@@ -151,7 +151,7 @@ export default function Clientes() {
 
   const fetchCatalogs = async () => {
     const [listasRes, zonasRes, vendedoresRes, configRes] = await Promise.all([
-      supabase.from('listas_precios').select('id, nombre').eq('activo', true),
+      supabase.from('listas_precios').select('id, nombre').eq('activo', true).neq('destino', 'paladini'),
       supabase.from('zonas').select('id, codigo, nombre').eq('activo', true).order('codigo'),
       supabase.from('vendedores').select('id, codigo, nombre').eq('activo', true).order('nombre'),
       supabase.from('configuracion_comercio').select('facturas_adeudadas_bloqueo, bloqueo_automatico_activo, monto_adeudado_bloqueo').limit(1).maybeSingle(),

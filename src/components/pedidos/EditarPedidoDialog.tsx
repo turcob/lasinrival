@@ -72,7 +72,8 @@ export function EditarPedidoDialog({ pedidoId, open, onOpenChange }: EditarPedid
       const { data: listas, error: listasError } = await supabase
         .from('listas_precios')
         .select('id, nombre, codigo')
-        .eq('activo', true);
+        .eq('activo', true)
+        .neq('destino', 'paladini');
       if (listasError) throw listasError;
       const { data: porcentajes, error: porcError } = await supabase
         .from('lista_precio_porcentajes')
