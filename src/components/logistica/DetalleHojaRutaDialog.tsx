@@ -103,8 +103,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return cobros
       .filter((c: any) => c.pedido?.numero_pedido && c.pedido)
       .filter((c: any) => {
-        // Filtrar por pedido_id real, necesitamos agregarlo al query
-        return true; // Por ahora retornar todos
+        return true;
       })
       .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
   };
@@ -114,6 +113,24 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return cobros
       .filter((c: any) => c.parada?.id === paradaId)
       .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
+  };
+
+  // Calcular monto de devoluciones por parada
+  const getDevolucionesPorParada = (paradaId: string): number => {
+    if (!devoluciones) return 0;
+    return devoluciones
+      .filter((d: any) => d.parada_id === paradaId || d.parada?.id === paradaId)
+      .reduce((sum: number, d: any) => {
+        const precio = d.pedido_detalle?.precio_unitario || 0;
+        const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+        const precioNeto = precio * (1 - descuento / 100);
+        return sum + (d.cantidad * precioNeto);
+      }, 0);
+  };
+
+  // Total neto del pedido (total - devoluciones)
+  const getTotalNeto = (paradaId: string, totalPedido: number): number => {
+    return totalPedido - getDevolucionesPorParada(paradaId);
   };
 
   if (!hojaRutaId) return null;
@@ -499,12 +516,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 {['entregado', 'entrega_parcial'].includes(parada.estado) && (
                                   <Button
                                     size="sm"
-                                    variant={getCobradoPorParada(parada.id) >= parada.pedido.total ? "outline" : "default"}
+                                    variant={getCobradoPorParada(parada.id) >= getTotalNeto(parada.id, parada.pedido.total) ? "outline" : "default"}
                                     onClick={() => setCobroDialog({
                                       open: true,
                                       paradaId: parada.id,
                                       pedidoId: parada.pedido!.id,
-                                      totalPedido: parada.pedido!.total,
+                                      totalPedido: getTotalNeto(parada.id, parada.pedido!.total),
                                       montoCobrado: getCobradoPorParada(parada.id),
                                     })}
                                   >
@@ -534,6 +551,19 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             <p className="font-semibold">
                               ${parada.pedido?.total?.toLocaleString('es-AR')}
                             </p>
+                            {getDevolucionesPorParada(parada.id) > 0 && (
+                              <div className="mt-1">
+                                <p className="text-xs text-destructive line-through">
+                                  ${parada.pedido?.total?.toLocaleString('es-AR')}
+                                </p>
+                                <p className="text-sm font-bold text-primary">
+                                  ${getTotalNeto(parada.id, parada.pedido?.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-xs text-amber-600">
+                                  -${getDevolucionesPorParada(parada.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })} dev.
+                                </p>
+                              </div>
+                            )}
                             {hojaRuta.estado === 'planificada' && (
                               <Button
                                 size="sm"
@@ -572,31 +602,57 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 </div>
                 
                 <div className="border border-amber-200 rounded-lg divide-y bg-amber-50/50 max-h-[200px] overflow-y-auto">
-                  {devoluciones.map((devolucion: any) => (
-                    <div key={devolucion.id} className="p-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">
-                          {devolucion.pedido_detalle?.producto?.descripcion || 'Producto'}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {devolucion.cantidad} un.
-                        </Badge>
+                  {devoluciones.map((devolucion: any) => {
+                    const precio = devolucion.pedido_detalle?.precio_unitario || 0;
+                    const descuento = devolucion.pedido_detalle?.descuento_porcentaje || 0;
+                    const precioNeto = precio * (1 - descuento / 100);
+                    const valorDevolucion = devolucion.cantidad * precioNeto;
+                    
+                    return (
+                      <div key={devolucion.id} className="p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">
+                            {devolucion.pedido_detalle?.producto?.descripcion || 'Producto'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {devolucion.cantidad} un.
+                            </Badge>
+                            {valorDevolucion > 0 && (
+                              <span className="text-sm font-semibold text-destructive">
+                                -${valorDevolucion.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="capitalize">
+                            {devolucion.motivo?.replace(/_/g, ' ') || 'Sin motivo'}
+                          </span>
+                          <span>
+                            {format(new Date(devolucion.created_at), 'dd/MM HH:mm', { locale: es })}
+                          </span>
+                        </div>
+                        {devolucion.detalle_motivo && (
+                          <p className="text-xs text-muted-foreground italic">
+                            {devolucion.detalle_motivo}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="capitalize">
-                          {devolucion.motivo?.replace(/_/g, ' ') || 'Sin motivo'}
-                        </span>
-                        <span>
-                          {format(new Date(devolucion.created_at), 'dd/MM HH:mm', { locale: es })}
-                        </span>
-                      </div>
-                      {devolucion.detalle_motivo && (
-                        <p className="text-xs text-muted-foreground italic">
-                          {devolucion.detalle_motivo}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+                
+                {/* Total devoluciones */}
+                <div className="flex justify-end px-3">
+                  <span className="text-sm font-bold text-destructive">
+                    {'Total devoluciones: -$'}
+                    {devoluciones.reduce((sum: number, d: any) => {
+                      const precio = d.pedido_detalle?.precio_unitario || 0;
+                      const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+                      return sum + (d.cantidad * precio * (1 - descuento / 100));
+                    }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               </div>
             )}

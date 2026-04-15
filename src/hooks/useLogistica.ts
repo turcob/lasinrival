@@ -924,12 +924,15 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
           detalle_motivo,
           reingresado_stock,
           created_at,
+          parada_id,
           parada:hoja_ruta_paradas(
             id,
             pedido:pedidos(numero_pedido, cliente:clientes(nombre))
           ),
           pedido_detalle:pedido_detalles(
             id,
+            precio_unitario,
+            descuento_porcentaje,
             producto:productos(codigo_articulo, descripcion)
           )
         `)
