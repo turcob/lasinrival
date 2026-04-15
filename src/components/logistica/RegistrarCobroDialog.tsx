@@ -78,7 +78,10 @@ export function RegistrarCobroDialog({
   };
 
   const agregarCobro = () => {
-    setCobros([...cobros, { forma_pago_id: '', monto: 0, referencia: '' }]);
+    // Calculate remaining amount excluding what other cobros already cover
+    const otrosCobrosTotal = cobros.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+    const restante = Math.max(0, saldoInicial - otrosCobrosTotal);
+    setCobros([...cobros, { forma_pago_id: '', monto: restante, referencia: '' }]);
   };
 
   const eliminarCobro = (index: number) => {
