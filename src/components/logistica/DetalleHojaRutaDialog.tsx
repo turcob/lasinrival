@@ -503,48 +503,56 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
                             {/* Botones de cobro y devolución - visible cuando está en ruta o entregado */}
                             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && 
-                             ['entregado', 'entrega_parcial', 'rechazado'].includes(parada.estado) && parada.pedido && (
+                             ['entregado', 'entrega_parcial', 'rechazado'].includes(parada.estado) && parada.pedido && (() => {
+                              const totalNeto = getTotalNeto(parada.id, parada.pedido!.total);
+                              const cobrado = getCobradoPorParada(parada.id);
+                              const pedidoCobradoCompleto = cobrado >= totalNeto && totalNeto > 0;
+                              
+                              return (
                               <div className="pt-2 flex flex-wrap items-center gap-2">
-                                {getCobradoPorParada(parada.id) > 0 && (
-                                  <Badge variant="secondary" className="text-xs">
+                                {cobrado > 0 && (
+                                  <Badge variant={pedidoCobradoCompleto ? "default" : "secondary"} className={`text-xs ${pedidoCobradoCompleto ? 'bg-green-600' : ''}`}>
                                     <Banknote className="h-3 w-3 mr-1" />
-                                    Cobrado: ${getCobradoPorParada(parada.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                    {pedidoCobradoCompleto ? 'Cobrado ✓' : `Cobrado: $${cobrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
                                   </Badge>
                                 )}
                                 
-                                {/* Botón Cobrar */}
-                                {['entregado', 'entrega_parcial'].includes(parada.estado) && (
+                                {/* Botón Cobrar - oculto si ya está cobrado completo */}
+                                {!pedidoCobradoCompleto && ['entregado', 'entrega_parcial'].includes(parada.estado) && (
                                   <Button
                                     size="sm"
-                                    variant={getCobradoPorParada(parada.id) >= getTotalNeto(parada.id, parada.pedido.total) ? "outline" : "default"}
+                                    variant="default"
                                     onClick={() => setCobroDialog({
                                       open: true,
                                       paradaId: parada.id,
                                       pedidoId: parada.pedido!.id,
-                                      totalPedido: getTotalNeto(parada.id, parada.pedido!.total),
-                                      montoCobrado: getCobradoPorParada(parada.id),
+                                      totalPedido: totalNeto,
+                                      montoCobrado: cobrado,
                                     })}
                                   >
                                     <DollarSign className="h-4 w-4 mr-1" />
-                                    {getCobradoPorParada(parada.id) > 0 ? 'Agregar Cobro' : 'Cobrar'}
+                                    {cobrado > 0 ? 'Agregar Cobro' : 'Cobrar'}
                                   </Button>
                                 )}
 
-                                {/* Botón Devoluciones */}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDevolucionDialog({
-                                    open: true,
-                                    paradaId: parada.id,
-                                    pedidoDetalles: parada.pedido?.detalles || [],
-                                  })}
-                                >
-                                  <PackageX className="h-4 w-4 mr-1" />
-                                  Devoluciones
-                                </Button>
+                                {/* Botón Devoluciones - oculto si ya está cobrado completo */}
+                                {!pedidoCobradoCompleto && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setDevolucionDialog({
+                                      open: true,
+                                      paradaId: parada.id,
+                                      pedidoDetalles: parada.pedido?.detalles || [],
+                                    })}
+                                  >
+                                    <PackageX className="h-4 w-4 mr-1" />
+                                    Devoluciones
+                                  </Button>
+                                )}
                               </div>
-                            )}
+                              );
+                            })()}
                           </div>
 
                           <div className="text-right shrink-0">
