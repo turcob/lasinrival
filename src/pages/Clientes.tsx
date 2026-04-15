@@ -825,6 +825,23 @@ export default function Clientes() {
                             <TooltipContent>Ver Cuenta Corriente</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setReplicarCliente(cliente);
+                                  setReplicarDialogOpen(true);
+                                }}
+                              >
+                                <Upload className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Replicar en Paladini</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(cliente)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
