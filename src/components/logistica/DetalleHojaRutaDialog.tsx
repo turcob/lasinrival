@@ -15,6 +15,7 @@ import {
   useEliminarParada,
   useCobrosHojaRuta,
   useDevolucionesHojaRuta,
+  useRendicionHojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
