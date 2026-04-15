@@ -73,6 +73,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const { data: hojaRuta, isLoading, refetch } = useHojaRuta(hojaRutaId || undefined);
   const { data: cobros } = useCobrosHojaRuta(hojaRutaId || undefined);
   const { data: devoluciones } = useDevolucionesHojaRuta(hojaRutaId || undefined);
+  const { data: rendicionExistente } = useRendicionHojaRuta(hojaRutaId || undefined);
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
