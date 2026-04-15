@@ -516,12 +516,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 {['entregado', 'entrega_parcial'].includes(parada.estado) && (
                                   <Button
                                     size="sm"
-                                    variant={getCobradoPorParada(parada.id) >= parada.pedido.total ? "outline" : "default"}
+                                    variant={getCobradoPorParada(parada.id) >= getTotalNeto(parada.id, parada.pedido.total) ? "outline" : "default"}
                                     onClick={() => setCobroDialog({
                                       open: true,
                                       paradaId: parada.id,
                                       pedidoId: parada.pedido!.id,
-                                      totalPedido: parada.pedido!.total,
+                                      totalPedido: getTotalNeto(parada.id, parada.pedido!.total),
                                       montoCobrado: getCobradoPorParada(parada.id),
                                     })}
                                   >
@@ -551,6 +551,19 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             <p className="font-semibold">
                               ${parada.pedido?.total?.toLocaleString('es-AR')}
                             </p>
+                            {getDevolucionesPorParada(parada.id) > 0 && (
+                              <div className="mt-1">
+                                <p className="text-xs text-destructive line-through">
+                                  ${parada.pedido?.total?.toLocaleString('es-AR')}
+                                </p>
+                                <p className="text-sm font-bold text-primary">
+                                  ${getTotalNeto(parada.id, parada.pedido?.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-xs text-amber-600">
+                                  -${getDevolucionesPorParada(parada.id).toLocaleString('es-AR', { minimumFractionDigits: 2 })} dev.
+                                </p>
+                              </div>
+                            )}
                             {hojaRuta.estado === 'planificada' && (
                               <Button
                                 size="sm"
