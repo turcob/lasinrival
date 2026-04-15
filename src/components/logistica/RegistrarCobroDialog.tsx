@@ -54,10 +54,11 @@ export function RegistrarCobroDialog({
   useEffect(() => {
     if (open) {
       loadFormasPago();
-      setCobros([{ forma_pago_id: '', monto: 0, referencia: '' }]);
       setObservaciones('');
     }
   }, [open]);
+
+  const saldoInicial = totalPedido - montoCobrado;
 
   const loadFormasPago = async () => {
     const { data } = await supabase
@@ -65,7 +66,15 @@ export function RegistrarCobroDialog({
       .select('id, nombre')
       .eq('activo', true)
       .order('nombre');
-    if (data) setFormasPago(data);
+    if (data) {
+      setFormasPago(data);
+      const efectivo = data.find(fp => fp.nombre.toLowerCase().includes('efectivo'));
+      setCobros([{
+        forma_pago_id: efectivo?.id || '',
+        monto: saldoInicial > 0 ? saldoInicial : 0,
+        referencia: '',
+      }]);
+    }
   };
 
   const agregarCobro = () => {
