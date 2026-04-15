@@ -70,6 +70,7 @@ interface ListaPrecio {
   codigo: string | null;
   orden: number;
   activo: boolean;
+  destino: string;
 }
 
 interface Porcentaje {
@@ -127,7 +128,7 @@ export default function ListasPrecios() {
   const [selectedExcepcion, setSelectedExcepcion] = useState<Excepcion | null>(null);
   
   // Form data
-  const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true });
+  const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true, destino: 'sin_rival' });
   const [columnaFormData, setColumnaFormData] = useState<{ tipo: 'marca' | 'tipo_producto', id: string }>({ tipo: 'marca', id: '' });
   const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
   const [productoSearch, setProductoSearch] = useState('');
@@ -324,16 +325,45 @@ export default function ListasPrecios() {
         codigo: listaFormData.codigo || null,
         orden: listaFormData.orden,
         activo: listaFormData.activo,
+        destino: listaFormData.destino,
       };
       
+      let savedListaId: string | null = null;
       if (selectedLista) {
         const { error } = await supabase.from('listas_precios').update(dataToSave).eq('id', selectedLista.id);
         if (error) throw error;
+        savedListaId = selectedLista.id;
         toast.success('Lista actualizada');
       } else {
-        const { error } = await supabase.from('listas_precios').insert([dataToSave]);
+        const { data: insertData, error } = await supabase.from('listas_precios').insert([dataToSave]).select('id').single();
         if (error) throw error;
+        savedListaId = insertData?.id || null;
         toast.success('Lista creada');
+      }
+
+      // Sync to Paladini if destino includes it
+      if (dataToSave.destino === 'paladini' || dataToSave.destino === 'ambos') {
+        try {
+          // Get the general percentage for this list
+          let porcentajeGeneral = 0;
+          if (savedListaId && matrizTemp[savedListaId]) {
+            porcentajeGeneral = matrizTemp[savedListaId]['general'] ?? 0;
+          }
+          const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+          const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-lista-precios-paladini', {
+            body: {
+              lista_id: savedListaId,
+              action: 'upsert',
+              nombre: dataToSave.nombre,
+              porcentaje_general: porcentajeGeneral,
+            },
+          });
+          if (syncError) throw syncError;
+          toast.success('Lista sincronizada con Paladini Pedidos');
+        } catch (syncErr: any) {
+          console.error('Error syncing to Paladini:', syncErr);
+          toast.error('Lista guardada pero falló la sincronización con Paladini');
+        }
       }
       
       setListaDialogOpen(false);
@@ -348,6 +378,17 @@ export default function ListasPrecios() {
   const handleDeleteLista = async () => {
     if (!selectedLista) return;
     try {
+      // Sync delete to Paladini if needed
+      if (selectedLista.destino === 'paladini' || selectedLista.destino === 'ambos') {
+        try {
+          await supabase.functions.invoke('sync-lista-precios-paladini', {
+            body: { action: 'delete', nombre: selectedLista.nombre },
+          });
+        } catch (syncErr) {
+          console.error('Error syncing delete to Paladini:', syncErr);
+          toast.error('No se pudo eliminar en Paladini');
+        }
+      }
       const { error } = await supabase.from('listas_precios').delete().eq('id', selectedLista.id);
       if (error) throw error;
       toast.success('Lista eliminada');
@@ -362,13 +403,13 @@ export default function ListasPrecios() {
 
   const openEditListaDialog = (lista: ListaPrecio) => {
     setSelectedLista(lista);
-    setListaFormData({ nombre: lista.nombre, codigo: lista.codigo || '', orden: lista.orden, activo: lista.activo });
+    setListaFormData({ nombre: lista.nombre, codigo: lista.codigo || '', orden: lista.orden, activo: lista.activo, destino: lista.destino || 'sin_rival' });
     setListaDialogOpen(true);
   };
 
   const resetListaForm = () => {
     setSelectedLista(null);
-    setListaFormData({ nombre: '', codigo: '', orden: listas.length, activo: true });
+    setListaFormData({ nombre: '', codigo: '', orden: listas.length, activo: true, destino: 'sin_rival' });
   };
 
   // Agregar columna
