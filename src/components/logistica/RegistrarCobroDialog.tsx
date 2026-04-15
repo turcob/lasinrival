@@ -54,10 +54,11 @@ export function RegistrarCobroDialog({
   useEffect(() => {
     if (open) {
       loadFormasPago();
-      setCobros([{ forma_pago_id: '', monto: 0, referencia: '' }]);
       setObservaciones('');
     }
   }, [open]);
+
+  const saldoInicial = totalPedido - montoCobrado;
 
   const loadFormasPago = async () => {
     const { data } = await supabase
@@ -65,11 +66,22 @@ export function RegistrarCobroDialog({
       .select('id, nombre')
       .eq('activo', true)
       .order('nombre');
-    if (data) setFormasPago(data);
+    if (data) {
+      setFormasPago(data);
+      const efectivo = data.find(fp => fp.nombre.toLowerCase().includes('efectivo'));
+      setCobros([{
+        forma_pago_id: efectivo?.id || '',
+        monto: saldoInicial > 0 ? saldoInicial : 0,
+        referencia: '',
+      }]);
+    }
   };
 
   const agregarCobro = () => {
-    setCobros([...cobros, { forma_pago_id: '', monto: 0, referencia: '' }]);
+    // Calculate remaining amount excluding what other cobros already cover
+    const otrosCobrosTotal = cobros.reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+    const restante = Math.max(0, saldoInicial - otrosCobrosTotal);
+    setCobros([...cobros, { forma_pago_id: '', monto: restante, referencia: '' }]);
   };
 
   const eliminarCobro = (index: number) => {
@@ -81,6 +93,13 @@ export function RegistrarCobroDialog({
   const actualizarCobro = (index: number, field: keyof CobroItem, value: string | number) => {
     const newCobros = [...cobros];
     newCobros[index] = { ...newCobros[index], [field]: value };
+    
+    // When changing monto on non-first items, auto-adjust the first item
+    if (field === 'monto' && index !== 0 && newCobros.length > 1) {
+      const otrosTotal = newCobros.slice(1).reduce((sum, c) => sum + (Number(c.monto) || 0), 0);
+      newCobros[0] = { ...newCobros[0], monto: Math.max(0, saldoInicial - otrosTotal) };
+    }
+    
     setCobros(newCobros);
   };
 
