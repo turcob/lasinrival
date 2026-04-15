@@ -2980,48 +2980,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rendiciones: {
-        Row: {
-          created_at: string | null
-          diferencia: number
-          fecha_cierre: string | null
-          hoja_ruta_id: string
-          id: string
-          monto_cobrado_efectivo: number
-          monto_cobrado_otros: number
-          monto_esperado: number
-          monto_total_cobrado: number
-          observaciones: string | null
-          tipo_diferencia: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          diferencia?: number
-          fecha_cierre?: string | null
-          hoja_ruta_id: string
-          id?: string
-          monto_cobrado_efectivo?: number
-          monto_cobrado_otros?: number
-          monto_esperado?: number
-          monto_total_cobrado?: number
-          observaciones?: string | null
-          tipo_diferencia?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          diferencia?: number
-          fecha_cierre?: string | null
-          hoja_ruta_id?: string
-          id?: string
-          monto_cobrado_efectivo?: number
-          monto_cobrado_otros?: number
-          monto_esperado?: number
-          monto_total_cobrado?: number
-          observaciones?: string | null
-          tipo_diferencia?: string | null
-        }
-        Relationships: []
-      }
       role_permissions: {
         Row: {
           id: string
