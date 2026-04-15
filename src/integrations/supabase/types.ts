@@ -1829,6 +1829,7 @@ export type Database = {
           activo: boolean | null
           codigo: string | null
           created_at: string | null
+          destino: string
           id: string
           nombre: string
           orden: number | null
@@ -1837,6 +1838,7 @@ export type Database = {
           activo?: boolean | null
           codigo?: string | null
           created_at?: string | null
+          destino?: string
           id?: string
           nombre: string
           orden?: number | null
@@ -1845,6 +1847,7 @@ export type Database = {
           activo?: boolean | null
           codigo?: string | null
           created_at?: string | null
+          destino?: string
           id?: string
           nombre?: string
           orden?: number | null
