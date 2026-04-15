@@ -304,7 +304,29 @@ export default function ListasPrecios() {
         if (error) throw error;
       }
       
+      // Sync lists with Paladini destino
+      const listasParaSyncPaladini = listas.filter(l => l.destino === 'paladini' || l.destino === 'ambos');
+      for (const lista of listasParaSyncPaladini) {
+        try {
+          const porcentajeGeneral = matrizTemp[lista.id]?.['general'] ?? 0;
+          await supabase.functions.invoke('sync-lista-precios-paladini', {
+            body: {
+              lista_id: lista.id,
+              action: 'upsert',
+              nombre: lista.nombre,
+              porcentaje_general: porcentajeGeneral,
+            },
+          });
+        } catch (syncErr) {
+          console.error(`Error syncing list ${lista.nombre} to Paladini:`, syncErr);
+          toast.error(`No se pudo sincronizar "${lista.nombre}" con Paladini`);
+        }
+      }
+      
       toast.success('Matriz de precios guardada correctamente');
+      if (listasParaSyncPaladini.length > 0) {
+        toast.success(`${listasParaSyncPaladini.length} lista(s) sincronizada(s) con Paladini`);
+      }
       setHasChanges(false);
       fetchData();
     } catch (error) {
