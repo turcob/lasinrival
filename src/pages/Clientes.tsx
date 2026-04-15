@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MapPin, User, Wallet, FileSpreadsheet, ShieldAlert, ShieldCheck, Upload } from 'lucide-react';
 import { ExcelImporterClientes } from '@/components/clientes/ExcelImporterClientes';
 import { ExcelImporterCuentaCorriente } from '@/components/clientes/ExcelImporterCuentaCorriente';
 import { ImportarDeudasDialog } from '@/components/clientes/ImportarDeudasDialog';
