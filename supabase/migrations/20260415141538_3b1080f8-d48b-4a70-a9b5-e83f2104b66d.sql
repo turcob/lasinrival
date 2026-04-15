@@ -1,0 +1,1 @@
+ALTER TABLE public.listas_precios ADD COLUMN destino text NOT NULL DEFAULT 'sin_rival';
