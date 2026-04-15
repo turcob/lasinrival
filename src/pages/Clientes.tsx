@@ -332,6 +332,29 @@ export default function Clientes() {
     }
   };
 
+  const handleReplicarPaladini = async () => {
+    if (!replicarCliente) return;
+    setReplicando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-cliente-paladini', {
+        body: { cliente_id: replicarCliente.id },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success(data?.message || 'Cliente replicado en Paladini Pedidos');
+      }
+    } catch (error: any) {
+      console.error('Error replicando cliente:', error);
+      toast.error(error?.message || 'Error al replicar cliente');
+    } finally {
+      setReplicando(false);
+      setReplicarDialogOpen(false);
+      setReplicarCliente(null);
+    }
+  };
+
   const openEditDialog = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setFormData({
