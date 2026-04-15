@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   useVehiculos, 
   useCrearHojaRuta,
@@ -20,7 +21,7 @@ import {
 } from '@/hooks/useLogistica';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, User, Truck, Calendar, Check } from 'lucide-react';
+import { MapPin, User, Truck, Calendar, Check, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 
 const formSchema = z.object({
@@ -41,6 +42,8 @@ interface NuevaHojaRutaDialogProps {
 
 export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogProps) {
   const [selectedPedidos, setSelectedPedidos] = useState<string[]>([]);
+  const [filtroZona, setFiltroZona] = useState<string>('');
+  const [filtroVendedor, setFiltroVendedor] = useState<string>('');
   
   const { data: vehiculos = [] } = useVehiculos();
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
@@ -58,6 +61,41 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       return data;
     },
   });
+
+  const { data: zonas = [] } = useQuery({
+    queryKey: ['zonas-lista'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zonas')
+        .select('id, nombre')
+        .order('nombre');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: vendedores = [] } = useQuery({
+    queryKey: ['vendedores-lista'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendedores')
+        .select('id, nombre')
+        .eq('activo', true)
+        .order('nombre');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const pedidosFiltrados = useMemo(() => {
+    return pedidosDisponibles.filter((pedido: any) => {
+      if (filtroZona && pedido.cliente?.zona_id !== filtroZona) return false;
+      if (filtroVendedor && pedido.cliente?.vendedor_id !== filtroVendedor) return false;
+      return true;
+    });
+  }, [pedidosDisponibles, filtroZona, filtroVendedor]);
+
+  const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -79,6 +117,16 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     );
   };
 
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredIds = pedidosFiltrados.map((p: any) => p.id);
+      setSelectedPedidos(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      const filteredIds = pedidosFiltrados.map((p: any) => p.id);
+      setSelectedPedidos(prev => [...new Set([...prev, ...filteredIds])]);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     await crearHojaRuta.mutateAsync({
       fecha: values.fecha,
@@ -91,6 +139,8 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     });
     reset();
     setSelectedPedidos([]);
+    setFiltroZona('');
+    setFiltroVendedor('');
     onOpenChange(false);
   };
 
@@ -184,55 +234,97 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
           {/* Pedidos selection */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <Label>Pedidos Disponibles</Label>
+              <Label className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Pedidos Disponibles
+              </Label>
               <span className="text-sm text-muted-foreground">
                 {selectedPedidos.length} seleccionados
               </span>
             </div>
+
+            {/* Filters */}
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={filtroZona}
+                onChange={e => setFiltroZona(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                <option value="">Todas las zonas</option>
+                {zonas.map(z => (
+                  <option key={z.id} value={z.id}>{z.nombre}</option>
+                ))}
+              </select>
+              <select
+                value={filtroVendedor}
+                onChange={e => setFiltroVendedor(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                <option value="">Todos los vendedores</option>
+                {vendedores.map(v => (
+                  <option key={v.id} value={v.id}>{v.nombre}</option>
+                ))}
+              </select>
+            </div>
             
-            <div className="border rounded-md max-h-[200px] overflow-y-auto">
-              {pedidosDisponibles.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground text-sm">
-                  No hay pedidos disponibles para asignar
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {pedidosDisponibles.map((pedido) => {
-                    const isSelected = selectedPedidos.includes(pedido.id);
-                    return (
-                      <div 
-                        key={pedido.id}
-                        className={`p-3 cursor-pointer transition-colors hover:bg-muted ${isSelected ? 'bg-primary/5' : ''}`}
-                        onClick={() => togglePedido(pedido.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-input'}`}>
-                            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-sm">
-                                #{pedido.numero_pedido}
-                              </span>
-                              <span className="text-xs px-2 py-0.5 rounded bg-muted">
-                                {pedido.estado}
-                              </span>
-                            </div>
-                            <p className="text-sm truncate">
-                              {pedido.cliente?.nombre}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-sm">
-                              ${pedido.total.toLocaleString('es-AR')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+            <div className="border rounded-md">
+              {/* Select all header */}
+              {pedidosFiltrados.length > 0 && (
+                <div
+                  className="p-2 border-b bg-muted/50 flex items-center gap-3 cursor-pointer hover:bg-muted"
+                  onClick={toggleSelectAll}
+                >
+                  <Checkbox checked={allFilteredSelected} />
+                  <span className="text-sm font-medium">
+                    Seleccionar todos ({pedidosFiltrados.length})
+                  </span>
                 </div>
               )}
+
+              <div className="max-h-[200px] overflow-y-auto">
+                {pedidosFiltrados.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    No hay pedidos disponibles para asignar
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {pedidosFiltrados.map((pedido: any) => {
+                      const isSelected = selectedPedidos.includes(pedido.id);
+                      return (
+                        <div 
+                          key={pedido.id}
+                          className={`p-3 cursor-pointer transition-colors hover:bg-muted ${isSelected ? 'bg-primary/5' : ''}`}
+                          onClick={() => togglePedido(pedido.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-input'}`}>
+                              {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-sm">
+                                  #{pedido.numero_pedido}
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded bg-muted">
+                                  {pedido.estado}
+                                </span>
+                              </div>
+                              <p className="text-sm truncate">
+                                {pedido.cliente?.nombre}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-sm">
+                                ${pedido.total.toLocaleString('es-AR')}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
