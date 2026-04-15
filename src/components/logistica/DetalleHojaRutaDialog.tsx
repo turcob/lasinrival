@@ -103,8 +103,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return cobros
       .filter((c: any) => c.pedido?.numero_pedido && c.pedido)
       .filter((c: any) => {
-        // Filtrar por pedido_id real, necesitamos agregarlo al query
-        return true; // Por ahora retornar todos
+        return true;
       })
       .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
   };
@@ -114,6 +113,24 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return cobros
       .filter((c: any) => c.parada?.id === paradaId)
       .reduce((sum: number, c: any) => sum + (c.monto || 0), 0);
+  };
+
+  // Calcular monto de devoluciones por parada
+  const getDevolucionesPorParada = (paradaId: string): number => {
+    if (!devoluciones) return 0;
+    return devoluciones
+      .filter((d: any) => d.parada_id === paradaId || d.parada?.id === paradaId)
+      .reduce((sum: number, d: any) => {
+        const precio = d.pedido_detalle?.precio_unitario || 0;
+        const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+        const precioNeto = precio * (1 - descuento / 100);
+        return sum + (d.cantidad * precioNeto);
+      }, 0);
+  };
+
+  // Total neto del pedido (total - devoluciones)
+  const getTotalNeto = (paradaId: string, totalPedido: number): number => {
+    return totalPedido - getDevolucionesPorParada(paradaId);
   };
 
   if (!hojaRutaId) return null;
