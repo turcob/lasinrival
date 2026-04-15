@@ -646,14 +646,17 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 {/* Total devoluciones */}
                 <div className="flex justify-end px-3">
                   <span className="text-sm font-bold text-destructive">
-                    Total devoluciones: -${devoluciones.reduce((sum: number, d: any) => {
-                      const precio = d.pedido_detalle?.precio_unitario || 0;
-                      const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
-                      return sum + (d.cantidad * precio * (1 - descuento / 100));
-                    }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    Total devoluciones: -${(() => {
+                      const total = devoluciones.reduce((sum: number, d: any) => {
+                        const precio = d.pedido_detalle?.precio_unitario || 0;
+                        const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+                        return sum + (d.cantidad * precio * (1 - descuento / 100));
+                      }, 0);
+                      return total.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+                    })()}
                   </span>
                 </div>
-                </div>
+              </div>
               </div>
             )}
 
