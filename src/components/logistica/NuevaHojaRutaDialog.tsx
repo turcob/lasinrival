@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+
 import { 
   useVehiculos, 
   useCrearHojaRuta,
@@ -274,7 +274,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                   className="p-2 border-b bg-muted/50 flex items-center gap-3 cursor-pointer hover:bg-muted"
                   onClick={toggleSelectAll}
                 >
-                  <Checkbox checked={allFilteredSelected} />
+                  <input type="checkbox" checked={allFilteredSelected} readOnly className="h-4 w-4 rounded border-input accent-primary" />
                   <span className="text-sm font-medium">
                     Seleccionar todos ({pedidosFiltrados.length})
                   </span>
