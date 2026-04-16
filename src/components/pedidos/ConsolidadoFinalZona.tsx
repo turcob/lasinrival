@@ -63,21 +63,26 @@ function useZonas() {
   });
 }
 
-function usePedidosPreparadosPorZona(zonaId: string | null) {
+function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
   return useQuery({
-    queryKey: ['pedidos-consolidado-final-zona', zonaId],
+    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin],
     queryFn: async () => {
       if (!zonaId) return [];
 
-      // Fetch all preparado pedidos, filter by zona client-side
-      const { data: allPedidos, error: pedidosError } = await supabase
+      // Fetch pedidos: admin sees all non-rejected, others only preparado
+      let query = supabase
         .from('pedidos')
         .select(`
           id, numero_pedido, total, estado, fecha_pedido, observaciones,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
-        .eq('estado', 'preparado' as any)
         .order('numero_pedido', { ascending: true });
+
+      if (!isAdmin) {
+        query = query.eq('estado', 'preparado' as any);
+      } else {
+        query = query.not('estado', 'eq', 'rechazado');
+      }
 
       if (pedidosError) throw pedidosError;
       if (!allPedidos || allPedidos.length === 0) return [];
