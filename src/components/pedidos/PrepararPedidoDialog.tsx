@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Package, AlertTriangle, X, Check, Calculator } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,8 @@ interface PrepararPedidoDialogProps {
   pedidoId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  pedidoIds?: string[];
+  onNavigate?: (pedidoId: string) => void;
 }
 
 interface LineaPreparacion {
@@ -47,11 +49,44 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 };
 
-export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararPedidoDialogProps) {
+export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, onNavigate }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
   
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
+
+  // Navigation between pedidos
+  const currentIndex = pedidoIds && pedidoId ? pedidoIds.indexOf(pedidoId) : -1;
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = pedidoIds ? currentIndex < pedidoIds.length - 1 : false;
+
+  const goToPrev = useCallback(() => {
+    if (canGoPrev && pedidoIds && onNavigate) {
+      onNavigate(pedidoIds[currentIndex - 1]);
+    }
+  }, [canGoPrev, pedidoIds, currentIndex, onNavigate]);
+
+  const goToNext = useCallback(() => {
+    if (canGoNext && pedidoIds && onNavigate) {
+      onNavigate(pedidoIds[currentIndex + 1]);
+    }
+  }, [canGoNext, pedidoIds, currentIndex, onNavigate]);
+
+  // Keyboard navigation: PageUp / PageDown
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'PageDown') {
+        e.preventDefault();
+        goToNext();
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        goToPrev();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, goToNext, goToPrev]);
 
   // Initialize lines when dialog opens
   useEffect(() => {
