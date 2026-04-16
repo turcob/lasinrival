@@ -436,6 +436,8 @@ export default function Pedidos() {
         pedidoId={prepararPedidoId}
         open={!!prepararPedidoId}
         onOpenChange={(open) => !open && setPrepararPedidoId(null)}
+        pedidoIds={pedidosFiltrados.map(p => p.id)}
+        onNavigate={(id) => setPrepararPedidoId(id)}
       />
 
       <EditarPedidoDialog
