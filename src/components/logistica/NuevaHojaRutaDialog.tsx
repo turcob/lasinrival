@@ -143,6 +143,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     setSelectedPedidos([]);
     setFiltroZona('');
     setFiltroVendedor('');
+    setFiltroOrigen('todos');
     onOpenChange(false);
   };
 
