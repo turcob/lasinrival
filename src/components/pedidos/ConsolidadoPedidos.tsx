@@ -164,16 +164,16 @@ export function ConsolidadoPedidos() {
     printWindow.onload = () => printWindow.print();
   };
 
-  // Generate consolidado from ALL pedidos
+  // Generate consolidado from filtered pedidos
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [] };
-    const items = generarConsolidado(pedidos);
+    if (!pedidosFiltrados || pedidosFiltrados.length === 0) return { noPesables: [], frios: [], pesables: [] };
+    const items = generarConsolidado(pedidosFiltrados);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   // Filter consolidado by search
   const filtrarItems = (items: ProductoConsolidadoItem[]) => {
