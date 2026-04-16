@@ -36,6 +36,7 @@ import Cheques from "./pages/Cheques";
 import Proveedores from "./pages/Proveedores";
 import NotFound from "./pages/NotFound";
 import ReportePagos from "./pages/ReportePagos";
+import HorariosZona from "./pages/HorariosZona";
 
 const queryClient = new QueryClient();
 
