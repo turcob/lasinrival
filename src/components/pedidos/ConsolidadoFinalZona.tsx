@@ -135,8 +135,11 @@ export function ConsolidadoFinalZona() {
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
+  const { roles } = useAuth();
+  const isAdmin = roles.some(r => r.role === 'admin');
+
   const { data: zonas } = useZonas();
-  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
+  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin);
 
   const pedidosFiltrados = useMemo(() => {
     if (!pedidos) return [];
