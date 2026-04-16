@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Printer,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,7 +69,7 @@ export function ConsolidadoPedidos() {
   const [productoAQuitar, setProductoAQuitar] = useState<ProductoConsolidadoItem | null>(null);
   const [confirmarMasivoOpen, setConfirmarMasivoOpen] = useState(false);
   const [seccionAbierta, setSeccionAbierta] = useState({ noPesables: true, frios: true, pesables: true });
-  const [soloPaladini, setSoloPaladini] = useState(false);
+  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
   const { data: vendedores } = useVendedoresActivos();
   const { data: zonas } = useZonasDeVendedor(vendedorId);
@@ -93,9 +94,10 @@ export function ConsolidadoPedidos() {
 
   const pedidosFiltrados = useMemo(() => {
     if (!pedidos) return [];
-    if (!soloPaladini) return pedidos;
-    return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
-  }, [pedidos, soloPaladini]);
+    if (filtroOrigen === 'web') return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
+    if (filtroOrigen === 'reparto') return pedidos.filter(p => !p.observaciones?.startsWith('Pedido Paladini'));
+    return pedidos;
+  }, [pedidos, filtroOrigen]);
 
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
@@ -323,11 +325,19 @@ export function ConsolidadoPedidos() {
             Imprimir
           </Button>
           <Button
-            variant={soloPaladini ? "default" : "outline"}
-            onClick={() => setSoloPaladini(!soloPaladini)}
-            className="whitespace-nowrap"
+            variant={filtroOrigen === 'web' ? "default" : "outline"}
+            onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
+            className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
           >
-            🅿️ Paladini
+            🌐 Web
+          </Button>
+          <Button
+            variant={filtroOrigen === 'reparto' ? "default" : "outline"}
+            onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
+            className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
+          >
+            <Truck className="h-4 w-4 mr-1" />
+            Reparto
           </Button>
       </div>
 
