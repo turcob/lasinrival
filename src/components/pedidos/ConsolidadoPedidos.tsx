@@ -49,6 +49,7 @@ import {
 import {
   useVendedoresActivos,
   useZonasDeVendedor,
+  useZonasTodas,
   usePedidosConsolidado,
   generarConsolidado,
   useQuitarProductoConsolidado,
@@ -72,7 +73,9 @@ export function ConsolidadoPedidos() {
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
   const { data: vendedores } = useVendedoresActivos();
-  const { data: zonas } = useZonasDeVendedor(vendedorId);
+  const { data: zonasVendedor } = useZonasDeVendedor(vendedorId);
+  const { data: zonasTodas } = useZonasTodas();
+  const zonas = vendedorId ? zonasVendedor : zonasTodas;
   const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente');
   const quitarProducto = useQuitarProductoConsolidado();
   const confirmarMasivo = useConfirmarPedidosMasivo();
@@ -299,7 +302,7 @@ export function ConsolidadoPedidos() {
           </SelectContent>
         </Select>
 
-        <Select value={zonaId || 'todas'} onValueChange={v => setZonaId(v === 'todas' ? null : v)} disabled={!vendedorId}>
+        <Select value={zonaId || 'todas'} onValueChange={v => setZonaId(v === 'todas' ? null : v)}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Zona" />
           </SelectTrigger>

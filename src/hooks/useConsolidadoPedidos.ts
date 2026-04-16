@@ -77,6 +77,21 @@ export function useVendedoresActivos() {
   });
 }
 
+export function useZonasTodas() {
+  return useQuery({
+    queryKey: ['zonas-todas-consolidado'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zonas')
+        .select('id, nombre, codigo')
+        .eq('activo', true)
+        .order('nombre');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useZonasDeVendedor(vendedorId: string | null) {
   return useQuery({
     queryKey: ['zonas-vendedor', vendedorId],
