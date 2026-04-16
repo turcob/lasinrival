@@ -63,13 +63,13 @@ const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 
 export default function Pedidos() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('todos');
+  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [soloPaladini, setSoloPaladini] = useState(false);
+  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
@@ -87,10 +87,14 @@ export default function Pedidos() {
   const pedidosFiltrados = useMemo(() => {
     let resultado = pedidos || [];
 
-    // Filtro Paladini
-    if (soloPaladini) {
+    // Filtro por origen
+    if (filtroOrigen === 'web') {
       resultado = resultado.filter(p =>
         p.observaciones?.startsWith('Pedido Paladini')
+      );
+    } else if (filtroOrigen === 'reparto') {
+      resultado = resultado.filter(p =>
+        !p.observaciones?.startsWith('Pedido Paladini')
       );
     }
 
@@ -116,7 +120,7 @@ export default function Pedidos() {
     }
 
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto, soloPaladini]);
+  }, [pedidos, busqueda, busquedaProducto, filtroOrigen]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -194,11 +198,19 @@ export default function Pedidos() {
                 </SelectContent>
               </Select>
               <Button
-                variant={soloPaladini ? "default" : "outline"}
-                onClick={() => setSoloPaladini(!soloPaladini)}
-                className="whitespace-nowrap"
+                variant={filtroOrigen === 'web' ? "default" : "outline"}
+                onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
+                className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
               >
-                🅿️ Paladini
+                🌐 Web
+              </Button>
+              <Button
+                variant={filtroOrigen === 'reparto' ? "default" : "outline"}
+                onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
+                className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
+              >
+                <Truck className="h-4 w-4 mr-1" />
+                Reparto
               </Button>
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
