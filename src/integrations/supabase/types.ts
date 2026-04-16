@@ -1140,6 +1140,103 @@ export type Database = {
           },
         ]
       }
+      devoluciones_manuales: {
+        Row: {
+          cantidad: number
+          cliente_id: string
+          created_at: string
+          detalle_motivo: string | null
+          fecha: string
+          generar_nc: boolean | null
+          id: string
+          importe_total: number
+          motivo: string
+          nc_pendiente_id: string | null
+          observaciones: string | null
+          precio_unitario: number
+          producto_id: string
+          reingresar_stock: boolean | null
+          usuario_id: string
+        }
+        Insert: {
+          cantidad: number
+          cliente_id: string
+          created_at?: string
+          detalle_motivo?: string | null
+          fecha?: string
+          generar_nc?: boolean | null
+          id?: string
+          importe_total?: number
+          motivo: string
+          nc_pendiente_id?: string | null
+          observaciones?: string | null
+          precio_unitario?: number
+          producto_id: string
+          reingresar_stock?: boolean | null
+          usuario_id: string
+        }
+        Update: {
+          cantidad?: number
+          cliente_id?: string
+          created_at?: string
+          detalle_motivo?: string | null
+          fecha?: string
+          generar_nc?: boolean | null
+          id?: string
+          importe_total?: number
+          motivo?: string
+          nc_pendiente_id?: string | null
+          observaciones?: string | null
+          precio_unitario?: number
+          producto_id?: string
+          reingresar_stock?: boolean | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devoluciones_manuales_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devoluciones_manuales_nc_pendiente_id_fkey"
+            columns: ["nc_pendiente_id"]
+            isOneToOne: false
+            referencedRelation: "notas_credito_pendientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devoluciones_manuales_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devoluciones_manuales_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "devoluciones_manuales_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "devoluciones_manuales_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+        ]
+      }
       empleado_liquidaciones: {
         Row: {
           anio: number
@@ -2009,6 +2106,141 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_sales_line"
             referencedColumns: ["venta_id"]
+          },
+        ]
+      }
+      notas_credito_pendientes: {
+        Row: {
+          cantidad: number
+          cliente_id: string
+          cliente_movimiento_id: string | null
+          created_at: string
+          detalle_motivo: string | null
+          estado: string
+          fecha_aprobacion: string | null
+          generar_nc: boolean | null
+          hoja_ruta_id: string | null
+          id: string
+          importe_total: number
+          motivo: string
+          observaciones_admin: string | null
+          origen: string
+          parada_id: string | null
+          pedido_detalle_id: string | null
+          pedido_id: string | null
+          precio_unitario: number
+          producto_id: string | null
+          reingresar_stock: boolean | null
+          updated_at: string
+          usuario_aprobador_id: string | null
+          usuario_creador_id: string
+        }
+        Insert: {
+          cantidad: number
+          cliente_id: string
+          cliente_movimiento_id?: string | null
+          created_at?: string
+          detalle_motivo?: string | null
+          estado?: string
+          fecha_aprobacion?: string | null
+          generar_nc?: boolean | null
+          hoja_ruta_id?: string | null
+          id?: string
+          importe_total?: number
+          motivo: string
+          observaciones_admin?: string | null
+          origen: string
+          parada_id?: string | null
+          pedido_detalle_id?: string | null
+          pedido_id?: string | null
+          precio_unitario?: number
+          producto_id?: string | null
+          reingresar_stock?: boolean | null
+          updated_at?: string
+          usuario_aprobador_id?: string | null
+          usuario_creador_id: string
+        }
+        Update: {
+          cantidad?: number
+          cliente_id?: string
+          cliente_movimiento_id?: string | null
+          created_at?: string
+          detalle_motivo?: string | null
+          estado?: string
+          fecha_aprobacion?: string | null
+          generar_nc?: boolean | null
+          hoja_ruta_id?: string | null
+          id?: string
+          importe_total?: number
+          motivo?: string
+          observaciones_admin?: string | null
+          origen?: string
+          parada_id?: string | null
+          pedido_detalle_id?: string | null
+          pedido_id?: string | null
+          precio_unitario?: number
+          producto_id?: string | null
+          reingresar_stock?: boolean | null
+          updated_at?: string
+          usuario_aprobador_id?: string | null
+          usuario_creador_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_credito_pendientes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_cliente_movimiento_id_fkey"
+            columns: ["cliente_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "notas_credito_pendientes_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
