@@ -69,6 +69,7 @@ export default function Pedidos() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
