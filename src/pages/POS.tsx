@@ -470,9 +470,9 @@ export default function POS() {
 
   const addToCart = (producto: Producto) => {
     const precio = getProductoPrice(producto);
-    
-    if (producto.precio_costo <= 0) {
-      toast.error('Este producto no tiene precio de costo definido');
+
+    if (!precio || precio <= 0) {
+      toast.error('Este producto no tiene precio definido en la lista del cliente');
       return;
     }
 
@@ -509,8 +509,9 @@ export default function POS() {
 
   // Handler para selección de producto desde el modal de búsqueda
   const handleProductSelectedFromModal = (producto: Producto) => {
-    if (producto.precio_costo <= 0) {
-      toast.error('Este producto no tiene precio de costo definido');
+    const precioCalc = getProductoPrice(producto);
+    if (!precioCalc || precioCalc <= 0) {
+      toast.error('Este producto no tiene precio definido en la lista del cliente');
       return;
     }
     setSelectedProductForQuantity(producto);
