@@ -135,7 +135,7 @@ export function usePedido(id: string | undefined) {
         .from('pedidos')
         .select(`
           *,
-          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono),
+          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono, zona:zonas(id, nombre)),
           vendedor:vendedores(id, nombre, codigo)
         `)
         .eq('id', id)
