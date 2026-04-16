@@ -44,6 +44,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   const [selectedPedidos, setSelectedPedidos] = useState<string[]>([]);
   const [filtroZona, setFiltroZona] = useState<string>('');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('');
+  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web'>('todos');
   
   const { data: vehiculos = [] } = useVehiculos();
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
@@ -91,9 +92,10 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     return pedidosDisponibles.filter((pedido: any) => {
       if (filtroZona && pedido.cliente?.zona_id !== filtroZona) return false;
       if (filtroVendedor && pedido.cliente?.vendedor_id !== filtroVendedor) return false;
+      if (filtroOrigen === 'web' && !pedido.observaciones?.startsWith('Pedido Paladini')) return false;
       return true;
     });
-  }, [pedidosDisponibles, filtroZona, filtroVendedor]);
+  }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
 
   const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
 
@@ -141,6 +143,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     setSelectedPedidos([]);
     setFiltroZona('');
     setFiltroVendedor('');
+    setFiltroOrigen('todos');
     onOpenChange(false);
   };
 
@@ -266,6 +269,15 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 ))}
               </select>
             </div>
+            <Button
+              type="button"
+              variant={filtroOrigen === 'web' ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
+              className={`w-fit ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
+            >
+              🌐 Web
+            </Button>
             
             <div className="border rounded-md">
               {/* Select all header */}
