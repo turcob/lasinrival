@@ -44,6 +44,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   const [selectedPedidos, setSelectedPedidos] = useState<string[]>([]);
   const [filtroZona, setFiltroZona] = useState<string>('');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('');
+  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web'>('todos');
   
   const { data: vehiculos = [] } = useVehiculos();
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
