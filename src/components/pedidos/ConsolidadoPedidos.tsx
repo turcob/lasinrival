@@ -49,6 +49,7 @@ import {
 import {
   useVendedoresActivos,
   useZonasDeVendedor,
+  useZonasTodas,
   usePedidosConsolidado,
   generarConsolidado,
   useQuitarProductoConsolidado,
