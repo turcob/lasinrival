@@ -268,6 +268,15 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 ))}
               </select>
             </div>
+            <Button
+              type="button"
+              variant={filtroOrigen === 'web' ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
+              className={`w-fit ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
+            >
+              🌐 Web
+            </Button>
             
             <div className="border rounded-md">
               {/* Select all header */}
