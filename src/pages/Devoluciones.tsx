@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check, ChevronsUpDown, PackageX, Plus, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -56,7 +56,7 @@ export default function Devoluciones() {
     queryFn: async () => {
       let q = supabase
         .from('productos')
-        .select('id, codigo_articulo, descripcion, precio_venta, stock_actual')
+        .select('id, codigo_articulo, descripcion, precio_costo, stock_actual')
         .eq('activo', true)
         .limit(30);
       if (productoSearch) {
@@ -130,7 +130,6 @@ export default function Devoluciones() {
       <PageHeader
         title="Devoluciones"
         description="Registrar productos devueltos por clientes (fuera de pedido). Genera NC pendiente de aprobación."
-        icon={PackageX}
       />
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -177,14 +176,14 @@ export default function Devoluciones() {
                               value={p.id}
                               onSelect={() => {
                                 setProductoId(p.id);
-                                setPrecio(String(p.precio_venta || 0));
+                                setPrecio(String(p.precio_costo || 0));
                                 setProductoOpen(false);
                               }}
                             >
                               <Check className={cn('mr-2 h-4 w-4', productoId === p.id ? 'opacity-100' : 'opacity-0')} />
                               <span className="font-mono text-xs mr-2">{p.codigo_articulo}</span>
                               <span className="flex-1">{p.descripcion}</span>
-                              <span className="text-muted-foreground text-xs">${Number(p.precio_venta || 0).toLocaleString('es-AR')}</span>
+                              <span className="text-muted-foreground text-xs">Costo: ${Number(p.precio_costo || 0).toLocaleString('es-AR')}</span>
                             </CommandItem>
                           ))}
                         </CommandGroup>

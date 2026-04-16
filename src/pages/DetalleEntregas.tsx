@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ClipboardList, MapPin, Clock, DollarSign, PackageX, CheckCircle2, XCircle } from 'lucide-react';
+import { MapPin, Clock, DollarSign, PackageX, CheckCircle2, XCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -116,7 +116,6 @@ export default function DetalleEntregas() {
       <PageHeader
         title="Detalle de Entregas"
         description="Historial completo de visitas y entregas por repartidor"
-        icon={ClipboardList}
       />
 
       <Card className="mb-4">
