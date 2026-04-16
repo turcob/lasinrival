@@ -3781,6 +3781,56 @@ export type Database = {
           },
         ]
       }
+      zona_horarios: {
+        Row: {
+          activo: boolean
+          capacidad_maxima: number | null
+          created_at: string
+          dia_semana: number
+          hora_desde: string | null
+          hora_hasta: string | null
+          id: string
+          tipo: string
+          turno_nombre: string
+          updated_at: string
+          zona_id: string
+        }
+        Insert: {
+          activo?: boolean
+          capacidad_maxima?: number | null
+          created_at?: string
+          dia_semana: number
+          hora_desde?: string | null
+          hora_hasta?: string | null
+          id?: string
+          tipo: string
+          turno_nombre?: string
+          updated_at?: string
+          zona_id: string
+        }
+        Update: {
+          activo?: boolean
+          capacidad_maxima?: number | null
+          created_at?: string
+          dia_semana?: number
+          hora_desde?: string | null
+          hora_hasta?: string | null
+          id?: string
+          tipo?: string
+          turno_nombre?: string
+          updated_at?: string
+          zona_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zona_horarios_zona_id_fkey"
+            columns: ["zona_id"]
+            isOneToOne: false
+            referencedRelation: "zonas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zonas: {
         Row: {
           activo: boolean | null
