@@ -68,6 +68,7 @@ export function ConsolidadoPedidos() {
   const [productoAQuitar, setProductoAQuitar] = useState<ProductoConsolidadoItem | null>(null);
   const [confirmarMasivoOpen, setConfirmarMasivoOpen] = useState(false);
   const [seccionAbierta, setSeccionAbierta] = useState({ noPesables: true, frios: true, pesables: true });
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: vendedores } = useVendedoresActivos();
   const { data: zonas } = useZonasDeVendedor(vendedorId);
