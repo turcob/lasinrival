@@ -92,9 +92,10 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     return pedidosDisponibles.filter((pedido: any) => {
       if (filtroZona && pedido.cliente?.zona_id !== filtroZona) return false;
       if (filtroVendedor && pedido.cliente?.vendedor_id !== filtroVendedor) return false;
+      if (filtroOrigen === 'web' && !pedido.observaciones?.startsWith('Pedido Paladini')) return false;
       return true;
     });
-  }, [pedidosDisponibles, filtroZona, filtroVendedor]);
+  }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
 
   const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
 
