@@ -238,9 +238,10 @@ export default function Pedidos() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {estadosActivos.map((key) => {
+            {estadosActivos.map((key) => {
                 const config = estadoConfig[key];
-                const count = pedidos?.filter(p => p.estado === key).length || 0;
+                const baseList = (busqueda || busquedaProducto || filtroOrigen !== 'todos') ? pedidosFiltrados : (pedidos || []);
+                const count = baseList.filter(p => p.estado === key).length;
                 const Icon = config.icon;
                 return (
                   <div
