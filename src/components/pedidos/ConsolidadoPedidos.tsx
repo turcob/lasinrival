@@ -335,7 +335,7 @@ export function ConsolidadoPedidos() {
         <div className="flex justify-center py-8">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : !pedidos || pedidos.length === 0 ? (
+      ) : !pedidosFiltrados || pedidosFiltrados.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No se encontraron pedidos pendientes con los filtros seleccionados
         </div>
@@ -345,7 +345,7 @@ export function ConsolidadoPedidos() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">Total pedidos</p>
-              <p className="text-2xl font-bold">{pedidos.length}</p>
+              <p className="text-2xl font-bold">{pedidosFiltrados.length}</p>
             </div>
             <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
               <p className="text-sm text-muted-foreground">Sin pesables</p>
