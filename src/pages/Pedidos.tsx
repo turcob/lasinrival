@@ -69,6 +69,7 @@ export default function Pedidos() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: pedidos, isLoading } = usePedidos(
     filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
@@ -85,6 +86,13 @@ export default function Pedidos() {
 
   const pedidosFiltrados = useMemo(() => {
     let resultado = pedidos || [];
+
+    // Filtro Paladini
+    if (soloPaladini) {
+      resultado = resultado.filter(p =>
+        p.observaciones?.startsWith('Pedido Paladini')
+      );
+    }
 
     // Filtro por búsqueda general (número, cliente)
     if (busqueda) {
@@ -108,7 +116,7 @@ export default function Pedidos() {
     }
 
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto]);
+  }, [pedidos, busqueda, busquedaProducto, soloPaladini]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -185,6 +193,13 @@ export default function Pedidos() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant={soloPaladini ? "default" : "outline"}
+                onClick={() => setSoloPaladini(!soloPaladini)}
+                className="whitespace-nowrap"
+              >
+                🅿️ Paladini
+              </Button>
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Pedido
