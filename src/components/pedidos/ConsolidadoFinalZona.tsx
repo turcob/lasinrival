@@ -243,8 +243,8 @@ export function ConsolidadoFinalZona() {
     printWindow.print();
   };
 
-  const pedidosCortos = useMemo(() => pedidos?.filter(p => p.detalles.length <= 10) || [], [pedidos]);
-  const pedidosLargos = useMemo(() => pedidos?.filter(p => p.detalles.length > 10) || [], [pedidos]);
+  const pedidosCortos = useMemo(() => pedidosFiltrados?.filter(p => p.detalles.length <= 10) || [], [pedidosFiltrados]);
+  const pedidosLargos = useMemo(() => pedidosFiltrados?.filter(p => p.detalles.length > 10) || [], [pedidosFiltrados]);
 
 
 
