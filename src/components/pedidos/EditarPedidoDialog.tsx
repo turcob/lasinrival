@@ -341,7 +341,20 @@ export function EditarPedidoDialog({ pedidoId, open, onOpenChange }: EditarPedid
                                 <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => actualizarCantidad(item.producto_id, -1)}>
                                   <Minus className="h-3 w-3" />
                                 </Button>
-                                <span className="w-8 text-center font-medium">{item.cantidad}</span>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.cantidad}
+                                  onChange={e => {
+                                    const val = parseInt(e.target.value);
+                                    if (!isNaN(val) && val > 0) {
+                                      setCarrito(carrito.map(c =>
+                                        c.producto_id === item.producto_id ? { ...c, cantidad: val } : c
+                                      ));
+                                    }
+                                  }}
+                                  className="w-16 text-center h-8"
+                                />
                                 <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => actualizarCantidad(item.producto_id, 1)}>
                                   <Plus className="h-3 w-3" />
                                 </Button>
