@@ -397,7 +397,7 @@ export function ConsolidadoFinalZona() {
         <div className="flex justify-center py-8">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : !pedidos || pedidos.length === 0 ? (
+      ) : !pedidosFiltrados || pedidosFiltrados.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No se encontraron pedidos preparados en la zona seleccionada
         </div>
