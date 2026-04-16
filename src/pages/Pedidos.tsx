@@ -269,6 +269,7 @@ export default function Pedidos() {
                     <TableHead className="w-10"></TableHead>
                     <TableHead>N° Pedido</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Zona</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Entrega Est.</TableHead>
                     <TableHead>Estado</TableHead>
