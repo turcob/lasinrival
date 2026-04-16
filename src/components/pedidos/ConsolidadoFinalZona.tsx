@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   generarConsolidado,
   type ProductoConsolidadoItem,
@@ -62,21 +63,28 @@ function useZonas() {
   });
 }
 
-function usePedidosPreparadosPorZona(zonaId: string | null) {
+function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
   return useQuery({
-    queryKey: ['pedidos-consolidado-final-zona', zonaId],
+    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin],
     queryFn: async () => {
       if (!zonaId) return [];
 
-      // Fetch all preparado pedidos, filter by zona client-side
-      const { data: allPedidos, error: pedidosError } = await supabase
+      // Fetch pedidos: admin sees all non-rejected, others only preparado
+      let query = supabase
         .from('pedidos')
         .select(`
           id, numero_pedido, total, estado, fecha_pedido, observaciones,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
-        .eq('estado', 'preparado' as any)
         .order('numero_pedido', { ascending: true });
+
+      if (!isAdmin) {
+        query = query.eq('estado', 'preparado' as any);
+      } else {
+        query = query.not('estado', 'eq', 'rechazado');
+      }
+
+      const { data: allPedidos, error: pedidosError } = await query;
 
       if (pedidosError) throw pedidosError;
       if (!allPedidos || allPedidos.length === 0) return [];
@@ -127,8 +135,11 @@ export function ConsolidadoFinalZona() {
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
+  const { roles } = useAuth();
+  const isAdmin = roles.some(r => r.role === 'admin');
+
   const { data: zonas } = useZonas();
-  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
+  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin);
 
   const pedidosFiltrados = useMemo(() => {
     if (!pedidos) return [];

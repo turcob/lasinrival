@@ -269,6 +269,7 @@ export default function Pedidos() {
                     <TableHead className="w-10"></TableHead>
                     <TableHead>N° Pedido</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Zona</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Entrega Est.</TableHead>
                     <TableHead>Estado</TableHead>
@@ -280,7 +281,7 @@ export default function Pedidos() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
+                      <TableCell colSpan={10} className="text-center py-8">
                         <div className="flex justify-center">
                           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                         </div>
@@ -288,7 +289,7 @@ export default function Pedidos() {
                     </TableRow>
                   ) : pedidosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No se encontraron pedidos
                       </TableCell>
                     </TableRow>
@@ -328,6 +329,9 @@ export default function Pedidos() {
                               </div>
                             </TableCell>
                             <TableCell>
+                              <span className="text-sm text-muted-foreground">{pedido.cliente?.zona?.nombre || '-'}</span>
+                            </TableCell>
+                            <TableCell>
                               {format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy HH:mm', { locale: es })}
                             </TableCell>
                             <TableCell>
@@ -359,7 +363,7 @@ export default function Pedidos() {
                           </TableRow>
                           {isExpanded && detallesVisibles && detallesVisibles.length > 0 && (
                             <TableRow key={`${pedido.id}-details`}>
-                              <TableCell colSpan={9} className="p-0">
+                              <TableCell colSpan={10} className="p-0">
                                 <div className="bg-muted/30 px-6 py-3 border-t">
                                   <table className="w-full text-sm">
                                     <thead>

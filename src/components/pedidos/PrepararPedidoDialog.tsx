@@ -263,6 +263,12 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange }: PrepararP
                             inputMode="decimal"
                             value={linea.inputValue}
                             onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleCalcular(linea.detalleId);
+                              }
+                            }}
                             className={`w-28 text-center font-medium text-lg ${
                               esMayor ? 'border-blue-500 bg-blue-50' :
                               esMenor ? 'border-amber-500 bg-amber-50' : ''

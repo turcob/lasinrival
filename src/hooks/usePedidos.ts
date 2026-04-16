@@ -44,6 +44,7 @@ export interface Pedido {
     dni_cuit: string | null;
     direccion: string | null;
     telefono: string | null;
+    zona?: { id: string; nombre: string } | null;
   };
   vendedor?: {
     id: string;
@@ -104,7 +105,7 @@ export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string
         .from('pedidos')
         .select(`
           *,
-          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono),
+          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono, zona:zonas(id, nombre)),
           vendedor:vendedores(id, nombre, codigo),
           detalles:pedido_detalles(id, producto_id, cantidad_pedida, cantidad_entregada, cantidad_devuelta, precio_unitario, descuento_porcentaje, subtotal, observaciones, producto:productos(id, descripcion, codigo_articulo, stock_actual, unidad_medida))
         `)
@@ -134,7 +135,7 @@ export function usePedido(id: string | undefined) {
         .from('pedidos')
         .select(`
           *,
-          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono),
+          cliente:clientes(id, nombre, codigo_cliente, dni_cuit, direccion, telefono, zona:zonas(id, nombre)),
           vendedor:vendedores(id, nombre, codigo)
         `)
         .eq('id', id)
