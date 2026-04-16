@@ -87,6 +87,13 @@ export default function Pedidos() {
   const pedidosFiltrados = useMemo(() => {
     let resultado = pedidos || [];
 
+    // Filtro Paladini
+    if (soloPaladini) {
+      resultado = resultado.filter(p =>
+        p.observaciones?.startsWith('Pedido Paladini')
+      );
+    }
+
     // Filtro por búsqueda general (número, cliente)
     if (busqueda) {
       const term = busqueda.toLowerCase();
@@ -109,7 +116,7 @@ export default function Pedidos() {
     }
 
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto]);
+  }, [pedidos, busqueda, busquedaProducto, soloPaladini]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
