@@ -302,7 +302,7 @@ export function ConsolidadoPedidos() {
           </SelectContent>
         </Select>
 
-        <Select value={zonaId || 'todas'} onValueChange={v => setZonaId(v === 'todas' ? null : v)} disabled={!vendedorId}>
+        <Select value={zonaId || 'todas'} onValueChange={v => setZonaId(v === 'todas' ? null : v)}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Zona" />
           </SelectTrigger>
