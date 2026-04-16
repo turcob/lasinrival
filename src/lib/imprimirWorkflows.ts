@@ -346,8 +346,13 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     </div>
 
     <div class="info-bar">
-      <div>Total devoluciones: <span>${devoluciones.length} ítems</span></div>
+      <div>Total ítems: <span>${devoluciones.length}</span></div>
       <div>Total unidades: <span>${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</span></div>
+      <div>Importe total: <span>$${devoluciones.reduce((s: number, d: any) => {
+        const precio = d.pedido_detalle?.precio_unitario || 0;
+        const desc = d.pedido_detalle?.descuento_porcentaje || 0;
+        return s + (Number(d.cantidad) || 0) * precio * (1 - desc / 100);
+      }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
     </div>
 
     <table>
@@ -356,25 +361,40 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
           <th>#</th>
           <th>Producto</th>
           <th>Cantidad</th>
+          <th>P. Unit.</th>
+          <th>Importe</th>
           <th>Motivo</th>
           <th>Detalle</th>
           <th>Fecha/Hora</th>
         </tr>
       </thead>
       <tbody>
-        ${devoluciones.map((d: any, i: number) => `
+        ${devoluciones.map((d: any, i: number) => {
+          const precio = d.pedido_detalle?.precio_unitario || 0;
+          const desc = d.pedido_detalle?.descuento_porcentaje || 0;
+          const precioNeto = precio * (1 - desc / 100);
+          const importe = (Number(d.cantidad) || 0) * precioNeto;
+          return `
           <tr>
             <td>${i + 1}</td>
             <td>${d.pedido_detalle?.producto?.descripcion || 'Producto'}</td>
             <td style="text-align:center;font-weight:700;">${d.cantidad}</td>
+            <td style="text-align:right;">$${precioNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td style="text-align:right;font-weight:700;">$${importe.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
             <td class="motivo">${(d.motivo || 'Sin motivo').replace(/_/g, ' ')}</td>
             <td class="detalle">${d.detalle_motivo || '-'}</td>
             <td>${new Date(d.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-          </tr>
-        `).join('')}
+          </tr>`;
+        }).join('')}
         <tr class="total-row">
           <td colspan="2" style="text-align:right;">TOTAL</td>
           <td style="text-align:center;">${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</td>
+          <td></td>
+          <td style="text-align:right;">$${devoluciones.reduce((s: number, d: any) => {
+            const precio = d.pedido_detalle?.precio_unitario || 0;
+            const desc = d.pedido_detalle?.descuento_porcentaje || 0;
+            return s + (Number(d.cantidad) || 0) * precio * (1 - desc / 100);
+          }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
           <td colspan="3"></td>
         </tr>
       </tbody>
