@@ -96,6 +96,7 @@ function AppRoutes() {
       <Route path="/cheques" element={<ProtectedRoute><Cheques /></ProtectedRoute>} />
       <Route path="/proveedores" element={<ProtectedRoute><Proveedores /></ProtectedRoute>} />
       <Route path="/reporte-pagos" element={<ProtectedRoute><ReportePagos /></ProtectedRoute>} />
+      <Route path="/horarios-zona" element={<ProtectedRoute><HorariosZona /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
