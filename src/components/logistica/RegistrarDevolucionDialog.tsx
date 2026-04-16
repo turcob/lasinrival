@@ -129,12 +129,11 @@ export function RegistrarDevolucionDialog({
   const productosConDevolucion = productos.filter((p) => p.cantidad_devolver > 0);
 
   const handleSubmit = async () => {
-    // Validar que todos los productos con devolución tengan motivo
     const sinMotivo = productosConDevolucion.filter((p) => !p.motivo);
     if (sinMotivo.length > 0) {
       toast({
         title: 'Datos incompletos',
-        description: 'Seleccione un motivo para cada producto a devolver',
+        description: 'Seleccione un motivo para cada producto rechazado',
         variant: 'destructive',
       });
       return;
@@ -143,7 +142,7 @@ export function RegistrarDevolucionDialog({
     if (productosConDevolucion.length === 0) {
       toast({
         title: 'Sin productos',
-        description: 'Ingrese al menos un producto para devolver',
+        description: 'Ingrese al menos un producto a rechazar',
         variant: 'destructive',
       });
       return;
@@ -151,7 +150,6 @@ export function RegistrarDevolucionDialog({
 
     setIsSubmitting(true);
     try {
-      // Registrar cada devolución
       for (const producto of productosConDevolucion) {
         await registrarDevolucion.mutateAsync({
           hoja_ruta_id: hojaRutaId,
@@ -165,17 +163,17 @@ export function RegistrarDevolucionDialog({
       }
 
       toast({
-        title: 'Devoluciones registradas',
-        description: `Se registraron ${productosConDevolucion.length} producto(s) devuelto(s)`,
+        title: 'Rechazos registrados',
+        description: `${productosConDevolucion.length} producto(s) rechazado(s). NC pendiente de aprobación.`,
       });
 
       onSuccess?.();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error registrando devoluciones:', error);
+      console.error('Error registrando rechazos:', error);
       toast({
         title: 'Error',
-        description: 'No se pudieron registrar las devoluciones',
+        description: 'No se pudieron registrar los rechazos',
         variant: 'destructive',
       });
     } finally {
@@ -194,11 +192,11 @@ export function RegistrarDevolucionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackageX className="h-5 w-5 text-destructive" />
-            Registrar Devoluciones
+            Registrar Rechazo de Mercadería
           </DialogTitle>
           <DialogDescription>
-            Indique qué productos fueron rechazados o devueltos en esta entrega.
-            Los productos marcados se reintegrarán al stock automáticamente.
+            Indique qué productos fueron rechazados por el cliente. Se generará una Nota de Crédito en estado pendiente
+            que administración deberá aprobar para hacerla efectiva.
           </DialogDescription>
         </DialogHeader>
 
@@ -231,10 +229,10 @@ export function RegistrarDevolucionDialog({
                   </div>
                 </div>
 
-                {/* Cantidad a devolver */}
+                {/* Cantidad a rechazar */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm">Cantidad a devolver</Label>
+                    <Label className="text-sm">Cantidad a rechazar</Label>
                     <Input
                       type="number"
                       min="0"
@@ -267,13 +265,13 @@ export function RegistrarDevolucionDialog({
                   )}
                 </div>
 
-                {/* Campos adicionales cuando hay devolución */}
+                {/* Campos adicionales cuando hay rechazo */}
                 {producto.cantidad_devolver > 0 && (
                   <>
                     <div className="space-y-2">
                       <Label className="text-sm">Detalle adicional (opcional)</Label>
                       <Textarea
-                        placeholder="Describir el motivo de la devolución..."
+                        placeholder="Describir el motivo del rechazo..."
                         value={producto.detalle_motivo}
                         onChange={(e) => handleDetalleChange(index, e.target.value)}
                         rows={2}
@@ -293,7 +291,7 @@ export function RegistrarDevolucionDialog({
                         className="text-sm cursor-pointer flex items-center gap-1"
                       >
                         <RotateCcw className="h-3 w-3" />
-                        Reingresar al stock
+                        Sugerir reingreso al stock (admin decide al aprobar)
                       </Label>
                     </div>
                   </>
@@ -309,7 +307,7 @@ export function RegistrarDevolucionDialog({
             <AlertTriangle className="h-5 w-5 text-amber-600" />
             <div className="text-sm">
               <span className="font-medium">
-                {productosConDevolucion.length} producto(s) a devolver
+                {productosConDevolucion.length} producto(s) a rechazar
               </span>
               <span className="text-muted-foreground ml-2">
                 ({totalProductosDevueltos} unidades en total)
@@ -327,7 +325,7 @@ export function RegistrarDevolucionDialog({
             disabled={productosConDevolucion.length === 0 || isSubmitting}
           >
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Registrar Devoluciones
+            Registrar Rechazos
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -600,10 +600,11 @@ export function useRegistrarDevolucion() {
       // Fetch detalle info for price calculation and client
       const { data: detalleInfo } = await supabase
         .from('pedido_detalles')
-        .select('producto_id, precio_unitario, descuento_porcentaje, pedido:pedidos(cliente_id, numero_pedido)')
+        .select('producto_id, precio_unitario, descuento_porcentaje, pedido:pedidos(id, cliente_id, numero_pedido)')
         .eq('id', data.pedido_detalle_id)
         .single();
 
+      // 1. Registrar el rechazo en hoja_ruta_devoluciones (sin reingresar stock automáticamente)
       const { error: devError } = await supabase
         .from('hoja_ruta_devoluciones')
         .insert({
@@ -613,64 +614,46 @@ export function useRegistrarDevolucion() {
           cantidad: data.cantidad,
           motivo: data.motivo,
           detalle_motivo: data.detalle_motivo || null,
-          reingresado_stock: data.reingresarStock ?? false,
+          reingresado_stock: false, // Stock se reingresa al aprobar la NC
           usuario_id: user.id
         });
 
       if (devError) throw devError;
 
-      // Reingress stock if needed
-      if (data.reingresarStock) {
-        if (detalleInfo?.producto_id) {
-          const { data: producto } = await supabase
-            .from('productos')
-            .select('stock_actual')
-            .eq('id', detalleInfo.producto_id)
-            .single();
-
-          if (producto) {
-            await supabase
-              .from('productos')
-              .update({ stock_actual: (producto.stock_actual || 0) + data.cantidad })
-              .eq('id', detalleInfo.producto_id);
-
-            await supabase.from('movimientos_inventario').insert({
-              producto_id: detalleInfo.producto_id,
-              tipo: 'entrada',
-              cantidad: data.cantidad,
-              stock_anterior: producto.stock_actual || 0,
-              stock_nuevo: (producto.stock_actual || 0) + data.cantidad,
-              motivo: `Devolución en ruta: ${data.motivo}`,
-              usuario_id: user.id
-            });
-          }
-        }
-      }
-
-      // Generate automatic NCR (Nota de Crédito) in cuenta corriente
-      if (detalleInfo?.precio_unitario && detalleInfo.pedido) {
+      // 2. Crear NC pendiente para que administración apruebe
+      if (detalleInfo?.pedido) {
         const pedidoData = detalleInfo.pedido as any;
-        const precioNeto = detalleInfo.precio_unitario * (1 - (detalleInfo.descuento_porcentaje || 0) / 100);
-        const montoNCR = data.cantidad * precioNeto;
+        const precioNeto = (detalleInfo.precio_unitario || 0) * (1 - (detalleInfo.descuento_porcentaje || 0) / 100);
+        const importeTotal = data.cantidad * precioNeto;
 
-        if (montoNCR > 0 && pedidoData.cliente_id) {
-          await supabase.from('cliente_movimientos').insert({
+        if (pedidoData.cliente_id) {
+          await supabase.from('notas_credito_pendientes').insert({
             cliente_id: pedidoData.cliente_id,
-            tipo: 'NCR',
-            monto: montoNCR,
-            concepto: `NC por devolución - Pedido #${pedidoData.numero_pedido} - ${data.motivo}`,
-            usuario_registro_id: user.id
+            producto_id: detalleInfo.producto_id,
+            pedido_id: pedidoData.id,
+            pedido_detalle_id: data.pedido_detalle_id,
+            hoja_ruta_id: data.hoja_ruta_id,
+            parada_id: data.parada_id,
+            origen: 'rechazo_logistica',
+            cantidad: data.cantidad,
+            precio_unitario: precioNeto,
+            importe_total: importeTotal,
+            motivo: data.motivo,
+            detalle_motivo: data.detalle_motivo || null,
+            reingresar_stock: data.reingresarStock ?? true,
+            generar_nc: true,
+            usuario_creador_id: user.id,
           });
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-ruta'] });
-      queryClient.invalidateQueries({ queryKey: ['productos'] });
-      toast({ title: 'Devolución registrada' });
+      queryClient.invalidateQueries({ queryKey: ['notas-credito-pendientes'] });
+      toast({ title: 'Rechazo registrado', description: 'Nota de crédito generada en estado pendiente' });
     },
     onError: (error) => {
-      toast({ title: 'Error al registrar devolución', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error al registrar rechazo', description: error.message, variant: 'destructive' });
     },
   });
 }
