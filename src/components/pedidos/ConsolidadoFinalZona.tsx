@@ -407,7 +407,7 @@ export function ConsolidadoFinalZona() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">Pedidos preparados</p>
-              <p className="text-2xl font-bold">{pedidos.length}</p>
+              <p className="text-2xl font-bold">{pedidosFiltrados.length}</p>
             </div>
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
               <p className="text-sm text-muted-foreground">No Pesables</p>
