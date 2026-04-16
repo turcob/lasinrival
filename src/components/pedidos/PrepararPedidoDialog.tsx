@@ -208,9 +208,26 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-          <X className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {pedidoIds && pedidoIds.length > 1 && (
+            <>
+              <Button variant="outline" size="sm" onClick={goToPrev} disabled={!canGoPrev} title="Pedido anterior (Re Pág)">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentIndex + 1} / {pedidoIds.length}
+              </span>
+              <Button variant="outline" size="sm" onClick={goToNext} disabled={!canGoNext} title="Siguiente pedido (Av Pág)">
+                Siguiente
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
