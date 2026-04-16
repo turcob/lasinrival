@@ -3368,6 +3368,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vendedor_zonas: {
+        Row: {
+          created_at: string
+          id: string
+          vendedor_id: string
+          zona_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          vendedor_id: string
+          zona_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          vendedor_id?: string
+          zona_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_zonas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendedor_zonas_zona_id_fkey"
+            columns: ["zona_id"]
+            isOneToOne: false
+            referencedRelation: "zonas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendedores: {
         Row: {
           activo: boolean | null
