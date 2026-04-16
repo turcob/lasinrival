@@ -193,6 +193,13 @@ export default function Pedidos() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant={soloPaladini ? "default" : "outline"}
+                onClick={() => setSoloPaladini(!soloPaladini)}
+                className="whitespace-nowrap"
+              >
+                🅿️ Paladini
+              </Button>
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Pedido
