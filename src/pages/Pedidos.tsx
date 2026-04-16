@@ -281,7 +281,7 @@ export default function Pedidos() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
+                      <TableCell colSpan={10} className="text-center py-8">
                         <div className="flex justify-center">
                           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                         </div>
@@ -289,7 +289,7 @@ export default function Pedidos() {
                     </TableRow>
                   ) : pedidosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No se encontraron pedidos
                       </TableCell>
                     </TableRow>
