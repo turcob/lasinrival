@@ -73,7 +73,9 @@ export function ConsolidadoPedidos() {
   const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
   const { data: vendedores } = useVendedoresActivos();
-  const { data: zonas } = useZonasDeVendedor(vendedorId);
+  const { data: zonasVendedor } = useZonasDeVendedor(vendedorId);
+  const { data: zonasTodas } = useZonasTodas();
+  const zonas = vendedorId ? zonasVendedor : zonasTodas;
   const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente');
   const quitarProducto = useQuitarProductoConsolidado();
   const confirmarMasivo = useConfirmarPedidosMasivo();
