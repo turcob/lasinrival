@@ -84,6 +84,8 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
         query = query.not('estado', 'eq', 'rechazado');
       }
 
+      const { data: allPedidos, error: pedidosError } = await query;
+
       if (pedidosError) throw pedidosError;
       if (!allPedidos || allPedidos.length === 0) return [];
 
