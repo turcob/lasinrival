@@ -91,14 +91,19 @@ export function ConsolidadoPedidos() {
     });
   };
 
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return [];
+    if (!soloPaladini) return pedidos;
+    return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
+  }, [pedidos, soloPaladini]);
+
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
-    if (!pedidos) return { sinPesables: [], conPesables: [] };
     return {
-      sinPesables: pedidos.filter(p => !p.tiene_pesables),
-      conPesables: pedidos.filter(p => p.tiene_pesables),
+      sinPesables: pedidosFiltrados.filter(p => !p.tiene_pesables),
+      conPesables: pedidosFiltrados.filter(p => p.tiene_pesables),
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   const handleImprimirPesablesPorCliente = () => {
     if (conPesables.length === 0) return;
