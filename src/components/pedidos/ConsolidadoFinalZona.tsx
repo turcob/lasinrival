@@ -353,12 +353,12 @@ export function ConsolidadoFinalZona() {
           />
         </div>
 
-        <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
+        <Button variant="outline" onClick={handleImprimir} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
           Consolidado por Tipo
         </Button>
 
-        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidos || pedidos.length === 0}>
+        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
           Consolidado Completo
         </Button>
@@ -377,6 +377,14 @@ export function ConsolidadoFinalZona() {
           {pedidosLargos.length > 0 && (
             <Badge variant="secondary" className="ml-1">{pedidosLargos.length}</Badge>
           )}
+        </Button>
+
+        <Button
+          variant={soloPaladini ? "default" : "outline"}
+          onClick={() => setSoloPaladini(!soloPaladini)}
+          className="whitespace-nowrap"
+        >
+          🅿️ Paladini
         </Button>
       </div>
 
