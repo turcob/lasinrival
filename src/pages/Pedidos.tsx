@@ -329,6 +329,9 @@ export default function Pedidos() {
                               </div>
                             </TableCell>
                             <TableCell>
+                              <span className="text-sm text-muted-foreground">{pedido.cliente?.zona?.nombre || '-'}</span>
+                            </TableCell>
+                            <TableCell>
                               {format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy HH:mm', { locale: es })}
                             </TableCell>
                             <TableCell>
@@ -360,7 +363,7 @@ export default function Pedidos() {
                           </TableRow>
                           {isExpanded && detallesVisibles && detallesVisibles.length > 0 && (
                             <TableRow key={`${pedido.id}-details`}>
-                              <TableCell colSpan={9} className="p-0">
+                              <TableCell colSpan={10} className="p-0">
                                 <div className="bg-muted/30 px-6 py-3 border-t">
                                   <table className="w-full text-sm">
                                     <thead>
