@@ -22,6 +22,8 @@ import { Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { RegistrarPagoClienteDialog } from './RegistrarPagoClienteDialog';
+import { NCPendientesTab } from './NCPendientesTab';
+import { useNotasCreditoPendientes } from '@/hooks/useNotasCredito';
 
 interface Cliente {
   id: string;
@@ -76,6 +78,7 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
   const [loading, setLoading] = useState(true);
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('cuenta');
+  const { data: ncsPendientes = [] } = useNotasCreditoPendientes({ cliente_id: cliente.id, estado: 'pendiente' });
 
   useEffect(() => {
     if (open && cliente) {
@@ -269,6 +272,13 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
               <TabsTrigger value="historial">
                 Historial ({movimientosHistorial.length})
               </TabsTrigger>
+              <TabsTrigger value="nc">
+                NC Pendientes {ncsPendientes.length > 0 && (
+                  <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground">
+                    {ncsPendientes.length}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="cuenta">
               <ScrollArea className="h-[400px]">
@@ -278,6 +288,11 @@ export function CuentaCorrienteClienteDialog({ open, onOpenChange, cliente, onMo
             <TabsContent value="historial">
               <ScrollArea className="h-[400px]">
                 {renderMovimientosTable(movimientosHistorial, false)}
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="nc">
+              <ScrollArea className="h-[400px]">
+                <NCPendientesTab clienteId={cliente.id} onChange={fetchData} />
               </ScrollArea>
             </TabsContent>
           </Tabs>
