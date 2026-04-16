@@ -68,6 +68,7 @@ export function ConsolidadoPedidos() {
   const [productoAQuitar, setProductoAQuitar] = useState<ProductoConsolidadoItem | null>(null);
   const [confirmarMasivoOpen, setConfirmarMasivoOpen] = useState(false);
   const [seccionAbierta, setSeccionAbierta] = useState({ noPesables: true, frios: true, pesables: true });
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: vendedores } = useVendedoresActivos();
   const { data: zonas } = useZonasDeVendedor(vendedorId);
@@ -90,14 +91,19 @@ export function ConsolidadoPedidos() {
     });
   };
 
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return [];
+    if (!soloPaladini) return pedidos;
+    return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
+  }, [pedidos, soloPaladini]);
+
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
-    if (!pedidos) return { sinPesables: [], conPesables: [] };
     return {
-      sinPesables: pedidos.filter(p => !p.tiene_pesables),
-      conPesables: pedidos.filter(p => p.tiene_pesables),
+      sinPesables: pedidosFiltrados.filter(p => !p.tiene_pesables),
+      conPesables: pedidosFiltrados.filter(p => p.tiene_pesables),
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   const handleImprimirPesablesPorCliente = () => {
     if (conPesables.length === 0) return;
@@ -158,16 +164,16 @@ export function ConsolidadoPedidos() {
     printWindow.onload = () => printWindow.print();
   };
 
-  // Generate consolidado from ALL pedidos
+  // Generate consolidado from filtered pedidos
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [] };
-    const items = generarConsolidado(pedidos);
+    if (!pedidosFiltrados || pedidosFiltrados.length === 0) return { noPesables: [], frios: [], pesables: [] };
+    const items = generarConsolidado(pedidosFiltrados);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   // Filter consolidado by search
   const filtrarItems = (items: ProductoConsolidadoItem[]) => {
@@ -312,9 +318,16 @@ export function ConsolidadoPedidos() {
               className="pl-9"
             />
           </div>
-          <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
+           <Button variant="outline" onClick={handleImprimir} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimir
+          </Button>
+          <Button
+            variant={soloPaladini ? "default" : "outline"}
+            onClick={() => setSoloPaladini(!soloPaladini)}
+            className="whitespace-nowrap"
+          >
+            🅿️ Paladini
           </Button>
       </div>
 
@@ -322,7 +335,7 @@ export function ConsolidadoPedidos() {
         <div className="flex justify-center py-8">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : !pedidos || pedidos.length === 0 ? (
+      ) : !pedidosFiltrados || pedidosFiltrados.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No se encontraron pedidos pendientes con los filtros seleccionados
         </div>
@@ -332,7 +345,7 @@ export function ConsolidadoPedidos() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">Total pedidos</p>
-              <p className="text-2xl font-bold">{pedidos.length}</p>
+              <p className="text-2xl font-bold">{pedidosFiltrados.length}</p>
             </div>
             <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
               <p className="text-sm text-muted-foreground">Sin pesables</p>

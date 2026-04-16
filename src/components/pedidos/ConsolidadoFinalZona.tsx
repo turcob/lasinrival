@@ -71,7 +71,7 @@ function usePedidosPreparadosPorZona(zonaId: string | null) {
       const { data: allPedidos, error: pedidosError } = await supabase
         .from('pedidos')
         .select(`
-          id, numero_pedido, total, estado, fecha_pedido,
+          id, numero_pedido, total, estado, fecha_pedido, observaciones,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
         .eq('estado', 'preparado' as any)
@@ -124,20 +124,27 @@ function usePedidosPreparadosPorZona(zonaId: string | null) {
 export function ConsolidadoFinalZona() {
   const [zonaId, setZonaId] = useState<string | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: zonas } = useZonas();
   const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
 
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return [];
+    if (!soloPaladini) return pedidos;
+    return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
+  }, [pedidos, soloPaladini]);
+
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
-    const items = generarConsolidado(pedidos);
+    if (!pedidosFiltrados || pedidosFiltrados.length === 0) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
+    const items = generarConsolidado(pedidosFiltrados);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
       todos: items,
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   const filtrarItems = (items: ProductoConsolidadoItem[]) => {
     if (!busquedaProducto) return items;
@@ -236,8 +243,8 @@ export function ConsolidadoFinalZona() {
     printWindow.print();
   };
 
-  const pedidosCortos = useMemo(() => pedidos?.filter(p => p.detalles.length <= 10) || [], [pedidos]);
-  const pedidosLargos = useMemo(() => pedidos?.filter(p => p.detalles.length > 10) || [], [pedidos]);
+  const pedidosCortos = useMemo(() => pedidosFiltrados?.filter(p => p.detalles.length <= 10) || [], [pedidosFiltrados]);
+  const pedidosLargos = useMemo(() => pedidosFiltrados?.filter(p => p.detalles.length > 10) || [], [pedidosFiltrados]);
 
 
 
@@ -346,12 +353,12 @@ export function ConsolidadoFinalZona() {
           />
         </div>
 
-        <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
+        <Button variant="outline" onClick={handleImprimir} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
           Consolidado por Tipo
         </Button>
 
-        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidos || pedidos.length === 0}>
+        <Button variant="outline" onClick={handleImprimirTodos} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
           <Printer className="h-4 w-4 mr-2" />
           Consolidado Completo
         </Button>
@@ -371,6 +378,14 @@ export function ConsolidadoFinalZona() {
             <Badge variant="secondary" className="ml-1">{pedidosLargos.length}</Badge>
           )}
         </Button>
+
+        <Button
+          variant={soloPaladini ? "default" : "outline"}
+          onClick={() => setSoloPaladini(!soloPaladini)}
+          className="whitespace-nowrap"
+        >
+          🅿️ Paladini
+        </Button>
       </div>
 
       {!zonaId ? (
@@ -382,7 +397,7 @@ export function ConsolidadoFinalZona() {
         <div className="flex justify-center py-8">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : !pedidos || pedidos.length === 0 ? (
+      ) : !pedidosFiltrados || pedidosFiltrados.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No se encontraron pedidos preparados en la zona seleccionada
         </div>
@@ -392,7 +407,7 @@ export function ConsolidadoFinalZona() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">Pedidos preparados</p>
-              <p className="text-2xl font-bold">{pedidos.length}</p>
+              <p className="text-2xl font-bold">{pedidosFiltrados.length}</p>
             </div>
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
               <p className="text-sm text-muted-foreground">No Pesables</p>

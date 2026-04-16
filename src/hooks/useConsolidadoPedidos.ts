@@ -10,6 +10,7 @@ export interface PedidoConsolidado {
   total: number;
   estado: string;
   fecha_pedido: string;
+  observaciones: string | null;
   cliente: {
     id: string;
     nombre: string;
@@ -116,7 +117,7 @@ export function usePedidosConsolidado(
       const { data: allPedidos, error: pedidosError } = await supabase
         .from('pedidos')
         .select(`
-          id, numero_pedido, total, estado, fecha_pedido,
+          id, numero_pedido, total, estado, fecha_pedido, observaciones,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
         .eq('estado', estado as any)
