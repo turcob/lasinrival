@@ -124,20 +124,27 @@ function usePedidosPreparadosPorZona(zonaId: string | null) {
 export function ConsolidadoFinalZona() {
   const [zonaId, setZonaId] = useState<string | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [soloPaladini, setSoloPaladini] = useState(false);
 
   const { data: zonas } = useZonas();
   const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId);
 
+  const pedidosFiltrados = useMemo(() => {
+    if (!pedidos) return [];
+    if (!soloPaladini) return pedidos;
+    return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
+  }, [pedidos, soloPaladini]);
+
   const consolidado = useMemo(() => {
-    if (!pedidos) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
-    const items = generarConsolidado(pedidos);
+    if (!pedidosFiltrados || pedidosFiltrados.length === 0) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
+    const items = generarConsolidado(pedidosFiltrados);
     return {
       noPesables: items.filter(i => i.tipo === 'no_pesable'),
       frios: items.filter(i => i.tipo === 'frio'),
       pesables: items.filter(i => i.tipo === 'pesable'),
       todos: items,
     };
-  }, [pedidos]);
+  }, [pedidosFiltrados]);
 
   const filtrarItems = (items: ProductoConsolidadoItem[]) => {
     if (!busquedaProducto) return items;
