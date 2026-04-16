@@ -10,6 +10,7 @@ export interface PedidoConsolidado {
   total: number;
   estado: string;
   fecha_pedido: string;
+  observaciones: string | null;
   cliente: {
     id: string;
     nombre: string;
