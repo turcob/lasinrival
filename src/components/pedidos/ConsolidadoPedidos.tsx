@@ -318,9 +318,16 @@ export function ConsolidadoPedidos() {
               className="pl-9"
             />
           </div>
-          <Button variant="outline" onClick={handleImprimir} disabled={!pedidos || pedidos.length === 0}>
+           <Button variant="outline" onClick={handleImprimir} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimir
+          </Button>
+          <Button
+            variant={soloPaladini ? "default" : "outline"}
+            onClick={() => setSoloPaladini(!soloPaladini)}
+            className="whitespace-nowrap"
+          >
+            🅿️ Paladini
           </Button>
       </div>
 
