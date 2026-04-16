@@ -25,7 +25,9 @@ import {
   Calendar,
   Smartphone,
   FileCheck,
-  Building2
+  Building2,
+  PackageX,
+  Route as RouteIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +65,8 @@ const catalogNavItems: NavItem[] = [
 const operationsNavItems: NavItem[] = [
   { title: 'Cajas', href: '/cajas', icon: CreditCard, module: 'cajas' },
   { title: 'Logística', href: '/logistica', icon: Truck, module: 'logistica' },
+  { title: 'Detalle Entregas', href: '/detalle-entregas', icon: RouteIcon, module: 'logistica' },
+  { title: 'Devoluciones', href: '/devoluciones', icon: PackageX, module: 'clientes' },
   { title: 'Horarios Zona', href: '/horarios-zona', icon: Calendar, module: 'logistica' },
   { title: 'Proveedores', href: '/proveedores', icon: Building2, module: 'proveedores' },
   { title: 'Agenda Visitas', href: '/agenda-visitas', icon: Calendar, module: 'ventas' },
