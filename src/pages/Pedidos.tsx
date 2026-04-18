@@ -101,17 +101,6 @@ function PedidosContent() {
   const pedidosFiltrados = useMemo(() => {
     let resultado = pedidos || [];
 
-    // Filtro por origen
-    if (filtroOrigen === 'web') {
-      resultado = resultado.filter(p =>
-        p.observaciones?.startsWith('Pedido Paladini')
-      );
-    } else if (filtroOrigen === 'reparto') {
-      resultado = resultado.filter(p =>
-        !p.observaciones?.startsWith('Pedido Paladini')
-      );
-    }
-
     // Filtro por búsqueda general (número, cliente)
     if (busqueda) {
       const term = busqueda.toLowerCase();
@@ -134,7 +123,7 @@ function PedidosContent() {
     }
 
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto, filtroOrigen]);
+  }, [pedidos, busqueda, busquedaProducto]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -211,21 +200,7 @@ function PedidosContent() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                variant={filtroOrigen === 'web' ? "default" : "outline"}
-                onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
-                className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
-              >
-                🌐 Web
-              </Button>
-              <Button
-                variant={filtroOrigen === 'reparto' ? "default" : "outline"}
-                onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
-                className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
-              >
-                <Truck className="h-4 w-4 mr-1" />
-                Reparto
-              </Button>
+              <TipoPedidoSelector />
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Pedido
@@ -254,7 +229,7 @@ function PedidosContent() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {estadosActivos.map((key) => {
                 const config = estadoConfig[key];
-                const baseList = (busqueda || busquedaProducto || filtroOrigen !== 'todos') ? pedidosFiltrados : (pedidos || []);
+                const baseList = (busqueda || busquedaProducto) ? pedidosFiltrados : (pedidos || []);
                 const count = baseList.filter(p => p.estado === key).length;
                 const Icon = config.icon;
                 return (
