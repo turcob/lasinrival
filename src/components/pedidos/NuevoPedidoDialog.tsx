@@ -33,6 +33,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCrearPedido, useClienteSaldoVencido, useProductosFrecuentes } from '@/hooks/usePedidos';
 import { obtenerPrecioVentaProducto } from '@/lib/precioUtils';
+import { useTipoPedido } from '@/contexts/TipoPedidoContext';
 
 interface CarritoItem {
   producto_id: string;
@@ -62,6 +63,7 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
   const crearPedido = useCrearPedido();
   const { data: saldoVencido } = useClienteSaldoVencido(clienteId || undefined);
   const { data: productosFrecuentes } = useProductosFrecuentes(clienteId || undefined);
+  const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   // Queries
   const { data: clientes } = useQuery({
@@ -254,6 +256,7 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
       lista_precio_id: listaClienteId,
       fecha_entrega_estimada: fechaEntrega || undefined,
       observaciones: observaciones || undefined,
+      tipo_pedido: tipoPedidoFiltro === 'web' ? 'web' : 'reparto',
       detalles: carrito.map(c => ({
         producto_id: c.producto_id,
         cantidad: c.cantidad,
