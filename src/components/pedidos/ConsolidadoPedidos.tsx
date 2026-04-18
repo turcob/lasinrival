@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronRight,
   Printer,
-  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +57,7 @@ import {
 } from '@/hooks/useConsolidadoPedidos';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { imprimirConsolidado } from '@/lib/imprimirConsolidado';
+import { useTipoPedido } from '@/contexts/TipoPedidoContext';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -70,13 +70,14 @@ export function ConsolidadoPedidos() {
   const [productoAQuitar, setProductoAQuitar] = useState<ProductoConsolidadoItem | null>(null);
   const [confirmarMasivoOpen, setConfirmarMasivoOpen] = useState(false);
   const [seccionAbierta, setSeccionAbierta] = useState({ noPesables: true, frios: true, pesables: true });
-  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
+
+  const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   const { data: vendedores } = useVendedoresActivos();
   const { data: zonasVendedor } = useZonasDeVendedor(vendedorId);
   const { data: zonasTodas } = useZonasTodas();
   const zonas = vendedorId ? zonasVendedor : zonasTodas;
-  const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente');
+  const { data: pedidos, isLoading } = usePedidosConsolidado(vendedorId, zonaId, 'pendiente', tipoPedidoFiltro);
   const quitarProducto = useQuitarProductoConsolidado();
   const confirmarMasivo = useConfirmarPedidosMasivo();
   const { config } = useConfiguracionComercio();
@@ -95,12 +96,8 @@ export function ConsolidadoPedidos() {
     });
   };
 
-  const pedidosFiltrados = useMemo(() => {
-    if (!pedidos) return [];
-    if (filtroOrigen === 'web') return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
-    if (filtroOrigen === 'reparto') return pedidos.filter(p => !p.observaciones?.startsWith('Pedido Paladini'));
-    return pedidos;
-  }, [pedidos, filtroOrigen]);
+  // Ya filtrado server-side por tipo_pedido en usePedidosConsolidado
+  const pedidosFiltrados = useMemo(() => pedidos || [], [pedidos]);
 
   // Separate pedidos by pesables
   const { sinPesables, conPesables } = useMemo(() => {
@@ -326,21 +323,6 @@ export function ConsolidadoPedidos() {
            <Button variant="outline" onClick={handleImprimir} disabled={!pedidosFiltrados || pedidosFiltrados.length === 0}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimir
-          </Button>
-          <Button
-            variant={filtroOrigen === 'web' ? "default" : "outline"}
-            onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
-            className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
-          >
-            🌐 Web
-          </Button>
-          <Button
-            variant={filtroOrigen === 'reparto' ? "default" : "outline"}
-            onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
-            className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
-          >
-            <Truck className="h-4 w-4 mr-1" />
-            Reparto
           </Button>
       </div>
 

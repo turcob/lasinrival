@@ -11,6 +11,7 @@ export interface PedidoConsolidado {
   estado: string;
   fecha_pedido: string;
   observaciones: string | null;
+  tipo_pedido?: string;
   cliente: {
     id: string;
     nombre: string;
@@ -123,20 +124,27 @@ export function useZonasDeVendedor(vendedorId: string | null) {
 export function usePedidosConsolidado(
   vendedorId: string | null,
   zonaId: string | null,
-  estado: string = 'pendiente'
+  estado: string = 'pendiente',
+  tipoPedido: 'web' | 'reparto' | 'ambos' = 'ambos'
 ) {
   return useQuery({
-    queryKey: ['pedidos-consolidado', vendedorId, zonaId, estado],
+    queryKey: ['pedidos-consolidado', vendedorId, zonaId, estado, tipoPedido],
     queryFn: async () => {
       // Query pedidos directly by estado, then filter by vendedor/zona via the joined cliente
-      const { data: allPedidos, error: pedidosError } = await supabase
+      let query = supabase
         .from('pedidos')
         .select(`
-          id, numero_pedido, total, estado, fecha_pedido, observaciones,
+          id, numero_pedido, total, estado, fecha_pedido, observaciones, tipo_pedido,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
         .eq('estado', estado as any)
         .order('numero_pedido', { ascending: true });
+
+      if (tipoPedido !== 'ambos') {
+        query = query.eq('tipo_pedido', tipoPedido as any);
+      }
+
+      const { data: allPedidos, error: pedidosError } = await query;
 
       if (pedidosError) throw pedidosError;
       if (!allPedidos || allPedidos.length === 0) return [];

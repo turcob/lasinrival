@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronRight,
   MapPin,
-  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +43,7 @@ import {
   type DetalleConsolidado,
 } from '@/hooks/useConsolidadoPedidos';
 import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
+import { useTipoPedido } from '@/contexts/TipoPedidoContext';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -63,9 +63,9 @@ function useZonas() {
   });
 }
 
-function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
+function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, tipoPedido: 'web' | 'reparto' | 'ambos') {
   return useQuery({
-    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin],
+    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin, tipoPedido],
     queryFn: async () => {
       if (!zonaId) return [];
 
@@ -73,7 +73,7 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
       let query = supabase
         .from('pedidos')
         .select(`
-          id, numero_pedido, total, estado, fecha_pedido, observaciones,
+          id, numero_pedido, total, estado, fecha_pedido, observaciones, tipo_pedido,
           cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
         `)
         .order('numero_pedido', { ascending: true });
@@ -82,6 +82,10 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
         query = query.eq('estado', 'preparado' as any);
       } else {
         query = query.not('estado', 'eq', 'rechazado');
+      }
+
+      if (tipoPedido !== 'ambos') {
+        query = query.eq('tipo_pedido', tipoPedido as any);
       }
 
       const { data: allPedidos, error: pedidosError } = await query;
@@ -133,20 +137,16 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean) {
 export function ConsolidadoFinalZona() {
   const [zonaId, setZonaId] = useState<string | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState('');
-  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
   const { roles } = useAuth();
   const isAdmin = roles.some(r => r.role === 'admin');
+  const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   const { data: zonas } = useZonas();
-  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin);
+  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro);
 
-  const pedidosFiltrados = useMemo(() => {
-    if (!pedidos) return [];
-    if (filtroOrigen === 'web') return pedidos.filter(p => p.observaciones?.startsWith('Pedido Paladini'));
-    if (filtroOrigen === 'reparto') return pedidos.filter(p => !p.observaciones?.startsWith('Pedido Paladini'));
-    return pedidos;
-  }, [pedidos, filtroOrigen]);
+  // Ya filtrado server-side por tipo_pedido
+  const pedidosFiltrados = useMemo(() => pedidos || [], [pedidos]);
 
   const consolidado = useMemo(() => {
     if (!pedidosFiltrados || pedidosFiltrados.length === 0) return { noPesables: [], frios: [], pesables: [], todos: [] as ProductoConsolidadoItem[] };
@@ -392,21 +392,6 @@ export function ConsolidadoFinalZona() {
           )}
         </Button>
 
-        <Button
-          variant={filtroOrigen === 'web' ? "default" : "outline"}
-          onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
-          className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
-        >
-          🌐 Web
-        </Button>
-        <Button
-          variant={filtroOrigen === 'reparto' ? "default" : "outline"}
-          onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
-          className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
-        >
-          <Truck className="h-4 w-4 mr-1" />
-          Reparto
-        </Button>
       </div>
 
       {!zonaId ? (

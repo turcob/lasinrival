@@ -16,6 +16,8 @@ export type PedidoEstado =
   | 'devuelto' 
   | 'anulado';
 
+export type TipoPedido = 'web' | 'reparto';
+
 export interface Pedido {
   id: string;
   numero_pedido: number;
@@ -24,6 +26,7 @@ export interface Pedido {
   usuario_id: string;
   lista_precio_id: string | null;
   estado: PedidoEstado;
+  tipo_pedido: TipoPedido;
   fecha_pedido: string;
   fecha_entrega_estimada: string | null;
   fecha_entrega_real: string | null;
@@ -97,7 +100,7 @@ export interface ProductoFrecuente {
   ultima_compra: string;
 }
 
-export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string }) {
+export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string; tipoPedido?: TipoPedido }) {
   return useQuery({
     queryKey: ['pedidos', filtros],
     queryFn: async () => {
@@ -116,6 +119,9 @@ export function usePedidos(filtros?: { estado?: PedidoEstado; clienteId?: string
       }
       if (filtros?.clienteId) {
         query = query.eq('cliente_id', filtros.clienteId);
+      }
+      if (filtros?.tipoPedido) {
+        query = query.eq('tipo_pedido', filtros.tipoPedido);
       }
 
       const { data, error } = await query;
@@ -257,6 +263,7 @@ export function useCrearPedido() {
       lista_precio_id?: string;
       fecha_entrega_estimada?: string;
       observaciones?: string;
+      tipo_pedido?: TipoPedido;
       detalles: {
         producto_id: string;
         cantidad: number;
@@ -281,10 +288,11 @@ export function useCrearPedido() {
           lista_precio_id: data.lista_precio_id || null,
           fecha_entrega_estimada: data.fecha_entrega_estimada || null,
           observaciones: data.observaciones || null,
+          tipo_pedido: data.tipo_pedido || 'reparto',
           subtotal,
           total: subtotal,
           estado: 'pendiente'
-        })
+        } as any)
         .select()
         .single();
 

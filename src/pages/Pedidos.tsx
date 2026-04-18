@@ -45,6 +45,9 @@ import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog'
 import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
 import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
+import { TipoPedidoProvider, useTipoPedido } from '@/contexts/TipoPedidoContext';
+import { SelectorTipoPedidoDialog } from '@/components/pedidos/SelectorTipoPedidoDialog';
+import { TipoPedidoSelector, TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
 
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -61,6 +64,15 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
+  return (
+    <TipoPedidoProvider>
+      <SelectorTipoPedidoDialog />
+      <PedidosContent />
+    </TipoPedidoProvider>
+  );
+}
+
+function PedidosContent() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
@@ -69,11 +81,13 @@ export default function Pedidos() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
-  const { data: pedidos, isLoading } = usePedidos(
-    filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
-  );
+  const { tipo: tipoPedidoFiltro } = useTipoPedido();
+
+  const { data: pedidos, isLoading } = usePedidos({
+    estado: filtroEstado !== 'todos' ? filtroEstado : undefined,
+    tipoPedido: tipoPedidoFiltro !== 'ambos' ? tipoPedidoFiltro : undefined,
+  });
 
   const toggleExpandido = (id: string) => {
     setExpandidos(prev => {
@@ -86,17 +100,6 @@ export default function Pedidos() {
 
   const pedidosFiltrados = useMemo(() => {
     let resultado = pedidos || [];
-
-    // Filtro por origen
-    if (filtroOrigen === 'web') {
-      resultado = resultado.filter(p =>
-        p.observaciones?.startsWith('Pedido Paladini')
-      );
-    } else if (filtroOrigen === 'reparto') {
-      resultado = resultado.filter(p =>
-        !p.observaciones?.startsWith('Pedido Paladini')
-      );
-    }
 
     // Filtro por búsqueda general (número, cliente)
     if (busqueda) {
@@ -120,7 +123,7 @@ export default function Pedidos() {
     }
 
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto, filtroOrigen]);
+  }, [pedidos, busqueda, busquedaProducto]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -197,21 +200,7 @@ export default function Pedidos() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                variant={filtroOrigen === 'web' ? "default" : "outline"}
-                onClick={() => setFiltroOrigen(filtroOrigen === 'web' ? 'todos' : 'web')}
-                className={`whitespace-nowrap ${filtroOrigen === 'web' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
-              >
-                🌐 Web
-              </Button>
-              <Button
-                variant={filtroOrigen === 'reparto' ? "default" : "outline"}
-                onClick={() => setFiltroOrigen(filtroOrigen === 'reparto' ? 'todos' : 'reparto')}
-                className={`whitespace-nowrap ${filtroOrigen === 'reparto' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}
-              >
-                <Truck className="h-4 w-4 mr-1" />
-                Reparto
-              </Button>
+              <TipoPedidoSelector />
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Pedido
@@ -240,7 +229,7 @@ export default function Pedidos() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {estadosActivos.map((key) => {
                 const config = estadoConfig[key];
-                const baseList = (busqueda || busquedaProducto || filtroOrigen !== 'todos') ? pedidosFiltrados : (pedidos || []);
+                const baseList = (busqueda || busquedaProducto) ? pedidosFiltrados : (pedidos || []);
                 const count = baseList.filter(p => p.estado === key).length;
                 const Icon = config.icon;
                 return (
@@ -311,14 +300,25 @@ export default function Pedidos() {
 
                       return (
                         <>
-                          <TableRow key={pedido.id} className="cursor-pointer" onClick={() => toggleExpandido(pedido.id)}>
+                          <TableRow
+                            key={pedido.id}
+                            className={`cursor-pointer border-l-4 ${
+                              (pedido as any).tipo_pedido === 'web'
+                                ? 'border-l-red-500'
+                                : 'border-l-blue-500'
+                            }`}
+                            onClick={() => toggleExpandido(pedido.id)}
+                          >
                             <TableCell className="px-2">
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); toggleExpandido(pedido.id); }}>
                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                               </Button>
                             </TableCell>
                             <TableCell className="font-mono font-medium">
-                              #{pedido.numero_pedido.toString().padStart(6, '0')}
+                              <div className="flex flex-col gap-1">
+                                <span>#{pedido.numero_pedido.toString().padStart(6, '0')}</span>
+                                <TipoPedidoBadge tipo={(pedido as any).tipo_pedido} />
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div>
