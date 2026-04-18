@@ -263,6 +263,7 @@ export function useCrearPedido() {
       lista_precio_id?: string;
       fecha_entrega_estimada?: string;
       observaciones?: string;
+      tipo_pedido?: TipoPedido;
       detalles: {
         producto_id: string;
         cantidad: number;
@@ -287,10 +288,11 @@ export function useCrearPedido() {
           lista_precio_id: data.lista_precio_id || null,
           fecha_entrega_estimada: data.fecha_entrega_estimada || null,
           observaciones: data.observaciones || null,
+          tipo_pedido: data.tipo_pedido || 'reparto',
           subtotal,
           total: subtotal,
           estado: 'pendiente'
-        })
+        } as any)
         .select()
         .single();
 
