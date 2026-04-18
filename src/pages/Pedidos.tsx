@@ -64,6 +64,15 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
+  return (
+    <TipoPedidoProvider>
+      <SelectorTipoPedidoDialog />
+      <PedidosContent />
+    </TipoPedidoProvider>
+  );
+}
+
+function PedidosContent() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
@@ -72,11 +81,13 @@ export default function Pedidos() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [filtroOrigen, setFiltroOrigen] = useState<'todos' | 'web' | 'reparto'>('todos');
 
-  const { data: pedidos, isLoading } = usePedidos(
-    filtroEstado !== 'todos' ? { estado: filtroEstado } : undefined
-  );
+  const { tipo: tipoPedidoFiltro } = useTipoPedido();
+
+  const { data: pedidos, isLoading } = usePedidos({
+    estado: filtroEstado !== 'todos' ? filtroEstado : undefined,
+    tipoPedido: tipoPedidoFiltro !== 'ambos' ? tipoPedidoFiltro : undefined,
+  });
 
   const toggleExpandido = (id: string) => {
     setExpandidos(prev => {
