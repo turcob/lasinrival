@@ -300,14 +300,25 @@ function PedidosContent() {
 
                       return (
                         <>
-                          <TableRow key={pedido.id} className="cursor-pointer" onClick={() => toggleExpandido(pedido.id)}>
+                          <TableRow
+                            key={pedido.id}
+                            className={`cursor-pointer border-l-4 ${
+                              (pedido as any).tipo_pedido === 'web'
+                                ? 'border-l-red-500'
+                                : 'border-l-blue-500'
+                            }`}
+                            onClick={() => toggleExpandido(pedido.id)}
+                          >
                             <TableCell className="px-2">
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); toggleExpandido(pedido.id); }}>
                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                               </Button>
                             </TableCell>
                             <TableCell className="font-mono font-medium">
-                              #{pedido.numero_pedido.toString().padStart(6, '0')}
+                              <div className="flex flex-col gap-1">
+                                <span>#{pedido.numero_pedido.toString().padStart(6, '0')}</span>
+                                <TipoPedidoBadge tipo={(pedido as any).tipo_pedido} />
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div>
