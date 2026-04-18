@@ -2670,6 +2670,7 @@ export type Database = {
           rendido: boolean | null
           rendido_por: string | null
           subtotal: number
+          tipo_pedido: string
           total: number
           updated_at: string
           usuario_id: string
@@ -2694,6 +2695,7 @@ export type Database = {
           rendido?: boolean | null
           rendido_por?: string | null
           subtotal?: number
+          tipo_pedido?: string
           total?: number
           updated_at?: string
           usuario_id: string
@@ -2718,6 +2720,7 @@ export type Database = {
           rendido?: boolean | null
           rendido_por?: string | null
           subtotal?: number
+          tipo_pedido?: string
           total?: number
           updated_at?: string
           usuario_id?: string
