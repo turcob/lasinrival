@@ -45,6 +45,9 @@ import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog'
 import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
 import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
+import { TipoPedidoProvider, useTipoPedido } from '@/contexts/TipoPedidoContext';
+import { SelectorTipoPedidoDialog } from '@/components/pedidos/SelectorTipoPedidoDialog';
+import { TipoPedidoSelector, TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
 
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
