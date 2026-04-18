@@ -1733,6 +1733,7 @@ export type Database = {
           id: string
           km_final: number | null
           km_inicial: number | null
+          monto_esperado: number | null
           numero_hoja: number
           observaciones: string | null
           responsable_id: string | null
@@ -1751,6 +1752,7 @@ export type Database = {
           id?: string
           km_final?: number | null
           km_inicial?: number | null
+          monto_esperado?: number | null
           numero_hoja?: number
           observaciones?: string | null
           responsable_id?: string | null
@@ -1769,6 +1771,7 @@ export type Database = {
           id?: string
           km_final?: number | null
           km_inicial?: number | null
+          monto_esperado?: number | null
           numero_hoja?: number
           observaciones?: string | null
           responsable_id?: string | null

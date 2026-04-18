@@ -1,0 +1,1 @@
+ALTER TABLE public.hojas_ruta ADD COLUMN IF NOT EXISTS monto_esperado numeric;
