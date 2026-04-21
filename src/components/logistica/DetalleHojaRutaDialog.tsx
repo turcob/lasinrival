@@ -796,6 +796,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             )}
+            </div>
+            </div>
+            )}
           </div>
         ) : null}
           </div>
