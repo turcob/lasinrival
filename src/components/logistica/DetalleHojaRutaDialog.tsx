@@ -796,7 +796,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             )}
           </div>
         ) : null}
-      </SheetContent>
+          </div>
+        </div>
+      )}
 
       {/* Diálogo de Cobro */}
       <RegistrarCobroDialog
@@ -832,6 +834,6 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onSuccess={() => refetch()}
         />
       )}
-    </Sheet>
+    </>
   );
 }
