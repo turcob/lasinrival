@@ -16,6 +16,7 @@ import {
   useCobrosHojaRuta,
   useDevolucionesHojaRuta,
   useRendicionHojaRuta,
+  useHojaCarga,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
@@ -75,6 +76,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const { data: cobros } = useCobrosHojaRuta(hojaRutaId || undefined);
   const { data: devoluciones } = useDevolucionesHojaRuta(hojaRutaId || undefined);
   const { data: rendicionExistente } = useRendicionHojaRuta(hojaRutaId || undefined);
+  const { data: productosCarga = [] } = useHojaCarga(hojaRutaId || undefined);
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
@@ -407,7 +409,54 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               </div>
             </div>
 
-            {/* Paradas */}
+            {/* Hoja de Carga - visible en planificada/en_carga */}
+            {(hojaRuta.estado === 'planificada' || hojaRuta.estado === 'en_carga') && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Hoja de Carga ({productosCarga.length} productos)
+                  </h3>
+                  <Badge variant="outline" className="text-xs">
+                    {hojaRuta.paradas?.length || 0} paradas asignadas
+                  </Badge>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Código</th>
+                        <th className="px-3 py-2 text-left font-medium">Descripción</th>
+                        <th className="px-3 py-2 text-right font-medium">Cantidad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y max-h-[400px]">
+                      {productosCarga.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-3 py-8 text-center text-muted-foreground">
+                            No hay productos para cargar
+                          </td>
+                        </tr>
+                      ) : (
+                        productosCarga.map((p) => (
+                          <tr key={p.id}>
+                            <td className="px-3 py-2 font-mono text-xs">{p.codigo}</td>
+                            <td className="px-3 py-2">{p.descripcion}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{p.cantidad_total}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  Los pedidos individuales estarán disponibles para gestionar cuando se inicie la ruta.
+                </p>
+              </div>
+            )}
+
+            {/* Paradas - visible solo cuando la ruta está en curso o terminada */}
+            {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada' || hojaRuta.estado === 'cancelada') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold flex items-center gap-2">
@@ -592,6 +641,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
+            )}
 
             {/* Sección de Devoluciones Registradas */}
             {devoluciones && devoluciones.length > 0 && (
