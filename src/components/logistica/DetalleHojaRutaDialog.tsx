@@ -339,17 +339,22 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
-          </SheetTitle>
-          <SheetDescription>
-            Detalle y gestión de entregas
-          </SheetDescription>
-        </SheetHeader>
+    <>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
+          <div className="sticky top-0 z-10 bg-background border-b px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
+              </h2>
+              <p className="text-sm text-muted-foreground">Detalle y gestión de entregas</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Cerrar">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="max-w-6xl mx-auto px-6 py-6">
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
