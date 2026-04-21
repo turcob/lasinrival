@@ -770,9 +770,19 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && (
               <div className="pt-4 border-t">
                 {rendicionExistente ? (
-                  <div className="flex items-center justify-center gap-2 p-3 bg-muted rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-600">Rendición registrada</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 p-3 bg-muted rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-600">Rendición registrada</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setRendicionOpen(true)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Ver / Imprimir Rendición
+                    </Button>
                   </div>
                 ) : (
                   <Button 
