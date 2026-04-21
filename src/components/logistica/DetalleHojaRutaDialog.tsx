@@ -1,12 +1,5 @@
 import { useState } from 'react';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { 
   useHojaRuta,
@@ -39,7 +32,8 @@ import {
   Banknote,
   PackageX,
   Printer,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
