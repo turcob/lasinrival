@@ -464,7 +464,8 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
             {/* Paradas - visible solo cuando la ruta está en curso o terminada */}
             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada' || hojaRuta.estado === 'cancelada') && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="space-y-3 lg:col-span-2">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Package className="h-4 w-4" />
