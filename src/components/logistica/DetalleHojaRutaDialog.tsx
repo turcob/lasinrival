@@ -618,7 +618,20 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             <p className="font-semibold">
                               ${parada.pedido?.total?.toLocaleString('es-AR')}
                             </p>
-                            {getDevolucionesPorParada(parada.id) > 0 && (
+                            {parada.estado === 'rechazado' && parada.pedido && (
+                              <div className="mt-1">
+                                <p className="text-xs text-destructive line-through">
+                                  ${parada.pedido.total?.toLocaleString('es-AR')}
+                                </p>
+                                <p className="text-sm font-bold text-destructive">
+                                  $0,00
+                                </p>
+                                <p className="text-xs text-destructive">
+                                  Pedido rechazado
+                                </p>
+                              </div>
+                            )}
+                            {parada.estado !== 'rechazado' && getDevolucionesPorParada(parada.id) > 0 && (
                               <div className="mt-1">
                                 <p className="text-xs text-destructive line-through">
                                   ${parada.pedido?.total?.toLocaleString('es-AR')}
