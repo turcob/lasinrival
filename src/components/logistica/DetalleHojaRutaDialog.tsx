@@ -354,7 +354,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="w-full px-6 py-6">
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -383,7 +383,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             </div>
 
             {/* Info grid */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -464,7 +464,8 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
             {/* Paradas - visible solo cuando la ruta está en curso o terminada */}
             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada' || hojaRuta.estado === 'cancelada') && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="space-y-3 lg:col-span-2">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Package className="h-4 w-4" />
@@ -661,7 +662,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
-            )}
+            <div className="space-y-6 lg:col-span-1">
 
             {/* Sección de Devoluciones Registradas */}
             {devoluciones && devoluciones.length > 0 && (
@@ -793,6 +794,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   </Button>
                 )}
               </div>
+            )}
+            </div>
+            </div>
             )}
           </div>
         ) : null}
