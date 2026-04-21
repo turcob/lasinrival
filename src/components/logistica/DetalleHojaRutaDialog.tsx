@@ -563,7 +563,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             {/* Botones de cobro y devolución - visible cuando está en ruta o entregado */}
                             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && 
                              ['entregado', 'entrega_parcial', 'rechazado'].includes(parada.estado) && parada.pedido && (() => {
-                              const totalNeto = getTotalNeto(parada.id, parada.pedido!.total);
+                              const totalNeto = getTotalEsperadoParada(parada.id, parada.estado, parada.pedido!.total);
                               const cobrado = getCobradoPorParada(parada.id);
                               const pedidoCobradoCompleto = cobrado >= totalNeto && totalNeto > 0;
                               
