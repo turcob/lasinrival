@@ -50,6 +50,10 @@ export function RendicionHojaRutaDialog({
   const [resumen, setResumen] = useState<ResumenPorMedio[]>([]);
   const [rendicionExistente, setRendicionExistente] = useState<any>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [totalEsperado, setTotalEsperado] = useState<number>(0);
+  const [totalEntregado, setTotalEntregado] = useState<number>(0);
+  const [totalRechazado, setTotalRechazado] = useState<number>(0);
+  const [totalDevoluciones, setTotalDevoluciones] = useState<number>(0);
 
   // Montos declarados por el chofer
   const [efectivoDeclarado, setEfectivoDeclarado] = useState<number>(0);
