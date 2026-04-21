@@ -137,6 +137,14 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return totalPedido - getDevolucionesPorParada(paradaId);
   };
 
+  // Total neto considerando el estado de la parada:
+  // - Si está rechazado, el total esperado es 0 (no se cobra nada)
+  // - Si está entregado/parcial, se descuentan las devoluciones registradas
+  const getTotalEsperadoParada = (paradaId: string, paradaEstado: string, totalPedido: number): number => {
+    if (paradaEstado === 'rechazado' || paradaEstado === 'no_entregado') return 0;
+    return getTotalNeto(paradaId, totalPedido);
+  };
+
   if (!hojaRutaId) return null;
 
   const getNextEstado = (current: HojaRutaEstado): HojaRutaEstado | null => {
