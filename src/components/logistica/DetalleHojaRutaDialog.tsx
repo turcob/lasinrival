@@ -354,7 +354,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="w-full px-6 py-6">
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -383,7 +383,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             </div>
 
             {/* Info grid */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
