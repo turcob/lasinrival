@@ -662,7 +662,8 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
-            )}
+            </div>
+            <div className="space-y-6 lg:col-span-1">
 
             {/* Sección de Devoluciones Registradas */}
             {devoluciones && devoluciones.length > 0 && (
