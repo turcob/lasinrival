@@ -472,6 +472,45 @@ export function RendicionHojaRutaDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Resumen de entregas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Resumen de Entregas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total entregado:</span>
+                  <span className="font-medium text-green-600">
+                    +${totalEntregado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {totalRechazado > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Pedidos rechazados:</span>
+                    <span className="font-medium text-destructive">
+                      -${totalRechazado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {totalDevoluciones > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Devoluciones parciales:</span>
+                    <span className="font-medium text-amber-600">
+                      -${totalDevoluciones.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-bold">
+                  <span>Total a rendir:</span>
+                  <span className="text-primary">
+                    ${totalEsperado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Resumen de cobros registrados */}
           <Card>
             <CardHeader className="pb-2">
