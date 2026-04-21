@@ -50,6 +50,10 @@ export function RendicionHojaRutaDialog({
   const [resumen, setResumen] = useState<ResumenPorMedio[]>([]);
   const [rendicionExistente, setRendicionExistente] = useState<any>(null);
   const [observaciones, setObservaciones] = useState('');
+  const [totalEsperado, setTotalEsperado] = useState<number>(0);
+  const [totalEntregado, setTotalEntregado] = useState<number>(0);
+  const [totalRechazado, setTotalRechazado] = useState<number>(0);
+  const [totalDevoluciones, setTotalDevoluciones] = useState<number>(0);
 
   // Montos declarados por el chofer
   const [efectivoDeclarado, setEfectivoDeclarado] = useState<number>(0);
@@ -81,10 +85,56 @@ export function RendicionHojaRutaDialog({
       // También cargar cobros de la tabla legacy
       const { data: paradas } = await supabase
         .from('hoja_ruta_paradas')
-        .select('id')
+        .select('id, estado, pedido:pedidos(total)')
         .eq('hoja_ruta_id', hojaRutaId);
       
       const paradasIds = paradas?.map(p => p.id) || [];
+
+      // Calcular total entregado vs rechazado por estado de parada
+      let entregadoSum = 0;
+      let rechazadoSum = 0;
+      (paradas || []).forEach((p: any) => {
+        const totalPedido = Number(p.pedido?.total || 0);
+        if (p.estado === 'rechazado' || p.estado === 'no_entregado') {
+          rechazadoSum += totalPedido;
+        } else if (['entregado', 'entrega_parcial'].includes(p.estado)) {
+          entregadoSum += totalPedido;
+        }
+      });
+
+      // Cargar devoluciones (productos devueltos en entregas parciales)
+      let devolucionesSum = 0;
+      if (paradasIds.length > 0) {
+        const { data: devs } = await supabase
+          .from('hoja_ruta_devoluciones')
+          .select(`
+            cantidad,
+            parada_id,
+            pedido_detalle:pedido_detalles(precio_unitario, descuento_porcentaje)
+          `)
+          .in('parada_id', paradasIds);
+
+        // Solo contar devoluciones de paradas NO rechazadas (las rechazadas ya descuentan total completo)
+        const paradasNoRechazadas = new Set(
+          (paradas || [])
+            .filter((p: any) => p.estado !== 'rechazado' && p.estado !== 'no_entregado')
+            .map((p: any) => p.id)
+        );
+
+        devolucionesSum = (devs || [])
+          .filter((d: any) => paradasNoRechazadas.has(d.parada_id))
+          .reduce((sum: number, d: any) => {
+            const precio = Number(d.pedido_detalle?.precio_unitario || 0);
+            const descuento = Number(d.pedido_detalle?.descuento_porcentaje || 0);
+            const precioNeto = precio * (1 - descuento / 100);
+            return sum + Number(d.cantidad) * precioNeto;
+          }, 0);
+      }
+
+      setTotalEntregado(entregadoSum);
+      setTotalRechazado(rechazadoSum);
+      setTotalDevoluciones(devolucionesSum);
+      setTotalEsperado(entregadoSum - devolucionesSum);
       
       let cobrosLegacy: Cobro[] = [];
       if (paradasIds.length > 0) {
@@ -422,6 +472,45 @@ export function RendicionHojaRutaDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Resumen de entregas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Resumen de Entregas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total entregado:</span>
+                  <span className="font-medium text-green-600">
+                    +${totalEntregado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {totalRechazado > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Pedidos rechazados:</span>
+                    <span className="font-medium text-destructive">
+                      -${totalRechazado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {totalDevoluciones > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Devoluciones parciales:</span>
+                    <span className="font-medium text-amber-600">
+                      -${totalDevoluciones.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-bold">
+                  <span>Total a rendir:</span>
+                  <span className="text-primary">
+                    ${totalEsperado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Resumen de cobros registrados */}
           <Card>
             <CardHeader className="pb-2">

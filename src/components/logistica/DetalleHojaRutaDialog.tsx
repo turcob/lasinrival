@@ -137,6 +137,14 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return totalPedido - getDevolucionesPorParada(paradaId);
   };
 
+  // Total neto considerando el estado de la parada:
+  // - Si está rechazado, el total esperado es 0 (no se cobra nada)
+  // - Si está entregado/parcial, se descuentan las devoluciones registradas
+  const getTotalEsperadoParada = (paradaId: string, paradaEstado: string, totalPedido: number): number => {
+    if (paradaEstado === 'rechazado' || paradaEstado === 'no_entregado') return 0;
+    return getTotalNeto(paradaId, totalPedido);
+  };
+
   if (!hojaRutaId) return null;
 
   const getNextEstado = (current: HojaRutaEstado): HojaRutaEstado | null => {
@@ -555,7 +563,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             {/* Botones de cobro y devolución - visible cuando está en ruta o entregado */}
                             {(hojaRuta.estado === 'en_ruta' || hojaRuta.estado === 'completada') && 
                              ['entregado', 'entrega_parcial', 'rechazado'].includes(parada.estado) && parada.pedido && (() => {
-                              const totalNeto = getTotalNeto(parada.id, parada.pedido!.total);
+                              const totalNeto = getTotalEsperadoParada(parada.id, parada.estado, parada.pedido!.total);
                               const cobrado = getCobradoPorParada(parada.id);
                               const pedidoCobradoCompleto = cobrado >= totalNeto && totalNeto > 0;
                               
@@ -610,7 +618,20 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                             <p className="font-semibold">
                               ${parada.pedido?.total?.toLocaleString('es-AR')}
                             </p>
-                            {getDevolucionesPorParada(parada.id) > 0 && (
+                            {parada.estado === 'rechazado' && parada.pedido && (
+                              <div className="mt-1">
+                                <p className="text-xs text-destructive line-through">
+                                  ${parada.pedido.total?.toLocaleString('es-AR')}
+                                </p>
+                                <p className="text-sm font-bold text-destructive">
+                                  $0,00
+                                </p>
+                                <p className="text-xs text-destructive">
+                                  Pedido rechazado
+                                </p>
+                              </div>
+                            )}
+                            {parada.estado !== 'rechazado' && getDevolucionesPorParada(parada.id) > 0 && (
                               <div className="mt-1">
                                 <p className="text-xs text-destructive line-through">
                                   ${parada.pedido?.total?.toLocaleString('es-AR')}
