@@ -641,6 +641,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 )}
               </div>
             </div>
+            )}
 
             {/* Sección de Devoluciones Registradas */}
             {devoluciones && devoluciones.length > 0 && (
