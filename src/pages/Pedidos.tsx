@@ -391,13 +391,24 @@ function PedidosContent() {
                               {formatCurrency(pedido.total)}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); setPedidoSeleccionado(pedido.id); }}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                {pedido.estado === 'borrador' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); handleImprimirPedido(pedido); }}
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); setPedidoSeleccionado(pedido.id); }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                           {isExpanded && detallesVisibles && detallesVisibles.length > 0 && (
