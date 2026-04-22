@@ -177,6 +177,70 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     }));
   };
 
+  const recalcularLinea = useCallback((linea: LineaPreparacion) => {
+    const esPorPeso = isProductoPorPeso(linea.unidadMedida);
+    const cantidadParsed = parseCantidad(linea.inputValue, esPorPeso);
+    const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
+    return {
+      ...linea,
+      cantidadPreparada: cantidadParsed,
+      subtotal: cantidadParsed * precioConDescuento,
+    };
+  }, []);
+
+  const calcularPrecioProducto = useCallback((producto: any) => {
+    const listaId = pedido?.lista_precio_id || listasPrecios?.listas?.[0]?.id;
+    if (!listaId || !listasPrecios) return producto.precio_costo;
+    return obtenerPrecioVentaProducto(
+      {
+        id: producto.id,
+        precio_costo: producto.precio_costo,
+        marca_id: producto.marca_id,
+        tipo_producto_id: producto.tipo_producto_id,
+      },
+      listaId,
+      listasPrecios.porcentajes || [],
+      listasPrecios.excepciones || []
+    ).precioVenta;
+  }, [listasPrecios, pedido?.lista_precio_id]);
+
+  const productosFiltrados = useMemo(() => {
+    if (!busquedaProducto || !productos) return [];
+    const term = busquedaProducto.toLowerCase();
+    return productos
+      .filter((p) =>
+        p.codigo_articulo.toLowerCase().includes(term) ||
+        p.descripcion.toLowerCase().includes(term)
+      )
+      .filter((p) => !lineas.some((l) => l.productoId === p.id))
+      .slice(0, 10);
+  }, [busquedaProducto, productos, lineas]);
+
+  const agregarProducto = (producto: any) => {
+    const esPorPeso = isProductoPorPeso(producto.unidad_medida || 'UN');
+    const precio = calcularPrecioProducto(producto);
+    const nuevaLinea = recalcularLinea({
+      detalleId: `nuevo-${producto.id}`,
+      productoId: producto.id,
+      codigo: producto.codigo_articulo,
+      descripcion: producto.descripcion,
+      unidadMedida: producto.unidad_medida || 'UN',
+      cantidadPedida: 1,
+      inputValue: formatCantidadInicial(1, esPorPeso),
+      cantidadPreparada: 1,
+      subtotal: precio,
+      precioUnitario: precio,
+      descuentoPorcentaje: 0,
+      esNuevo: true,
+    });
+    setLineas((prev) => [...prev, nuevaLinea]);
+    setBusquedaProducto('');
+  };
+
+  const eliminarLinea = (detalleId: string) => {
+    setLineas((prev) => prev.filter((l) => l.detalleId !== detalleId));
+  };
+
   const handleDescuentoChange = (detalleId: string, value: string) => {
     const num = parseFloat(value);
     if (isNaN(num) || num < 0) return;
