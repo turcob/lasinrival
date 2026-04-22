@@ -401,7 +401,46 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
         </div>
       ) : (
         <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="mx-auto max-w-4xl space-y-4">
+            <div className="rounded-lg border bg-card p-4 space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-medium">Agregar producto</p>
+                  <p className="text-xs text-muted-foreground">Buscá por código o descripción para sumarlo al pedido.</p>
+                </div>
+                {pedido?.estado === 'borrador' && (
+                  <Button variant="outline" onClick={handleImprimirBorrador}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir borrador
+                  </Button>
+                )}
+              </div>
+              <div className="relative">
+                <Input
+                  placeholder="Buscar producto..."
+                  value={busquedaProducto}
+                  onChange={(e) => setBusquedaProducto(e.target.value)}
+                />
+                {productosFiltrados.length > 0 && (
+                  <div className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover shadow-md">
+                    {productosFiltrados.map((producto) => (
+                      <button
+                        key={producto.id}
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent"
+                        onClick={() => agregarProducto(producto)}
+                      >
+                        <div>
+                          <p className="font-mono text-xs text-muted-foreground">{producto.codigo_articulo}</p>
+                          <p className="text-sm font-medium">{producto.descripcion}</p>
+                        </div>
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             {lineas.map((linea) => {
               const esPorPeso = isProductoPorPeso(linea.unidadMedida);
               const esMenor = linea.cantidadPreparada < linea.cantidadPedida;
@@ -412,8 +451,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                 <div 
                   key={linea.detalleId}
                   className={`p-4 rounded-lg border-2 transition-colors ${
-                    esMayor ? 'border-blue-400 bg-blue-50' : 
-                    esMenor ? 'border-amber-400 bg-amber-50' : 
+                    esMayor ? 'border-primary bg-primary/5' : 
+                    esMenor ? 'border-warning bg-warning/10' : 
                     'border-border bg-card'
                   }`}
                 >
@@ -425,12 +464,9 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                         {esPorPeso && (
                           <Badge variant="outline" className="text-xs">Por Peso</Badge>
                         )}
-                        {esMayor && (
-                          <Badge className="text-xs bg-blue-500 text-white">+Mayor</Badge>
-                        )}
-                        {esMenor && (
-                          <Badge className="text-xs bg-amber-500 text-white">-Menor</Badge>
-                        )}
+                          {esMayor && <Badge className="text-xs bg-primary text-primary-foreground">+Mayor</Badge>}
+                          {esMenor && <Badge className="text-xs bg-warning text-warning-foreground">-Menor</Badge>}
+                          {linea.esNuevo && <Badge variant="outline" className="text-xs">Nuevo</Badge>}
                       </div>
                       <p className="font-medium truncate">{linea.descripcion}</p>
                       <div className="flex items-center gap-3 mt-1">
@@ -486,8 +522,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                               }
                             }}
                             className={`w-28 text-center font-medium text-lg ${
-                              esMayor ? 'border-blue-500 bg-blue-50' :
-                              esMenor ? 'border-amber-500 bg-amber-50' : ''
+                              esMayor ? 'border-primary bg-primary/5' :
+                              esMenor ? 'border-warning bg-warning/10' : ''
                             }`}
                           />
                           <Button
@@ -505,10 +541,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                       <div className="text-right min-w-[120px]">
                         <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
                         <p className={`font-bold text-lg ${
-                          esMayor ? 'text-blue-700' : esMenor ? 'text-amber-700' : ''
+                          esMayor ? 'text-primary' : esMenor ? 'text-warning' : ''
                         }`}>
                           {formatCurrency(linea.subtotal)}
                         </p>
+                        <Button variant="ghost" size="sm" className="mt-2" onClick={() => eliminarLinea(linea.detalleId)}>
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          Eliminar
+                        </Button>
                       </div>
                     </div>
                   </div>
