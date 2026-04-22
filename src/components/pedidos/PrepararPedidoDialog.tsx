@@ -563,11 +563,11 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
       <div className="border-t bg-card px-6 py-4">
         <div className="max-w-4xl mx-auto">
           {hayDiferencias && (
-            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 p-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
               <div className="text-sm">
-                <p className="font-medium text-amber-800">Preparación parcial</p>
-                <p className="text-amber-700">
+                <p className="font-medium text-warning">Preparación parcial</p>
+                <p className="text-warning/80">
                   Algunos productos tienen cantidades menores a las pedidas. El total se ajustará automáticamente.
                 </p>
               </div>
