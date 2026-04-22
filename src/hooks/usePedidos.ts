@@ -284,7 +284,7 @@ export function useCrearPedido() {
           tipo_pedido: data.tipo_pedido || 'reparto',
           subtotal,
           total: subtotal,
-          estado: 'borrador'
+          estado: 'pendiente'
         } as any)
         .select()
         .single();
@@ -313,16 +313,16 @@ export function useCrearPedido() {
       await supabase.from('pedido_historial').insert({
         pedido_id: pedido.id,
         estado_anterior: null,
-        estado_nuevo: 'borrador',
+        estado_nuevo: 'pendiente',
         usuario_id: user.id,
-        observaciones: 'Pedido creado en borrador'
+        observaciones: 'Pedido creado en pendiente'
       });
 
       return pedido;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
-      toast({ title: 'Pedido creado en borrador' });
+      toast({ title: 'Pedido creado en pendiente' });
     },
     onError: (error) => {
       toast({ 
