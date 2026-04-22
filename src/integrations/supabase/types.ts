@@ -4493,6 +4493,7 @@ export type Database = {
         | "recibida"
         | "anulada"
       pedido_estado:
+        | "borrador"
         | "pendiente"
         | "confirmado"
         | "preparado"
@@ -4676,6 +4677,7 @@ export const Constants = {
         "anulada",
       ],
       pedido_estado: [
+        "borrador",
         "pendiente",
         "confirmado",
         "preparado",
