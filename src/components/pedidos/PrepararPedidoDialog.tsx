@@ -270,7 +270,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
       numeroPedido: pedido.numero_pedido,
       clienteNombre: pedido.cliente?.nombre || 'Cliente',
       clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.map(l => ({
+      lineas: lineas.filter(l => l.productoId).map(l => ({
         detalleId: l.detalleId,
         productoId: l.productoId,
         codigo: l.codigo,
@@ -298,7 +298,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
       numeroPedido: pedido.numero_pedido,
       clienteNombre: pedido.cliente?.nombre || 'Cliente',
       clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.map(l => ({
+      lineas: lineas.filter(l => l.productoId).map(l => ({
         detalleId: l.detalleId,
         productoId: l.productoId,
         codigo: l.codigo,
@@ -343,7 +343,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
             telefono: config.telefono || undefined,
           }
         : undefined,
-      lineas: lineas.map((l) => ({
+      lineas: lineas.filter((l) => l.productoId).map((l) => ({
         codigo: l.codigo,
         descripcion: l.descripcion,
         unidadMedida: l.unidadMedida,
