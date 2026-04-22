@@ -397,7 +397,7 @@ export function ConsolidadoPedidos() {
                   disabled={seleccionados.size === 0 || confirmarMasivo.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar seleccionados ({seleccionados.size})
+                  Confirmar pedidos ({seleccionados.size})
                 </Button>
               </div>
 
@@ -500,7 +500,7 @@ export function ConsolidadoPedidos() {
       <AlertDialog open={confirmarMasivoOpen} onOpenChange={setConfirmarMasivoOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar pedidos masivamente</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar pedidos</AlertDialogTitle>
             <AlertDialogDescription>
               Se cambiarán {seleccionados.size} pedidos de estado "pendiente" a "preparado". ¿Continuar?
             </AlertDialogDescription>
@@ -508,7 +508,7 @@ export function ConsolidadoPedidos() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmarMasivo} disabled={confirmarMasivo.isPending}>
-              {confirmarMasivo.isPending ? 'Confirmando...' : `Confirmar ${seleccionados.size} pedidos`}
+              {confirmarMasivo.isPending ? 'Confirmando...' : `Confirmar pedidos (${seleccionados.size})`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

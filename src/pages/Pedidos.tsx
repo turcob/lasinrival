@@ -65,7 +65,7 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
   anulado: { label: 'Anulado', color: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
-const estadosActivos: PedidoEstado[] = ['borrador', 'pendiente', 'preparado', 'despachado', 'rechazado'];
+const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
   return (
@@ -79,7 +79,7 @@ export default function Pedidos() {
 function PedidosContent() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('borrador');
+  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
@@ -167,7 +167,7 @@ function PedidosContent() {
         zona: pedido.cliente?.zona?.nombre || undefined,
       },
       vendedor: pedido.vendedor ? `[${pedido.vendedor.codigo}] ${pedido.vendedor.nombre}` : undefined,
-      condicionVenta: pedido.estado === 'borrador' ? 'Borrador' : undefined,
+      condicionVenta: pedido.estado === 'pendiente' ? 'Pendiente' : undefined,
       total: pedido.total,
       empresa: config
         ? {
@@ -392,7 +392,7 @@ function PedidosContent() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
-                                {pedido.estado === 'borrador' && (
+                                {pedido.estado === 'pendiente' && (
                                   <Button
                                     variant="ghost"
                                     size="sm"

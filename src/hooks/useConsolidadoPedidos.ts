@@ -307,7 +307,7 @@ export function useConfirmarPedidosMasivo() {
         estado_anterior: 'pendiente' as const,
         estado_nuevo: 'preparado' as const,
         usuario_id: user.id,
-        observaciones: 'Confirmado masivamente desde consolidado',
+        observaciones: 'Pedidos confirmados desde consolidado',
       }));
 
       const { error: histError } = await supabase
@@ -321,7 +321,7 @@ export function useConfirmarPedidosMasivo() {
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos-consolidado'] });
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
-      toast({ title: `${count} pedidos confirmados como preparados` });
+      toast({ title: `${count} pedidos confirmados` });
     },
     onError: (error) => {
       toast({
