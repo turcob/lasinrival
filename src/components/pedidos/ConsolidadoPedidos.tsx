@@ -195,11 +195,13 @@ export function ConsolidadoPedidos() {
     });
   };
 
+  const pedidosConfirmables = pedidosFiltrados;
+
   const handleToggleTodos = () => {
-    if (seleccionados.size === sinPesables.length) {
+    if (seleccionados.size === pedidosConfirmables.length) {
       setSeleccionados(new Set());
     } else {
-      setSeleccionados(new Set(sinPesables.map(p => p.id)));
+      setSeleccionados(new Set(pedidosConfirmables.map(p => p.id)));
     }
   };
 
@@ -336,6 +338,38 @@ export function ConsolidadoPedidos() {
         </div>
       ) : (
         <>
+          <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-primary" />
+                Confirmación masiva
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Seleccioná y confirmá todos los pedidos filtrados desde acá.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  checked={seleccionados.size === pedidosConfirmables.length && pedidosConfirmables.length > 0}
+                  onCheckedChange={handleToggleTodos}
+                />
+                <span className="text-sm font-medium">
+                  Seleccionar todos ({pedidosConfirmables.length})
+                </span>
+              </div>
+
+              <Button
+                onClick={() => setConfirmarMasivoOpen(true)}
+                disabled={seleccionados.size === 0 || confirmarMasivo.isPending}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Confirmar pedidos ({seleccionados.size})
+              </Button>
+            </div>
+          </div>
+
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted">
@@ -384,33 +418,27 @@ export function ConsolidadoPedidos() {
             )}
           </div>
 
-          {/* Confirmación masiva de pedidos sin pesables */}
-          {sinPesables.length > 0 && (
+          {/* Listado de pedidos a confirmar */}
+          {pedidosConfirmables.length > 0 && (
             <div className="space-y-3 border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
-                  Pedidos sin pesables ({sinPesables.length})
+                  Pedidos a confirmar ({pedidosConfirmables.length})
                 </h3>
-                <Button
-                  onClick={() => setConfirmarMasivoOpen(true)}
-                  disabled={seleccionados.size === 0 || confirmarMasivo.isPending}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar pedidos ({seleccionados.size})
-                </Button>
+                <Badge variant="secondary">{seleccionados.size} seleccionados</Badge>
               </div>
 
               <div className="flex items-center gap-2 pb-2 border-b">
                 <Checkbox
-                  checked={seleccionados.size === sinPesables.length && sinPesables.length > 0}
+                  checked={seleccionados.size === pedidosConfirmables.length && pedidosConfirmables.length > 0}
                   onCheckedChange={handleToggleTodos}
                 />
                 <span className="text-sm font-medium">Seleccionar todos</span>
               </div>
 
               <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {sinPesables.map(pedido => (
+                {pedidosConfirmables.map(pedido => (
                   <div
                     key={pedido.id}
                     className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
