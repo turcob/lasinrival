@@ -34,6 +34,27 @@ export function usePrepararPedido() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const getSuccessMessage = (data: { estadoDestino: PedidoEstado; registrarDeuda: boolean; totalFinal: number }) => {
+    if (data.estadoDestino === 'pendiente') {
+      return {
+        title: 'Pedido guardado',
+        description: `El pedido quedó en pendiente con total de $${data.totalFinal.toFixed(2)}.`,
+      };
+    }
+
+    if (data.registrarDeuda) {
+      return {
+        title: 'Pedido preparado',
+        description: `Se registró una deuda de $${data.totalFinal.toFixed(2)} en la cuenta corriente del cliente.`,
+      };
+    }
+
+    return {
+      title: 'Pedido preparado',
+      description: `El pedido quedó en ${data.estadoDestino} con total de $${data.totalFinal.toFixed(2)}.`,
+    };
+  };
+
   return useMutation({
     mutationFn: async (params: PrepararPedidoParams) => {
       if (!user) throw new Error('Usuario no autenticado');
@@ -157,11 +178,10 @@ export function usePrepararPedido() {
       queryClient.invalidateQueries({ queryKey: ['pedido-historial'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-movimientos'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-saldos'] });
+      const message = getSuccessMessage(data);
       toast({ 
-        title: data.estadoDestino === 'borrador' ? 'Pedido guardado en borrador' : 'Pedido preparado',
-        description: data.registrarDeuda
-          ? `Se registró una deuda de $${data.totalFinal.toFixed(2)} en la cuenta corriente del cliente.`
-          : `El pedido quedó en ${data.estadoDestino} con total de $${data.totalFinal.toFixed(2)}.`
+        title: message.title,
+        description: message.description,
       });
     },
     onError: (error) => {

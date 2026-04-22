@@ -69,8 +69,8 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 // - despachado -> sin acciones desde pedidos (se gestiona en logística)
 // - rechazado -> estado final
 const flujoEstados: Record<string, PedidoEstado[]> = {
-  borrador: ['preparado', 'rechazado'],
-  pendiente: ['preparado', 'rechazado'],
+  borrador: ['rechazado'],
+  pendiente: ['rechazado'],
   preparado: ['rechazado'],
   despachado: [],  // Solo se gestiona desde logística
   rechazado: [],
@@ -326,7 +326,7 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
                         {estadoActual === 'preparado' ? 'Editar Preparación' : 'Preparar Pedido'}
                       </Button>
                     )}
-                    {siguientesEstados.map(estado => {
+                     {siguientesEstados.map(estado => {
                       if (estado === 'rechazado') {
                         return (
                           <Button
@@ -340,7 +340,6 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
                           </Button>
                         );
                       }
-                      if (estado === 'preparado') return null;
                       const config = estadoConfig[estado];
                       const Icon = config?.icon || Package;
                       return (
