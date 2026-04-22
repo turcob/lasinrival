@@ -226,12 +226,12 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
                   {pedido.rendido && pedido.venta_id && (
                     <>
                       <Separator />
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-center gap-2 text-green-700">
+                      <div className="rounded-lg border border-success/20 bg-success/10 p-4">
+                        <div className="flex items-center gap-2 text-success">
                           <CheckCircle className="h-5 w-5" />
                           <span className="font-medium">Pedido rendido</span>
                         </div>
-                        <p className="text-sm text-green-600 mt-1">
+                        <p className="mt-1 text-sm text-success/80">
                           Venta generada el {format(new Date(pedido.fecha_rendicion!), 'dd/MM/yyyy HH:mm', { locale: es })}
                         </p>
                       </div>
