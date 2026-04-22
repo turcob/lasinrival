@@ -38,7 +38,16 @@ export function usePrepararPedido() {
     mutationFn: async (params: PrepararPedidoParams) => {
       if (!user) throw new Error('Usuario no autenticado');
 
-      const { pedidoId, clienteId, numeroPedido, lineas, totalFinal } = params;
+      const {
+        pedidoId,
+        clienteId,
+        numeroPedido,
+        lineas,
+        totalFinal,
+        estadoDestino = 'preparado',
+        registrarDeuda = true,
+        observacionesHistorial,
+      } = params;
 
       // Get current pedido state
       const { data: pedido, error: fetchError } = await supabase
@@ -62,11 +71,11 @@ export function usePrepararPedido() {
         if (updateError) throw updateError;
       }
 
-      // Update pedido with new total and estado = preparado
+      // Update pedido with new total and estado final
       const { error: pedidoUpdateError } = await supabase
         .from('pedidos')
         .update({
-          estado: 'preparado',
+          estado: estadoDestino,
           total: totalFinal,
           subtotal: totalFinal,
         })
@@ -78,25 +87,26 @@ export function usePrepararPedido() {
       await supabase.from('pedido_historial').insert({
         pedido_id: pedidoId,
         estado_anterior: pedido.estado,
-        estado_nuevo: 'preparado',
+        estado_nuevo: estadoDestino,
         usuario_id: user.id,
-        observaciones: `Pedido preparado. Total: $${totalFinal.toFixed(2)}`
+        observaciones: observacionesHistorial ?? `Pedido ${estadoDestino}. Total: $${totalFinal.toFixed(2)}`
       });
 
-      // Register debt in cliente_movimientos (cuenta corriente)
-      const { error: movimientoError } = await supabase
-        .from('cliente_movimientos')
-        .insert({
-          cliente_id: clienteId,
-          tipo: 'compra',
-          monto: totalFinal,
-          concepto: `Remito Pedido #${numeroPedido.toString().padStart(6, '0')}`,
-          usuario_registro_id: user.id,
-        });
+      if (registrarDeuda) {
+        const { error: movimientoError } = await supabase
+          .from('cliente_movimientos')
+          .insert({
+            cliente_id: clienteId,
+            tipo: 'compra',
+            monto: totalFinal,
+            concepto: `Remito Pedido #${numeroPedido.toString().padStart(6, '0')}`,
+            usuario_registro_id: user.id,
+          });
 
-      if (movimientoError) throw movimientoError;
+        if (movimientoError) throw movimientoError;
+      }
 
-      return { success: true, numeroPedido, totalFinal };
+      return { success: true, numeroPedido, totalFinal, estadoDestino, registrarDeuda };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
@@ -105,8 +115,10 @@ export function usePrepararPedido() {
       queryClient.invalidateQueries({ queryKey: ['cliente-movimientos'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-saldos'] });
       toast({ 
-        title: 'Pedido preparado',
-        description: `Se registró una deuda de $${data.totalFinal.toFixed(2)} en la cuenta corriente del cliente.`
+        title: data.estadoDestino === 'borrador' ? 'Pedido guardado en borrador' : 'Pedido preparado',
+        description: data.registrarDeuda
+          ? `Se registró una deuda de $${data.totalFinal.toFixed(2)} en la cuenta corriente del cliente.`
+          : `El pedido quedó en ${data.estadoDestino} con total de $${data.totalFinal.toFixed(2)}.`
       });
     },
     onError: (error) => {
