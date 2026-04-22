@@ -249,6 +249,51 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   const totalFinal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
   const hayDiferencias = lineas.some(l => l.cantidadPreparada !== l.cantidadPedida);
 
+  const buildLineasPayload = useCallback(() => (
+    lineas.filter(l => l.productoId).map(l => ({
+      detalleId: l.detalleId,
+      productoId: l.productoId,
+      codigo: l.codigo,
+      descripcion: l.descripcion,
+      cantidadPedida: l.cantidadPedida,
+      cantidadPreparada: l.cantidadPreparada,
+      precioUnitario: l.precioUnitario,
+      descuentoPorcentaje: l.descuentoPorcentaje,
+      subtotal: l.subtotal,
+    }))
+  ), [lineas]);
+
+  const guardarPedido = useCallback(async () => {
+    if (!pedido) return false;
+
+    const resultado = await prepararPedido.mutateAsync({
+      pedidoId: pedido.id,
+      clienteId: pedido.cliente_id,
+      numeroPedido: pedido.numero_pedido,
+      clienteNombre: pedido.cliente?.nombre || 'Cliente',
+      clienteDireccion: pedido.cliente?.direccion || '',
+      lineas: buildLineasPayload(),
+      totalFinal,
+      estadoDestino: 'pendiente',
+      registrarDeuda: false,
+      observacionesHistorial: `Pedido guardado en pendiente. Total: $${totalFinal.toFixed(2)}`,
+    });
+
+    return !!resultado;
+  }, [pedido, prepararPedido, buildLineasPayload, totalFinal]);
+
+  const goToPrev = useCallback(async () => {
+    if (!canGoPrev || !pedidoIds || !onNavigate || prepararPedido.isPending || totalFinal === 0) return;
+    const ok = await guardarPedido();
+    if (ok) onNavigate(pedidoIds[currentIndex - 1]);
+  }, [canGoPrev, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
+
+  const goToNext = useCallback(async () => {
+    if (!canGoNext || !pedidoIds || !onNavigate || prepararPedido.isPending || totalFinal === 0) return;
+    const ok = await guardarPedido();
+    if (ok) onNavigate(pedidoIds[currentIndex + 1]);
+  }, [canGoNext, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
+
   const handleGuardar = async () => {
     const resultado = await guardarPedido();
     if (resultado) onOpenChange(false);
