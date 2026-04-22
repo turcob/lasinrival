@@ -254,16 +254,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
 
   // Botón calcular - actualiza cantidadPreparada y subtotal
   const handleCalcular = (detalleId: string) => {
-    setLineas(prev => prev.map(l => {
-      if (l.detalleId !== detalleId) return l;
-      
-      const esPorPeso = isProductoPorPeso(l.unidadMedida);
-      const cantidadParsed = parseCantidad(l.inputValue, esPorPeso);
-      const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
-      const subtotal = cantidadParsed * precioConDescuento;
-      
-      return { ...l, cantidadPreparada: cantidadParsed, subtotal };
-    }));
+    setLineas(prev => prev.map(l => (l.detalleId !== detalleId ? l : recalcularLinea(l))));
   };
 
   // Valores derivados del estado
@@ -296,6 +287,72 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     if (resultado) {
       onOpenChange(false);
     }
+  };
+
+  const handleGuardarBorrador = async () => {
+    if (!pedido) return;
+
+    const resultado = await prepararPedido.mutateAsync({
+      pedidoId: pedido.id,
+      clienteId: pedido.cliente_id,
+      numeroPedido: pedido.numero_pedido,
+      clienteNombre: pedido.cliente?.nombre || 'Cliente',
+      clienteDireccion: pedido.cliente?.direccion || '',
+      lineas: lineas.map(l => ({
+        detalleId: l.detalleId,
+        productoId: l.productoId,
+        codigo: l.codigo,
+        descripcion: l.descripcion,
+        cantidadPedida: l.cantidadPedida,
+        cantidadPreparada: l.cantidadPreparada,
+        precioUnitario: l.precioUnitario,
+        descuentoPorcentaje: l.descuentoPorcentaje,
+        subtotal: l.subtotal,
+      })),
+      totalFinal,
+      estadoDestino: 'borrador',
+      registrarDeuda: false,
+      observacionesHistorial: `Pedido guardado como borrador. Total: $${totalFinal.toFixed(2)}`,
+    });
+
+    if (resultado && canGoNext) {
+      goToNext();
+    }
+  };
+
+  const handleImprimirBorrador = () => {
+    if (!pedido) return;
+    imprimirRemito({
+      numeroPedido: pedido.numero_pedido,
+      fecha: new Date(pedido.fecha_pedido),
+      cliente: {
+        nombre: pedido.cliente?.nombre || 'Cliente',
+        codigoCliente: pedido.cliente?.codigo_cliente || undefined,
+        direccion: pedido.cliente?.direccion || '',
+        cuit: pedido.cliente?.dni_cuit || '',
+        zona: pedido.cliente?.zona?.nombre || undefined,
+      },
+      vendedor: undefined,
+      condicionVenta: 'Borrador',
+      total: totalFinal,
+      empresa: config
+        ? {
+            razonSocial: config.nombre_fantasia || config.razon_social,
+            cuit: config.cuit,
+            direccion: config.direccion,
+            telefono: config.telefono || undefined,
+          }
+        : undefined,
+      lineas: lineas.map((l) => ({
+        codigo: l.codigo,
+        descripcion: l.descripcion,
+        unidadMedida: l.unidadMedida,
+        cantidad: l.cantidadPreparada,
+        precioUnitario: l.precioUnitario,
+        descuento: l.descuentoPorcentaje,
+        subtotal: l.subtotal,
+      })),
+    });
   };
 
   if (!open || !pedidoId) return null;
