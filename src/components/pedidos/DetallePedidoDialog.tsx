@@ -13,8 +13,7 @@ import {
   CheckCircle,
   Truck,
   XCircle,
-  RotateCcw,
-  Edit
+  RotateCcw
 } from 'lucide-react';
 import {
   Dialog,
@@ -47,15 +46,15 @@ interface DetallePedidoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPrepararPedido?: (pedidoId: string) => void;
-  onEditarPedido?: (pedidoId: string) => void;
 }
 
 // Configuración visual de estados (incluye legacy para historial)
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
-  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
-  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
+  borrador: { label: 'Borrador', color: 'bg-muted text-muted-foreground', icon: FileText },
+  pendiente: { label: 'Pendiente', color: 'badge-warning', icon: Clock },
+  preparado: { label: 'Preparado', color: 'bg-primary/10 text-primary', icon: Package },
+  despachado: { label: 'Despachado', color: 'badge-success', icon: Truck },
+  rechazado: { label: 'Rechazado', color: 'badge-destructive', icon: XCircle },
   // Legacy para visualización de historial
   confirmado: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
   entregado: { label: 'Entregado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -70,6 +69,7 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 // - despachado -> sin acciones desde pedidos (se gestiona en logística)
 // - rechazado -> estado final
 const flujoEstados: Record<string, PedidoEstado[]> = {
+  borrador: ['preparado', 'rechazado'],
   pendiente: ['preparado', 'rechazado'],
   preparado: ['rechazado'],
   despachado: [],  // Solo se gestiona desde logística
@@ -82,7 +82,7 @@ const flujoEstados: Record<string, PedidoEstado[]> = {
   anulado: [],
 };
 
-export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPedido, onEditarPedido }: DetallePedidoDialogProps) {
+export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPedido }: DetallePedidoDialogProps) {
   const [cambiarEstadoDialog, setCambiarEstadoDialog] = useState<PedidoEstado | null>(null);
 
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
@@ -313,32 +313,17 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
               </ScrollArea>
 
               {/* Acciones */}
-              {(siguientesEstados.length > 0 || estadoActual === 'pendiente') && (
+              {(siguientesEstados.length > 0 || estadoActual === 'pendiente' || estadoActual === 'borrador') && (
                 <div className="border-t p-4">
                   <div className="flex flex-wrap gap-2">
-                    {/* Botón editar pedido pendiente */}
-                    {estadoActual === 'pendiente' && onEditarPedido && pedido && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          onOpenChange(false);
-                          onEditarPedido(pedido.id);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Editar Pedido
-                      </Button>
-                    )}
-                    {/* Botón editar preparación para pedidos ya preparados */}
-                    {estadoActual === 'preparado' && onPrepararPedido && pedido && (
+                    {(estadoActual === 'preparado' || estadoActual === 'pendiente' || estadoActual === 'borrador') && onPrepararPedido && pedido && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onPrepararPedido(pedido.id)}
                       >
                         <Package className="h-4 w-4 mr-1" />
-                        Editar Preparación
+                        {estadoActual === 'preparado' ? 'Editar Preparación' : 'Preparar Pedido'}
                       </Button>
                     )}
                     {siguientesEstados.map(estado => {
