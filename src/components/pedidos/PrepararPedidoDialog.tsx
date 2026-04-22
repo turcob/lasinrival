@@ -57,9 +57,46 @@ const formatCurrency = (value: number) => {
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, onNavigate }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
+  const [busquedaProducto, setBusquedaProducto] = useState('');
   
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
+  const { config } = useConfiguracionComercio();
+
+  const { data: productos } = useQuery({
+    queryKey: ['productos-activos-preparacion'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('productos')
+        .select('id, codigo_articulo, descripcion, precio_costo, stock_actual, marca_id, tipo_producto_id, unidad_medida')
+        .eq('activo', true)
+        .order('descripcion');
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  const { data: listasPrecios } = useQuery({
+    queryKey: ['listas-precios-preparacion'],
+    queryFn: async () => {
+      const { data: listas, error: listasError } = await supabase
+        .from('listas_precios')
+        .select('id, nombre, codigo')
+        .eq('activo', true)
+        .neq('destino', 'paladini');
+      if (listasError) throw listasError;
+
+      const { data: porcentajes, error: porcError } = await supabase.from('lista_precio_porcentajes').select('*');
+      if (porcError) throw porcError;
+
+      const { data: excepciones, error: excError } = await supabase.from('lista_precio_excepciones').select('*');
+      if (excError) throw excError;
+
+      return { listas, porcentajes, excepciones };
+    },
+    enabled: open,
+  });
 
   // Navigation between pedidos
   const currentIndex = pedidoIds && pedidoId ? pedidoIds.indexOf(pedidoId) : -1;
