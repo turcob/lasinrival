@@ -340,23 +340,7 @@ export function DetallePedidoDialog({ pedidoId, open, onOpenChange, onPrepararPe
                           </Button>
                         );
                       }
-                      if (estado === 'preparado') {
-                        return (
-                          <Button
-                            key={estado}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (onPrepararPedido && pedido) {
-                                onPrepararPedido(pedido.id);
-                              }
-                            }}
-                          >
-                            <Package className="h-4 w-4 mr-1" />
-                            Preparar Pedido
-                          </Button>
-                        );
-                      }
+                      if (estado === 'preparado') return null;
                       const config = estadoConfig[estado];
                       const Icon = config?.icon || Package;
                       return (
