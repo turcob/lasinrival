@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight, Plus, Trash2, Printer } from 'lucide-react';
+import { Package, AlertTriangle, X, Calculator, ChevronLeft, ChevronRight, Plus, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -103,17 +103,50 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   const canGoPrev = currentIndex > 0;
   const canGoNext = pedidoIds ? currentIndex < pedidoIds.length - 1 : false;
 
-  const goToPrev = useCallback(() => {
-    if (canGoPrev && pedidoIds && onNavigate) {
-      onNavigate(pedidoIds[currentIndex - 1]);
-    }
-  }, [canGoPrev, pedidoIds, currentIndex, onNavigate]);
+  const buildLineasPayload = useCallback(() => (
+    lineas.filter(l => l.productoId).map(l => ({
+      detalleId: l.detalleId,
+      productoId: l.productoId,
+      codigo: l.codigo,
+      descripcion: l.descripcion,
+      cantidadPedida: l.cantidadPedida,
+      cantidadPreparada: l.cantidadPreparada,
+      precioUnitario: l.precioUnitario,
+      descuentoPorcentaje: l.descuentoPorcentaje,
+      subtotal: l.subtotal,
+    }))
+  ), [lineas]);
 
-  const goToNext = useCallback(() => {
-    if (canGoNext && pedidoIds && onNavigate) {
-      onNavigate(pedidoIds[currentIndex + 1]);
-    }
-  }, [canGoNext, pedidoIds, currentIndex, onNavigate]);
+  const guardarPedido = useCallback(async () => {
+    if (!pedido) return false;
+
+    const resultado = await prepararPedido.mutateAsync({
+      pedidoId: pedido.id,
+      clienteId: pedido.cliente_id,
+      numeroPedido: pedido.numero_pedido,
+      clienteNombre: pedido.cliente?.nombre || 'Cliente',
+      clienteDireccion: pedido.cliente?.direccion || '',
+      lineas: buildLineasPayload(),
+      totalFinal,
+      estadoDestino: 'pendiente',
+      registrarDeuda: false,
+      observacionesHistorial: `Pedido guardado en pendiente. Total: $${totalFinal.toFixed(2)}`,
+    });
+
+    return !!resultado;
+  }, [pedido, prepararPedido, buildLineasPayload, totalFinal]);
+
+  const goToPrev = useCallback(async () => {
+    if (!canGoPrev || !pedidoIds || !onNavigate || prepararPedido.isPending || totalFinal === 0) return;
+    const ok = await guardarPedido();
+    if (ok) onNavigate(pedidoIds[currentIndex - 1]);
+  }, [canGoPrev, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
+
+  const goToNext = useCallback(async () => {
+    if (!canGoNext || !pedidoIds || !onNavigate || prepararPedido.isPending || totalFinal === 0) return;
+    const ok = await guardarPedido();
+    if (ok) onNavigate(pedidoIds[currentIndex + 1]);
+  }, [canGoNext, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
 
   // Keyboard navigation: PageUp / PageDown
   useEffect(() => {
@@ -261,63 +294,9 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   const totalFinal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
   const hayDiferencias = lineas.some(l => l.cantidadPreparada !== l.cantidadPedida);
 
-  const handleConfirmar = async () => {
-    if (!pedido) return;
-
-    const resultado = await prepararPedido.mutateAsync({
-      pedidoId: pedido.id,
-      clienteId: pedido.cliente_id,
-      numeroPedido: pedido.numero_pedido,
-      clienteNombre: pedido.cliente?.nombre || 'Cliente',
-      clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.filter(l => l.productoId).map(l => ({
-        detalleId: l.detalleId,
-        productoId: l.productoId,
-        codigo: l.codigo,
-        descripcion: l.descripcion,
-        cantidadPedida: l.cantidadPedida,
-        cantidadPreparada: l.cantidadPreparada,
-        precioUnitario: l.precioUnitario,
-        descuentoPorcentaje: l.descuentoPorcentaje,
-        subtotal: l.subtotal,
-      })),
-      totalFinal: totalFinal,
-    });
-
-    if (resultado) {
-      onOpenChange(false);
-    }
-  };
-
-  const handleGuardarBorrador = async () => {
-    if (!pedido) return;
-
-    const resultado = await prepararPedido.mutateAsync({
-      pedidoId: pedido.id,
-      clienteId: pedido.cliente_id,
-      numeroPedido: pedido.numero_pedido,
-      clienteNombre: pedido.cliente?.nombre || 'Cliente',
-      clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.filter(l => l.productoId).map(l => ({
-        detalleId: l.detalleId,
-        productoId: l.productoId,
-        codigo: l.codigo,
-        descripcion: l.descripcion,
-        cantidadPedida: l.cantidadPedida,
-        cantidadPreparada: l.cantidadPreparada,
-        precioUnitario: l.precioUnitario,
-        descuentoPorcentaje: l.descuentoPorcentaje,
-        subtotal: l.subtotal,
-      })),
-      totalFinal,
-      estadoDestino: 'borrador',
-      registrarDeuda: false,
-      observacionesHistorial: `Pedido guardado como borrador. Total: $${totalFinal.toFixed(2)}`,
-    });
-
-    if (resultado && canGoNext) {
-      goToNext();
-    }
+  const handleGuardar = async () => {
+    const resultado = await guardarPedido();
+    if (resultado) onOpenChange(false);
   };
 
   const handleImprimirBorrador = () => {
@@ -408,10 +387,10 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                   <p className="text-sm font-medium">Agregar producto</p>
                   <p className="text-xs text-muted-foreground">Buscá por código o descripción para sumarlo al pedido.</p>
                 </div>
-                {pedido?.estado === 'borrador' && (
+                 {pedido?.estado === 'pendiente' && (
                   <Button variant="outline" onClick={handleImprimirBorrador}>
                     <Printer className="mr-2 h-4 w-4" />
-                    Imprimir borrador
+                     Imprimir pedido
                   </Button>
                 )}
               </div>
@@ -600,25 +579,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               </Button>
               <Button 
                 variant="outline"
-                onClick={handleGuardarBorrador}
+                onClick={handleGuardar}
                 disabled={prepararPedido.isPending || totalFinal === 0}
                 size="lg"
-              >
-                Guardar borrador
-              </Button>
-              <Button 
-                onClick={handleConfirmar}
-                disabled={prepararPedido.isPending || totalFinal === 0}
-                size="lg"
-                className="min-w-[200px]"
               >
                 {prepararPedido.isPending ? (
-                  <>Procesando...</>
+                  <>Guardando...</>
                 ) : (
-                  <>
-                    <Check className="h-5 w-5 mr-2" />
-                    Confirmar
-                  </>
+                  <>Guardar</>
                 )}
               </Button>
             </div>
