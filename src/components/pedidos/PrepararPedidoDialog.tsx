@@ -583,7 +583,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               <Separator orientation="vertical" className="h-12 hidden md:block" />
               <div>
                 <p className="text-sm text-muted-foreground">Nuevo Total</p>
-                <p className={`text-2xl font-bold ${hayDiferencias ? 'text-amber-700' : 'text-primary'}`}>
+                <p className={`text-2xl font-bold ${hayDiferencias ? 'text-warning' : 'text-primary'}`}>
                   {formatCurrency(totalFinal)}
                 </p>
                 {hayDiferencias && (
@@ -594,9 +594,17 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3 justify-end">
               <Button variant="outline" onClick={() => onOpenChange(false)} size="lg">
                 Cancelar
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={handleGuardarBorrador}
+                disabled={prepararPedido.isPending || totalFinal === 0}
+                size="lg"
+              >
+                Guardar borrador
               </Button>
               <Button 
                 onClick={handleConfirmar}
