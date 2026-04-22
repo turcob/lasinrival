@@ -79,7 +79,7 @@ export default function Pedidos() {
 function PedidosContent() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
+  const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('borrador');
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
