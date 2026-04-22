@@ -58,17 +58,60 @@ export function usePrepararPedido() {
 
       if (fetchError) throw fetchError;
 
-      // Update each pedido_detalle with cantidad_entregada (prepared quantity)
-      for (const linea of lineas) {
+      const { data: detallesActuales, error: detallesActualesError } = await supabase
+        .from('pedido_detalles')
+        .select('id')
+        .eq('pedido_id', pedidoId);
+
+      if (detallesActualesError) throw detallesActualesError;
+
+      const idsActuales = new Set((detallesActuales || []).map((detalle) => detalle.id));
+      const lineasExistentes = lineas.filter((linea) => linea.detalleId && !linea.detalleId.startsWith('nuevo-'));
+      const lineasNuevas = lineas.filter((linea) => linea.detalleId.startsWith('nuevo-'));
+      const idsConservados = new Set(lineasExistentes.map((linea) => linea.detalleId));
+      const idsEliminados = [...idsActuales].filter((id) => !idsConservados.has(id));
+
+      if (idsEliminados.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('pedido_detalles')
+          .delete()
+          .in('id', idsEliminados);
+
+        if (deleteError) throw deleteError;
+      }
+
+      for (const linea of lineasExistentes) {
         const { error: updateError } = await supabase
           .from('pedido_detalles')
           .update({
+            cantidad_pedida: linea.cantidadPreparada,
             cantidad_entregada: linea.cantidadPreparada,
+            precio_unitario: linea.precioUnitario,
+            descuento_porcentaje: linea.descuentoPorcentaje,
             subtotal: linea.subtotal,
           })
           .eq('id', linea.detalleId);
 
         if (updateError) throw updateError;
+      }
+
+      if (lineasNuevas.length > 0) {
+        const { error: insertDetallesError } = await supabase
+          .from('pedido_detalles')
+          .insert(
+            lineasNuevas.map((linea) => ({
+              pedido_id: pedidoId,
+              producto_id: linea.productoId,
+              cantidad_pedida: linea.cantidadPreparada,
+              cantidad_entregada: linea.cantidadPreparada,
+              cantidad_devuelta: 0,
+              precio_unitario: linea.precioUnitario,
+              descuento_porcentaje: linea.descuentoPorcentaje,
+              subtotal: linea.subtotal,
+            }))
+          );
+
+        if (insertDetallesError) throw insertDetallesError;
       }
 
       // Update pedido with new total and estado final
