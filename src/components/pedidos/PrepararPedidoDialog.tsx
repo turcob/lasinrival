@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight, Plus, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePedido, type PedidoDetalle } from '@/hooks/usePedidos';
 import { usePrepararPedido } from '@/hooks/usePrepararPedido';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { obtenerPrecioVentaProducto } from '@/lib/precioUtils';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirRemito } from '@/lib/imprimirRemito';
 
 
 interface PrepararPedidoDialogProps {
@@ -28,6 +33,7 @@ interface LineaPreparacion {
   subtotal: number; // valor calculado
   precioUnitario: number;
   descuentoPorcentaje: number;
+  esNuevo?: boolean;
 }
 
 const isProductoPorPeso = (unidadMedida: string) => {
@@ -51,9 +57,46 @@ const formatCurrency = (value: number) => {
 
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, onNavigate }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
+  const [busquedaProducto, setBusquedaProducto] = useState('');
   
   const { data: pedido, isLoading } = usePedido(pedidoId || undefined);
   const prepararPedido = usePrepararPedido();
+  const { config } = useConfiguracionComercio();
+
+  const { data: productos } = useQuery({
+    queryKey: ['productos-activos-preparacion'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('productos')
+        .select('id, codigo_articulo, descripcion, precio_costo, stock_actual, marca_id, tipo_producto_id, unidad_medida')
+        .eq('activo', true)
+        .order('descripcion');
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  const { data: listasPrecios } = useQuery({
+    queryKey: ['listas-precios-preparacion'],
+    queryFn: async () => {
+      const { data: listas, error: listasError } = await supabase
+        .from('listas_precios')
+        .select('id, nombre, codigo')
+        .eq('activo', true)
+        .neq('destino', 'paladini');
+      if (listasError) throw listasError;
+
+      const { data: porcentajes, error: porcError } = await supabase.from('lista_precio_porcentajes').select('*');
+      if (porcError) throw porcError;
+
+      const { data: excepciones, error: excError } = await supabase.from('lista_precio_excepciones').select('*');
+      if (excError) throw excError;
+
+      return { listas, porcentajes, excepciones };
+    },
+    enabled: open,
+  });
 
   // Navigation between pedidos
   const currentIndex = pedidoIds && pedidoId ? pedidoIds.indexOf(pedidoId) : -1;
@@ -134,6 +177,70 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     }));
   };
 
+  const recalcularLinea = useCallback((linea: LineaPreparacion) => {
+    const esPorPeso = isProductoPorPeso(linea.unidadMedida);
+    const cantidadParsed = parseCantidad(linea.inputValue, esPorPeso);
+    const precioConDescuento = linea.precioUnitario * (1 - linea.descuentoPorcentaje / 100);
+    return {
+      ...linea,
+      cantidadPreparada: cantidadParsed,
+      subtotal: cantidadParsed * precioConDescuento,
+    };
+  }, []);
+
+  const calcularPrecioProducto = useCallback((producto: any) => {
+    const listaId = pedido?.lista_precio_id || listasPrecios?.listas?.[0]?.id;
+    if (!listaId || !listasPrecios) return producto.precio_costo;
+    return obtenerPrecioVentaProducto(
+      {
+        id: producto.id,
+        precio_costo: producto.precio_costo,
+        marca_id: producto.marca_id,
+        tipo_producto_id: producto.tipo_producto_id,
+      },
+      listaId,
+      listasPrecios.porcentajes || [],
+      listasPrecios.excepciones || []
+    ).precioVenta;
+  }, [listasPrecios, pedido?.lista_precio_id]);
+
+  const productosFiltrados = useMemo(() => {
+    if (!busquedaProducto || !productos) return [];
+    const term = busquedaProducto.toLowerCase();
+    return productos
+      .filter((p) =>
+        p.codigo_articulo.toLowerCase().includes(term) ||
+        p.descripcion.toLowerCase().includes(term)
+      )
+      .filter((p) => !lineas.some((l) => l.productoId === p.id))
+      .slice(0, 10);
+  }, [busquedaProducto, productos, lineas]);
+
+  const agregarProducto = (producto: any) => {
+    const esPorPeso = isProductoPorPeso(producto.unidad_medida || 'UN');
+    const precio = calcularPrecioProducto(producto);
+    const nuevaLinea = recalcularLinea({
+      detalleId: `nuevo-${producto.id}`,
+      productoId: producto.id,
+      codigo: producto.codigo_articulo,
+      descripcion: producto.descripcion,
+      unidadMedida: producto.unidad_medida || 'UN',
+      cantidadPedida: 1,
+      inputValue: formatCantidadInicial(1, esPorPeso),
+      cantidadPreparada: 1,
+      subtotal: precio,
+      precioUnitario: precio,
+      descuentoPorcentaje: 0,
+      esNuevo: true,
+    });
+    setLineas((prev) => [...prev, nuevaLinea]);
+    setBusquedaProducto('');
+  };
+
+  const eliminarLinea = (detalleId: string) => {
+    setLineas((prev) => prev.filter((l) => l.detalleId !== detalleId));
+  };
+
   const handleDescuentoChange = (detalleId: string, value: string) => {
     const num = parseFloat(value);
     if (isNaN(num) || num < 0) return;
@@ -147,16 +254,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
 
   // Botón calcular - actualiza cantidadPreparada y subtotal
   const handleCalcular = (detalleId: string) => {
-    setLineas(prev => prev.map(l => {
-      if (l.detalleId !== detalleId) return l;
-      
-      const esPorPeso = isProductoPorPeso(l.unidadMedida);
-      const cantidadParsed = parseCantidad(l.inputValue, esPorPeso);
-      const precioConDescuento = l.precioUnitario * (1 - l.descuentoPorcentaje / 100);
-      const subtotal = cantidadParsed * precioConDescuento;
-      
-      return { ...l, cantidadPreparada: cantidadParsed, subtotal };
-    }));
+    setLineas(prev => prev.map(l => (l.detalleId !== detalleId ? l : recalcularLinea(l))));
   };
 
   // Valores derivados del estado
@@ -172,7 +270,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
       numeroPedido: pedido.numero_pedido,
       clienteNombre: pedido.cliente?.nombre || 'Cliente',
       clienteDireccion: pedido.cliente?.direccion || '',
-      lineas: lineas.map(l => ({
+      lineas: lineas.filter(l => l.productoId).map(l => ({
         detalleId: l.detalleId,
         productoId: l.productoId,
         codigo: l.codigo,
@@ -189,6 +287,72 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     if (resultado) {
       onOpenChange(false);
     }
+  };
+
+  const handleGuardarBorrador = async () => {
+    if (!pedido) return;
+
+    const resultado = await prepararPedido.mutateAsync({
+      pedidoId: pedido.id,
+      clienteId: pedido.cliente_id,
+      numeroPedido: pedido.numero_pedido,
+      clienteNombre: pedido.cliente?.nombre || 'Cliente',
+      clienteDireccion: pedido.cliente?.direccion || '',
+      lineas: lineas.filter(l => l.productoId).map(l => ({
+        detalleId: l.detalleId,
+        productoId: l.productoId,
+        codigo: l.codigo,
+        descripcion: l.descripcion,
+        cantidadPedida: l.cantidadPedida,
+        cantidadPreparada: l.cantidadPreparada,
+        precioUnitario: l.precioUnitario,
+        descuentoPorcentaje: l.descuentoPorcentaje,
+        subtotal: l.subtotal,
+      })),
+      totalFinal,
+      estadoDestino: 'borrador',
+      registrarDeuda: false,
+      observacionesHistorial: `Pedido guardado como borrador. Total: $${totalFinal.toFixed(2)}`,
+    });
+
+    if (resultado && canGoNext) {
+      goToNext();
+    }
+  };
+
+  const handleImprimirBorrador = () => {
+    if (!pedido) return;
+    imprimirRemito({
+      numeroPedido: pedido.numero_pedido,
+      fecha: new Date(pedido.fecha_pedido),
+      cliente: {
+        nombre: pedido.cliente?.nombre || 'Cliente',
+        codigoCliente: pedido.cliente?.codigo_cliente || undefined,
+        direccion: pedido.cliente?.direccion || '',
+        cuit: pedido.cliente?.dni_cuit || '',
+        zona: pedido.cliente?.zona?.nombre || undefined,
+      },
+      vendedor: undefined,
+      condicionVenta: 'Borrador',
+      total: totalFinal,
+      empresa: config
+        ? {
+            razonSocial: config.nombre_fantasia || config.razon_social,
+            cuit: config.cuit,
+            direccion: config.direccion,
+            telefono: config.telefono || undefined,
+          }
+        : undefined,
+      lineas: lineas.filter((l) => l.productoId).map((l) => ({
+        codigo: l.codigo,
+        descripcion: l.descripcion,
+        unidadMedida: l.unidadMedida,
+        cantidad: l.cantidadPreparada,
+        precioUnitario: l.precioUnitario,
+        descuento: l.descuentoPorcentaje,
+        subtotal: l.subtotal,
+      })),
+    });
   };
 
   if (!open || !pedidoId) return null;
@@ -237,7 +401,46 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
         </div>
       ) : (
         <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="mx-auto max-w-4xl space-y-4">
+            <div className="rounded-lg border bg-card p-4 space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-medium">Agregar producto</p>
+                  <p className="text-xs text-muted-foreground">Buscá por código o descripción para sumarlo al pedido.</p>
+                </div>
+                {pedido?.estado === 'borrador' && (
+                  <Button variant="outline" onClick={handleImprimirBorrador}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir borrador
+                  </Button>
+                )}
+              </div>
+              <div className="relative">
+                <Input
+                  placeholder="Buscar producto..."
+                  value={busquedaProducto}
+                  onChange={(e) => setBusquedaProducto(e.target.value)}
+                />
+                {productosFiltrados.length > 0 && (
+                  <div className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover shadow-md">
+                    {productosFiltrados.map((producto) => (
+                      <button
+                        key={producto.id}
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent"
+                        onClick={() => agregarProducto(producto)}
+                      >
+                        <div>
+                          <p className="font-mono text-xs text-muted-foreground">{producto.codigo_articulo}</p>
+                          <p className="text-sm font-medium">{producto.descripcion}</p>
+                        </div>
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             {lineas.map((linea) => {
               const esPorPeso = isProductoPorPeso(linea.unidadMedida);
               const esMenor = linea.cantidadPreparada < linea.cantidadPedida;
@@ -248,8 +451,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                 <div 
                   key={linea.detalleId}
                   className={`p-4 rounded-lg border-2 transition-colors ${
-                    esMayor ? 'border-blue-400 bg-blue-50' : 
-                    esMenor ? 'border-amber-400 bg-amber-50' : 
+                    esMayor ? 'border-primary bg-primary/5' : 
+                    esMenor ? 'border-warning bg-warning/10' : 
                     'border-border bg-card'
                   }`}
                 >
@@ -261,12 +464,9 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                         {esPorPeso && (
                           <Badge variant="outline" className="text-xs">Por Peso</Badge>
                         )}
-                        {esMayor && (
-                          <Badge className="text-xs bg-blue-500 text-white">+Mayor</Badge>
-                        )}
-                        {esMenor && (
-                          <Badge className="text-xs bg-amber-500 text-white">-Menor</Badge>
-                        )}
+                          {esMayor && <Badge className="text-xs bg-primary text-primary-foreground">+Mayor</Badge>}
+                          {esMenor && <Badge className="text-xs bg-warning text-warning-foreground">-Menor</Badge>}
+                          {linea.esNuevo && <Badge variant="outline" className="text-xs">Nuevo</Badge>}
                       </div>
                       <p className="font-medium truncate">{linea.descripcion}</p>
                       <div className="flex items-center gap-3 mt-1">
@@ -322,8 +522,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                               }
                             }}
                             className={`w-28 text-center font-medium text-lg ${
-                              esMayor ? 'border-blue-500 bg-blue-50' :
-                              esMenor ? 'border-amber-500 bg-amber-50' : ''
+                              esMayor ? 'border-primary bg-primary/5' :
+                              esMenor ? 'border-warning bg-warning/10' : ''
                             }`}
                           />
                           <Button
@@ -341,10 +541,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                       <div className="text-right min-w-[120px]">
                         <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
                         <p className={`font-bold text-lg ${
-                          esMayor ? 'text-blue-700' : esMenor ? 'text-amber-700' : ''
+                          esMayor ? 'text-primary' : esMenor ? 'text-warning' : ''
                         }`}>
                           {formatCurrency(linea.subtotal)}
                         </p>
+                        <Button variant="ghost" size="sm" className="mt-2" onClick={() => eliminarLinea(linea.detalleId)}>
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          Eliminar
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -359,11 +563,11 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
       <div className="border-t bg-card px-6 py-4">
         <div className="max-w-4xl mx-auto">
           {hayDiferencias && (
-            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 p-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
               <div className="text-sm">
-                <p className="font-medium text-amber-800">Preparación parcial</p>
-                <p className="text-amber-700">
+                <p className="font-medium text-warning">Preparación parcial</p>
+                <p className="text-warning/80">
                   Algunos productos tienen cantidades menores a las pedidas. El total se ajustará automáticamente.
                 </p>
               </div>
@@ -379,7 +583,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               <Separator orientation="vertical" className="h-12 hidden md:block" />
               <div>
                 <p className="text-sm text-muted-foreground">Nuevo Total</p>
-                <p className={`text-2xl font-bold ${hayDiferencias ? 'text-amber-700' : 'text-primary'}`}>
+                <p className={`text-2xl font-bold ${hayDiferencias ? 'text-warning' : 'text-primary'}`}>
                   {formatCurrency(totalFinal)}
                 </p>
                 {hayDiferencias && (
@@ -390,9 +594,17 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3 justify-end">
               <Button variant="outline" onClick={() => onOpenChange(false)} size="lg">
                 Cancelar
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={handleGuardarBorrador}
+                disabled={prepararPedido.isPending || totalFinal === 0}
+                size="lg"
+              >
+                Guardar borrador
               </Button>
               <Button 
                 onClick={handleConfirmar}

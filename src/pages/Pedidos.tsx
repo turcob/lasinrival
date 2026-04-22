@@ -15,8 +15,11 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
-  PackageSearch
+  PackageSearch,
+  Printer
 } from 'lucide-react';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirRemito } from '@/lib/imprimirRemito';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -50,18 +53,19 @@ import { SelectorTipoPedidoDialog } from '@/components/pedidos/SelectorTipoPedid
 import { TipoPedidoSelector, TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
 
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  preparado: { label: 'Preparado', color: 'bg-blue-100 text-blue-800', icon: Package },
-  despachado: { label: 'Despachado', color: 'bg-green-100 text-green-800', icon: Truck },
-  rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800', icon: XCircle },
-  confirmado: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
-  entregado: { label: 'Entregado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  parcial: { label: 'Parcial', color: 'bg-orange-100 text-orange-800', icon: AlertTriangle },
-  devuelto: { label: 'Devuelto', color: 'bg-red-100 text-red-100', icon: RotateCcw },
-  anulado: { label: 'Anulado', color: 'bg-gray-100 text-gray-800', icon: XCircle },
+  borrador: { label: 'Borrador', color: 'bg-muted text-muted-foreground', icon: Clock },
+  pendiente: { label: 'Pendiente', color: 'badge-warning', icon: Clock },
+  preparado: { label: 'Preparado', color: 'bg-primary/10 text-primary', icon: Package },
+  despachado: { label: 'Despachado', color: 'badge-success', icon: Truck },
+  rechazado: { label: 'Rechazado', color: 'badge-destructive', icon: XCircle },
+  confirmado: { label: 'Confirmado', color: 'bg-primary/10 text-primary', icon: CheckCircle },
+  entregado: { label: 'Entregado', color: 'badge-success', icon: CheckCircle },
+  parcial: { label: 'Parcial', color: 'badge-warning', icon: AlertTriangle },
+  devuelto: { label: 'Devuelto', color: 'badge-destructive', icon: RotateCcw },
+  anulado: { label: 'Anulado', color: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
-const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
+const estadosActivos: PedidoEstado[] = ['borrador', 'pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
   return (
@@ -81,6 +85,7 @@ function PedidosContent() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const { config } = useConfiguracionComercio();
 
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
@@ -149,6 +154,40 @@ function PedidosContent() {
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
+
+  const handleImprimirPedido = (pedido: any) => {
+    imprimirRemito({
+      numeroPedido: pedido.numero_pedido,
+      fecha: new Date(pedido.fecha_pedido),
+      cliente: {
+        nombre: pedido.cliente?.nombre || 'Cliente',
+        codigoCliente: pedido.cliente?.codigo_cliente || undefined,
+        direccion: pedido.cliente?.direccion || '',
+        cuit: pedido.cliente?.dni_cuit || '',
+        zona: pedido.cliente?.zona?.nombre || undefined,
+      },
+      vendedor: pedido.vendedor ? `[${pedido.vendedor.codigo}] ${pedido.vendedor.nombre}` : undefined,
+      condicionVenta: pedido.estado === 'borrador' ? 'Borrador' : undefined,
+      total: pedido.total,
+      empresa: config
+        ? {
+            razonSocial: config.nombre_fantasia || config.razon_social,
+            cuit: config.cuit,
+            direccion: config.direccion,
+            telefono: config.telefono || undefined,
+          }
+        : undefined,
+      lineas: (pedido.detalles || []).map((d: any) => ({
+        codigo: d.producto?.codigo_articulo || '',
+        descripcion: d.producto?.descripcion || 'Producto',
+        unidadMedida: d.producto?.unidad_medida || 'UN',
+        cantidad: d.cantidad_pedida,
+        precioUnitario: d.precio_unitario,
+        descuento: d.descuento_porcentaje || 0,
+        subtotal: d.subtotal,
+      })),
+    });
+  };
 
   return (
     <MainLayout>
@@ -352,13 +391,24 @@ function PedidosContent() {
                               {formatCurrency(pedido.total)}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); setPedidoSeleccionado(pedido.id); }}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                {pedido.estado === 'borrador' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); handleImprimirPedido(pedido); }}
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); setPedidoSeleccionado(pedido.id); }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                           {isExpanded && detallesVisibles && detallesVisibles.length > 0 && (
@@ -425,10 +475,6 @@ function PedidosContent() {
         onPrepararPedido={(pedidoId) => {
           setPedidoSeleccionado(null);
           setPrepararPedidoId(pedidoId);
-        }}
-        onEditarPedido={(pedidoId) => {
-          setPedidoSeleccionado(null);
-          setEditarPedidoId(pedidoId);
         }}
       />
 

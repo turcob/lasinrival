@@ -1,0 +1,1 @@
+ALTER TYPE public.pedido_estado ADD VALUE IF NOT EXISTS 'borrador' BEFORE 'pendiente';
