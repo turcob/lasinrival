@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Package, AlertTriangle, X, Check, Calculator, ChevronLeft, ChevronRight, Plus, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePedido, type PedidoDetalle } from '@/hooks/usePedidos';
 import { usePrepararPedido } from '@/hooks/usePrepararPedido';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { obtenerPrecioVentaProducto } from '@/lib/precioUtils';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
+import { imprimirRemito } from '@/lib/imprimirRemito';
 
 
 interface PrepararPedidoDialogProps {
