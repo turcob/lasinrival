@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Estados activos del sistema de pedidos
 export type PedidoEstado = 
+  | 'borrador'
   | 'pendiente' 
   | 'preparado' 
   | 'despachado' 
