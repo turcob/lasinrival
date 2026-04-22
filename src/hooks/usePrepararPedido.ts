@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { PedidoEstado } from '@/hooks/usePedidos';
 
 interface LineaPreparacion {
   detalleId: string;
@@ -23,6 +24,9 @@ interface PrepararPedidoParams {
   clienteDireccion: string;
   lineas: LineaPreparacion[];
   totalFinal: number;
+  estadoDestino?: PedidoEstado;
+  registrarDeuda?: boolean;
+  observacionesHistorial?: string;
 }
 
 export function usePrepararPedido() {
