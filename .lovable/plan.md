@@ -1,41 +1,74 @@
 
+Objetivo
 
-## Plan: Sync automático de listas de precios a Paladini-Pedidos
+Volver al flujo original basado en "pendiente", pero conservando la edición dentro de "Preparar pedido" y trasladando la confirmación final al Consolidado.
 
-### Contexto
-- **Este proyecto (La Sin Rival)** tiene listas de precios con sistema matricial (porcentajes por marca, tipo, excepciones).
-- **Paladini-Pedidos** tiene su propia tabla `price_lists` con campos simples: `name` y `surcharge_percentage`.
-- Paladini ya se conecta a Sin Rival via edge function (`sync-order-sinrival`) usando secrets `SINRIVAL_SUPABASE_URL` y `SINRIVAL_SERVICE_ROLE_KEY`.
-- La sincronización será **de Sin Rival hacia Paladini**, ya que acá es donde se gestionan las listas.
+Lo que entendí
 
-### Cambios
+1. No querés usar más el estado "borrador" para este flujo.
+2. Cuando abrís un pedido desde "Preparar pedido", hacés cambios y presionás "Guardar", el pedido debe seguir en estado "pendiente".
+3. Si cambiás de pedido con Av Pág / Re Pág, también debe guardar esos cambios y dejar el pedido en "pendiente".
+4. Dentro de la pantalla de preparación ya no querés un botón "Confirmar" por pedido. Debe quedar solo "Guardar".
+5. La confirmación debe hacerse en el módulo "Consolidado", con un botón que confirme pedidos en lote.
+6. En otras palabras:
+   - Preparación = editar y guardar cambios
+   - Consolidado = confirmar pedidos de una vez
+   - Logística = sigue manejando despacho y entrega
 
-**1. Migración de base de datos** (tabla `listas_precios`)
-- Agregar columna `destino` (`text`, default `'sin_rival'`). Valores: `'sin_rival'`, `'paladini'`, `'ambos'`.
+Cambios a implementar
 
-**2. Crear edge function `sync-lista-precios-paladini`**
-- Recibe `lista_id`, `action` (`upsert` o `delete`)
-- Se conecta a la base de Paladini usando secrets `PALADINI_SUPABASE_URL` y `PALADINI_SERVICE_ROLE_KEY` (se necesitarán configurar)
-- Para `upsert`: busca en `price_lists` de Paladini por nombre, hace insert o update con `name` y `surcharge_percentage` (usando el porcentaje general de la lista)
-- Para `delete`: elimina la lista correspondiente en Paladini
+1. Preparar Pedido
+- Reemplazar la lógica actual de "Guardar borrador" por un simple "Guardar".
+- Ese guardado actualizará líneas, cantidades, precios, descuentos y total, pero mantendrá `estado = pendiente`.
+- Al navegar entre pedidos con PageDown/PageUp o botones Anterior/Siguiente, se guardarán automáticamente los cambios antes de pasar al siguiente pedido.
+- Quitar el botón de confirmación individual del diálogo de preparación.
 
-**3. Configurar secrets necesarios**
-- `PALADINI_SUPABASE_URL` — URL del proyecto Paladini-Pedidos
-- `PALADINI_SERVICE_ROLE_KEY` — Service Role Key del proyecto Paladini-Pedidos
+2. Hook de guardado
+- Ajustar `usePrepararPedido` para soportar un guardado de edición sin pasar a `preparado`.
+- Separar claramente dos comportamientos:
+  - Guardar edición: persiste cambios y deja el pedido en `pendiente`
+  - Confirmar masivo: cambia de `pendiente` a `preparado`
+- Evitar registrar deuda o movimientos financieros durante el guardado desde preparación.
 
-**4. Modificar `src/pages/ListasPrecios.tsx`**
-- Agregar campo `Select` con destino (La Sin Rival / Paladini Pedidos / Ambos) en el formulario de crear/editar
-- Incluir `destino` en el state, `dataToSave`, y `openEditListaDialog`
-- Mostrar badge con destino en la lista de listas de precios
-- Después de guardar, si destino es `'paladini'` o `'ambos'`, invocar la edge function `sync-lista-precios-paladini` para sincronizar automáticamente
-- Al eliminar una lista, si tenía destino paladini/ambos, invocar el delete en la edge function
+3. Detalle del pedido
+- Mantener el acceso a "Preparar Pedido", pero alineado al nuevo flujo.
+- Revisar textos y acciones para que no aparezcan referencias a borrador ni confirmación individual innecesaria.
 
-### Mapeo de datos
-La tabla `price_lists` de Paladini solo tiene `name` y `surcharge_percentage`. Se mapeará:
-- `name` ← `nombre` de la lista en Sin Rival
-- `surcharge_percentage` ← porcentaje **general** (`es_general = true`) de la matriz de esa lista
+4. Consolidado
+- Agregar/ajustar el botón principal de confirmación para que sea el lugar donde se pasan pedidos de `pendiente` a `preparado`.
+- Mantener la confirmación masiva sobre pedidos filtrados/seleccionados.
+- Revisar si el botón actual debe renombrarse a algo más claro como "Confirmar pedidos" para que quede explícito que ahí ocurre la confirmación final.
 
-### Detalle técnico
-- La edge function usa `createClient` de Supabase con la service role key de Paladini para hacer CRUD directo en su tabla `price_lists`
-- Se necesitan 2 secrets nuevos del proyecto Paladini (URL y service role key)
+5. Pantalla de Pedidos
+- Cambiar el filtro por defecto nuevamente a `pendiente`.
+- Quitar del listado las referencias visuales y lógicas pensadas para `borrador`.
+- Revisar badges, contadores y acciones para que el flujo visible vuelva a ser: pendiente, preparado, despachado, rechazado.
 
+6. Limpieza del flujo "borrador"
+- No usar más `borrador` en UI, navegación, textos, toasts ni acciones.
+- Por seguridad, dejar el valor en base de datos sin usar por ahora, en vez de eliminarlo inmediatamente. Así evitamos una migración riesgosa y rompimientos en datos ya creados.
+- Si después querés, se puede hacer una segunda etapa de limpieza total del estado borrador.
+
+Archivos a tocar
+
+- `src/components/pedidos/PrepararPedidoDialog.tsx`
+- `src/hooks/usePrepararPedido.ts`
+- `src/components/pedidos/DetallePedidoDialog.tsx`
+- `src/components/pedidos/ConsolidadoPedidos.tsx`
+- `src/pages/Pedidos.tsx`
+- posiblemente `src/hooks/useConsolidadoPedidos.ts` para ajustar textos/comportamiento de confirmación masiva
+
+Resultado esperado
+
+- Editás un pedido desde "Preparar Pedido".
+- Tocás cantidades, agregás o quitás productos.
+- Presionás "Guardar" y el pedido sigue en "pendiente".
+- Si pasás al siguiente pedido, se guarda y el actual también queda "pendiente".
+- No existe más "Confirmar" dentro de cada pedido.
+- En "Consolidado" confirmás todos juntos y recién ahí pasan a "preparado".
+
+Detalle técnico
+
+- No hace falta un cambio de estructura de base de datos para resolver esto.
+- El cambio principal es de flujo de UI y de mutaciones.
+- El valor `borrador` puede quedar existente en el enum pero sin uso funcional, que es la opción más segura en esta etapa.
