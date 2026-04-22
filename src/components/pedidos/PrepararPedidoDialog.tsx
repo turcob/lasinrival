@@ -103,22 +103,6 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   const canGoPrev = currentIndex > 0;
   const canGoNext = pedidoIds ? currentIndex < pedidoIds.length - 1 : false;
 
-  // Keyboard navigation: PageUp / PageDown
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'PageDown') {
-        e.preventDefault();
-        goToNext();
-      } else if (e.key === 'PageUp') {
-        e.preventDefault();
-        goToPrev();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, goToNext, goToPrev]);
-
   // Initialize lines when dialog opens
   useEffect(() => {
     if (open && pedido?.detalles) {
@@ -293,6 +277,22 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     const ok = await guardarPedido();
     if (ok) onNavigate(pedidoIds[currentIndex + 1]);
   }, [canGoNext, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
+
+  // Keyboard navigation: PageUp / PageDown
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'PageDown') {
+        e.preventDefault();
+        goToNext();
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        goToPrev();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, goToNext, goToPrev]);
 
   const handleGuardar = async () => {
     const resultado = await guardarPedido();
