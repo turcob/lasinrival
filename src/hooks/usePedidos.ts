@@ -2,20 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Database } from '@/integrations/supabase/types';
 
-// Estados activos del sistema de pedidos
-export type PedidoEstado = 
-  | 'borrador'
-  | 'pendiente' 
-  | 'preparado' 
-  | 'despachado' 
-  | 'rechazado'
-  // Estados legacy (solo para historial)
-  | 'confirmado'
-  | 'entregado' 
-  | 'parcial' 
-  | 'devuelto' 
-  | 'anulado';
+type PedidoEstadoDb = Database['public']['Enums']['pedido_estado'];
+
+// Estados del sistema de pedidos
+export type PedidoEstado = PedidoEstadoDb;
 
 export type TipoPedido = 'web' | 'reparto';
 
