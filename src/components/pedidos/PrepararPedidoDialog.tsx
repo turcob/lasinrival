@@ -235,9 +235,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   };
 
   const handleDescuentoChange = (detalleId: string, value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num) || num < 0) return;
-    const descuento = Math.min(100, num);
+    // Permitir vacío (se toma como 0) y aceptar tanto "." como "," como separador decimal
+    const normalized = value.replace(',', '.').trim();
+    let descuento = 0;
+    if (normalized !== '') {
+      const num = parseFloat(normalized);
+      if (isNaN(num) || num < 0) return;
+      descuento = Math.min(100, num);
+    }
     setLineas(prev => prev.map(l => {
       if (l.detalleId !== detalleId) return l;
       const precioConDescuento = l.precioUnitario * (1 - descuento / 100);
@@ -497,11 +502,10 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-muted-foreground">Dto:</span>
                           <Input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            max="100"
-                            value={linea.descuentoPorcentaje}
+                            type="text"
+                            inputMode="decimal"
+                            value={linea.descuentoPorcentaje === 0 ? '' : String(linea.descuentoPorcentaje)}
+                            placeholder="0"
                             onChange={(e) => handleDescuentoChange(linea.detalleId, e.target.value)}
                             className="w-16 h-7 text-sm text-right"
                           />
