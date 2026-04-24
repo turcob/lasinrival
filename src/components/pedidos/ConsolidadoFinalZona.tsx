@@ -42,7 +42,7 @@ import {
   type PedidoConsolidado,
   type DetalleConsolidado,
 } from '@/hooks/useConsolidadoPedidos';
-import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
+import { generarRemitoHTML, REMITO_STYLES, buildRemitoOrientationToolbar } from '@/lib/imprimirRemito';
 import { useTipoPedido } from '@/contexts/TipoPedidoContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 
@@ -307,10 +307,10 @@ export function ConsolidadoFinalZona() {
     ventana.document.write(`
       <!DOCTYPE html>
       <html><head><title>Remitos - Zona ${zonaNombre}</title>
-      <style>${REMITO_STYLES}</style>
+      <style id="remito-styles">${REMITO_STYLES}</style>
       </head><body>
         ${remitosHTML}
-        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir Remitos</button>
+        ${buildRemitoOrientationToolbar('landscape')}
       </body></html>
     `);
     ventana.document.close();
