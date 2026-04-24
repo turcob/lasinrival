@@ -242,17 +242,22 @@ export function RendicionHojaRutaDialog({
     const formatCurrency = (v: number) =>
       new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-    const filaCobros = cobros.map((c, i) => `
-      <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
-        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.forma_pago?.nombre || '-'}</td>
-        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.pedido?.numero_pedido ? '#' + c.pedido.numero_pedido : '-'}</td>
-        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px;">${c.referencia || '-'}</td>
-        <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:12px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(c.monto)}</td>
-      </tr>
-    `).join('');
-
     const diferenciaColor = diferencia === 0 ? '#16a34a' : diferencia > 0 ? '#2563eb' : '#dc2626';
     const diferenciaTexto = diferencia === 0 ? '✓ Sin diferencia' : diferencia > 0 ? `+ $ ${formatCurrency(diferencia)} (Sobrante)` : `- $ ${formatCurrency(Math.abs(diferencia))} (Faltante)`;
+
+    // Resumen único por medio de pago: cantidad de cobros + total
+    const resumenConCantidad = resumen.map((r) => {
+      const cantidad = cobros.filter((c) => (c.forma_pago?.nombre || '') === r.nombre).length;
+      return { ...r, cantidad };
+    });
+
+    // Comparación sistema vs declarado por medio (solo se muestran filas con valor)
+    const declaradoPorMedio: { nombre: string; declarado: number }[] = [
+      { nombre: 'Efectivo', declarado: efectivoDeclarado },
+      { nombre: 'Transferencia', declarado: transferenciasDeclarado },
+      { nombre: 'QR / Mercado Pago', declarado: qrDeclarado },
+      { nombre: 'Tarjeta', declarado: tarjetaDeclarado },
+    ].filter((d) => d.declarado > 0);
 
     const html = `
       <!DOCTYPE html>
@@ -296,45 +301,55 @@ export function RendicionHojaRutaDialog({
           <p>Hoja de Ruta #${numeroHoja} — ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}</p>
         </div>
 
-        ${cobros.length > 0 ? `
         <div class="section">
-          <div class="section-title">Detalle de Cobros</div>
+          <div class="section-title">Resumen por Medio de Pago</div>
           <table>
             <thead>
               <tr>
-                <th>Forma de Pago</th>
-                <th>Pedido</th>
-                <th>Referencia</th>
-                <th class="right">Monto</th>
+                <th>Medio de Pago</th>
+                <th class="right" style="text-align:right;">Cobros</th>
+                <th class="right">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${filaCobros}
+              ${resumenConCantidad.map((r, i) => `
+                <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
+                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; font-weight:600;">${r.nombre}</td>
+                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right;">${r.cantidad}</td>
+                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(r.total)}</td>
+                </tr>
+              `).join('')}
+              <tr style="background:#222; color:#fff;">
+                <td style="padding:8px 10px; font-size:13px; font-weight:800;">TOTAL SISTEMA</td>
+                <td style="padding:8px 10px; font-size:13px; text-align:right; font-weight:800;">${cobros.length}</td>
+                <td style="padding:8px 10px; font-size:14px; text-align:right; font-family:'Courier New',monospace; font-weight:800;">$ ${formatCurrency(totalSistema)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
-        ` : ''}
 
         <div class="section">
-          <div class="section-title">Resumen por Medio de Pago</div>
-          ${resumen.map(r => `
-            <div class="resumen-row">
-              <span class="label">${r.nombre}</span>
-              <span class="value">$ ${formatCurrency(r.total)}</span>
-            </div>
-          `).join('')}
-          <div class="resumen-row" style="border-top:2px solid #333; font-weight:800; padding-top:8px; margin-top:4px;">
-            <span>Total Sistema</span>
-            <span class="value">$ ${formatCurrency(totalSistema)}</span>
-          </div>
-        </div>
-
-        <div class="total-box">
-          <div class="row"><span>Efectivo declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(efectivoDeclarado)}</span></div>
-          <div class="row"><span>Transferencias declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(transferenciasDeclarado)}</span></div>
-          <div class="row"><span>QR / Mercado Pago declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(qrDeclarado)}</span></div>
-          <div class="row"><span>Tarjeta declarado:</span><span style="font-family:'Courier New',monospace;font-weight:700;">$ ${formatCurrency(tarjetaDeclarado)}</span></div>
-          <div class="row main"><span>TOTAL DECLARADO:</span><span style="font-family:'Courier New',monospace;">$ ${formatCurrency(totalDeclarado)}</span></div>
+          <div class="section-title">Comparación Sistema vs Declarado</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Concepto</th>
+                <th class="right">Declarado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${declaradoPorMedio.map((d, i) => `
+                <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
+                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px;">${d.nombre}</td>
+                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(d.declarado)}</td>
+                </tr>
+              `).join('')}
+              <tr style="background:#f0f0f0;">
+                <td style="padding:8px 10px; font-size:14px; font-weight:800; border-top:2px solid #222;">TOTAL DECLARADO</td>
+                <td style="padding:8px 10px; font-size:14px; text-align:right; font-family:'Courier New',monospace; font-weight:800; border-top:2px solid #222;">$ ${formatCurrency(totalDeclarado)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div class="diferencia" style="background:${diferencia === 0 ? '#dcfce7' : diferencia > 0 ? '#dbeafe' : '#fee2e2'}; color:${diferenciaColor}; border:2px solid ${diferenciaColor};">
