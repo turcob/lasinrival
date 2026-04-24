@@ -67,6 +67,28 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     },
   });
 
+  // Empleados que además tienen el rol "responsable" (vía user_roles)
+  const { data: responsables = [] } = useQuery({
+    queryKey: ['empleados-rol-responsable'],
+    queryFn: async () => {
+      const { data: rolesUsuarios, error: errRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'responsable' as any);
+      if (errRoles) throw errRoles;
+      const userIds = (rolesUsuarios || []).map((r: any) => r.user_id).filter(Boolean);
+      if (userIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('empleados')
+        .select('id, nombre, user_id')
+        .eq('activo', true)
+        .in('user_id', userIds)
+        .order('nombre');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const { data: zonas = [] } = useQuery({
     queryKey: ['zonas-lista'],
     queryFn: async () => {
