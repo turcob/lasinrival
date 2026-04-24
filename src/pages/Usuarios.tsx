@@ -47,7 +47,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito' | 'chofer';
+  role: string;
 }
 
 interface UserWithRoles extends Profile {
@@ -62,25 +62,11 @@ interface Empleado {
   user_id: string | null;
 }
 
-const roleLabels: Record<string, string> = {
-  admin: 'Administrador',
-  encargado: 'Encargado',
-  cajero: 'Cajero',
-  vendedor: 'Vendedor',
-  deposito: 'Depósito',
-  chofer: 'Chofer',
-};
-
-const roleColors: Record<string, string> = {
-  admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  encargado: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  cajero: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  vendedor: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  deposito: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  chofer: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-};
-
-const allRoles = ['admin', 'encargado', 'cajero', 'vendedor', 'deposito', 'chofer'] as const;
+interface RoleDefinition {
+  codigo: string;
+  nombre: string;
+  color: string;
+}
 
 export default function Usuarios() {
   const { hasRole } = useAuth();
@@ -88,6 +74,7 @@ export default function Usuarios() {
   
   const [usuarios, setUsuarios] = useState<UserWithRoles[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [allRoles, setAllRoles] = useState<RoleDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
