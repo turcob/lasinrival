@@ -102,7 +102,27 @@ export default function Usuarios() {
   useEffect(() => {
     fetchUsuarios();
     fetchEmpleados();
+    fetchRoles();
   }, []);
+
+  const fetchRoles = async () => {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('codigo, nombre, color')
+      .eq('activo', true)
+      .order('orden');
+    if (error) {
+      console.error('Error fetching roles:', error);
+      return;
+    }
+    setAllRoles((data || []) as RoleDefinition[]);
+  };
+
+  const getRoleLabel = (codigo: string) =>
+    allRoles.find((r) => r.codigo === codigo)?.nombre || codigo;
+  const getRoleColor = (codigo: string) =>
+    allRoles.find((r) => r.codigo === codigo)?.color ||
+    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -367,7 +387,7 @@ export default function Usuarios() {
           .insert(
             selectedRoles.map((role) => ({
               user_id: selectedUser.id,
-              role: role as UserRole['role'],
+              role: role as any,
             }))
           );
 
@@ -467,8 +487,8 @@ export default function Usuarios() {
         <div className="flex flex-wrap gap-1">
           {item.roles.length > 0 ? (
             item.roles.map((r, idx) => (
-              <Badge key={idx} className={roleColors[r.role]}>
-                {roleLabels[r.role]}
+              <Badge key={idx} className={getRoleColor(r.role)}>
+                {getRoleLabel(r.role)}
               </Badge>
             ))
           ) : (
@@ -685,14 +705,14 @@ export default function Usuarios() {
             </p>
             <div className="space-y-3">
               {allRoles.map((role) => (
-                <div key={role} className="flex items-center space-x-3">
+                <div key={role.codigo} className="flex items-center space-x-3">
                   <Checkbox
-                    id={`role-${role}`}
-                    checked={selectedRoles.includes(role)}
-                    onCheckedChange={() => toggleRole(role)}
+                    id={`role-${role.codigo}`}
+                    checked={selectedRoles.includes(role.codigo)}
+                    onCheckedChange={() => toggleRole(role.codigo)}
                   />
-                  <Label htmlFor={`role-${role}`} className="flex items-center gap-2">
-                    <Badge className={roleColors[role]}>{roleLabels[role]}</Badge>
+                  <Label htmlFor={`role-${role.codigo}`} className="flex items-center gap-2">
+                    <Badge className={role.color}>{role.nombre}</Badge>
                   </Label>
                 </div>
               ))}
