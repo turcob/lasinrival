@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -106,12 +106,24 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     });
   }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
 
+  useEffect(() => {
+    const filteredIds = new Set(pedidosFiltrados.map((pedido: any) => pedido.id));
+
+    setSelectedPedidos((prev) => {
+      const visibles = prev.filter((id) => filteredIds.has(id));
+      return visibles.length === prev.length ? prev : visibles;
+    });
+  }, [pedidosFiltrados]);
+
   const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
 
-  // Pedidos seleccionados completos (para imprimir remitos)
   const pedidosSeleccionadosData = useMemo(() => {
-    return pedidosDisponibles.filter((p: any) => selectedPedidos.includes(p.id));
-  }, [pedidosDisponibles, selectedPedidos]);
+    return pedidosFiltrados.filter((p: any) => selectedPedidos.includes(p.id));
+  }, [pedidosFiltrados, selectedPedidos]);
+
+  const selectedPedidosIdsVisibles = useMemo(() => {
+    return pedidosSeleccionadosData.map((pedido: any) => pedido.id);
+  }, [pedidosSeleccionadosData]);
 
   const pedidosCortos = useMemo(
     () => pedidosSeleccionadosData.filter((p: any) => (p.detalles?.length || 0) <= 10),
@@ -215,7 +227,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       responsable_id: values.responsable_id || undefined,
       hora_salida_estimada: values.hora_salida_estimada || undefined,
       observaciones: values.observaciones || undefined,
-      pedido_ids: selectedPedidos,
+        pedido_ids: selectedPedidosIdsVisibles,
     });
     reset();
     setSelectedPedidos([]);
@@ -320,7 +332,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 Pedidos Disponibles
               </Label>
               <span className="text-sm text-muted-foreground">
-                {selectedPedidos.length} seleccionados
+                {selectedPedidosIdsVisibles.length} seleccionados
               </span>
             </div>
 
@@ -376,7 +388,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             </div>
 
             {/* Botones imprimir remitos de seleccionados */}
-            {selectedPedidos.length > 0 && (
+            {selectedPedidosIdsVisibles.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button
                   type="button"
