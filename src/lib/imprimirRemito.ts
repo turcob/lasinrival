@@ -169,7 +169,7 @@ function getStyles(useA5: boolean) {
     .doc-band {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       padding: 6px 10px;
       border-bottom: 2px solid #222;
       background: #fff;
