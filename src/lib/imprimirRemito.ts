@@ -45,7 +45,7 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = '148mm 210mm';
+const REMITO_PAGE_SIZE = '210mm 148mm';
 const REMITO_BODY_MAX_WIDTH = '780px';
 
 /** Common styles shared by single and batch printing */
@@ -59,7 +59,7 @@ function getStyles(useA5: boolean) {
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
         width: 202mm;
-        min-height: 140mm;
+        min-height: 138mm;
         page-break-after: always;
         break-after: page;
       }
@@ -67,7 +67,7 @@ function getStyles(useA5: boolean) {
         page-break-after: auto;
         break-after: auto;
       }
-      .factura-container { min-height: 140mm; display: flex; flex-direction: column; }
+      .factura-container { min-height: 138mm; display: flex; flex-direction: column; }
       .items-table-wrapper { flex: 1; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
