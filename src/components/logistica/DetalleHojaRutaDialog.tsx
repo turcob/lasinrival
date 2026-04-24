@@ -92,16 +92,25 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const [reasignarOpen, setReasignarOpen] = useState(false);
   const [nuevoResponsableId, setNuevoResponsableId] = useState<string>('');
 
+  // Solo empleados con rol "responsable" (vía user_roles)
   const { data: empleados = [] } = useQuery({
-    queryKey: ['empleados-activos'],
+    queryKey: ['empleados-rol-responsable'],
     queryFn: async () => {
+      const { data: rolesUsuarios, error: errRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'responsable' as any);
+      if (errRoles) throw errRoles;
+      const userIds = (rolesUsuarios || []).map((r: any) => r.user_id).filter(Boolean);
+      if (userIds.length === 0) return [];
       const { data, error } = await supabase
         .from('empleados')
-        .select('id, nombre')
+        .select('id, nombre, user_id')
         .eq('activo', true)
+        .in('user_id', userIds)
         .order('nombre');
       if (error) throw error;
-      return data;
+      return (data || []) as Array<{ id: string; nombre: string; user_id: string | null }>;
     },
   });
 
