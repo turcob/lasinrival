@@ -367,8 +367,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               <span className="text-sm text-muted-foreground">
                 {currentIndex + 1} / {pedidoIds.length}
               </span>
-              <Button variant="outline" size="sm" onClick={goToNext} disabled={!canGoNext} title="Siguiente pedido (Av Pág)">
-                Siguiente
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNext}
+                disabled={prepararPedido.isPending || totalFinal === 0}
+                title={canGoNext ? 'Siguiente pedido (Av Pág)' : 'Guardar y cerrar (Av Pág)'}
+              >
+                {canGoNext ? 'Siguiente' : 'Guardar y cerrar'}
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </>
