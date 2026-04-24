@@ -350,7 +350,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 size="sm"
                 onClick={() => setFiltroOrigen('sin_web')}
               >
-                Sin Web
+                Reparto
               </Button>
               <Button
                 type="button"
