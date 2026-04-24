@@ -428,16 +428,22 @@ function buildFacturaHTML(datos: DatosRemito): string {
           <img src="/logo-empresa.jpg" alt="Logo" />
         </div>
         <div class="header-center">
-          <div class="empresa-nombre">${datos.empresa?.razonSocial || 'FACTURA'}</div>
-          ${datos.sucursal ? `<div class="empresa-detalle">Sucursal: ${datos.sucursal}</div>` : ''}
-          ${datos.empresa ? `<div class="empresa-detalle">${datos.empresa.direccion}${datos.empresa.telefono ? ' · Tel: ' + datos.empresa.telefono : ''}</div>` : ''}
-          ${datos.empresa ? `<div class="empresa-detalle">CUIT: ${datos.empresa.cuit}</div>` : ''}
+          <div class="doc-tipo" style="font-size:22px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#000;">FACTURA</div>
+          ${datos.sucursal ? `<div class="empresa-detalle" style="margin-top:4px;">Sucursal: ${datos.sucursal}</div>` : ''}
         </div>
         <div class="header-right">
-          <div class="doc-tipo">Factura</div>
-          <div class="doc-numero">${numeroFactura}</div>
-          <div class="doc-fecha">${fechaFormateada}</div>
+          <div class="empresa-info">
+            <div class="empresa-nombre-right">${datos.empresa?.razonSocial || ''}</div>
+            ${datos.empresa ? `<div>${datos.empresa.direccion}</div>` : ''}
+            ${datos.empresa?.telefono ? `<div>Tel: ${datos.empresa.telefono}</div>` : ''}
+            ${datos.empresa ? `<div>CUIT: ${datos.empresa.cuit}</div>` : ''}
+          </div>
         </div>
+      </div>
+
+      <div class="doc-band">
+        <div class="doc-numero">${numeroFactura}</div>
+        <div><span class="doc-fecha-label">Fecha:</span><span class="doc-fecha">${fechaFormateada}</span></div>
       </div>
 
       <div class="client-bar">${clientBarHTML}</div>
