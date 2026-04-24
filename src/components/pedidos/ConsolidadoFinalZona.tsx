@@ -79,12 +79,9 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
         `)
         .order('numero_pedido', { ascending: true });
 
-      if (!isAdmin) {
-        query = query.eq('estado', 'preparado' as any);
-      } else {
-        // Excluir despachados (ya tienen remito) y rechazados
-        query = query.not('estado', 'in', '(rechazado,despachado)');
-      }
+      // Solo mostrar pedidos confirmados (preparados) que aún no tienen remito.
+      // Excluye pendientes, borradores, despachados y rechazados.
+      query = query.eq('estado', 'preparado' as any);
 
       if (tipoPedido !== 'ambos') {
         query = query.eq('tipo_pedido', tipoPedido as any);
