@@ -18,7 +18,6 @@ import {
   PackageSearch,
   Printer
 } from 'lucide-react';
-import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { imprimirDetallePedido } from '@/lib/imprimirDetallePedido';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -85,7 +84,6 @@ function PedidosContent() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const { config } = useConfiguracionComercio();
 
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
