@@ -398,7 +398,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
     </tr>
   `).join('');
 
-  const filasVacias = Math.max(0, 10 - datos.lineas.length);
+  const filasVacias = Math.max(0, 6 - datos.lineas.length);
   const filasVaciasHTML = Array(filasVacias).fill('').map(() =>
     `<tr><td class="cell">&nbsp;</td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td><td class="cell"></td></tr>`
   ).join('');
@@ -461,13 +461,13 @@ function buildFacturaHTML(datos: DatosRemito): string {
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width:80px;">Código</th>
+            <th style="width:55px;">Código</th>
             <th>Descripción</th>
-            <th class="center" style="width:40px;">U/M</th>
-            <th class="center" style="width:40px;">Bon.</th>
-            <th class="center" style="width:45px;">Cant</th>
-            <th class="right" style="width:80px;">P.Unit.</th>
-            <th class="right" style="width:85px;">Importe</th>
+            <th class="center" style="width:30px;">U/M</th>
+            <th class="center" style="width:30px;">Bon.</th>
+            <th class="center" style="width:32px;">Cant</th>
+            <th class="right" style="width:55px;">P.Unit.</th>
+            <th class="right" style="width:60px;">Importe</th>
           </tr>
         </thead>
         <tbody>
@@ -505,9 +505,7 @@ export function imprimirRemito(datos: DatosRemito) {
    const useA5 = true;
 
   const facturaHTML = buildFacturaHTML(datos);
-  const copiasHTML = [facturaHTML, facturaHTML]
-    .map((html, index) => `<div class="factura-page" data-copy="${index + 1}">${html}</div>`)
-    .join('');
+  const copiasHTML = `<div class="factura-page" data-copy="1">${facturaHTML}</div>`;
 
   const html = `
     <!DOCTYPE html>
@@ -533,10 +531,9 @@ export function imprimirRemito(datos: DatosRemito) {
  */
 export function generarRemitoHTML(datos: DatosRemito, isLast: boolean = false): string {
   const copiaUno = `<div class="factura-page">${buildFacturaHTML(datos)}</div>`;
-  const copiaDos = `<div class="factura-page">${buildFacturaHTML(datos)}</div>`;
   const pageBreak = !isLast ? '<div class="remito-batch-separator"></div>' : '';
 
-  return `${copiaUno}${copiaDos}${pageBreak}`;
+  return `${copiaUno}${pageBreak}`;
 }
 
 /** Shared CSS styles for facturas (used in batch printing) */
