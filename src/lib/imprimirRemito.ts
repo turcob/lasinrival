@@ -45,13 +45,22 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_WIDTH = '210mm';
-const REMITO_PAGE_HEIGHT = '148mm';
-const REMITO_PAGE_SIZE = `${REMITO_PAGE_WIDTH} ${REMITO_PAGE_HEIGHT}`;
-const REMITO_BODY_MAX_WIDTH = REMITO_PAGE_WIDTH;
+type RemitoOrientation = 'landscape' | 'portrait';
+
+const A5_LONG = '210mm';
+const A5_SHORT = '148mm';
+
+function getPageDims(orientation: RemitoOrientation) {
+  // landscape: 210x148, portrait: 148x210
+  const width = orientation === 'landscape' ? A5_LONG : A5_SHORT;
+  const height = orientation === 'landscape' ? A5_SHORT : A5_LONG;
+  return { width, height, size: `${width} ${height}` };
+}
 
 /** Common styles shared by single and batch printing */
-function getStyles(useA5: boolean) {
+function getStyles(orientation: RemitoOrientation = 'landscape') {
+  const { width: REMITO_PAGE_WIDTH, height: REMITO_PAGE_HEIGHT, size: REMITO_PAGE_SIZE } = getPageDims(orientation);
+  const REMITO_BODY_MAX_WIDTH = REMITO_PAGE_WIDTH;
   const pageSize = `size: ${REMITO_PAGE_SIZE};`;
   const pageMargin = 'margin: 0;';
   return `
@@ -502,14 +511,12 @@ function buildFacturaHTML(datos: DatosRemito): string {
   `;
 }
 
-export function imprimirRemito(datos: DatosRemito) {
+export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientation = 'landscape') {
   const ventana = window.open('', '_blank', 'width=800,height=600');
   if (!ventana) {
     alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
     return;
   }
-
-   const useA5 = true;
 
   const facturaHTML = buildFacturaHTML(datos);
   const copiasHTML = `<div class="factura-page" data-copy="1">${facturaHTML}</div>`;
@@ -519,17 +526,50 @@ export function imprimirRemito(datos: DatosRemito) {
     <html>
     <head>
       <title>Factura ${formatNumeroFactura(datos.numeroPedido)}</title>
-      <style>${getStyles(useA5)}</style>
+      <style id="remito-styles">${getStyles(orientation)}</style>
     </head>
     <body>
-      ${copiasHTML}
-      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
+      <div id="remito-content">${copiasHTML}</div>
+      ${buildOrientationToolbar(orientation)}
     </body>
     </html>
   `;
 
   ventana.document.write(html);
   ventana.document.close();
+}
+
+/** Toolbar with orientation selector + print button injected into the print window */
+function buildOrientationToolbar(initial: RemitoOrientation): string {
+  const stylesLandscape = getStyles('landscape').replace(/<\/script>/g, '<\\/script>');
+  const stylesPortrait = getStyles('portrait').replace(/<\/script>/g, '<\\/script>');
+  return `
+    <div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:8px;align-items:center;background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.18);font-family:'Segoe UI',Arial,sans-serif;font-size:13px;z-index:9999;">
+      <label style="font-weight:600;color:#222;">Orientación:</label>
+      <select id="remito-orientation" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        <option value="landscape" ${initial === 'landscape' ? 'selected' : ''}>A5 Horizontal</option>
+        <option value="portrait" ${initial === 'portrait' ? 'selected' : ''}>A5 Vertical</option>
+      </select>
+      <button id="remito-print-btn" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🖨️ Imprimir</button>
+    </div>
+    <script>
+      (function(){
+        var stylesMap = {
+          landscape: ${JSON.stringify(stylesLandscape)},
+          portrait: ${JSON.stringify(stylesPortrait)}
+        };
+        var sel = document.getElementById('remito-orientation');
+        var styleEl = document.getElementById('remito-styles');
+        if (sel && styleEl) {
+          sel.addEventListener('change', function(){
+            styleEl.textContent = stylesMap[sel.value] || stylesMap.landscape;
+          });
+        }
+        var btn = document.getElementById('remito-print-btn');
+        if (btn) btn.addEventListener('click', function(){ window.print(); });
+      })();
+    </script>
+  `;
 }
 
 /**
@@ -543,10 +583,25 @@ export function generarRemitoHTML(datos: DatosRemito, isLast: boolean = false): 
   return `${copiaUno}${pageBreak}`;
 }
 
-/** Shared CSS styles for facturas (used in batch printing) */
-export const REMITO_STYLES = `${getStyles(true)}
+/** Shared CSS styles for facturas (used in batch printing). Default landscape. */
+export const REMITO_STYLES = `${getStyles('landscape')}
   .remito-batch-separator {
     page-break-after: auto;
     break-after: auto;
   }
 `;
+
+/** Builds the orientation toolbar for batch print windows. Exposed for external callers. */
+export function buildRemitoOrientationToolbar(initial: RemitoOrientation = 'landscape'): string {
+  return buildOrientationToolbar(initial);
+}
+
+/** Returns the styles for a given orientation. Useful for batch print windows. */
+export function getRemitoStyles(orientation: RemitoOrientation = 'landscape'): string {
+  return `${getStyles(orientation)}
+  .remito-batch-separator {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  `;
+}
