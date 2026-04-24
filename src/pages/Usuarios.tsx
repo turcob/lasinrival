@@ -47,7 +47,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito' | 'chofer';
+  role: string;
 }
 
 interface UserWithRoles extends Profile {
@@ -62,25 +62,11 @@ interface Empleado {
   user_id: string | null;
 }
 
-const roleLabels: Record<string, string> = {
-  admin: 'Administrador',
-  encargado: 'Encargado',
-  cajero: 'Cajero',
-  vendedor: 'Vendedor',
-  deposito: 'Depósito',
-  chofer: 'Chofer',
-};
-
-const roleColors: Record<string, string> = {
-  admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  encargado: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  cajero: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  vendedor: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  deposito: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  chofer: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-};
-
-const allRoles = ['admin', 'encargado', 'cajero', 'vendedor', 'deposito', 'chofer'] as const;
+interface RoleDefinition {
+  codigo: string;
+  nombre: string;
+  color: string;
+}
 
 export default function Usuarios() {
   const { hasRole } = useAuth();
@@ -88,6 +74,7 @@ export default function Usuarios() {
   
   const [usuarios, setUsuarios] = useState<UserWithRoles[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [allRoles, setAllRoles] = useState<RoleDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -115,7 +102,27 @@ export default function Usuarios() {
   useEffect(() => {
     fetchUsuarios();
     fetchEmpleados();
+    fetchRoles();
   }, []);
+
+  const fetchRoles = async () => {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('codigo, nombre, color')
+      .eq('activo', true)
+      .order('orden');
+    if (error) {
+      console.error('Error fetching roles:', error);
+      return;
+    }
+    setAllRoles((data || []) as RoleDefinition[]);
+  };
+
+  const getRoleLabel = (codigo: string) =>
+    allRoles.find((r) => r.codigo === codigo)?.nombre || codigo;
+  const getRoleColor = (codigo: string) =>
+    allRoles.find((r) => r.codigo === codigo)?.color ||
+    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -380,7 +387,7 @@ export default function Usuarios() {
           .insert(
             selectedRoles.map((role) => ({
               user_id: selectedUser.id,
-              role: role as UserRole['role'],
+              role: role as any,
             }))
           );
 
@@ -480,8 +487,8 @@ export default function Usuarios() {
         <div className="flex flex-wrap gap-1">
           {item.roles.length > 0 ? (
             item.roles.map((r, idx) => (
-              <Badge key={idx} className={roleColors[r.role]}>
-                {roleLabels[r.role]}
+              <Badge key={idx} className={getRoleColor(r.role)}>
+                {getRoleLabel(r.role)}
               </Badge>
             ))
           ) : (
@@ -698,14 +705,14 @@ export default function Usuarios() {
             </p>
             <div className="space-y-3">
               {allRoles.map((role) => (
-                <div key={role} className="flex items-center space-x-3">
+                <div key={role.codigo} className="flex items-center space-x-3">
                   <Checkbox
-                    id={`role-${role}`}
-                    checked={selectedRoles.includes(role)}
-                    onCheckedChange={() => toggleRole(role)}
+                    id={`role-${role.codigo}`}
+                    checked={selectedRoles.includes(role.codigo)}
+                    onCheckedChange={() => toggleRole(role.codigo)}
                   />
-                  <Label htmlFor={`role-${role}`} className="flex items-center gap-2">
-                    <Badge className={roleColors[role]}>{roleLabels[role]}</Badge>
+                  <Label htmlFor={`role-${role.codigo}`} className="flex items-center gap-2">
+                    <Badge className={role.color}>{role.nombre}</Badge>
                   </Label>
                 </div>
               ))}
