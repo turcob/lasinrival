@@ -143,13 +143,14 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
 export function ConsolidadoFinalZona() {
   const [zonaId, setZonaId] = useState<string | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [incluirHistoricos, setIncluirHistoricos] = useState(false);
 
   const { roles } = useAuth();
   const isAdmin = roles.some(r => r.role === 'admin');
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   const { data: zonas } = useZonas();
-  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro);
+  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro, incluirHistoricos);
 
   // Ya filtrado server-side por tipo_pedido
   const pedidosFiltrados = useMemo(() => pedidos || [], [pedidos]);
