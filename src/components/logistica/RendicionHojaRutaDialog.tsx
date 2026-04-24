@@ -242,22 +242,14 @@ export function RendicionHojaRutaDialog({
     const formatCurrency = (v: number) =>
       new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-    const diferenciaColor = diferencia === 0 ? '#16a34a' : diferencia > 0 ? '#2563eb' : '#dc2626';
-    const diferenciaTexto = diferencia === 0 ? '✓ Sin diferencia' : diferencia > 0 ? `+ $ ${formatCurrency(diferencia)} (Sobrante)` : `- $ ${formatCurrency(Math.abs(diferencia))} (Faltante)`;
-
     // Resumen único por medio de pago: cantidad de cobros + total
     const resumenConCantidad = resumen.map((r) => {
       const cantidad = cobros.filter((c) => (c.forma_pago?.nombre || '') === r.nombre).length;
       return { ...r, cantidad };
     });
 
-    // Comparación sistema vs declarado por medio (solo se muestran filas con valor)
-    const declaradoPorMedio: { nombre: string; declarado: number }[] = [
-      { nombre: 'Efectivo', declarado: efectivoDeclarado },
-      { nombre: 'Transferencia', declarado: transferenciasDeclarado },
-      { nombre: 'QR / Mercado Pago', declarado: qrDeclarado },
-      { nombre: 'Tarjeta', declarado: tarjetaDeclarado },
-    ].filter((d) => d.declarado > 0);
+    // Total final = cobrado - rechazos
+    const totalFinal = totalSistema - totalRechazado;
 
     const html = `
       <!DOCTYPE html>
@@ -328,33 +320,27 @@ export function RendicionHojaRutaDialog({
           </table>
         </div>
 
+        ${totalRechazado > 0 ? `
         <div class="section">
-          <div class="section-title">Comparación Sistema vs Declarado</div>
+          <div class="section-title">Rechazos y Total Final</div>
           <table>
-            <thead>
-              <tr>
-                <th>Concepto</th>
-                <th class="right">Declarado</th>
-              </tr>
-            </thead>
             <tbody>
-              ${declaradoPorMedio.map((d, i) => `
-                <tr${i % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
-                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px;">${d.nombre}</td>
-                  <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(d.declarado)}</td>
-                </tr>
-              `).join('')}
-              <tr style="background:#f0f0f0;">
-                <td style="padding:8px 10px; font-size:14px; font-weight:800; border-top:2px solid #222;">TOTAL DECLARADO</td>
-                <td style="padding:8px 10px; font-size:14px; text-align:right; font-family:'Courier New',monospace; font-weight:800; border-top:2px solid #222;">$ ${formatCurrency(totalDeclarado)}</td>
+              <tr>
+                <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px;">Cobrado</td>
+                <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right; font-family:'Courier New',monospace; font-weight:700;">$ ${formatCurrency(totalSistema)}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; color:#dc2626;">(−) Rechazado</td>
+                <td style="padding:6px 10px; border-bottom:1px solid #ddd; font-size:13px; text-align:right; font-family:'Courier New',monospace; font-weight:700; color:#dc2626;">$ ${formatCurrency(totalRechazado)}</td>
+              </tr>
+              <tr style="background:#222; color:#fff;">
+                <td style="padding:8px 10px; font-size:14px; font-weight:800;">TOTAL FINAL</td>
+                <td style="padding:8px 10px; font-size:14px; text-align:right; font-family:'Courier New',monospace; font-weight:800;">$ ${formatCurrency(totalFinal)}</td>
               </tr>
             </tbody>
           </table>
         </div>
-
-        <div class="diferencia" style="background:${diferencia === 0 ? '#dcfce7' : diferencia > 0 ? '#dbeafe' : '#fee2e2'}; color:${diferenciaColor}; border:2px solid ${diferenciaColor};">
-          ${diferenciaTexto}
-        </div>
+        ` : ''}
 
         ${observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${observaciones}</div>` : ''}
 
