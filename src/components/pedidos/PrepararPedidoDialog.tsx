@@ -511,7 +511,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                           <Input
                             type="text"
                             inputMode="decimal"
-                            value={linea.descuentoPorcentaje === 0 ? '' : String(linea.descuentoPorcentaje)}
+                            value={linea.descuentoInput ?? (linea.descuentoPorcentaje === 0 ? '' : String(linea.descuentoPorcentaje))}
                             placeholder="0"
                             onChange={(e) => handleDescuentoChange(linea.detalleId, e.target.value)}
                             className="w-16 h-7 text-sm text-right"
