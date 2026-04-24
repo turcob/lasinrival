@@ -45,9 +45,9 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = '210mm 297mm';
-const REMITO_BODY_MAX_WIDTH = '210mm';
-const REMITO_HALF_PAGE_HEIGHT = '148.5mm';
+const REMITO_PAGE_SIZE = 'A5 portrait';
+const REMITO_BODY_MAX_WIDTH = '148mm';
+const REMITO_PAGE_HEIGHT = '210mm';
 
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
@@ -59,16 +59,20 @@ function getStyles(useA5: boolean) {
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: 210mm;
-        height: ${REMITO_HALF_PAGE_HEIGHT};
-        min-height: ${REMITO_HALF_PAGE_HEIGHT};
+        width: 148mm;
+        height: ${REMITO_PAGE_HEIGHT};
+        min-height: ${REMITO_PAGE_HEIGHT};
+        page-break-after: always;
         page-break-inside: avoid;
         break-inside: avoid;
         overflow: hidden;
       }
+      .factura-page:last-child {
+        page-break-after: auto;
+      }
       .factura-container {
-        min-height: ${REMITO_HALF_PAGE_HEIGHT};
-        height: ${REMITO_HALF_PAGE_HEIGHT};
+        min-height: ${REMITO_PAGE_HEIGHT};
+        height: ${REMITO_PAGE_HEIGHT};
         display: flex;
         flex-direction: column;
       }
@@ -77,9 +81,9 @@ function getStyles(useA5: boolean) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
-      line-height: 1.35;
+      line-height: 1.25;
       color: #1a1a1a;
       width: ${REMITO_BODY_MAX_WIDTH};
       max-width: ${REMITO_BODY_MAX_WIDTH};
