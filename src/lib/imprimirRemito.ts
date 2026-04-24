@@ -134,33 +134,65 @@ function getStyles(useA5: boolean) {
       margin-top: 1px;
     }
     .header-right {
-      width: 125px;
+      width: 160px;
       border-left: 2px solid #222;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
-      padding: 5px;
+      padding: 6px 8px;
     }
     .header-right .doc-tipo {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 900;
-      letter-spacing: 2px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       color: #000;
+      text-align: center;
+      border-bottom: 1px solid #bbb;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
     }
-    .header-right .doc-numero {
-      font-size: 17px;
-      font-weight: 800;
+    .header-right .empresa-info {
+      font-size: 9.5px;
       color: #222;
-      margin-top: 2px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .header-right .empresa-info .empresa-nombre-right {
+      font-size: 11px;
+      font-weight: 900;
+      color: #000;
+      margin-bottom: 2px;
+    }
+    /* Doc number / date band */
+    .doc-band {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 2px solid #222;
+      background: #fff;
+    }
+    .doc-band .doc-numero {
+      font-size: 18px;
+      font-weight: 900;
+      color: #000;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+    .doc-band .doc-fecha {
+      font-size: 18px;
+      font-weight: 900;
+      color: #000;
       font-family: 'Courier New', monospace;
     }
-    .header-right .doc-fecha {
-      font-size: 11px;
-      color: #333;
-      font-weight: 700;
-      margin-top: 2px;
+    .doc-band .doc-fecha-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #555;
+      text-transform: uppercase;
+      margin-right: 6px;
     }
     /* Client info bar */
     .client-bar {
@@ -368,6 +400,9 @@ function buildFacturaHTML(datos: DatosRemito): string {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Cód:</span><span class="cb-value">${datos.cliente.codigoCliente}</span></div>`);
   }
   clientItems.push(`<div class="cb-item"><span class="cb-label">Cliente:</span><span class="cb-value">${datos.cliente.nombre}</span></div>`);
+  if (datos.cliente.direccion) {
+    clientItems.push(`<div class="cb-item"><span class="cb-label">Dir:</span><span class="cb-value">${datos.cliente.direccion}</span></div>`);
+  }
   if (datos.cliente.zona) {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Zona:</span><span class="cb-value">${datos.cliente.zona}</span></div>`);
   }
@@ -379,15 +414,10 @@ function buildFacturaHTML(datos: DatosRemito): string {
 
   // Secondary info items
   const infoItems: string[] = [];
-  if (datos.cliente.direccion) {
-    infoItems.push(`<div class="ib-item"><span class="ib-label">Dir:</span><span class="ib-value">${datos.cliente.direccion}</span></div>`);
-  }
   if (datos.vendedor) {
     infoItems.push(`<div class="ib-item"><span class="ib-label">Vendedor:</span><span class="ib-value">${datos.vendedor}</span></div>`);
   }
-  if (datos.condicionVenta) {
-    infoItems.push(`<div class="ib-item"><span class="ib-label">Cond. Venta:</span><span class="ib-value">${datos.condicionVenta}</span></div>`);
-  }
+  infoItems.push(`<div class="ib-item"><span class="ib-label">Cond. Venta:</span><span class="ib-value">${datos.condicionVenta || 'Cuenta Corriente'}</span></div>`);
 
   return `
     <div class="factura-container">
@@ -396,16 +426,22 @@ function buildFacturaHTML(datos: DatosRemito): string {
           <img src="/logo-empresa.jpg" alt="Logo" />
         </div>
         <div class="header-center">
-          <div class="empresa-nombre">${datos.empresa?.razonSocial || 'FACTURA'}</div>
-          ${datos.sucursal ? `<div class="empresa-detalle">Sucursal: ${datos.sucursal}</div>` : ''}
-          ${datos.empresa ? `<div class="empresa-detalle">${datos.empresa.direccion}${datos.empresa.telefono ? ' · Tel: ' + datos.empresa.telefono : ''}</div>` : ''}
-          ${datos.empresa ? `<div class="empresa-detalle">CUIT: ${datos.empresa.cuit}</div>` : ''}
+          <div class="doc-tipo" style="font-size:22px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#000;">FACTURA</div>
+          ${datos.sucursal ? `<div class="empresa-detalle" style="margin-top:4px;">Sucursal: ${datos.sucursal}</div>` : ''}
         </div>
         <div class="header-right">
-          <div class="doc-tipo">Factura</div>
-          <div class="doc-numero">${numeroFactura}</div>
-          <div class="doc-fecha">${fechaFormateada}</div>
+          <div class="empresa-info">
+            <div class="empresa-nombre-right">${datos.empresa?.razonSocial || ''}</div>
+            ${datos.empresa ? `<div>${datos.empresa.direccion}</div>` : ''}
+            ${datos.empresa?.telefono ? `<div>Tel: ${datos.empresa.telefono}</div>` : ''}
+            ${datos.empresa ? `<div>CUIT: ${datos.empresa.cuit}</div>` : ''}
+          </div>
         </div>
+      </div>
+
+      <div class="doc-band">
+        <div class="doc-numero">${numeroFactura}</div>
+        <div><span class="doc-fecha-label">Fecha:</span><span class="doc-fecha">${fechaFormateada}</span></div>
       </div>
 
       <div class="client-bar">${clientBarHTML}</div>
