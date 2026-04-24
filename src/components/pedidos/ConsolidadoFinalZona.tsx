@@ -401,6 +401,19 @@ export function ConsolidadoFinalZona() {
 
       </div>
 
+      {isAdmin && (
+        <div className="flex items-center gap-2 px-1">
+          <Switch
+            id="incluir-historicos"
+            checked={incluirHistoricos}
+            onCheckedChange={setIncluirHistoricos}
+          />
+          <Label htmlFor="incluir-historicos" className="text-sm cursor-pointer">
+            Incluir pedidos despachados (con remito)
+          </Label>
+        </div>
+      )}
+
       {!zonaId ? (
         <div className="text-center py-12 text-muted-foreground">
           <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
