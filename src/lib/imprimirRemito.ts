@@ -111,116 +111,116 @@ function getStyles(useA5: boolean) {
       background: #f5f5f5;
     }
     .header-logo {
-      width: 56px;
+      width: 44px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 5px;
+      padding: 3px;
       border-right: 1px solid #bbb;
     }
     .header-logo img {
-      max-width: 44px;
-      max-height: 44px;
+      max-width: 36px;
+      max-height: 36px;
       object-fit: contain;
     }
     .header-center {
       flex: 1;
-      padding: 5px 8px;
+      padding: 3px 6px;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
     .header-center .empresa-nombre {
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: #000;
     }
     .header-center .empresa-detalle {
-      font-size: 10px;
+      font-size: 8.5px;
       color: #333;
       font-weight: 700;
       margin-top: 1px;
     }
     .header-right {
-      width: 160px;
+      width: 130px;
       border-left: 2px solid #222;
       display: flex;
       flex-direction: column;
       align-items: stretch;
       justify-content: center;
-      padding: 6px 8px;
+      padding: 4px 6px;
     }
     .header-right .doc-tipo {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 900;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       color: #000;
       text-align: center;
       border-bottom: 1px solid #bbb;
-      padding-bottom: 3px;
-      margin-bottom: 4px;
+      padding-bottom: 2px;
+      margin-bottom: 3px;
     }
     .header-right .empresa-info {
-      font-size: 9.5px;
+      font-size: 8px;
       color: #222;
       font-weight: 700;
-      line-height: 1.3;
+      line-height: 1.25;
     }
     .header-right .empresa-info .empresa-nombre-right {
-      font-size: 11px;
+      font-size: 9.5px;
       font-weight: 900;
       color: #000;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     /* Doc number / date band */
     .doc-band {
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 6px 10px;
+      padding: 4px 8px;
       border-bottom: 2px solid #222;
       background: #fff;
     }
     .doc-band .doc-numero {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: 900;
       color: #000;
       font-family: 'Courier New', monospace;
       letter-spacing: 1px;
     }
     .doc-band .doc-fecha {
-      font-size: 18px;
+      font-size: 13px;
       font-weight: 900;
       color: #000;
       font-family: 'Courier New', monospace;
     }
     .doc-band .doc-fecha-label {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 800;
       color: #555;
       text-transform: uppercase;
-      margin-right: 6px;
+      margin-right: 4px;
     }
     /* Client info bar */
     .client-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 5px 8px;
+      gap: 6px;
+      padding: 3px 6px;
       border-bottom: 1px solid #ccc;
       background: #fff;
-      font-size: 12px;
+      font-size: 10px;
       flex-wrap: wrap;
     }
     .client-bar .cb-item {
       display: flex;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
     }
     .cb-label {
-      font-size: 10px;
+      font-size: 8.5px;
       color: #555;
       text-transform: uppercase;
       font-weight: 800;
@@ -228,33 +228,33 @@ function getStyles(useA5: boolean) {
     .cb-value {
       font-weight: 800;
       color: #000;
-      font-size: 13px;
+      font-size: 10.5px;
     }
     .client-bar .cb-separator {
       width: 1px;
-      height: 14px;
+      height: 11px;
       background: #bbb;
     }
     /* Secondary info row */
     .info-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 4px 8px;
+      gap: 6px;
+      padding: 3px 6px;
       border-bottom: 2px solid #222;
-      font-size: 11px;
+      font-size: 9.5px;
       color: #333;
       background: #fafafa;
     }
     .info-bar .ib-item {
       display: flex;
-      gap: 3px;
+      gap: 2px;
     }
     .info-bar .ib-label {
       font-weight: 800;
       color: #555;
       text-transform: uppercase;
-      font-size: 10px;
+      font-size: 8.5px;
     }
     .info-bar .ib-value {
       font-weight: 700;
@@ -270,9 +270,9 @@ function getStyles(useA5: boolean) {
     .items-table thead th {
       background: #222;
       color: #fff;
-      padding: 5px 6px;
+      padding: 3px 4px;
       text-align: left;
-      font-size: 10px;
+      font-size: 8.5px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -280,15 +280,15 @@ function getStyles(useA5: boolean) {
     .items-table thead th.center { text-align: center; }
     .items-table thead th.right { text-align: right; }
     .cell {
-      padding: 4px 6px;
+      padding: 2px 4px;
       border-bottom: 1px solid #d0d0d0;
-      font-size: 11px;
+      font-size: 9.5px;
       font-weight: 700;
       vertical-align: middle;
     }
     .cell.mono {
       font-family: 'Courier New', monospace;
-      font-size: 11px;
+      font-size: 9.5px;
       font-weight: 700;
     }
     .center { text-align: center; }
@@ -306,37 +306,37 @@ function getStyles(useA5: boolean) {
       background: #eee;
     }
     .total-label {
-      padding: 7px 12px;
-      font-size: 14px;
+      padding: 5px 10px;
+      font-size: 12px;
       font-weight: 900;
       letter-spacing: 2px;
       color: #222;
     }
     .total-value {
-      padding: 7px 12px;
-      font-size: 16px;
+      padding: 5px 10px;
+      font-size: 13px;
       font-weight: 900;
       border-left: 2px solid #222;
-      min-width: 120px;
+      min-width: 100px;
       text-align: right;
       color: #000;
       font-family: 'Courier New', monospace;
     }
     /* Footer */
     .footer-section {
-      padding: 8px 8px 6px;
+      padding: 5px 6px 4px;
       border-top: 1px solid #ccc;
     }
     .recibi-conforme {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       color: #222;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     .firmas-row {
       display: flex;
       justify-content: space-between;
-      margin-top: 6px;
+      margin-top: 4px;
     }
     .firma-block {
       width: 28%;
@@ -344,24 +344,24 @@ function getStyles(useA5: boolean) {
     }
     .firma-dots {
       border-bottom: 1px dotted #666;
-      height: 28px;
-      margin-bottom: 3px;
+      height: 20px;
+      margin-bottom: 2px;
     }
     .firma-label {
-      font-size: 10px;
+      font-size: 8.5px;
       color: #555;
       font-weight: 700;
       text-transform: uppercase;
     }
     .disclaimer {
-      margin-top: 8px;
-      font-size: 11px;
+      margin-top: 5px;
+      font-size: 9px;
       text-align: center;
       font-weight: 800;
       color: #333;
       letter-spacing: 0.3px;
       border-top: 1px solid #ccc;
-      padding-top: 6px;
+      padding-top: 4px;
     }
     .print-button {
       position: fixed;
