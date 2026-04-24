@@ -900,6 +900,50 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onSuccess={() => refetch()}
         />
       )}
+
+      {/* Diálogo de reasignación de responsable */}
+      <Dialog open={reasignarOpen} onOpenChange={setReasignarOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reasignar responsable</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="responsable-select">Responsable</Label>
+            <select
+              id="responsable-select"
+              value={nuevoResponsableId}
+              onChange={(e) => setNuevoResponsableId(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="">Sin responsable</option>
+              {empleados.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Los pedidos de esta hoja le aparecerán al responsable seleccionado en la app móvil.
+              Si no se elige responsable, los verá el chofer asignado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReasignarOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarReasignar}
+              disabled={actualizarHojaRuta.isPending}
+            >
+              {actualizarHojaRuta.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Guardar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
