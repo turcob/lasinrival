@@ -45,8 +45,9 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = '210mm 148mm';
+const REMITO_PAGE_SIZE = '210mm 297mm';
 const REMITO_BODY_MAX_WIDTH = '210mm';
+const REMITO_HALF_PAGE_HEIGHT = '148.5mm';
 
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
@@ -59,15 +60,18 @@ function getStyles(useA5: boolean) {
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
         width: 210mm;
-        min-height: 148mm;
-        page-break-after: always;
-        break-after: page;
+        height: ${REMITO_HALF_PAGE_HEIGHT};
+        min-height: ${REMITO_HALF_PAGE_HEIGHT};
+        page-break-inside: avoid;
+        break-inside: avoid;
+        overflow: hidden;
       }
-      .factura-page:last-child {
-        page-break-after: auto;
-        break-after: auto;
+      .factura-container {
+        min-height: ${REMITO_HALF_PAGE_HEIGHT};
+        height: ${REMITO_HALF_PAGE_HEIGHT};
+        display: flex;
+        flex-direction: column;
       }
-      .factura-container { min-height: 148mm; display: flex; flex-direction: column; }
       .items-table-wrapper { flex: 1; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -494,7 +498,7 @@ export function imprimirRemito(datos: DatosRemito) {
     return;
   }
 
-  const useA5 = true; // Always A5 horizontal
+   const useA5 = true;
 
   const facturaHTML = buildFacturaHTML(datos);
   const copiasHTML = [facturaHTML, facturaHTML]
