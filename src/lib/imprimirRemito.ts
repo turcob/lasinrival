@@ -426,7 +426,8 @@ function buildFacturaHTML(datos: DatosRemito): string {
           <img src="/logo-empresa.jpg" alt="Logo" />
         </div>
         <div class="header-center">
-          <div class="doc-tipo" style="font-size:22px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#000;">FACTURA</div>
+          <div class="doc-tipo" style="font-size:14px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#000;">FACTURA</div>
+          <div class="doc-numero" style="font-size:20px;font-weight:900;color:#000;font-family:'Courier New',monospace;letter-spacing:1px;margin-top:4px;">${numeroFactura}</div>
           ${datos.sucursal ? `<div class="empresa-detalle" style="margin-top:4px;">Sucursal: ${datos.sucursal}</div>` : ''}
         </div>
         <div class="header-right">
@@ -440,7 +441,6 @@ function buildFacturaHTML(datos: DatosRemito): string {
       </div>
 
       <div class="doc-band">
-        <div class="doc-numero">${numeroFactura}</div>
         <div><span class="doc-fecha-label">Fecha:</span><span class="doc-fecha">${fechaFormateada}</span></div>
       </div>
 
