@@ -334,10 +334,15 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Seleccionar responsable</option>
-                {empleados.map(e => (
+                {responsables.map((e: any) => (
                   <option key={e.id} value={e.id}>{e.nombre}</option>
                 ))}
               </select>
+              {responsables.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay empleados con rol "Responsable". Asigná el rol desde Usuarios.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2 col-span-2">
