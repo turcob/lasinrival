@@ -65,11 +65,11 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
   const pageMargin = 'margin: 0;';
   return `
     @media print {
-      body { margin: 0; padding: 0; }
+      body { margin: 0; padding: 0 5mm; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: ${REMITO_PAGE_WIDTH};
+        width: calc(${REMITO_PAGE_WIDTH} - 10mm);
         height: ${REMITO_PAGE_HEIGHT};
         max-height: ${REMITO_PAGE_HEIGHT};
         min-height: ${REMITO_PAGE_HEIGHT};
@@ -109,7 +109,7 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
     }
     .factura-page {
       width: 100%;
-      max-width: ${REMITO_BODY_MAX_WIDTH};
+      max-width: calc(${REMITO_BODY_MAX_WIDTH} - 10mm);
       margin: 0;
     }
     .factura-container {
