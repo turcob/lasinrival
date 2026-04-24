@@ -33,6 +33,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,9 +65,9 @@ function useZonas() {
   });
 }
 
-function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, tipoPedido: 'web' | 'reparto' | 'ambos') {
+function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, tipoPedido: 'web' | 'reparto' | 'ambos', incluirHistoricos: boolean) {
   return useQuery({
-    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin, tipoPedido],
+    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin, tipoPedido, incluirHistoricos],
     queryFn: async () => {
       if (!zonaId) return [];
 
@@ -80,8 +82,12 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
 
       if (!isAdmin) {
         query = query.eq('estado', 'preparado' as any);
-      } else {
+      } else if (incluirHistoricos) {
+        // Mostrar histórico completo (sin rechazados)
         query = query.not('estado', 'eq', 'rechazado');
+      } else {
+        // Por defecto excluir despachados (ya tienen remito) y rechazados
+        query = query.not('estado', 'in', '(rechazado,despachado)');
       }
 
       if (tipoPedido !== 'ambos') {
