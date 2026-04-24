@@ -4476,6 +4476,8 @@ export type Database = {
         | "vendedor"
         | "deposito"
         | "chofer"
+        | "administracion"
+        | "responsable"
       cash_register_status: "abierta" | "cerrada"
       cheque_estado:
         | "en_cartera"
@@ -4657,6 +4659,8 @@ export const Constants = {
         "vendedor",
         "deposito",
         "chofer",
+        "administracion",
+        "responsable",
       ],
       cash_register_status: ["abierta", "cerrada"],
       cheque_estado: [
