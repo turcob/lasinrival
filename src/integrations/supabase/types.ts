@@ -1457,6 +1457,59 @@ export type Database = {
         }
         Relationships: []
       }
+      hoja_ruta_carga_items: {
+        Row: {
+          cantidad_cargada: number | null
+          cantidad_esperada: number
+          created_at: string
+          estado: string
+          hoja_ruta_id: string
+          id: string
+          observaciones: string | null
+          pedido_id: string
+          producto_id: string
+          updated_at: string
+          verificado_at: string | null
+          verificado_por: string | null
+        }
+        Insert: {
+          cantidad_cargada?: number | null
+          cantidad_esperada?: number
+          created_at?: string
+          estado?: string
+          hoja_ruta_id: string
+          id?: string
+          observaciones?: string | null
+          pedido_id: string
+          producto_id: string
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Update: {
+          cantidad_cargada?: number | null
+          cantidad_esperada?: number
+          created_at?: string
+          estado?: string
+          hoja_ruta_id?: string
+          id?: string
+          observaciones?: string | null
+          pedido_id?: string
+          producto_id?: string
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_ruta_carga_items_hoja_ruta_id_fkey"
+            columns: ["hoja_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hojas_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_ruta_cobros: {
         Row: {
           created_at: string
@@ -1723,6 +1776,9 @@ export type Database = {
       }
       hojas_ruta: {
         Row: {
+          carga_confirmada_at: string | null
+          carga_confirmada_por: string | null
+          carga_forzada: boolean
           chofer_id: string | null
           created_at: string
           estado: string
@@ -1742,6 +1798,9 @@ export type Database = {
           vehiculo_id: string | null
         }
         Insert: {
+          carga_confirmada_at?: string | null
+          carga_confirmada_por?: string | null
+          carga_forzada?: boolean
           chofer_id?: string | null
           created_at?: string
           estado?: string
@@ -1761,6 +1820,9 @@ export type Database = {
           vehiculo_id?: string | null
         }
         Update: {
+          carga_confirmada_at?: string | null
+          carga_confirmada_por?: string | null
+          carga_forzada?: boolean
           chofer_id?: string | null
           created_at?: string
           estado?: string
@@ -4459,6 +4521,7 @@ export type Database = {
         Returns: boolean
       }
       is_route_owner: { Args: { route_id: string }; Returns: boolean }
+      is_route_responsable: { Args: { route_id: string }; Returns: boolean }
       is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
     }
     Enums: {
