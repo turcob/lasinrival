@@ -235,18 +235,24 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   };
 
   const handleDescuentoChange = (detalleId: string, value: string) => {
-    // Permitir vacío (se toma como 0) y aceptar tanto "." como "," como separador decimal
-    const normalized = value.replace(',', '.').trim();
-    let descuento = 0;
-    if (normalized !== '') {
-      const num = parseFloat(normalized);
-      if (isNaN(num) || num < 0) return;
-      descuento = Math.min(100, num);
-    }
+    // Aceptar "." y "," como separador decimal y permitir estados intermedios ("5.", "", ".")
+    const normalized = value.replace(',', '.');
+    // Solo permitir dígitos y un punto decimal
+    if (normalized !== '' && !/^\d*\.?\d*$/.test(normalized)) return;
+
+    // Calcular el descuento numérico para el subtotal (vacío o "." se tratan como 0)
+    const num = normalized === '' || normalized === '.' ? 0 : parseFloat(normalized);
+    if (isNaN(num) || num < 0 || num > 100) return;
+
     setLineas(prev => prev.map(l => {
       if (l.detalleId !== detalleId) return l;
-      const precioConDescuento = l.precioUnitario * (1 - descuento / 100);
-      return { ...l, descuentoPorcentaje: descuento, subtotal: l.cantidadPreparada * precioConDescuento };
+      const precioConDescuento = l.precioUnitario * (1 - num / 100);
+      return {
+        ...l,
+        descuentoPorcentaje: num,
+        descuentoInput: normalized,
+        subtotal: l.cantidadPreparada * precioConDescuento,
+      };
     }));
   };
 
