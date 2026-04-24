@@ -56,7 +56,8 @@ import { es } from 'date-fns/locale';
 
 const estadoHojaConfig: Record<HojaRutaEstado, { label: string; className: string }> = {
   planificada: { label: 'Planificada', className: 'bg-muted text-muted-foreground' },
-  en_carga: { label: 'En Carga', className: 'bg-amber-100 text-amber-800' },
+  en_carga: { label: 'Esperando Confirmación', className: 'bg-amber-100 text-amber-800' },
+  carga_confirmada: { label: 'Carga Confirmada', className: 'bg-emerald-100 text-emerald-800' },
   en_ruta: { label: 'En Ruta', className: 'bg-blue-100 text-blue-800' },
   completada: { label: 'Completada', className: 'bg-green-100 text-green-800' },
   cancelada: { label: 'Cancelada', className: 'bg-red-100 text-red-800' },
@@ -198,7 +199,8 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const getNextEstado = (current: HojaRutaEstado): HojaRutaEstado | null => {
     switch (current) {
       case 'planificada': return 'en_carga';
-      case 'en_carga': return 'en_ruta';
+      case 'en_carga': return null; // requiere confirmación del responsable o forzado manual
+      case 'carga_confirmada': return 'en_ruta';
       case 'en_ruta': return 'completada';
       default: return null;
     }
@@ -210,6 +212,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     if (nextEstado) {
       await cambiarEstado.mutateAsync({ id: hojaRuta.id, estado: nextEstado });
     }
+  };
+
+  const handleForzarConfirmacion = async () => {
+    if (!hojaRuta) return;
+    if (!confirm('¿Confirmar manualmente la carga sin esperar al responsable en la app?\n\nQuedará registrado como confirmación forzada desde el sistema web.')) return;
+    await cambiarEstado.mutateAsync({ id: hojaRuta.id, estado: 'carga_confirmada', forzada: true });
   };
 
   const handleEstadoParada = async (paradaId: string, estado: ParadaEstado) => {
@@ -418,22 +426,48 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           <div className="space-y-6 mt-6">
             {/* Estado badge */}
             <div className="flex items-center justify-between">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${estadoHojaConfig[hojaRuta.estado].className}`}>
-                {estadoHojaConfig[hojaRuta.estado].label}
-              </span>
-              
-              {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && (
-                <Button 
-                  size="sm"
-                  onClick={handleCambiarEstadoHoja}
-                  disabled={cambiarEstado.isPending}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  {hojaRuta.estado === 'planificada' && 'Iniciar Carga'}
-                  {hojaRuta.estado === 'en_carga' && 'Iniciar Ruta'}
-                  {hojaRuta.estado === 'en_ruta' && 'Completar'}
-                </Button>
-              )}
+              <div className="flex flex-col gap-1">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium w-fit ${estadoHojaConfig[hojaRuta.estado].className}`}>
+                  {estadoHojaConfig[hojaRuta.estado].label}
+                </span>
+                {hojaRuta.estado === 'en_carga' && (
+                  <span className="text-xs text-muted-foreground">
+                    Esperando que el responsable confirme la carga desde la app.
+                  </span>
+                )}
+                {hojaRuta.estado === 'carga_confirmada' && hojaRuta.carga_confirmada_at && (
+                  <span className="text-xs text-muted-foreground">
+                    Confirmada el {format(new Date(hojaRuta.carga_confirmada_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                    {hojaRuta.carga_forzada ? ' · Confirmación manual' : ' · Confirmada por el responsable'}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {hojaRuta.estado === 'en_carga' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleForzarConfirmacion}
+                    disabled={cambiarEstado.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Forzar confirmación
+                  </Button>
+                )}
+                {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && hojaRuta.estado !== 'en_carga' && (
+                  <Button
+                    size="sm"
+                    onClick={handleCambiarEstadoHoja}
+                    disabled={cambiarEstado.isPending}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    {hojaRuta.estado === 'planificada' && 'Iniciar Carga'}
+                    {hojaRuta.estado === 'carga_confirmada' && 'Iniciar Ruta'}
+                    {hojaRuta.estado === 'en_ruta' && 'Completar'}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Info grid */}
