@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -105,6 +105,15 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       return true;
     });
   }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
+
+  useEffect(() => {
+    const filteredIds = new Set(pedidosFiltrados.map((pedido: any) => pedido.id));
+
+    setSelectedPedidos((prev) => {
+      const visibles = prev.filter((id) => filteredIds.has(id));
+      return visibles.length === prev.length ? prev : visibles;
+    });
+  }, [pedidosFiltrados]);
 
   const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
 
