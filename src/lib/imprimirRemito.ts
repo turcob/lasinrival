@@ -45,11 +45,19 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-type RemitoOrientation = 'landscape' | 'portrait';
+type RemitoOrientation = 'landscape' | 'portrait' | 'a4-portrait';
 
 function getPageDims(orientation: RemitoOrientation) {
   // landscape: A5 estándar 210x148
   // portrait (alimentación vertical del usuario): 200x140 personalizado
+  // a4-portrait: hoja A4 210x297, contenido limitado a 200x140 anclado arriba a la izquierda
+  if (orientation === 'a4-portrait') {
+    return {
+      width: '200mm',
+      height: '140mm',
+      size: 'A4 portrait',
+    };
+  }
   const width = orientation === 'landscape' ? '210mm' : '200mm';
   const height = orientation === 'landscape' ? '148mm' : '140mm';
   return { width, height, size: `${width} ${height}` };
@@ -61,13 +69,19 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
   const REMITO_BODY_MAX_WIDTH = REMITO_PAGE_WIDTH;
   const pageSize = `size: ${REMITO_PAGE_SIZE};`;
   const pageMargin = 'margin: 0;';
+  const isA4Portrait = orientation === 'a4-portrait';
+  // En A4 vertical anclamos el contenido arriba a la izquierda y NO usamos padding lateral
+  // para que la impresión no supere los 14cm de alto ni se centre en la hoja.
+  const bodyPrintPadding = isA4Portrait ? '0' : '0 5mm';
+  const widthCalc = isA4Portrait ? REMITO_PAGE_WIDTH : `calc(${REMITO_PAGE_WIDTH} - 10mm)`;
+  const maxWidthCalc = isA4Portrait ? REMITO_PAGE_WIDTH : `calc(${REMITO_BODY_MAX_WIDTH} - 10mm)`;
   return `
     @media print {
-      body { margin: 0; padding: 0 5mm; }
+      body { margin: 0; padding: ${bodyPrintPadding}; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: calc(${REMITO_PAGE_WIDTH} - 10mm);
+        width: ${widthCalc};
         height: ${REMITO_PAGE_HEIGHT};
         max-height: ${REMITO_PAGE_HEIGHT};
         min-height: ${REMITO_PAGE_HEIGHT};
@@ -107,7 +121,7 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
     }
     .factura-page {
       width: 100%;
-      max-width: calc(${REMITO_BODY_MAX_WIDTH} - 10mm);
+      max-width: ${maxWidthCalc};
       margin: 0;
     }
     .factura-container {
@@ -541,12 +555,14 @@ export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientatio
 function buildOrientationToolbar(initial: RemitoOrientation): string {
   const stylesLandscape = getStyles('landscape').replace(/<\/script>/g, '<\\/script>');
   const stylesPortrait = getStyles('portrait').replace(/<\/script>/g, '<\\/script>');
+  const stylesA4Portrait = getStyles('a4-portrait').replace(/<\/script>/g, '<\\/script>');
   return `
     <div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:8px;align-items:center;background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.18);font-family:'Segoe UI',Arial,sans-serif;font-size:13px;z-index:9999;">
       <label style="font-weight:600;color:#222;">Orientación:</label>
       <select id="remito-orientation" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
         <option value="landscape" ${initial === 'landscape' ? 'selected' : ''}>A5 Horizontal</option>
         <option value="portrait" ${initial === 'portrait' ? 'selected' : ''}>A5 Vertical</option>
+        <option value="a4-portrait" ${initial === 'a4-portrait' ? 'selected' : ''}>A4 Vertical (máx 14cm)</option>
       </select>
       <button id="remito-print-btn" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🖨️ Imprimir</button>
     </div>
@@ -554,7 +570,8 @@ function buildOrientationToolbar(initial: RemitoOrientation): string {
       (function(){
         var stylesMap = {
           landscape: ${JSON.stringify(stylesLandscape)},
-          portrait: ${JSON.stringify(stylesPortrait)}
+          portrait: ${JSON.stringify(stylesPortrait)},
+          'a4-portrait': ${JSON.stringify(stylesA4Portrait)}
         };
         var sel = document.getElementById('remito-orientation');
         var styleEl = document.getElementById('remito-styles');
