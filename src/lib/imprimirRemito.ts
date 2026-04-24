@@ -400,6 +400,9 @@ function buildFacturaHTML(datos: DatosRemito): string {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Cód:</span><span class="cb-value">${datos.cliente.codigoCliente}</span></div>`);
   }
   clientItems.push(`<div class="cb-item"><span class="cb-label">Cliente:</span><span class="cb-value">${datos.cliente.nombre}</span></div>`);
+  if (datos.cliente.direccion) {
+    clientItems.push(`<div class="cb-item"><span class="cb-label">Dir:</span><span class="cb-value">${datos.cliente.direccion}</span></div>`);
+  }
   if (datos.cliente.zona) {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Zona:</span><span class="cb-value">${datos.cliente.zona}</span></div>`);
   }
@@ -411,15 +414,10 @@ function buildFacturaHTML(datos: DatosRemito): string {
 
   // Secondary info items
   const infoItems: string[] = [];
-  if (datos.cliente.direccion) {
-    infoItems.push(`<div class="ib-item"><span class="ib-label">Dir:</span><span class="ib-value">${datos.cliente.direccion}</span></div>`);
-  }
   if (datos.vendedor) {
     infoItems.push(`<div class="ib-item"><span class="ib-label">Vendedor:</span><span class="ib-value">${datos.vendedor}</span></div>`);
   }
-  if (datos.condicionVenta) {
-    infoItems.push(`<div class="ib-item"><span class="ib-label">Cond. Venta:</span><span class="ib-value">${datos.condicionVenta}</span></div>`);
-  }
+  infoItems.push(`<div class="ib-item"><span class="ib-label">Cond. Venta:</span><span class="ib-value">${datos.condicionVenta || 'Cuenta Corriente'}</span></div>`);
 
   return `
     <div class="factura-container">
