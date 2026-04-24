@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Types
-export type HojaRutaEstado = 'planificada' | 'en_carga' | 'en_ruta' | 'completada' | 'cancelada';
+export type HojaRutaEstado = 'planificada' | 'en_carga' | 'carga_confirmada' | 'en_ruta' | 'completada' | 'cancelada';
 export type ParadaEstado = 'pendiente' | 'en_camino' | 'entregado' | 'entrega_parcial' | 'rechazado' | 'no_entregado';
 export type DevolucionMotivo = 'rechazo_cliente' | 'producto_vencido' | 'producto_roto' | 'producto_faltante' | 'cambio' | 'error_pedido' | 'otro';
 
@@ -38,6 +38,9 @@ export interface HojaRuta {
   usuario_id: string;
   created_at: string;
   updated_at: string;
+  carga_confirmada_at?: string | null;
+  carga_confirmada_por?: string | null;
+  carga_forzada?: boolean | null;
   vehiculo?: Vehiculo;
   chofer?: { id: string; nombre: string };
   responsable?: { id: string; nombre: string };
@@ -353,15 +356,20 @@ export function useActualizarHojaRuta() {
 export function useCambiarEstadoHojaRuta() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ id, estado }: { id: string; estado: HojaRutaEstado }) => {
+    mutationFn: async ({ id, estado, forzada }: { id: string; estado: HojaRutaEstado; forzada?: boolean }) => {
       const updateData: Record<string, unknown> = { estado };
       
       if (estado === 'en_ruta') {
         updateData.hora_salida_real = new Date().toISOString();
       } else if (estado === 'completada') {
         updateData.hora_regreso = new Date().toISOString();
+      } else if (estado === 'carga_confirmada') {
+        updateData.carga_confirmada_at = new Date().toISOString();
+        updateData.carga_confirmada_por = user?.id ?? null;
+        updateData.carga_forzada = !!forzada;
       }
 
       const { error } = await supabase
