@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
 import { Button } from '@/components/ui/button';
 import { 
@@ -10,9 +12,18 @@ import {
   useDevolucionesHojaRuta,
   useRendicionHojaRuta,
   useHojaCarga,
+  useActualizarHojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { 
   Truck, 
   User, 
@@ -33,7 +44,8 @@ import {
   PackageX,
   Printer,
   RotateCcw,
-  X
+  X,
+  UserCog
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -74,6 +86,39 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
+  const actualizarHojaRuta = useActualizarHojaRuta();
+
+  // Reasignación de responsable
+  const [reasignarOpen, setReasignarOpen] = useState(false);
+  const [nuevoResponsableId, setNuevoResponsableId] = useState<string>('');
+
+  const { data: empleados = [] } = useQuery({
+    queryKey: ['empleados-activos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('empleados')
+        .select('id, nombre')
+        .eq('activo', true)
+        .order('nombre');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleAbrirReasignar = () => {
+    setNuevoResponsableId(hojaRuta?.responsable_id || '');
+    setReasignarOpen(true);
+  };
+
+  const handleConfirmarReasignar = async () => {
+    if (!hojaRuta) return;
+    await actualizarHojaRuta.mutateAsync({
+      id: hojaRuta.id,
+      responsable_id: nuevoResponsableId || null,
+    } as any);
+    setReasignarOpen(false);
+  };
+
   // Estados para diálogos de cobro, rendición y devoluciones
   const [cobroDialog, setCobroDialog] = useState<{
     open: boolean;
@@ -383,7 +428,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             </div>
 
             {/* Info grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -405,6 +450,23 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 <div>
                   <p className="text-xs text-muted-foreground">Chofer</p>
                   <p className="font-medium">{hojaRuta.chofer?.nombre || '-'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <UserCog className="h-4 w-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">Responsable</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium truncate">{hojaRuta.responsable?.nombre || '-'}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={handleAbrirReasignar}
+                    >
+                      Cambiar
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -838,6 +900,50 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onSuccess={() => refetch()}
         />
       )}
+
+      {/* Diálogo de reasignación de responsable */}
+      <Dialog open={reasignarOpen} onOpenChange={setReasignarOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reasignar responsable</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="responsable-select">Responsable</Label>
+            <select
+              id="responsable-select"
+              value={nuevoResponsableId}
+              onChange={(e) => setNuevoResponsableId(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="">Sin responsable</option>
+              {empleados.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Los pedidos de esta hoja le aparecerán al responsable seleccionado en la app móvil.
+              Si no se elige responsable, los verá el chofer asignado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReasignarOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarReasignar}
+              disabled={actualizarHojaRuta.isPending}
+            >
+              {actualizarHojaRuta.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Guardar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
