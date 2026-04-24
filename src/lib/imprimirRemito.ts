@@ -134,33 +134,65 @@ function getStyles(useA5: boolean) {
       margin-top: 1px;
     }
     .header-right {
-      width: 125px;
+      width: 160px;
       border-left: 2px solid #222;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
-      padding: 5px;
+      padding: 6px 8px;
     }
     .header-right .doc-tipo {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 900;
-      letter-spacing: 2px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       color: #000;
+      text-align: center;
+      border-bottom: 1px solid #bbb;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
     }
-    .header-right .doc-numero {
-      font-size: 17px;
-      font-weight: 800;
+    .header-right .empresa-info {
+      font-size: 9.5px;
       color: #222;
-      margin-top: 2px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .header-right .empresa-info .empresa-nombre-right {
+      font-size: 11px;
+      font-weight: 900;
+      color: #000;
+      margin-bottom: 2px;
+    }
+    /* Doc number / date band */
+    .doc-band {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 2px solid #222;
+      background: #fff;
+    }
+    .doc-band .doc-numero {
+      font-size: 18px;
+      font-weight: 900;
+      color: #000;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+    .doc-band .doc-fecha {
+      font-size: 18px;
+      font-weight: 900;
+      color: #000;
       font-family: 'Courier New', monospace;
     }
-    .header-right .doc-fecha {
-      font-size: 11px;
-      color: #333;
-      font-weight: 700;
-      margin-top: 2px;
+    .doc-band .doc-fecha-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #555;
+      text-transform: uppercase;
+      margin-right: 6px;
     }
     /* Client info bar */
     .client-bar {
