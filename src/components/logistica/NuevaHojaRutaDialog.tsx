@@ -21,8 +21,11 @@ import {
 } from '@/hooks/useLogistica';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, User, Truck, Calendar, Check, Filter } from 'lucide-react';
+import { MapPin, User, Truck, Calendar, Check, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 
 const formSchema = z.object({
   fecha: z.string().min(1, 'La fecha es requerida'),
@@ -49,6 +52,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   const { data: vehiculos = [] } = useVehiculos();
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
   const crearHojaRuta = useCrearHojaRuta();
+  const { config: empresaConfig } = useConfiguracionComercio();
 
   const { data: empleados = [] } = useQuery({
     queryKey: ['empleados-activos'],
@@ -92,12 +96,81 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     return pedidosDisponibles.filter((pedido: any) => {
       if (filtroZona && pedido.cliente?.zona_id !== filtroZona) return false;
       if (filtroVendedor && pedido.cliente?.vendedor_id !== filtroVendedor) return false;
-      if (filtroOrigen === 'web' && !pedido.observaciones?.startsWith('Pedido Paladini')) return false;
+      if (filtroOrigen === 'web' && pedido.tipo_pedido !== 'web') return false;
       return true;
     });
   }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
 
   const allFilteredSelected = pedidosFiltrados.length > 0 && pedidosFiltrados.every((p: any) => selectedPedidos.includes(p.id));
+
+  // Pedidos seleccionados completos (para imprimir remitos)
+  const pedidosSeleccionadosData = useMemo(() => {
+    return pedidosDisponibles.filter((p: any) => selectedPedidos.includes(p.id));
+  }, [pedidosDisponibles, selectedPedidos]);
+
+  const pedidosCortos = useMemo(
+    () => pedidosSeleccionadosData.filter((p: any) => (p.detalles?.length || 0) <= 10),
+    [pedidosSeleccionadosData]
+  );
+  const pedidosLargos = useMemo(
+    () => pedidosSeleccionadosData.filter((p: any) => (p.detalles?.length || 0) > 10),
+    [pedidosSeleccionadosData]
+  );
+
+  const handleImprimirRemitos = (pedidos: any[]) => {
+    if (pedidos.length === 0) return;
+    const ventana = window.open('', '_blank', 'width=800,height=600');
+    if (!ventana) {
+      alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
+      return;
+    }
+
+    const remitosHTML = pedidos.map((pedido: any, index: number) => {
+      const isLast = index === pedidos.length - 1;
+      const zonaNombre = zonas.find(z => z.id === pedido.cliente?.zona_id)?.nombre;
+      return generarRemitoHTML({
+        numeroPedido: pedido.numero_pedido,
+        fecha: new Date(pedido.fecha_pedido),
+        cliente: {
+          nombre: pedido.cliente?.nombre || '-',
+          codigoCliente: pedido.cliente?.codigo_cliente || undefined,
+          direccion: pedido.cliente?.direccion || '',
+          cuit: pedido.cliente?.dni_cuit || '',
+          zona: zonaNombre || undefined,
+        },
+        vendedor: undefined,
+        empresa: empresaConfig ? {
+          razonSocial: empresaConfig.nombre_fantasia || empresaConfig.razon_social,
+          cuit: empresaConfig.cuit,
+          direccion: [empresaConfig.direccion, empresaConfig.localidad, empresaConfig.provincia].filter(Boolean).join(', '),
+          telefono: empresaConfig.telefono || undefined,
+        } : undefined,
+        lineas: (pedido.detalles || [])
+          .filter((d: any) => d.producto)
+          .map((d: any) => ({
+            codigo: d.producto.codigo_articulo,
+            descripcion: d.producto.descripcion,
+            unidadMedida: d.producto.unidad_medida || 'UNI',
+            cantidad: d.cantidad_pedida,
+            precioUnitario: d.precio_unitario,
+            descuento: d.descuento_porcentaje ?? 0,
+            subtotal: d.subtotal,
+          })),
+        total: pedido.total,
+      }, isLast);
+    }).join('');
+
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Remitos</title>
+      <style>${REMITO_STYLES}</style>
+      </head><body>
+        ${remitosHTML}
+        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir Remitos</button>
+      </body></html>
+    `);
+    ventana.document.close();
+  };
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -278,6 +351,38 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             >
               🌐 Web
             </Button>
+
+            {/* Botones imprimir remitos de seleccionados */}
+            {selectedPedidos.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleImprimirRemitos(pedidosCortos)}
+                  disabled={pedidosCortos.length === 0}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Remitos Cortos
+                  {pedidosCortos.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{pedidosCortos.length}</Badge>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleImprimirRemitos(pedidosLargos)}
+                  disabled={pedidosLargos.length === 0}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Remitos Largos
+                  {pedidosLargos.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{pedidosLargos.length}</Badge>
+                  )}
+                </Button>
+              </div>
+            )}
             
             <div className="border rounded-md">
               {/* Select all header */}
