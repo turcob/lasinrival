@@ -402,7 +402,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
           ${datos.empresa ? `<div class="empresa-detalle">CUIT: ${datos.empresa.cuit}</div>` : ''}
         </div>
         <div class="header-right">
-          <div class="doc-tipo">Remito</div>
+          <div class="doc-tipo">Factura</div>
           <div class="doc-numero">${numeroFactura}</div>
           <div class="doc-fecha">${fechaFormateada}</div>
         </div>
