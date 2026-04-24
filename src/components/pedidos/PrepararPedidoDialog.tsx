@@ -536,6 +536,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                           <Input
                             type="text"
                             inputMode="decimal"
+                            autoFocus={lineas[0]?.detalleId === linea.detalleId}
                             value={linea.inputValue}
                             onChange={(e) => handleInputChange(linea.detalleId, e.target.value)}
                             onKeyDown={(e) => {
