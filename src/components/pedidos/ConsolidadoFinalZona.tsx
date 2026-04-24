@@ -46,6 +46,7 @@ import {
 } from '@/hooks/useConsolidadoPedidos';
 import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
 import { useTipoPedido } from '@/contexts/TipoPedidoContext';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -148,6 +149,7 @@ export function ConsolidadoFinalZona() {
   const { roles } = useAuth();
   const isAdmin = roles.some(r => r.role === 'admin');
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
+  const { config: empresaConfig } = useConfiguracionComercio();
 
   const { data: zonas } = useZonas();
   const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro, incluirHistoricos);
@@ -285,11 +287,17 @@ export function ConsolidadoFinalZona() {
         cliente: {
           nombre: pedido.cliente?.nombre || '-',
           codigoCliente: pedido.cliente?.codigo_cliente || undefined,
-          direccion: '',
-          cuit: '',
+          direccion: (pedido.cliente as any)?.direccion || '',
+          cuit: (pedido.cliente as any)?.dni_cuit || '',
           zona: zonaNombre || undefined,
         },
         vendedor: undefined,
+        empresa: empresaConfig ? {
+          razonSocial: empresaConfig.nombre_fantasia || empresaConfig.razon_social,
+          cuit: empresaConfig.cuit,
+          direccion: [empresaConfig.direccion, empresaConfig.localidad, empresaConfig.provincia].filter(Boolean).join(', '),
+          telefono: empresaConfig.telefono || undefined,
+        } : undefined,
         lineas: pedido.detalles
           .filter(d => d.producto)
           .map(d => ({
