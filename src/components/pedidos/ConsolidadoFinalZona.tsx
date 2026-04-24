@@ -76,7 +76,7 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
         .from('pedidos')
         .select(`
           id, numero_pedido, total, estado, fecha_pedido, observaciones, tipo_pedido,
-          cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id)
+          cliente:clientes(id, nombre, codigo_cliente, vendedor_id, zona_id, direccion, dni_cuit)
         `)
         .order('numero_pedido', { ascending: true });
 
