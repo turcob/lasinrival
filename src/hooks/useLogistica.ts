@@ -730,8 +730,8 @@ export function usePedidosDisponiblesParaRuta() {
       let query = supabase
         .from('pedidos')
         .select(`
-          id, numero_pedido, fecha_pedido, total, estado,
-          cliente:clientes(id, nombre, direccion, telefono, zona_id, vendedor_id),
+          id, numero_pedido, fecha_pedido, total, estado, tipo_pedido, observaciones,
+          cliente:clientes(id, nombre, direccion, telefono, zona_id, vendedor_id, codigo_cliente, dni_cuit),
           vendedor_id
         `)
         .eq('estado', 'preparado');  // Solo pedidos preparados
@@ -742,7 +742,30 @@ export function usePedidosDisponiblesParaRuta() {
 
       const { data, error } = await query.order('fecha_pedido');
       if (error) throw error;
-      return data;
+      if (!data || data.length === 0) return [];
+
+      // Traer detalles para poder imprimir remitos y clasificar cortos/largos
+      const pedidoIds = data.map((p: any) => p.id);
+      const { data: detalles, error: detError } = await supabase
+        .from('pedido_detalles')
+        .select(`
+          id, pedido_id, producto_id, cantidad_pedida, precio_unitario, descuento_porcentaje, subtotal,
+          producto:productos(id, descripcion, codigo_articulo, unidad_medida, es_frio)
+        `)
+        .in('pedido_id', pedidoIds);
+      if (detError) throw detError;
+
+      const detallesPorPedido = new Map<string, any[]>();
+      for (const d of (detalles || [])) {
+        const list = detallesPorPedido.get(d.pedido_id) || [];
+        list.push(d);
+        detallesPorPedido.set(d.pedido_id, list);
+      }
+
+      return data.map((p: any) => ({
+        ...p,
+        detalles: detallesPorPedido.get(p.id) || [],
+      }));
     },
   });
 }
