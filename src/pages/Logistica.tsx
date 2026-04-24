@@ -36,6 +36,7 @@ import { HojaCargaDialog } from '@/components/logistica/HojaCargaDialog';
 const estadoConfig: Record<HojaRutaEstado, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   planificada: { label: 'Planificada', variant: 'secondary' },
   en_carga: { label: 'En Carga', variant: 'outline' },
+  carga_confirmada: { label: 'Carga OK', variant: 'default' },
   en_ruta: { label: 'En Ruta', variant: 'default' },
   completada: { label: 'Completada', variant: 'secondary' },
   cancelada: { label: 'Cancelada', variant: 'destructive' },
@@ -270,6 +271,7 @@ export default function Logistica() {
                     <option value="">Todos los estados</option>
                     <option value="planificada">Planificada</option>
                     <option value="en_carga">En Carga</option>
+                    <option value="carga_confirmada">Carga Confirmada</option>
                     <option value="en_ruta">En Ruta</option>
                     <option value="completada">Completada</option>
                     <option value="cancelada">Cancelada</option>
