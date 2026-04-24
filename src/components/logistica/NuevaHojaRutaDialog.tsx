@@ -24,7 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MapPin, User, Truck, Calendar, Check, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { generarRemitoHTML, REMITO_STYLES } from '@/lib/imprimirRemito';
+import { generarRemitoHTML, REMITO_STYLES, buildRemitoOrientationToolbar, getRemitoStyles } from '@/lib/imprimirRemito';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 
 const formSchema = z.object({
@@ -180,10 +180,10 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     ventana.document.write(`
       <!DOCTYPE html>
       <html><head><title>Remitos</title>
-      <style>${REMITO_STYLES}</style>
+      <style id="remito-styles">${REMITO_STYLES}</style>
       </head><body>
         ${remitosHTML}
-        <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir Remitos</button>
+        ${buildRemitoOrientationToolbar('landscape')}
       </body></html>
     `);
     ventana.document.close();
