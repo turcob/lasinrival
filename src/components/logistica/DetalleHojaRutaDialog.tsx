@@ -428,7 +428,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             </div>
 
             {/* Info grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -450,6 +450,23 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 <div>
                   <p className="text-xs text-muted-foreground">Chofer</p>
                   <p className="font-medium">{hojaRuta.chofer?.nombre || '-'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <UserCog className="h-4 w-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">Responsable</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium truncate">{hojaRuta.responsable?.nombre || '-'}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={handleAbrirReasignar}
+                    >
+                      Cambiar
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
