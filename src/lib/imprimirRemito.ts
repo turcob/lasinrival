@@ -45,11 +45,19 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-type RemitoOrientation = 'landscape' | 'portrait';
+type RemitoOrientation = 'landscape' | 'portrait' | 'a4-portrait';
 
 function getPageDims(orientation: RemitoOrientation) {
   // landscape: A5 estándar 210x148
   // portrait (alimentación vertical del usuario): 200x140 personalizado
+  // a4-portrait: hoja A4 210x297, contenido limitado a 200x140 anclado arriba a la izquierda
+  if (orientation === 'a4-portrait') {
+    return {
+      width: '200mm',
+      height: '140mm',
+      size: 'A4 portrait',
+    };
+  }
   const width = orientation === 'landscape' ? '210mm' : '200mm';
   const height = orientation === 'landscape' ? '148mm' : '140mm';
   return { width, height, size: `${width} ${height}` };
