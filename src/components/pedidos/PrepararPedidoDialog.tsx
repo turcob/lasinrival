@@ -273,10 +273,16 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   }, [canGoPrev, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
 
   const goToNext = useCallback(async () => {
-    if (!canGoNext || !pedidoIds || !onNavigate || prepararPedido.isPending || totalFinal === 0) return;
+    if (prepararPedido.isPending || totalFinal === 0) return;
     const ok = await guardarPedido();
-    if (ok) onNavigate(pedidoIds[currentIndex + 1]);
-  }, [canGoNext, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex]);
+    if (!ok) return;
+    if (canGoNext && pedidoIds && onNavigate) {
+      onNavigate(pedidoIds[currentIndex + 1]);
+    } else {
+      // Último pedido: cerrar el diálogo, igual que el botón Guardar
+      onOpenChange(false);
+    }
+  }, [canGoNext, pedidoIds, onNavigate, prepararPedido.isPending, totalFinal, guardarPedido, currentIndex, onOpenChange]);
 
   // Keyboard navigation: PageUp / PageDown
   useEffect(() => {
