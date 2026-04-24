@@ -18,8 +18,7 @@ import {
   PackageSearch,
   Printer
 } from 'lucide-react';
-import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { imprimirRemito } from '@/lib/imprimirRemito';
+import { imprimirDetallePedido } from '@/lib/imprimirDetallePedido';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -85,7 +84,6 @@ function PedidosContent() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const { config } = useConfiguracionComercio();
 
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
@@ -156,35 +154,21 @@ function PedidosContent() {
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 
   const handleImprimirPedido = (pedido: any) => {
-    imprimirRemito({
+    imprimirDetallePedido({
       numeroPedido: pedido.numero_pedido,
       fecha: new Date(pedido.fecha_pedido),
       cliente: {
         nombre: pedido.cliente?.nombre || 'Cliente',
         codigoCliente: pedido.cliente?.codigo_cliente || undefined,
         direccion: pedido.cliente?.direccion || '',
-        cuit: pedido.cliente?.dni_cuit || '',
         zona: pedido.cliente?.zona?.nombre || undefined,
       },
       vendedor: pedido.vendedor ? `[${pedido.vendedor.codigo}] ${pedido.vendedor.nombre}` : undefined,
-      condicionVenta: pedido.estado === 'pendiente' ? 'Pendiente' : undefined,
-      total: pedido.total,
-      empresa: config
-        ? {
-            razonSocial: config.nombre_fantasia || config.razon_social,
-            cuit: config.cuit,
-            direccion: config.direccion,
-            telefono: config.telefono || undefined,
-          }
-        : undefined,
       lineas: (pedido.detalles || []).map((d: any) => ({
         codigo: d.producto?.codigo_articulo || '',
         descripcion: d.producto?.descripcion || 'Producto',
         unidadMedida: d.producto?.unidad_medida || 'UN',
         cantidad: d.cantidad_pedida,
-        precioUnitario: d.precio_unitario,
-        descuento: d.descuento_porcentaje || 0,
-        subtotal: d.subtotal,
       })),
     });
   };
