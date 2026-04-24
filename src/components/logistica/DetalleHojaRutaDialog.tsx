@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
 import { Button } from '@/components/ui/button';
 import { 
@@ -10,9 +12,18 @@ import {
   useDevolucionesHojaRuta,
   useRendicionHojaRuta,
   useHojaCarga,
+  useActualizarHojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { 
   Truck, 
   User, 
@@ -33,7 +44,8 @@ import {
   PackageX,
   Printer,
   RotateCcw,
-  X
+  X,
+  UserCog
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -74,6 +86,39 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const cambiarEstado = useCambiarEstadoHojaRuta();
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
+  const actualizarHojaRuta = useActualizarHojaRuta();
+
+  // Reasignación de responsable
+  const [reasignarOpen, setReasignarOpen] = useState(false);
+  const [nuevoResponsableId, setNuevoResponsableId] = useState<string>('');
+
+  const { data: empleados = [] } = useQuery({
+    queryKey: ['empleados-activos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('empleados')
+        .select('id, nombre')
+        .eq('activo', true)
+        .order('nombre');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleAbrirReasignar = () => {
+    setNuevoResponsableId(hojaRuta?.responsable_id || '');
+    setReasignarOpen(true);
+  };
+
+  const handleConfirmarReasignar = async () => {
+    if (!hojaRuta) return;
+    await actualizarHojaRuta.mutateAsync({
+      id: hojaRuta.id,
+      responsable_id: nuevoResponsableId || null,
+    } as any);
+    setReasignarOpen(false);
+  };
+
   // Estados para diálogos de cobro, rendición y devoluciones
   const [cobroDialog, setCobroDialog] = useState<{
     open: boolean;
