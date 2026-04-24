@@ -69,13 +69,19 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
   const REMITO_BODY_MAX_WIDTH = REMITO_PAGE_WIDTH;
   const pageSize = `size: ${REMITO_PAGE_SIZE};`;
   const pageMargin = 'margin: 0;';
+  const isA4Portrait = orientation === 'a4-portrait';
+  // En A4 vertical anclamos el contenido arriba a la izquierda y NO usamos padding lateral
+  // para que la impresión no supere los 14cm de alto ni se centre en la hoja.
+  const bodyPrintPadding = isA4Portrait ? '0' : '0 5mm';
+  const widthCalc = isA4Portrait ? REMITO_PAGE_WIDTH : `calc(${REMITO_PAGE_WIDTH} - 10mm)`;
+  const maxWidthCalc = isA4Portrait ? REMITO_PAGE_WIDTH : `calc(${REMITO_BODY_MAX_WIDTH} - 10mm)`;
   return `
     @media print {
-      body { margin: 0; padding: 0 5mm; }
+      body { margin: 0; padding: ${bodyPrintPadding}; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: calc(${REMITO_PAGE_WIDTH} - 10mm);
+        width: ${widthCalc};
         height: ${REMITO_PAGE_HEIGHT};
         max-height: ${REMITO_PAGE_HEIGHT};
         min-height: ${REMITO_PAGE_HEIGHT};
@@ -115,7 +121,7 @@ function getStyles(orientation: RemitoOrientation = 'landscape') {
     }
     .factura-page {
       width: 100%;
-      max-width: calc(${REMITO_BODY_MAX_WIDTH} - 10mm);
+      max-width: ${maxWidthCalc};
       margin: 0;
     }
     .factura-container {
