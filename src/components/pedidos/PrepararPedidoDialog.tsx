@@ -33,6 +33,7 @@ interface LineaPreparacion {
   subtotal: number; // valor calculado
   precioUnitario: number;
   descuentoPorcentaje: number;
+  descuentoInput?: string;
   esNuevo?: boolean;
 }
 
