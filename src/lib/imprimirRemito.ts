@@ -47,13 +47,11 @@ const formatNumeroFactura = (numero: number) => {
 
 type RemitoOrientation = 'landscape' | 'portrait';
 
-const A5_LONG = '210mm';
-const A5_SHORT = '148mm';
-
 function getPageDims(orientation: RemitoOrientation) {
-  // landscape: 210x148, portrait: 148x210
-  const width = orientation === 'landscape' ? A5_LONG : A5_SHORT;
-  const height = orientation === 'landscape' ? A5_SHORT : A5_LONG;
+  // landscape: A5 estándar 210x148
+  // portrait (alimentación vertical del usuario): 200x140 personalizado
+  const width = orientation === 'landscape' ? '210mm' : '200mm';
+  const height = orientation === 'landscape' ? '148mm' : '140mm';
   return { width, height, size: `${width} ${height}` };
 }
 
