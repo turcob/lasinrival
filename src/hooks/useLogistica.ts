@@ -764,6 +764,7 @@ export function usePedidosDisponiblesParaRuta() {
 
       return data.map((p: any) => ({
         ...p,
+        tipo_pedido: typeof p.tipo_pedido === 'string' ? p.tipo_pedido.trim().toLowerCase() : 'reparto',
         detalles: detallesPorPedido.get(p.id) || [],
       }));
     },

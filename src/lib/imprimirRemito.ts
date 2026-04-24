@@ -45,21 +45,21 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = '210mm 148mm';
-const REMITO_BODY_MAX_WIDTH = '780px';
+const REMITO_PAGE_SIZE = '148mm 210mm';
+const REMITO_BODY_MAX_WIDTH = '148mm';
 
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
   const pageSize = useA5 ? `size: ${REMITO_PAGE_SIZE};` : `size: ${REMITO_PAGE_SIZE};`;
-  const pageMargin = useA5 ? 'margin: 4mm;' : 'margin: 4mm;';
+  const pageMargin = useA5 ? 'margin: 0;' : 'margin: 0;';
   return `
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: 202mm;
-        min-height: 138mm;
+        width: 148mm;
+        min-height: 210mm;
         page-break-after: always;
         break-after: page;
       }
@@ -67,7 +67,7 @@ function getStyles(useA5: boolean) {
         page-break-after: auto;
         break-after: auto;
       }
-      .factura-container { min-height: 138mm; display: flex; flex-direction: column; }
+      .factura-container { min-height: 210mm; display: flex; flex-direction: column; }
       .items-table-wrapper { flex: 1; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -77,15 +77,16 @@ function getStyles(useA5: boolean) {
       font-weight: 700;
       line-height: 1.35;
       color: #1a1a1a;
+      width: ${REMITO_BODY_MAX_WIDTH};
       max-width: ${REMITO_BODY_MAX_WIDTH};
-      margin: 0 auto;
-      padding: 4mm;
+      margin: 0;
+      padding: 0;
       background: #fff;
     }
     .factura-page {
       width: 100%;
       max-width: ${REMITO_BODY_MAX_WIDTH};
-      margin: 0 auto 0;
+      margin: 0;
     }
     .factura-container {
       border: 2px solid #222;

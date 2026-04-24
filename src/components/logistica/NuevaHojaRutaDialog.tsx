@@ -94,10 +94,14 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
 
   const pedidosFiltrados = useMemo(() => {
     return pedidosDisponibles.filter((pedido: any) => {
+      const tipoPedidoNormalizado = typeof pedido.tipo_pedido === 'string'
+        ? pedido.tipo_pedido.trim().toLowerCase()
+        : 'reparto';
+
       if (filtroZona && pedido.cliente?.zona_id !== filtroZona) return false;
       if (filtroVendedor && pedido.cliente?.vendedor_id !== filtroVendedor) return false;
-      if (filtroOrigen === 'solo_web' && pedido.tipo_pedido !== 'web') return false;
-      if (filtroOrigen === 'sin_web' && pedido.tipo_pedido === 'web') return false;
+      if (filtroOrigen === 'solo_web' && tipoPedidoNormalizado !== 'web') return false;
+      if (filtroOrigen === 'sin_web' && tipoPedidoNormalizado === 'web') return false;
       return true;
     });
   }, [pedidosDisponibles, filtroZona, filtroVendedor, filtroOrigen]);
