@@ -531,7 +531,10 @@ export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientatio
   }
 
   const facturaHTML = buildFacturaHTML(datos);
-  const copiasHTML = `<div class="factura-page" data-copy="1">${facturaHTML}</div>`;
+  const copiasHTML = `
+    <div class="factura-page" data-copy="1">${facturaHTML}</div>
+    <div class="factura-page" data-copy="2">${facturaHTML}</div>
+  `;
 
   const html = `
     <!DOCTYPE html>
@@ -592,10 +595,12 @@ function buildOrientationToolbar(initial: RemitoOrientation): string {
  * Each factura gets its own page via page-break-after.
  */
 export function generarRemitoHTML(datos: DatosRemito, isLast: boolean = false): string {
-  const copiaUno = `<div class="factura-page">${buildFacturaHTML(datos)}</div>`;
+  const facturaHTML = buildFacturaHTML(datos);
+  const copiaUno = `<div class="factura-page" data-copy="1">${facturaHTML}</div>`;
+  const copiaDos = `<div class="factura-page" data-copy="2">${facturaHTML}</div>`;
   const pageBreak = !isLast ? '<div class="remito-batch-separator"></div>' : '';
 
-  return `${copiaUno}${pageBreak}`;
+  return `${copiaUno}${copiaDos}${pageBreak}`;
 }
 
 /** Shared CSS styles for facturas (used in batch printing). Default landscape. */
