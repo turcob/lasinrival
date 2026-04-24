@@ -33,6 +33,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,9 +65,9 @@ function useZonas() {
   });
 }
 
-function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, tipoPedido: 'web' | 'reparto' | 'ambos') {
+function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, tipoPedido: 'web' | 'reparto' | 'ambos', incluirHistoricos: boolean) {
   return useQuery({
-    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin, tipoPedido],
+    queryKey: ['pedidos-consolidado-final-zona', zonaId, isAdmin, tipoPedido, incluirHistoricos],
     queryFn: async () => {
       if (!zonaId) return [];
 
@@ -80,8 +82,12 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
 
       if (!isAdmin) {
         query = query.eq('estado', 'preparado' as any);
-      } else {
+      } else if (incluirHistoricos) {
+        // Mostrar histórico completo (sin rechazados)
         query = query.not('estado', 'eq', 'rechazado');
+      } else {
+        // Por defecto excluir despachados (ya tienen remito) y rechazados
+        query = query.not('estado', 'in', '(rechazado,despachado)');
       }
 
       if (tipoPedido !== 'ambos') {
@@ -137,13 +143,14 @@ function usePedidosPreparadosPorZona(zonaId: string | null, isAdmin: boolean, ti
 export function ConsolidadoFinalZona() {
   const [zonaId, setZonaId] = useState<string | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [incluirHistoricos, setIncluirHistoricos] = useState(false);
 
   const { roles } = useAuth();
   const isAdmin = roles.some(r => r.role === 'admin');
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   const { data: zonas } = useZonas();
-  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro);
+  const { data: pedidos, isLoading } = usePedidosPreparadosPorZona(zonaId, isAdmin, tipoPedidoFiltro, incluirHistoricos);
 
   // Ya filtrado server-side por tipo_pedido
   const pedidosFiltrados = useMemo(() => pedidos || [], [pedidos]);
@@ -393,6 +400,19 @@ export function ConsolidadoFinalZona() {
         </Button>
 
       </div>
+
+      {isAdmin && (
+        <div className="flex items-center gap-2 px-1">
+          <Switch
+            id="incluir-historicos"
+            checked={incluirHistoricos}
+            onCheckedChange={setIncluirHistoricos}
+          />
+          <Label htmlFor="incluir-historicos" className="text-sm cursor-pointer">
+            Incluir pedidos despachados (con remito)
+          </Label>
+        </div>
+      )}
 
       {!zonaId ? (
         <div className="text-center py-12 text-muted-foreground">
