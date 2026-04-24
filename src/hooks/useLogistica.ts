@@ -8,6 +8,37 @@ export type HojaRutaEstado = 'planificada' | 'en_carga' | 'carga_confirmada' | '
 export type ParadaEstado = 'pendiente' | 'en_camino' | 'entregado' | 'entrega_parcial' | 'rechazado' | 'no_entregado';
 export type DevolucionMotivo = 'rechazo_cliente' | 'producto_vencido' | 'producto_roto' | 'producto_faltante' | 'cambio' | 'error_pedido' | 'otro';
 
+const DEVOLUCION_MOTIVO_ALIAS: Record<string, DevolucionMotivo> = {
+  rechazo_cliente: 'rechazo_cliente',
+  'rechazo del cliente': 'rechazo_cliente',
+  producto_vencido: 'producto_vencido',
+  vencido: 'producto_vencido',
+  producto_roto: 'producto_roto',
+  producto_danado: 'producto_roto',
+  'producto danado/roto': 'producto_roto',
+  'producto dañado/roto': 'producto_roto',
+  danado: 'producto_roto',
+  dañado: 'producto_roto',
+  mal_estado: 'producto_roto',
+  producto_faltante: 'producto_faltante',
+  faltante: 'producto_faltante',
+  cambio: 'cambio',
+  error_pedido: 'error_pedido',
+  otro: 'otro',
+};
+
+function normalizeDevolucionMotivo(motivo: string): DevolucionMotivo {
+  const limpio = motivo.trim().toLowerCase();
+  const sinAcentos = limpio.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalizado = DEVOLUCION_MOTIVO_ALIAS[limpio] ?? DEVOLUCION_MOTIVO_ALIAS[sinAcentos];
+
+  if (!normalizado) {
+    throw new Error(`Motivo de rechazo no reconocido: ${motivo}`);
+  }
+
+  return normalizado;
+}
+
 export interface Vehiculo {
   id: string;
   patente: string;
@@ -605,6 +636,17 @@ export function useRegistrarDevolucion() {
     }) => {
       if (!user) throw new Error('Usuario no autenticado');
 
+      const motivoNormalizado = normalizeDevolucionMotivo(data.motivo);
+
+      console.info('[logistica] Registrando rechazo', {
+        hoja_ruta_id: data.hoja_ruta_id,
+        parada_id: data.parada_id,
+        pedido_detalle_id: data.pedido_detalle_id,
+        motivoOriginal: data.motivo,
+        motivoNormalizado,
+        cantidad: data.cantidad,
+      });
+
       // Fetch detalle info for price calculation and client
       const { data: detalleInfo } = await supabase
         .from('pedido_detalles')
@@ -620,13 +662,15 @@ export function useRegistrarDevolucion() {
           parada_id: data.parada_id,
           pedido_detalle_id: data.pedido_detalle_id,
           cantidad: data.cantidad,
-          motivo: data.motivo,
+          motivo: motivoNormalizado,
           detalle_motivo: data.detalle_motivo || null,
           reingresado_stock: false, // Stock se reingresa al aprobar la NC
           usuario_id: user.id
         });
 
-      if (devError) throw devError;
+      if (devError) {
+        throw new Error(`No se pudo registrar el rechazo con motivo "${data.motivo}" (${motivoNormalizado}). ${devError.message}`);
+      }
 
       // 2. Crear NC pendiente para que administración apruebe
       if (detalleInfo?.pedido) {
@@ -646,7 +690,7 @@ export function useRegistrarDevolucion() {
             cantidad: data.cantidad,
             precio_unitario: precioNeto,
             importe_total: importeTotal,
-            motivo: data.motivo,
+            motivo: motivoNormalizado,
             detalle_motivo: data.detalle_motivo || null,
             reingresar_stock: data.reingresarStock ?? true,
             generar_nc: true,
