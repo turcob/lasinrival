@@ -45,38 +45,45 @@ const formatNumeroFactura = (numero: number) => {
   return `B ${puntoVenta}-${nroComprobante}`;
 };
 
-const REMITO_PAGE_SIZE = 'A5 portrait';
-const REMITO_BODY_MAX_WIDTH = '148mm';
+const REMITO_PAGE_WIDTH = '148mm';
 const REMITO_PAGE_HEIGHT = '210mm';
+const REMITO_PAGE_SIZE = `${REMITO_PAGE_WIDTH} ${REMITO_PAGE_HEIGHT}`;
+const REMITO_BODY_MAX_WIDTH = REMITO_PAGE_WIDTH;
 
 /** Common styles shared by single and batch printing */
 function getStyles(useA5: boolean) {
-  const pageSize = useA5 ? `size: ${REMITO_PAGE_SIZE};` : `size: ${REMITO_PAGE_SIZE};`;
-  const pageMargin = useA5 ? 'margin: 0;' : 'margin: 0;';
+  const pageSize = `size: ${REMITO_PAGE_SIZE};`;
+  const pageMargin = 'margin: 0;';
   return `
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none !important; }
       @page { ${pageSize} ${pageMargin} }
       .factura-page {
-        width: 148mm;
+        width: ${REMITO_PAGE_WIDTH};
         height: ${REMITO_PAGE_HEIGHT};
+        max-height: ${REMITO_PAGE_HEIGHT};
         min-height: ${REMITO_PAGE_HEIGHT};
         page-break-after: always;
+        break-after: page;
         page-break-inside: avoid;
         break-inside: avoid;
         overflow: hidden;
       }
       .factura-page:last-child {
         page-break-after: auto;
+        break-after: auto;
       }
       .factura-container {
         min-height: ${REMITO_PAGE_HEIGHT};
         height: ${REMITO_PAGE_HEIGHT};
+        max-height: ${REMITO_PAGE_HEIGHT};
         display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
       .items-table-wrapper { flex: 1; }
+      .remito-batch-separator { display: none; }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
