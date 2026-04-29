@@ -1514,6 +1514,8 @@ export type Database = {
         Row: {
           created_at: string
           forma_pago_id: string
+          foto_comprobante_nombre: string | null
+          foto_comprobante_path: string | null
           hoja_ruta_id: string
           id: string
           monto: number
@@ -1526,6 +1528,8 @@ export type Database = {
         Insert: {
           created_at?: string
           forma_pago_id: string
+          foto_comprobante_nombre?: string | null
+          foto_comprobante_path?: string | null
           hoja_ruta_id: string
           id?: string
           monto?: number
@@ -1538,6 +1542,8 @@ export type Database = {
         Update: {
           created_at?: string
           forma_pago_id?: string
+          foto_comprobante_nombre?: string | null
+          foto_comprobante_path?: string | null
           hoja_ruta_id?: string
           id?: string
           monto?: number
