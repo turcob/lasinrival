@@ -464,6 +464,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               const esMenor = linea.cantidadPreparada < linea.cantidadPedida;
               const esMayor = linea.cantidadPreparada > linea.cantidadPedida;
               const hayDiferencia = esMenor || esMayor;
+              const subtotalBruto = linea.cantidadPreparada * linea.precioUnitario;
+              const importeDescuento = Math.max(0, subtotalBruto - linea.subtotal);
               
               return (
                 <div 
@@ -557,12 +559,16 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                       </div>
 
                       <div className="text-right min-w-[120px]">
-                        <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
+                        <p className="text-xs text-muted-foreground mb-1">Total</p>
                         <p className={`font-bold text-lg ${
                           esMayor ? 'text-primary' : esMenor ? 'text-warning' : ''
                         }`}>
                           {formatCurrency(linea.subtotal)}
                         </p>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          <p>Importe: {formatCurrency(subtotalBruto)}</p>
+                          <p>Dto: {importeDescuento > 0 ? `-${formatCurrency(importeDescuento)}` : '-'}</p>
+                        </div>
                         <Button variant="ghost" size="sm" className="mt-2" onClick={() => eliminarLinea(linea.detalleId)}>
                           <Trash2 className="mr-1 h-4 w-4" />
                           Eliminar
