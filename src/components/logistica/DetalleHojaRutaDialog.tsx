@@ -272,10 +272,6 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     await cambiarEstado.mutateAsync({ id: hojaRuta.id, estado: 'carga_confirmada', forzada: true });
   };
 
-  const handleEstadoParada = async (paradaId: string, estado: ParadaEstado) => {
-    await actualizarParada.mutateAsync({ id: paradaId, estado });
-  };
-
   const handleEliminarParada = async (paradaId: string) => {
     if (confirm('¿Eliminar esta parada de la hoja de ruta?')) {
       await eliminarParada.mutateAsync(paradaId);
