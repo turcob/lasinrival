@@ -141,6 +141,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
+    marcarParcialAlGuardar?: boolean;
     pedidoDetalles: Array<{
       id: string;
       producto_id: string | null;
@@ -148,7 +149,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       cantidad_entregada: number | null;
       producto?: { descripcion: string; codigo_articulo: string };
     }>;
-  }>({ open: false, paradaId: '', pedidoDetalles: [] });
+  }>({ open: false, paradaId: '', marcarParcialAlGuardar: false, pedidoDetalles: [] });
 
   // Calcular monto cobrado por pedido
   const getCobradoPorPedido = (pedidoId: string): number => {
@@ -251,14 +252,24 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     }
   };
 
+  const handleEstadoParada = async (paradaId: string, estado: ParadaEstado, pedidoDetalles: any[] = []) => {
+    if (estado === 'entrega_parcial') {
+      setDevolucionDialog({
+        open: true,
+        paradaId,
+        marcarParcialAlGuardar: true,
+        pedidoDetalles,
+      });
+      return;
+    }
+
+    await actualizarParada.mutateAsync({ id: paradaId, estado });
+  };
+
   const handleForzarConfirmacion = async () => {
     if (!hojaRuta) return;
     if (!confirm('¿Confirmar manualmente la carga sin esperar al responsable en la app?\n\nQuedará registrado como confirmación forzada desde el sistema web.')) return;
     await cambiarEstado.mutateAsync({ id: hojaRuta.id, estado: 'carga_confirmada', forzada: true });
-  };
-
-  const handleEstadoParada = async (paradaId: string, estado: ParadaEstado) => {
-    await actualizarParada.mutateAsync({ id: paradaId, estado });
   };
 
   const handleEliminarParada = async (paradaId: string) => {
@@ -686,7 +697,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => handleEstadoParada(parada.id, 'entrega_parcial')}
+                                  onClick={() => handleEstadoParada(parada.id, 'entrega_parcial', parada.pedido?.detalles || [])}
                                 >
                                   <AlertTriangle className="h-4 w-4 mr-1" />
                                   Parcial
@@ -744,6 +755,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                     onClick={() => setDevolucionDialog({
                                       open: true,
                                       paradaId: parada.id,
+                                      marcarParcialAlGuardar: false,
                                       pedidoDetalles: parada.pedido?.detalles || [],
                                     })}
                                   >
@@ -978,7 +990,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           hojaRutaId={hojaRutaId}
           paradaId={devolucionDialog.paradaId}
           pedidoDetalles={devolucionDialog.pedidoDetalles}
-          onSuccess={() => refetch()}
+          onSuccess={async () => {
+            if (devolucionDialog.marcarParcialAlGuardar && devolucionDialog.paradaId) {
+              await actualizarParada.mutateAsync({ id: devolucionDialog.paradaId, estado: 'entrega_parcial' });
+            }
+            await refetch();
+          }}
         />
       )}
 
