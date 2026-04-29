@@ -45,7 +45,8 @@ import {
   Printer,
   RotateCcw,
   X,
-  UserCog
+  UserCog,
+  History
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -140,6 +141,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
   const [refacturarOpen, setRefacturarOpen] = useState(false);
+  const [historiaOpen, setHistoriaOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
@@ -281,6 +283,77 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       await eliminarParada.mutateAsync(paradaId);
     }
   };
+
+  const formatDateTime = (value?: string | null) => value
+    ? format(new Date(value), 'dd/MM/yyyy HH:mm', { locale: es })
+    : '-';
+
+  const formatMoney = (value: number) =>
+    `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const eventosHistoria = hojaRuta ? [
+    {
+      fecha: hojaRuta.created_at,
+      titulo: 'Hoja de ruta creada',
+      detalle: `Se armó la hoja #${hojaRuta.numero_hoja} con ${hojaRuta.paradas?.length || 0} paradas. Chofer: ${hojaRuta.chofer?.nombre || '-'}, vehículo: ${hojaRuta.vehiculo?.patente || '-'}.`,
+    },
+    ...(hojaRuta.carga_confirmada_at ? [{
+      fecha: hojaRuta.carga_confirmada_at,
+      titulo: hojaRuta.carga_forzada ? 'Carga confirmada manualmente' : 'Carga confirmada',
+      detalle: hojaRuta.carga_forzada ? 'La carga fue confirmada desde el sistema web.' : 'El responsable confirmó la carga de la hoja.',
+    }] : []),
+    ...(hojaRuta.hora_salida_real ? [{
+      fecha: hojaRuta.hora_salida_real,
+      titulo: 'Ruta iniciada',
+      detalle: `Salida real registrada. Km inicial: ${hojaRuta.km_inicial ?? '-'}.`,
+    }] : []),
+    ...((hojaRuta.paradas || []).flatMap((parada: any) => {
+      const cobrosParada = (cobros || []).filter((c: any) => c.parada?.id === parada.id);
+      const devolucionesParada = productosRechazadosControl.filter((d: any) => (d.parada_id || d.parada?.id) === parada.id);
+      return [
+        {
+          fecha: parada.created_at,
+          titulo: `Parada ${parada.orden} asignada`,
+          detalle: `Pedido #${parada.pedido?.numero_pedido || '-'} · Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Importe original: ${formatMoney(parada.pedido?.total || 0)}.`,
+        },
+        ...(parada.hora_llegada ? [{
+          fecha: parada.hora_llegada,
+          titulo: `Llegada a parada ${parada.orden}`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Estado actual: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}.`,
+        }] : []),
+        ...devolucionesParada.map((d: any) => {
+          const precio = d.pedido_detalle?.precio_unitario || 0;
+          const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+          const importe = (Number(d.cantidad) || 0) * precio * (1 - descuento / 100);
+          return {
+            fecha: d.created_at,
+            titulo: `Producto rechazado en parada ${parada.orden}`,
+            detalle: `${d.pedido_detalle?.producto?.codigo_articulo || '-'} · ${d.pedido_detalle?.producto?.descripcion || 'Producto'} · Cantidad: ${d.cantidad} · Importe: ${formatMoney(importe)} · Motivo: ${(d.motivo || 'Sin motivo').replace(/_/g, ' ')}${d.detalle_motivo ? ` · Detalle: ${d.detalle_motivo}` : ''}.`,
+          };
+        }),
+        ...cobrosParada.map((c: any) => ({
+          fecha: c.created_at,
+          titulo: `Cobro registrado en parada ${parada.orden}`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Monto: ${formatMoney(c.monto || 0)} · Forma de pago: ${c.forma_pago?.nombre || c.medio_pago || 'Efectivo'}${c.referencia ? ` · Referencia: ${c.referencia}` : ''}${c.observaciones ? ` · Obs.: ${c.observaciones}` : ''}.`,
+        })),
+        ...(parada.hora_salida ? [{
+          fecha: parada.hora_salida,
+          titulo: `Parada ${parada.orden} finalizada`,
+          detalle: `Resultado: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}${parada.observaciones ? ` · Observaciones: ${parada.observaciones}` : ''}.`,
+        }] : []),
+      ];
+    })),
+    ...(rendicionExistente ? [{
+      fecha: rendicionExistente.fecha_aprobacion || rendicionExistente.updated_at || rendicionExistente.created_at,
+      titulo: 'Rendición registrada',
+      detalle: `Estado: ${rendicionExistente.estado || '-'} · Diferencia: ${formatMoney(Number(rendicionExistente.diferencia) || 0)} · Efectivo: ${formatMoney(Number(rendicionExistente.total_efectivo) || 0)} · Tarjeta: ${formatMoney(Number(rendicionExistente.total_tarjeta) || 0)}.`,
+    }] : []),
+    ...(hojaRuta.hora_regreso ? [{
+      fecha: hojaRuta.hora_regreso,
+      titulo: 'Ruta finalizada',
+      detalle: `Regreso registrado. Km final: ${hojaRuta.km_final ?? '-'}.`,
+    }] : []),
+  ].filter((e) => e.fecha).sort((a, b) => new Date(a.fecha as string).getTime() - new Date(b.fecha as string).getTime()) : [];
 
   const imprimirListadoParadas = (hoja: any) => {
     const ventana = window.open('', '_blank', 'width=900,height=600');
@@ -496,6 +569,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setHistoriaOpen(true)}
+                  disabled={!hojaRuta}
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Historia
+                </Button>
                 {hojaRuta.estado === 'en_carga' && (
                   <Button
                     size="sm"
@@ -1026,6 +1108,43 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           }}
         />
       )}
+
+      <Dialog open={historiaOpen} onOpenChange={setHistoriaOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historia de hoja de ruta #{hojaRuta?.numero_hoja || ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm rounded-lg border bg-muted/30 p-3">
+            <div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{hojaRuta ? format(new Date(hojaRuta.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Chofer</p><p className="font-medium">{hojaRuta?.chofer?.nombre || '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Vehículo</p><p className="font-medium">{hojaRuta?.vehiculo?.patente || '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Estado</p><p className="font-medium">{hojaRuta ? estadoHojaConfig[hojaRuta.estado]?.label : '-'}</p></div>
+          </div>
+          <div className="space-y-3 py-2">
+            {eventosHistoria.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No hay movimientos registrados.</div>
+            ) : (
+              eventosHistoria.map((evento, index) => (
+                <div key={`${evento.fecha}-${index}`} className="flex gap-3 rounded-lg border p-3">
+                  <div className="flex flex-col items-center">
+                    <span className="h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">{index + 1}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                      <p className="font-semibold">{evento.titulo}</p>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(evento.fecha)}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{evento.detalle}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de reasignación de responsable */}
       <Dialog open={reasignarOpen} onOpenChange={setReasignarOpen}>
