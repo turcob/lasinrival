@@ -101,6 +101,8 @@ export interface HojaRutaParada {
       producto_id: string | null;
       cantidad_pedida: number;
       cantidad_entregada: number | null;
+      precio_unitario?: number | null;
+      descuento_porcentaje?: number | null;
       producto?: { descripcion: string; codigo_articulo: string };
     }>;
   };
