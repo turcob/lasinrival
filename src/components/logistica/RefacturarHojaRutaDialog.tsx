@@ -23,6 +23,8 @@ interface RefacturarHojaRutaDialogProps {
   onSuccess?: () => Promise<void> | void;
 }
 
+type PedidoAImprimir = { pedido_id: string; [key: string]: unknown };
+
 const parseCantidad = (value: string) => {
   const parsed = Number(value.replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : NaN;
@@ -44,7 +46,7 @@ export function RefacturarHojaRutaDialog({
   const [productoId, setProductoId] = useState('');
   const [nuevaCantidad, setNuevaCantidad] = useState('');
   const [resultado, setResultado] = useState<any | null>(null);
-  const [pedidosAImprimir, setPedidosAImprimir] = useState<any[]>([]);
+  const [pedidosAImprimir, setPedidosAImprimir] = useState<PedidoAImprimir[]>([]);
   const [imprimiendo, setImprimiendo] = useState(false);
   const refacturar = useRefacturarHojaRuta();
   const { config: empresaConfig } = useConfiguracionComercio();
@@ -104,8 +106,8 @@ export function RefacturarHojaRutaDialog({
     });
     setResultado(data);
     setPedidosAImprimir((prev) => {
-      const acumulados = new Map(prev.map((p: any) => [p.pedido_id, p]));
-      (data?.pedidos_afectados || []).forEach((p: any) => acumulados.set(p.pedido_id, p));
+      const acumulados = new Map(prev.map((p) => [p.pedido_id, p]));
+      ((data?.pedidos_afectados || []) as PedidoAImprimir[]).forEach((p) => acumulados.set(p.pedido_id, p));
       return Array.from(acumulados.values());
     });
     await onSuccess?.();
