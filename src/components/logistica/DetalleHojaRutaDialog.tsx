@@ -770,8 +770,10 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                     const IconEstado = estadoConfig.icon;
                     const cobrosParada = (cobros || []).filter((c) => ((c as { parada_id?: string; parada?: { id?: string } }).parada_id || (c as { parada?: { id?: string } }).parada?.id) === parada.id);
                     const totalCobradoParada = cobrosParada.reduce((sum: number, c) => sum + (Number((c as { monto?: number }).monto) || 0), 0);
-                    const devolucionImporteParada = getDevolucionesPorParada(parada.id);
                     const totalOriginalParada = Number(parada.pedido?.total) || 0;
+                    const devolucionImporteParada = parada.estado === 'rechazado' || parada.estado === 'no_entregado'
+                      ? totalOriginalParada
+                      : getDevolucionesPorParada(parada.id);
                     const totalEsperadoParadaDetalle = parada.pedido
                       ? getTotalEsperadoParada(parada.id, parada.estado, totalOriginalParada)
                       : 0;
