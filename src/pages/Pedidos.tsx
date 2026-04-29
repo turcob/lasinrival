@@ -46,7 +46,6 @@ import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
 import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
-import { ConsolidadoFinalZona } from '@/components/pedidos/ConsolidadoFinalZona';
 import { TipoPedidoProvider, useTipoPedido } from '@/contexts/TipoPedidoContext';
 import { SelectorTipoPedidoDialog } from '@/components/pedidos/SelectorTipoPedidoDialog';
 import { TipoPedidoSelector, TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
@@ -196,7 +195,6 @@ function PedidosContent() {
         <TabsList>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
-          <TabsTrigger value="consolidado-zona">Consolidado Final</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pedidos">
@@ -467,10 +465,6 @@ function PedidosContent() {
 
         <TabsContent value="consolidado">
           <ConsolidadoPedidos />
-        </TabsContent>
-
-        <TabsContent value="consolidado-zona">
-          <ConsolidadoFinalZona />
         </TabsContent>
       </Tabs>
 
