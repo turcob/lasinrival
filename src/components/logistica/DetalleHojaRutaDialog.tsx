@@ -284,6 +284,77 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     }
   };
 
+  const formatDateTime = (value?: string | null) => value
+    ? format(new Date(value), 'dd/MM/yyyy HH:mm', { locale: es })
+    : '-';
+
+  const formatMoney = (value: number) =>
+    `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const eventosHistoria = hojaRuta ? [
+    {
+      fecha: hojaRuta.created_at,
+      titulo: 'Hoja de ruta creada',
+      detalle: `Se armó la hoja #${hojaRuta.numero_hoja} con ${hojaRuta.paradas?.length || 0} paradas. Chofer: ${hojaRuta.chofer?.nombre || '-'}, vehículo: ${hojaRuta.vehiculo?.patente || '-'}.`,
+    },
+    ...(hojaRuta.carga_confirmada_at ? [{
+      fecha: hojaRuta.carga_confirmada_at,
+      titulo: hojaRuta.carga_forzada ? 'Carga confirmada manualmente' : 'Carga confirmada',
+      detalle: hojaRuta.carga_forzada ? 'La carga fue confirmada desde el sistema web.' : 'El responsable confirmó la carga de la hoja.',
+    }] : []),
+    ...(hojaRuta.hora_salida_real ? [{
+      fecha: hojaRuta.hora_salida_real,
+      titulo: 'Ruta iniciada',
+      detalle: `Salida real registrada. Km inicial: ${hojaRuta.km_inicial ?? '-'}.`,
+    }] : []),
+    ...((hojaRuta.paradas || []).flatMap((parada: any) => {
+      const cobrosParada = (cobros || []).filter((c: any) => c.parada?.id === parada.id);
+      const devolucionesParada = productosRechazadosControl.filter((d: any) => (d.parada_id || d.parada?.id) === parada.id);
+      return [
+        {
+          fecha: parada.created_at,
+          titulo: `Parada ${parada.orden} asignada`,
+          detalle: `Pedido #${parada.pedido?.numero_pedido || '-'} · Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Importe original: ${formatMoney(parada.pedido?.total || 0)}.`,
+        },
+        ...(parada.hora_llegada ? [{
+          fecha: parada.hora_llegada,
+          titulo: `Llegada a parada ${parada.orden}`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Estado actual: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}.`,
+        }] : []),
+        ...devolucionesParada.map((d: any) => {
+          const precio = d.pedido_detalle?.precio_unitario || 0;
+          const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
+          const importe = (Number(d.cantidad) || 0) * precio * (1 - descuento / 100);
+          return {
+            fecha: d.created_at,
+            titulo: `Producto rechazado en parada ${parada.orden}`,
+            detalle: `${d.pedido_detalle?.producto?.codigo_articulo || '-'} · ${d.pedido_detalle?.producto?.descripcion || 'Producto'} · Cantidad: ${d.cantidad} · Importe: ${formatMoney(importe)} · Motivo: ${(d.motivo || 'Sin motivo').replace(/_/g, ' ')}${d.detalle_motivo ? ` · Detalle: ${d.detalle_motivo}` : ''}.`,
+          };
+        }),
+        ...cobrosParada.map((c: any) => ({
+          fecha: c.created_at,
+          titulo: `Cobro registrado en parada ${parada.orden}`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Monto: ${formatMoney(c.monto || 0)} · Forma de pago: ${c.forma_pago?.nombre || c.medio_pago || 'Efectivo'}${c.referencia ? ` · Referencia: ${c.referencia}` : ''}${c.observaciones ? ` · Obs.: ${c.observaciones}` : ''}.`,
+        })),
+        ...(parada.hora_salida ? [{
+          fecha: parada.hora_salida,
+          titulo: `Parada ${parada.orden} finalizada`,
+          detalle: `Resultado: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}${parada.observaciones ? ` · Observaciones: ${parada.observaciones}` : ''}.`,
+        }] : []),
+      ];
+    })),
+    ...(rendicionExistente ? [{
+      fecha: rendicionExistente.fecha_aprobacion || rendicionExistente.updated_at || rendicionExistente.created_at,
+      titulo: 'Rendición registrada',
+      detalle: `Estado: ${rendicionExistente.estado || '-'} · Diferencia: ${formatMoney(Number(rendicionExistente.diferencia) || 0)} · Efectivo: ${formatMoney(Number(rendicionExistente.total_efectivo) || 0)} · Tarjeta: ${formatMoney(Number(rendicionExistente.total_tarjeta) || 0)}.`,
+    }] : []),
+    ...(hojaRuta.hora_regreso ? [{
+      fecha: hojaRuta.hora_regreso,
+      titulo: 'Ruta finalizada',
+      detalle: `Regreso registrado. Km final: ${hojaRuta.km_final ?? '-'}.`,
+    }] : []),
+  ].filter((e) => e.fecha).sort((a, b) => new Date(a.fecha as string).getTime() - new Date(b.fecha as string).getTime()) : [];
+
   const imprimirListadoParadas = (hoja: any) => {
     const ventana = window.open('', '_blank', 'width=900,height=600');
     if (!ventana) {
