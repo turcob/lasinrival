@@ -13,6 +13,7 @@ import {
   useRendicionHojaRuta,
   useHojaCarga,
   useActualizarHojaRuta,
+  type HojaRuta,
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
