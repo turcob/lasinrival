@@ -768,17 +768,18 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   hojaRuta.paradas.map((parada, index) => {
                     const estadoConfig = estadoParadaConfig[parada.estado];
                     const IconEstado = estadoConfig.icon;
-                    const cobrosParada = (cobros || []).filter((c: any) => (c.parada_id || c.parada?.id) === parada.id);
-                    const totalCobradoParada = cobrosParada.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0);
+                    const cobrosParada = (cobros || []).filter((c) => ((c as { parada_id?: string; parada?: { id?: string } }).parada_id || (c as { parada?: { id?: string } }).parada?.id) === parada.id);
+                    const totalCobradoParada = cobrosParada.reduce((sum: number, c) => sum + (Number((c as { monto?: number }).monto) || 0), 0);
                     const devolucionImporteParada = getDevolucionesPorParada(parada.id);
                     const totalOriginalParada = Number(parada.pedido?.total) || 0;
                     const totalEsperadoParadaDetalle = parada.pedido
                       ? getTotalEsperadoParada(parada.id, parada.estado, totalOriginalParada)
                       : 0;
                     const saldoParada = Math.max(totalEsperadoParadaDetalle - totalCobradoParada, 0);
-                    const formasPagoParada = Array.from(cobrosParada.reduce((map: Map<string, number>, c: any) => {
-                      const forma = c.forma_pago?.nombre || c.medio_pago || 'Efectivo';
-                      map.set(forma, (map.get(forma) || 0) + (Number(c.monto) || 0));
+                    const formasPagoParada = Array.from(cobrosParada.reduce((map: Map<string, number>, c) => {
+                      const cobro = c as { forma_pago?: { nombre?: string }; medio_pago?: string; monto?: number };
+                      const forma = cobro.forma_pago?.nombre || cobro.medio_pago || 'Efectivo';
+                      map.set(forma, (map.get(forma) || 0) + (Number(cobro.monto) || 0));
                       return map;
                     }, new Map<string, number>()).entries());
                     
