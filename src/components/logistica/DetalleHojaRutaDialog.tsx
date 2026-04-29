@@ -391,6 +391,13 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
     const fechaHoja = format(new Date(hoja.fecha), 'dd/MM/yyyy', { locale: es });
 
+    const escapeHtml = (value: unknown) => String(value ?? '-')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
     const formatNumero = (num: number) => {
       const pv = '00001';
       const nro = num.toString().padStart(8, '0');
@@ -400,10 +407,46 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     const formatCurrency = (v: number) =>
       new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-    const paradas = (hoja.paradas || []).filter((p: any) => p.pedido);
-    const FILAS_POR_PAGINA = 50;
+    const getCobrosParadaListado = (paradaId: string) => (cobros || [])
+      .filter((c: any) => (c.parada_id || c.parada?.id) === paradaId);
 
-    const generarFilas = (items: any[], startIndex: number) => items.map((parada: any, i: number) => {
+    const getDevolucionImporteListado = (parada: any) => {
+      const totalOriginal = Number(parada.pedido?.total) || 0;
+      if (parada.estado === 'rechazado' || parada.estado === 'no_entregado') return totalOriginal;
+      return productosRechazadosControl
+        .filter((d: any) => (d.parada_id || d.parada?.id) === parada.id)
+        .reduce((sum: number, d: any) => {
+          const precio = Number(d.pedido_detalle?.precio_unitario) || 0;
+          const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
+          return sum + ((Number(d.cantidad) || 0) * precio * (1 - descuento / 100));
+        }, 0);
+    };
+
+    const paradas = (hoja.paradas || [])
+      .filter((p: any) => p.pedido)
+      .map((parada: any) => {
+        const cobrosParada = getCobrosParadaListado(parada.id);
+        const mediosMap = cobrosParada.reduce((map: Map<string, number>, c: any) => {
+          const medio = c.forma_pago?.nombre || c.medio_pago || 'Efectivo';
+          map.set(medio, (map.get(medio) || 0) + (Number(c.monto) || 0));
+          return map;
+        }, new Map<string, number>());
+        const aCobrar = Number(parada.pedido?.total) || 0;
+        const rechazado = getDevolucionImporteListado(parada);
+        const cobrado = Array.from(mediosMap.values()).reduce((sum, monto) => sum + monto, 0);
+        return {
+          parada,
+          aCobrar,
+          rechazado,
+          cobrado,
+          saldo: Math.max(aCobrar - rechazado - cobrado, 0),
+          medios: Array.from(mediosMap.entries()),
+        };
+      });
+    const FILAS_POR_PAGINA = 38;
+
+    const generarFilas = (items: any[], startIndex: number) => items.map((item: any, i: number) => {
+      const parada = item.parada;
       const pedido = parada.pedido;
       const cliente = pedido.cliente;
       const idx = startIndex + i;
@@ -411,25 +454,42 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       const nroRemito = formatNumero(pedido.numero_pedido);
       const codCliente = cliente?.codigo_cliente || '-';
       const razonSocial = cliente?.nombre || '-';
-      const vendedor = pedido.vendedor?.nombre || '-';
-      const zona = cliente?.zona?.nombre || '-';
-      const importe = formatCurrency(pedido.total || 0);
+      const mediosPago = item.medios.length > 0
+        ? item.medios.map(([medio, monto]: [string, number]) => `${escapeHtml(medio)}: $ ${formatCurrency(monto)}`).join('<br>')
+        : '-';
 
       return `
         <tr${idx % 2 === 1 ? ' style="background:#f7f7f7;"' : ''}>
           <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; text-align:center;">${idx + 1}</td>
           <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${fechaRemito}</td>
           <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; font-family:'Courier New',monospace;">${nroRemito}</td>
-          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; font-family:'Courier New',monospace;">${codCliente}</td>
-          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${razonSocial}</td>
-          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${vendedor}</td>
-          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${zona}</td>
-          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${importe}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700; font-family:'Courier New',monospace;">${escapeHtml(codCliente)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:700;">${escapeHtml(razonSocial)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${formatCurrency(item.aCobrar)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${formatCurrency(item.rechazado)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${formatCurrency(item.cobrado)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:10px; font-weight:800; text-align:right; font-family:'Courier New',monospace;">$ ${formatCurrency(item.saldo)}</td>
+          <td style="padding:3px 4px; border-bottom:1px solid #d0d0d0; font-size:9px; font-weight:700; line-height:1.25;">${mediosPago}</td>
         </tr>
       `;
     }).join('');
 
-    const totalGeneral = paradas.reduce((sum: number, p: any) => sum + (p.pedido?.total || 0), 0);
+    const totalACobrar = paradas.reduce((sum: number, item: any) => sum + item.aCobrar, 0);
+    const totalRechazado = paradas.reduce((sum: number, item: any) => sum + item.rechazado, 0);
+    const totalCobrado = paradas.reduce((sum: number, item: any) => sum + item.cobrado, 0);
+    const totalSaldo = paradas.reduce((sum: number, item: any) => sum + item.saldo, 0);
+    const totalesMedios = paradas.reduce((map: Map<string, number>, item: any) => {
+      item.medios.forEach(([medio, monto]: [string, number]) => {
+        map.set(medio, (map.get(medio) || 0) + monto);
+      });
+      return map;
+    }, new Map<string, number>());
+    const totalesMediosHTML = Array.from(totalesMedios.entries()).map(([medio, monto]) => `
+      <tr>
+        <td>${escapeHtml(medio)}</td>
+        <td class="right">$ ${formatCurrency(monto)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="2">Sin cobros registrados</td></tr>';
 
     // Dividir en páginas de 50 filas
     const paginas: any[][] = [];
@@ -443,17 +503,19 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           <th class="center" style="width:25px;">#</th>
           <th style="width:70px;">Fecha</th>
           <th style="width:120px;">Nº Remito</th>
-          <th style="width:60px;">Cód. Cli.</th>
+          <th style="width:55px;">Cód. Cli.</th>
           <th>Razón Social</th>
-          <th style="width:100px;">Vendedor</th>
-          <th style="width:80px;">Zona</th>
-          <th class="right" style="width:90px;">Importe</th>
+          <th class="right" style="width:82px;">A cobrar</th>
+          <th class="right" style="width:82px;">Rechazado</th>
+          <th class="right" style="width:82px;">Cobrado</th>
+          <th class="right" style="width:82px;">Saldo</th>
+          <th style="width:150px;">Medios de pago</th>
         </tr>
       </thead>`;
 
     const headerHTML = `
       <div class="header">
-        <div class="header-title">LISTADO DE PARADAS</div>
+        <div class="header-title">COBRANZAS POR CLIENTE</div>
         <div class="header-info">
           <span>Hoja de Ruta #${hoja.numero_hoja}</span>
           <span>Fecha: ${fechaHoja}</span>
@@ -476,8 +538,16 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             </table>
             ${isLast ? `
               <div class="total-row">
-                <span>TOTAL:</span>
-                <span>$ ${formatCurrency(totalGeneral)}</span>
+                <span>A COBRAR: $ ${formatCurrency(totalACobrar)}</span>
+                <span>RECHAZADO: $ ${formatCurrency(totalRechazado)}</span>
+                <span>COBRADO: $ ${formatCurrency(totalCobrado)}</span>
+                <span>SALDO: $ ${formatCurrency(totalSaldo)}</span>
+              </div>
+              <div class="medios-summary">
+                <div class="summary-title">TOTAL COBRADO POR MEDIO DE PAGO</div>
+                <table>
+                  <tbody>${totalesMediosHTML}</tbody>
+                </table>
               </div>
             ` : ''}
           </div>
