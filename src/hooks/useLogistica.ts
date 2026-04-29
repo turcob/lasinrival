@@ -262,7 +262,7 @@ export function useHojaRuta(id: string | undefined) {
             cliente:clientes(id, nombre, codigo_cliente, direccion, telefono, zona:zonas(nombre)),
             vendedor:vendedores(id, nombre),
             detalles:pedido_detalles(
-              id, producto_id, cantidad_pedida, cantidad_entregada,
+              id, producto_id, cantidad_pedida, cantidad_entregada, precio_unitario, descuento_porcentaje,
               producto:productos(descripcion, codigo_articulo)
             )
           )
