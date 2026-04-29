@@ -453,10 +453,10 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
 
     const generarFilas = (items: ItemListado[], startIndex: number) => items.map((item, i: number) => {
       const parada = item.parada;
-      const pedido = parada.pedido;
-      const cliente = pedido.cliente;
+      const pedido = parada.pedido as NonNullable<ParadaListado['pedido']> & { fecha_pedido?: string | null };
+      const cliente = pedido.cliente as NonNullable<ParadaListado['pedido']>['cliente'] & { codigo_cliente?: string | null };
       const idx = startIndex + i;
-      const fechaRemito = format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy', { locale: es });
+      const fechaRemito = pedido.fecha_pedido ? format(new Date(pedido.fecha_pedido), 'dd/MM/yyyy', { locale: es }) : '-';
       const nroRemito = formatNumero(pedido.numero_pedido);
       const codCliente = cliente?.codigo_cliente || '-';
       const razonSocial = cliente?.nombre || '-';
