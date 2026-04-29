@@ -1019,7 +1019,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onOpenChange={setRefacturarOpen}
           hojaRuta={hojaRuta}
           productosCarga={productosCarga || []}
-          onSuccess={() => refetch()}
+          onSuccess={async () => {
+            await refetch();
+          }}
         />
       )}
 
