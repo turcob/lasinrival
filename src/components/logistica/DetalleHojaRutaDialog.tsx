@@ -1011,6 +1011,16 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         />
       )}
 
+      {hojaRuta && (
+        <RefacturarHojaRutaDialog
+          open={refacturarOpen}
+          onOpenChange={setRefacturarOpen}
+          hojaRuta={hojaRuta}
+          productosCarga={productosCarga || []}
+          onSuccess={() => refetch()}
+        />
+      )}
+
       {/* Diálogo de reasignación de responsable */}
       <Dialog open={reasignarOpen} onOpenChange={setReasignarOpen}>
         <DialogContent className="max-w-md">
