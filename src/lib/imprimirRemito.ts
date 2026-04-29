@@ -523,7 +523,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
   `;
 }
 
-export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientation = 'landscape') {
+export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientation = 'a4-portrait') {
   const ventana = window.open('', '_blank', 'width=800,height=600');
   if (!ventana) {
     alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
@@ -554,35 +554,18 @@ export function imprimirRemito(datos: DatosRemito, orientation: RemitoOrientatio
   ventana.document.close();
 }
 
-/** Toolbar with orientation selector + print button injected into the print window */
+/** Toolbar with fixed A4 sheet + print button injected into the print window */
 function buildOrientationToolbar(initial: RemitoOrientation): string {
-  const stylesLandscape = getStyles('landscape').replace(/<\/script>/g, '<\\/script>');
-  const stylesPortrait = getStyles('portrait').replace(/<\/script>/g, '<\\/script>');
   const stylesA4Portrait = getStyles('a4-portrait').replace(/<\/script>/g, '<\\/script>');
   return `
     <div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:8px;align-items:center;background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.18);font-family:'Segoe UI',Arial,sans-serif;font-size:13px;z-index:9999;">
-      <label style="font-weight:600;color:#222;">Orientación:</label>
-      <select id="remito-orientation" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
-        <option value="landscape" ${initial === 'landscape' ? 'selected' : ''}>A5 Horizontal</option>
-        <option value="portrait" ${initial === 'portrait' ? 'selected' : ''}>A5 Vertical</option>
-        <option value="a4-portrait" ${initial === 'a4-portrait' ? 'selected' : ''}>A4 Vertical (máx 14cm)</option>
-      </select>
+      <span style="font-weight:600;color:#222;">Hoja: A4 Vertical</span>
       <button id="remito-print-btn" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">🖨️ Imprimir</button>
     </div>
     <script>
       (function(){
-        var stylesMap = {
-          landscape: ${JSON.stringify(stylesLandscape)},
-          portrait: ${JSON.stringify(stylesPortrait)},
-          'a4-portrait': ${JSON.stringify(stylesA4Portrait)}
-        };
-        var sel = document.getElementById('remito-orientation');
         var styleEl = document.getElementById('remito-styles');
-        if (sel && styleEl) {
-          sel.addEventListener('change', function(){
-            styleEl.textContent = stylesMap[sel.value] || stylesMap.landscape;
-          });
-        }
+        if (styleEl) styleEl.textContent = ${JSON.stringify(stylesA4Portrait)};
         var btn = document.getElementById('remito-print-btn');
         if (btn) btn.addEventListener('click', function(){ window.print(); });
       })();
