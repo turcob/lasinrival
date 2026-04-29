@@ -125,6 +125,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
         const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
         const descuentoLinea = inferirDescuentoLinea(d);
         const precioConDescuento = d.precio_unitario * (1 - descuentoLinea / 100);
+        const subtotalGuardado = Number(d.subtotal) || 0;
         return {
           detalleId: d.id,
           productoId: d.producto_id,
@@ -134,7 +135,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
           cantidadPedida: d.cantidad_pedida,
           inputValue: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
           cantidadPreparada: d.cantidad_pedida,
-          subtotal: descuentoLinea > 0 && d.subtotal > 0 ? d.subtotal : d.cantidad_pedida * precioConDescuento,
+          subtotal: subtotalGuardado > 0 ? subtotalGuardado : d.cantidad_pedida * precioConDescuento,
           precioUnitario: d.precio_unitario,
           descuentoPorcentaje: descuentoLinea,
         };
