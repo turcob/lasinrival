@@ -45,7 +45,8 @@ import {
   Printer,
   RotateCcw,
   X,
-  UserCog
+  UserCog,
+  History
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -140,6 +141,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
   const [refacturarOpen, setRefacturarOpen] = useState(false);
+  const [historiaOpen, setHistoriaOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
