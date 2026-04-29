@@ -209,7 +209,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           .flatMap((parada: any) =>
             (parada.pedido?.detalles || []).map((detalle: any) => ({
               id: `rechazo-total-${parada.id}-${detalle.id}`,
-              cantidad: detalle.cantidad_entregada ?? detalle.cantidad_pedida ?? 0,
+              cantidad: Number(detalle.cantidad_entregada) > 0
+                ? detalle.cantidad_entregada
+                : (detalle.cantidad_pedida ?? 0),
               motivo: 'rechazo_cliente',
               detalle_motivo: parada.observaciones || 'Pedido completo rechazado',
               reingresado_stock: false,
