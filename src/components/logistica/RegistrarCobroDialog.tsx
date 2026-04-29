@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { DollarSign, CreditCard, Smartphone, Banknote, Plus, Trash2 } from 'lucide-react';
+import { DollarSign, CreditCard, Smartphone, Banknote, Plus, Trash2, ImagePlus, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface FormaPago {
@@ -50,11 +50,13 @@ export function RegistrarCobroDialog({
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [cobros, setCobros] = useState<CobroItem[]>([{ forma_pago_id: '', monto: 0, referencia: '' }]);
   const [observaciones, setObservaciones] = useState('');
+  const [fotoComprobante, setFotoComprobante] = useState<File | null>(null);
 
   useEffect(() => {
     if (open) {
       loadFormasPago();
       setObservaciones('');
+      setFotoComprobante(null);
     }
   }, [open]);
 
@@ -128,6 +130,25 @@ export function RegistrarCobroDialog({
 
     setLoading(true);
     try {
+      let fotoPath: string | null = null;
+      let fotoNombre: string | null = null;
+
+      if (fotoComprobante) {
+        const extension = fotoComprobante.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${hojaRutaId}/${paradaId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from('comprobantes-cobros')
+          .upload(fileName, fotoComprobante, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: fotoComprobante.type || 'image/jpeg',
+          });
+
+        if (uploadError) throw uploadError;
+        fotoPath = fileName;
+        fotoNombre = fotoComprobante.name;
+      }
+
       // Insertar todos los cobros
       const { error: cobrosError } = await supabase.from('hoja_ruta_cobros').insert(
         cobrosValidos.map(c => ({
@@ -139,8 +160,10 @@ export function RegistrarCobroDialog({
           referencia: c.referencia || null,
           observaciones: observaciones || null,
           usuario_id: user.id,
+          foto_comprobante_path: fotoPath,
+          foto_comprobante_nombre: fotoNombre,
         }))
-      );
+      as any);
 
       if (cobrosError) throw cobrosError;
 
