@@ -194,6 +194,43 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return getTotalNeto(paradaId, totalPedido);
   };
 
+  const devolucionesRegistradas = devoluciones || [];
+  const paradasConDevolucion = new Set(
+    devolucionesRegistradas.map((d: any) => d.parada_id || d.parada?.id).filter(Boolean)
+  );
+  const productosRechazadosControl = hojaRuta
+    ? [
+        ...devolucionesRegistradas,
+        ...(hojaRuta.paradas || [])
+          .filter((parada: any) => parada.estado === 'rechazado' && !paradasConDevolucion.has(parada.id))
+          .flatMap((parada: any) =>
+            (parada.pedido?.detalles || []).map((detalle: any) => ({
+              id: `rechazo-total-${parada.id}-${detalle.id}`,
+              cantidad: detalle.cantidad_entregada ?? detalle.cantidad_pedida ?? 0,
+              motivo: 'rechazo_cliente',
+              detalle_motivo: parada.observaciones || 'Pedido completo rechazado',
+              reingresado_stock: false,
+              created_at: parada.hora_llegada || parada.updated_at || parada.created_at,
+              parada_id: parada.id,
+              parada: {
+                id: parada.id,
+                orden: parada.orden,
+                pedido: {
+                  numero_pedido: parada.pedido?.numero_pedido,
+                  cliente: parada.pedido?.cliente,
+                },
+              },
+              pedido_detalle: {
+                id: detalle.id,
+                precio_unitario: 0,
+                descuento_porcentaje: 0,
+                producto: detalle.producto,
+              },
+            }))
+          ),
+      ]
+    : [];
+
   if (!hojaRutaId) return null;
 
   const getNextEstado = (current: HojaRutaEstado): HojaRutaEstado | null => {
@@ -770,17 +807,17 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             <div className="space-y-6 lg:col-span-1">
 
             {/* Sección de Devoluciones Registradas */}
-            {devoluciones && devoluciones.length > 0 && (
+            {productosRechazadosControl.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <RotateCcw className="h-4 w-4 text-amber-600" />
-                    Productos Rechazados ({devoluciones.length})
+                    Productos Rechazados ({productosRechazadosControl.length})
                   </h3>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, devoluciones)}
+                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl)}
                     title="Imprimir detalle para control posterior"
                   >
                     <Printer className="h-4 w-4 mr-1" />
@@ -789,7 +826,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 </div>
                 
                 <div className="border border-amber-200 rounded-lg divide-y bg-amber-50/50 max-h-[200px] overflow-y-auto">
-                  {devoluciones.map((devolucion: any) => {
+                  {productosRechazadosControl.map((devolucion: any) => {
                     const precio = devolucion.pedido_detalle?.precio_unitario || 0;
                     const descuento = devolucion.pedido_detalle?.descuento_porcentaje || 0;
                     const precioNeto = precio * (1 - descuento / 100);
@@ -834,7 +871,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 <div className="flex justify-end px-3">
                   <span className="text-sm font-bold text-destructive">
                     {'Total devoluciones: -$'}
-                    {devoluciones.reduce((sum: number, d: any) => {
+                    {productosRechazadosControl.reduce((sum: number, d: any) => {
                       const precio = d.pedido_detalle?.precio_unitario || 0;
                       const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
                       return sum + (d.cantidad * precio * (1 - descuento / 100));
