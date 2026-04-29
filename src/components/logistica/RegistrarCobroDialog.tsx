@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { DollarSign, CreditCard, Smartphone, Banknote, Plus, Trash2 } from 'lucide-react';
+import { DollarSign, CreditCard, Smartphone, Banknote, Plus, Trash2, ImagePlus, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface FormaPago {
@@ -50,11 +50,13 @@ export function RegistrarCobroDialog({
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
   const [cobros, setCobros] = useState<CobroItem[]>([{ forma_pago_id: '', monto: 0, referencia: '' }]);
   const [observaciones, setObservaciones] = useState('');
+  const [fotoComprobante, setFotoComprobante] = useState<File | null>(null);
 
   useEffect(() => {
     if (open) {
       loadFormasPago();
       setObservaciones('');
+      setFotoComprobante(null);
     }
   }, [open]);
 
@@ -128,18 +130,41 @@ export function RegistrarCobroDialog({
 
     setLoading(true);
     try {
+      let fotoPath: string | null = null;
+      let fotoNombre: string | null = null;
+
+      if (fotoComprobante) {
+        const extension = fotoComprobante.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${hojaRutaId}/${paradaId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from('comprobantes-cobros')
+          .upload(fileName, fotoComprobante, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: fotoComprobante.type || 'image/jpeg',
+          });
+
+        if (uploadError) throw uploadError;
+        fotoPath = fileName;
+        fotoNombre = fotoComprobante.name;
+      }
+
       // Insertar todos los cobros
+      const cobrosPayload = cobrosValidos.map(c => ({
+        hoja_ruta_id: hojaRutaId,
+        parada_id: paradaId,
+        pedido_id: pedidoId,
+        forma_pago_id: c.forma_pago_id,
+        monto: c.monto,
+        referencia: c.referencia || null,
+        observaciones: observaciones || null,
+        usuario_id: user.id,
+        foto_comprobante_path: fotoPath,
+        foto_comprobante_nombre: fotoNombre,
+      }));
+
       const { error: cobrosError } = await supabase.from('hoja_ruta_cobros').insert(
-        cobrosValidos.map(c => ({
-          hoja_ruta_id: hojaRutaId,
-          parada_id: paradaId,
-          pedido_id: pedidoId,
-          forma_pago_id: c.forma_pago_id,
-          monto: c.monto,
-          referencia: c.referencia || null,
-          observaciones: observaciones || null,
-          usuario_id: user.id,
-        }))
+        cobrosPayload as any
       );
 
       if (cobrosError) throw cobrosError;
@@ -270,6 +295,30 @@ export function RegistrarCobroDialog({
               placeholder="Notas adicionales sobre el cobro..."
               rows={2}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Foto del comprobante (opcional)</Label>
+            {fotoComprobante ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
+                <span className="truncate">{fotoComprobante.name}</span>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFotoComprobante(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input px-3 py-3 text-sm text-muted-foreground hover:bg-muted/50">
+                <ImagePlus className="h-4 w-4" />
+                Adjuntar foto
+                <Input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => setFotoComprobante(e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
           </div>
 
           <Card className={saldoPendiente <= 0 ? 'border-success bg-success/5' : 'border-warning bg-warning/5'}>
