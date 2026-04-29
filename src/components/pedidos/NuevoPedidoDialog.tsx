@@ -217,6 +217,14 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
     }));
   };
 
+  const establecerCantidad = (productoId: string, valor: string) => {
+    const num = parseFloat(valor);
+    if (isNaN(num) || num <= 0) return;
+    setCarrito(carrito.map(c =>
+      c.producto_id === productoId ? { ...c, cantidad: num } : c
+    ));
+  };
+
   const actualizarDescuento = (productoId: string, valor: string) => {
     const num = parseFloat(valor);
     if (isNaN(num) || num < 0) return;
@@ -470,7 +478,14 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-8 text-center font-medium">{item.cantidad}</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={item.cantidad}
+                            onChange={e => establecerCantidad(item.producto_id, e.target.value)}
+                            className="h-8 w-20 text-center font-medium"
+                          />
                           <Button 
                             variant="outline" 
                             size="icon" 
