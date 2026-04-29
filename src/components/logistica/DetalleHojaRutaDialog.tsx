@@ -775,15 +775,16 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <RotateCcw className="h-4 w-4 text-amber-600" />
-                    Devoluciones Registradas ({devoluciones.length})
+                    Productos Rechazados ({devoluciones.length})
                   </h3>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, devoluciones)}
+                    title="Imprimir detalle para control posterior"
                   >
                     <Printer className="h-4 w-4 mr-1" />
-                    Imprimir
+                    Imprimir control
                   </Button>
                 </div>
                 
