@@ -1004,7 +1004,8 @@ export function useDevolucionesHojaRuta(hojaRutaId: string | undefined) {
           parada_id,
           parada:hoja_ruta_paradas(
             id,
-            pedido:pedidos(numero_pedido, cliente:clientes(nombre))
+            orden,
+            pedido:pedidos(numero_pedido, cliente:clientes(codigo_cliente, nombre))
           ),
           pedido_detalle:pedido_detalles(
             id,
