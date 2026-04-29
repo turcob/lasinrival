@@ -50,6 +50,7 @@ import {
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
 import { RegistrarDevolucionDialog } from './RegistrarDevolucionDialog';
+import { RefacturarHojaRutaDialog } from './RefacturarHojaRutaDialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -138,6 +139,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     montoCobrado: number;
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
+  const [refacturarOpen, setRefacturarOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
