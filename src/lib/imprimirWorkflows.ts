@@ -324,6 +324,16 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     .replace(/'/g, '&#039;');
   const formatMotivo = (motivo: string | null | undefined) => escapeHtml((motivo || 'Sin motivo').replace(/_/g, ' '));
   const totalUnidades = devoluciones.reduce((s: number, d: any) => s + (Number(d.cantidad) || 0), 0);
+  const zonas = Array.from(new Set((hojaRuta.paradas || [])
+    .map((p: any) => p.pedido?.cliente?.zona?.nombre)
+    .filter(Boolean)));
+  const zonaTexto = zonas.length > 0 ? zonas.join(', ') : '-';
+  const totalImporte = devoluciones.reduce((s: number, d: any) => {
+    const precio = Number(d.pedido_detalle?.precio_unitario) || 0;
+    const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
+    return s + ((Number(d.cantidad) || 0) * precio * (1 - descuento / 100));
+  }, 0);
+  const formatCurrency = (value: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Productos Rechazados - HR #${hojaRuta.numero_hoja}</title>
   <style>
     @page { size: A4; margin: 12mm; }
@@ -353,7 +363,7 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
   </style></head><body>
     <div class="header">
       <h1>PRODUCTOS RECHAZADOS — Hoja de Ruta #${escapeHtml(hojaRuta.numero_hoja)}</h1>
-      <p>Fecha: ${new Date(hojaRuta.fecha).toLocaleDateString('es-AR')} | Chofer: ${escapeHtml(hojaRuta.chofer?.nombre)} | Vehículo: ${escapeHtml(hojaRuta.vehiculo?.patente)}</p>
+      <p>Fecha: ${new Date(hojaRuta.fecha).toLocaleDateString('es-AR')} | Chofer: ${escapeHtml(hojaRuta.chofer?.nombre)} | Vehículo: ${escapeHtml(hojaRuta.vehiculo?.patente)} | Zona: ${escapeHtml(zonaTexto)}</p>
     </div>
 
     <div class="info-bar">
@@ -374,9 +384,11 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
           <th>Código</th>
           <th>Producto</th>
           <th>Cantidad</th>
+          <th>Precio total</th>
           <th>Motivo</th>
           <th>Detalle</th>
           <th>Recibido</th>
+          <th>No recibido</th>
           <th>OK</th>
           <th>Ajuste</th>
         </tr>
@@ -385,6 +397,9 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
         ${devoluciones.map((d: any, i: number) => {
           const pedido = d.parada?.pedido;
           const cliente = pedido?.cliente;
+          const precio = Number(d.pedido_detalle?.precio_unitario) || 0;
+          const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
+          const precioTotal = (Number(d.cantidad) || 0) * precio * (1 - descuento / 100);
           return `
           <tr>
             <td>${i + 1}</td>
@@ -394,8 +409,10 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
             <td class="codigo">${escapeHtml(d.pedido_detalle?.producto?.codigo_articulo)}</td>
             <td>${escapeHtml(d.pedido_detalle?.producto?.descripcion || 'Producto')}</td>
             <td style="text-align:center;font-weight:700;">${d.cantidad}</td>
+            <td style="text-align:right;font-weight:700;">$ ${formatCurrency(precioTotal)}</td>
             <td class="motivo">${formatMotivo(d.motivo)}</td>
             <td class="detalle">${escapeHtml(d.detalle_motivo)}</td>
+            <td class="check-cell">□</td>
             <td class="check-cell">□</td>
             <td class="check-cell">□</td>
             <td class="check-cell">□</td>
@@ -404,7 +421,8 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
         <tr class="total-row">
           <td colspan="6" style="text-align:right;">TOTAL UNIDADES</td>
           <td style="text-align:center;">${totalUnidades}</td>
-          <td colspan="5"></td>
+          <td style="text-align:right;">$ ${formatCurrency(totalImporte)}</td>
+          <td colspan="6"></td>
         </tr>
       </tbody>
     </table>
