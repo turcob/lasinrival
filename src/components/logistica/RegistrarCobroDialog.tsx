@@ -150,20 +150,22 @@ export function RegistrarCobroDialog({
       }
 
       // Insertar todos los cobros
+      const cobrosPayload = cobrosValidos.map(c => ({
+        hoja_ruta_id: hojaRutaId,
+        parada_id: paradaId,
+        pedido_id: pedidoId,
+        forma_pago_id: c.forma_pago_id,
+        monto: c.monto,
+        referencia: c.referencia || null,
+        observaciones: observaciones || null,
+        usuario_id: user.id,
+        foto_comprobante_path: fotoPath,
+        foto_comprobante_nombre: fotoNombre,
+      }));
+
       const { error: cobrosError } = await supabase.from('hoja_ruta_cobros').insert(
-        cobrosValidos.map(c => ({
-          hoja_ruta_id: hojaRutaId,
-          parada_id: paradaId,
-          pedido_id: pedidoId,
-          forma_pago_id: c.forma_pago_id,
-          monto: c.monto,
-          referencia: c.referencia || null,
-          observaciones: observaciones || null,
-          usuario_id: user.id,
-          foto_comprobante_path: fotoPath,
-          foto_comprobante_nombre: fotoNombre,
-        }))
-      as any);
+        cobrosPayload as any
+      );
 
       if (cobrosError) throw cobrosError;
 
