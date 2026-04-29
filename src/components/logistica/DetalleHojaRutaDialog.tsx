@@ -594,14 +594,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           thead th.right { text-align: right; }
           thead th.center { text-align: center; }
           .total-row {
-            display: flex; justify-content: flex-end; align-items: center;
+            display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap;
             border-top: 2px solid #222; background: #eee; padding: 6px 10px;
           }
-          .total-row span:first-child { font-size: 13px; font-weight: 900; letter-spacing: 2px; }
-          .total-row span:last-child {
-            margin-left: 16px; font-size: 14px; font-weight: 900;
-            font-family: 'Courier New', monospace;
-          }
+          .total-row span { font-size: 12px; font-weight: 900; font-family: 'Courier New', monospace; }
+          .medios-summary { border-top: 1px solid #222; padding: 6px 10px; background: #fafafa; }
+          .summary-title { font-size: 11px; font-weight: 900; margin-bottom: 4px; }
+          .medios-summary table { width: 280px; margin-left: auto; border-collapse: collapse; }
+          .medios-summary td { padding: 2px 4px; border-bottom: 1px solid #d0d0d0; font-size: 10px; font-weight: 800; }
+          .right { text-align: right; font-family: 'Courier New', monospace; }
           .print-button {
             position: fixed; bottom: 20px; right: 20px; padding: 10px 20px;
             background: #2563eb; color: white; border: none; border-radius: 6px;
