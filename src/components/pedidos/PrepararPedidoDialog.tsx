@@ -107,29 +107,9 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
   // Initialize lines when dialog opens
   useEffect(() => {
     if (open && pedido?.detalles) {
-      // Detect implicit header-level discount (e.g. Paladini quantity discounts)
-      // that wasn't propagated to per-line descuento_porcentaje.
-      const sinDescuentoPorLinea = pedido.detalles.every(
-        (d: PedidoDetalle) => !d.descuento_porcentaje || d.descuento_porcentaje === 0
-      );
-      const brutoLineas = pedido.detalles.reduce(
-        (sum: number, d: PedidoDetalle) => sum + d.cantidad_pedida * d.precio_unitario,
-        0
-      );
-      const totalPedido = pedido.total || 0;
-      let descuentoImplicitoPct = 0;
-      if (
-        sinDescuentoPorLinea &&
-        brutoLineas > 0 &&
-        totalPedido > 0 &&
-        totalPedido < brutoLineas - 0.01
-      ) {
-        descuentoImplicitoPct = Math.round(((1 - totalPedido / brutoLineas) * 100) * 100) / 100;
-      }
-
       setLineas(pedido.detalles.map((d: PedidoDetalle) => {
         const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
-        const descuentoLinea = (d.descuento_porcentaje || 0) || descuentoImplicitoPct;
+        const descuentoLinea = d.descuento_porcentaje || 0;
         const precioConDescuento = d.precio_unitario * (1 - descuentoLinea / 100);
         return {
           detalleId: d.id,
