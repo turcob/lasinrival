@@ -141,6 +141,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
+    marcarParcialAlGuardar?: boolean;
     pedidoDetalles: Array<{
       id: string;
       producto_id: string | null;
@@ -148,7 +149,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       cantidad_entregada: number | null;
       producto?: { descripcion: string; codigo_articulo: string };
     }>;
-  }>({ open: false, paradaId: '', pedidoDetalles: [] });
+  }>({ open: false, paradaId: '', marcarParcialAlGuardar: false, pedidoDetalles: [] });
 
   // Calcular monto cobrado por pedido
   const getCobradoPorPedido = (pedidoId: string): number => {
