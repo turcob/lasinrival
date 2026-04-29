@@ -297,6 +297,30 @@ export function RegistrarCobroDialog({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Foto del comprobante (opcional)</Label>
+            {fotoComprobante ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
+                <span className="truncate">{fotoComprobante.name}</span>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFotoComprobante(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input px-3 py-3 text-sm text-muted-foreground hover:bg-muted/50">
+                <ImagePlus className="h-4 w-4" />
+                Adjuntar foto
+                <Input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => setFotoComprobante(e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
+          </div>
+
           <Card className={saldoPendiente <= 0 ? 'border-success bg-success/5' : 'border-warning bg-warning/5'}>
             <CardContent className="pt-4">
               <div className="flex justify-between text-sm mb-1">
