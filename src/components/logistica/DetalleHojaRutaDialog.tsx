@@ -511,7 +511,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                     variant="outline"
                     onClick={() => setRefacturarOpen(true)}
                   >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    <RotateCcw className="h-4 w-4 mr-2" />
                     Refacturar hoja
                   </Button>
                 )}
