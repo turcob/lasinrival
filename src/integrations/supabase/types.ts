@@ -1705,6 +1705,42 @@ export type Database = {
           },
         ]
       }
+      hoja_ruta_refacturaciones: {
+        Row: {
+          cantidad_anterior: number
+          cantidad_descontada: number
+          cantidad_nueva: number
+          created_at: string
+          hoja_ruta_id: string
+          id: string
+          pedidos_afectados: Json
+          producto_id: string
+          usuario_id: string
+        }
+        Insert: {
+          cantidad_anterior: number
+          cantidad_descontada: number
+          cantidad_nueva: number
+          created_at?: string
+          hoja_ruta_id: string
+          id?: string
+          pedidos_afectados?: Json
+          producto_id: string
+          usuario_id: string
+        }
+        Update: {
+          cantidad_anterior?: number
+          cantidad_descontada?: number
+          cantidad_nueva?: number
+          created_at?: string
+          hoja_ruta_id?: string
+          id?: string
+          pedidos_afectados?: Json
+          producto_id?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       hoja_ruta_rendiciones: {
         Row: {
           aprobado_por: string | null
@@ -4529,6 +4565,14 @@ export type Database = {
       is_route_owner: { Args: { route_id: string }; Returns: boolean }
       is_route_responsable: { Args: { route_id: string }; Returns: boolean }
       is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
+      refacturar_hoja_ruta_producto: {
+        Args: {
+          p_hoja_ruta_id: string
+          p_nueva_cantidad: number
+          p_producto_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_permission:

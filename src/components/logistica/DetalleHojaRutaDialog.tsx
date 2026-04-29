@@ -50,6 +50,7 @@ import {
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
 import { RegistrarDevolucionDialog } from './RegistrarDevolucionDialog';
+import { RefacturarHojaRutaDialog } from './RefacturarHojaRutaDialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -138,6 +139,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     montoCobrado: number;
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
+  const [refacturarOpen, setRefacturarOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
     open: boolean;
     paradaId: string;
@@ -501,6 +503,16 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Forzar confirmación
+                  </Button>
+                )}
+                {(hojaRuta.paradas?.length || 0) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRefacturarOpen(true)}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Refacturar hoja
                   </Button>
                 )}
                 {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && hojaRuta.estado !== 'en_carga' && (
@@ -978,7 +990,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onOpenChange={setRendicionOpen}
           hojaRutaId={hojaRutaId}
           numeroHoja={hojaRuta.numero_hoja}
-          onSuccess={() => refetch()}
+          onSuccess={async () => {
+            await refetch();
+          }}
         />
       )}
 
@@ -994,6 +1008,18 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             if (devolucionDialog.marcarParcialAlGuardar && devolucionDialog.paradaId) {
               await actualizarParada.mutateAsync({ id: devolucionDialog.paradaId, estado: 'entrega_parcial' });
             }
+            await refetch();
+          }}
+        />
+      )}
+
+      {hojaRuta && (
+        <RefacturarHojaRutaDialog
+          open={refacturarOpen}
+          onOpenChange={setRefacturarOpen}
+          hojaRuta={hojaRuta}
+          productosCarga={productosCarga || []}
+          onSuccess={async () => {
             await refetch();
           }}
         />
