@@ -316,7 +316,15 @@ export function imprimirWorkflowLogistica() {
 }
 
 export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[]) {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Devoluciones - HR #${hojaRuta.numero_hoja}</title>
+  const escapeHtml = (value: unknown) => String(value ?? '-')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  const formatMotivo = (motivo: string | null | undefined) => escapeHtml((motivo || 'Sin motivo').replace(/_/g, ' '));
+  const totalUnidades = devoluciones.reduce((s: number, d: any) => s + (Number(d.cantidad) || 0), 0);
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Productos Rechazados - HR #${hojaRuta.numero_hoja}</title>
   <style>
     @page { size: A4; margin: 12mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -326,12 +334,15 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     .header p { font-size: 11px; color: #78716c; margin-top: 4px; }
     .info-bar { display: flex; gap: 24px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; font-weight: 600; }
     .info-bar span { color: #78716c; font-weight: 400; }
+    .control-note { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; font-size: 11px; color: #374151; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-    th { background: #f59e0b; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
+    th { background: #f59e0b; color: #fff; text-align: left; padding: 7px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    td { padding: 7px 6px; border-bottom: 1px solid #e5e7eb; font-size: 10px; vertical-align: top; }
     tr:nth-child(even) { background: #fffbeb; }
+    .codigo { font-family: 'Courier New', monospace; font-weight: 700; }
     .motivo { color: #92400e; font-weight: 600; }
     .detalle { color: #78716c; font-style: italic; }
+    .check-cell { text-align: center; font-size: 15px; line-height: 1; }
     .total-row { background: #fef3c7 !important; font-weight: 700; }
     .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; }
     .firma-section { display: flex; justify-content: space-between; margin-top: 40px; padding: 0 40px; }
@@ -341,61 +352,59 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style></head><body>
     <div class="header">
-      <h1>DEVOLUCIONES — Hoja de Ruta #${hojaRuta.numero_hoja}</h1>
-      <p>Fecha: ${new Date(hojaRuta.fecha).toLocaleDateString('es-AR')} | Chofer: ${hojaRuta.chofer?.nombre || '-'} | Vehículo: ${hojaRuta.vehiculo?.patente || '-'}</p>
+      <h1>PRODUCTOS RECHAZADOS — Hoja de Ruta #${escapeHtml(hojaRuta.numero_hoja)}</h1>
+      <p>Fecha: ${new Date(hojaRuta.fecha).toLocaleDateString('es-AR')} | Chofer: ${escapeHtml(hojaRuta.chofer?.nombre)} | Vehículo: ${escapeHtml(hojaRuta.vehiculo?.patente)}</p>
     </div>
 
     <div class="info-bar">
-      <div>Total ítems: <span>${devoluciones.length}</span></div>
-      <div>Total unidades: <span>${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</span></div>
-      <div>Importe total: <span>$${devoluciones.reduce((s: number, d: any) => {
-        const precio = d.pedido_detalle?.precio_unitario || 0;
-        const desc = d.pedido_detalle?.descuento_porcentaje || 0;
-        return s + (Number(d.cantidad) || 0) * precio * (1 - desc / 100);
-      }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></div>
+      <div>Total renglones: <span>${devoluciones.length}</span></div>
+      <div>Total unidades rechazadas: <span>${totalUnidades}</span></div>
+      <div>Control: <span>marcar revisión física y estado final</span></div>
     </div>
+
+    <div class="control-note">Planilla para control posterior de mercadería rechazada. Usar las columnas de control para verificar recepción física, estado del producto y reingreso/ajuste definido por administración.</div>
 
     <table>
       <thead>
         <tr>
           <th>#</th>
+          <th>Parada</th>
+          <th>Pedido</th>
+          <th>Cliente</th>
+          <th>Código</th>
           <th>Producto</th>
           <th>Cantidad</th>
-          <th>P. Unit.</th>
-          <th>Importe</th>
           <th>Motivo</th>
           <th>Detalle</th>
-          <th>Fecha/Hora</th>
+          <th>Recibido</th>
+          <th>OK</th>
+          <th>Ajuste</th>
         </tr>
       </thead>
       <tbody>
         ${devoluciones.map((d: any, i: number) => {
-          const precio = d.pedido_detalle?.precio_unitario || 0;
-          const desc = d.pedido_detalle?.descuento_porcentaje || 0;
-          const precioNeto = precio * (1 - desc / 100);
-          const importe = (Number(d.cantidad) || 0) * precioNeto;
+          const pedido = d.parada?.pedido;
+          const cliente = pedido?.cliente;
           return `
           <tr>
             <td>${i + 1}</td>
-            <td>${d.pedido_detalle?.producto?.descripcion || 'Producto'}</td>
+            <td style="text-align:center;font-weight:700;">${escapeHtml(d.parada?.orden ?? '-')}</td>
+            <td class="codigo">#${escapeHtml(pedido?.numero_pedido)}</td>
+            <td>${escapeHtml(cliente?.codigo_cliente ? `${cliente.codigo_cliente} - ${cliente.nombre}` : cliente?.nombre)}</td>
+            <td class="codigo">${escapeHtml(d.pedido_detalle?.producto?.codigo_articulo)}</td>
+            <td>${escapeHtml(d.pedido_detalle?.producto?.descripcion || 'Producto')}</td>
             <td style="text-align:center;font-weight:700;">${d.cantidad}</td>
-            <td style="text-align:right;">$${precioNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-            <td style="text-align:right;font-weight:700;">$${importe.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-            <td class="motivo">${(d.motivo || 'Sin motivo').replace(/_/g, ' ')}</td>
-            <td class="detalle">${d.detalle_motivo || '-'}</td>
-            <td>${new Date(d.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+            <td class="motivo">${formatMotivo(d.motivo)}</td>
+            <td class="detalle">${escapeHtml(d.detalle_motivo)}</td>
+            <td class="check-cell">□</td>
+            <td class="check-cell">□</td>
+            <td class="check-cell">□</td>
           </tr>`;
         }).join('')}
         <tr class="total-row">
-          <td colspan="2" style="text-align:right;">TOTAL</td>
-          <td style="text-align:center;">${devoluciones.reduce((s: number, d: any) => s + (d.cantidad || 0), 0)}</td>
-          <td></td>
-          <td style="text-align:right;">$${devoluciones.reduce((s: number, d: any) => {
-            const precio = d.pedido_detalle?.precio_unitario || 0;
-            const desc = d.pedido_detalle?.descuento_porcentaje || 0;
-            return s + (Number(d.cantidad) || 0) * precio * (1 - desc / 100);
-          }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-          <td colspan="3"></td>
+          <td colspan="6" style="text-align:right;">TOTAL UNIDADES</td>
+          <td style="text-align:center;">${totalUnidades}</td>
+          <td colspan="5"></td>
         </tr>
       </tbody>
     </table>
