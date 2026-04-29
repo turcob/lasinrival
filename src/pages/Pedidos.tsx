@@ -78,6 +78,8 @@ export default function Pedidos() {
 function PedidosContent() {
   const [busqueda, setBusqueda] = useState('');
   const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<PedidoEstado | 'todos'>('pendiente');
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
@@ -125,8 +127,18 @@ function PedidosContent() {
       );
     }
 
+    if (fechaDesde) {
+      const desde = new Date(fechaDesde).getTime();
+      resultado = resultado.filter(p => new Date(p.fecha_pedido).getTime() >= desde);
+    }
+
+    if (fechaHasta) {
+      const hasta = new Date(fechaHasta).getTime();
+      resultado = resultado.filter(p => new Date(p.fecha_pedido).getTime() <= hasta);
+    }
+
     return resultado;
-  }, [pedidos, busqueda, busquedaProducto]);
+  }, [pedidos, busqueda, busquedaProducto, fechaDesde, fechaHasta]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -207,6 +219,22 @@ function PedidosContent() {
                   value={busquedaProducto}
                   onChange={(e) => setBusquedaProducto(e.target.value)}
                   className="pl-9"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  type="datetime-local"
+                  aria-label="Fecha y hora desde"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="sm:w-[190px]"
+                />
+                <Input
+                  type="datetime-local"
+                  aria-label="Fecha y hora hasta"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="sm:w-[190px]"
                 />
               </div>
               <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as PedidoEstado | 'todos')}>
