@@ -768,6 +768,19 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   hojaRuta.paradas.map((parada, index) => {
                     const estadoConfig = estadoParadaConfig[parada.estado];
                     const IconEstado = estadoConfig.icon;
+                    const cobrosParada = (cobros || []).filter((c: any) => (c.parada_id || c.parada?.id) === parada.id);
+                    const totalCobradoParada = cobrosParada.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0);
+                    const devolucionImporteParada = getDevolucionesPorParada(parada.id);
+                    const totalOriginalParada = Number(parada.pedido?.total) || 0;
+                    const totalEsperadoParadaDetalle = parada.pedido
+                      ? getTotalEsperadoParada(parada.id, parada.estado, totalOriginalParada)
+                      : 0;
+                    const saldoParada = Math.max(totalEsperadoParadaDetalle - totalCobradoParada, 0);
+                    const formasPagoParada = Array.from(cobrosParada.reduce((map: Map<string, number>, c: any) => {
+                      const forma = c.forma_pago?.nombre || c.medio_pago || 'Efectivo';
+                      map.set(forma, (map.get(forma) || 0) + (Number(c.monto) || 0));
+                      return map;
+                    }, new Map<string, number>()).entries());
                     
                     return (
                       <div key={parada.id} className="p-4">
@@ -805,6 +818,31 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 </span>
                               )}
                             </div>
+
+                            {parada.pedido && (
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+                                <div>
+                                  <p className="text-muted-foreground">Cobrado</p>
+                                  <p className="font-semibold">{formatMoney(totalCobradoParada)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Forma de pago</p>
+                                  <p className="font-semibold">
+                                    {formasPagoParada.length > 0
+                                      ? formasPagoParada.map(([forma, monto]) => `${forma}: ${formatMoney(monto)}`).join(' · ')
+                                      : 'Sin cobro'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Devolución</p>
+                                  <p className="font-semibold">{formatMoney(devolucionImporteParada)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Saldo</p>
+                                  <p className="font-semibold">{formatMoney(saldoParada)}</p>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Actions for parada */}
                             {hojaRuta.estado === 'en_ruta' && parada.estado === 'pendiente' && (
