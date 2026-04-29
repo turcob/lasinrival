@@ -697,7 +697,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => handleEstadoParada(parada.id, 'entrega_parcial')}
+                                  onClick={() => handleEstadoParada(parada.id, 'entrega_parcial', parada.pedido?.detalles || [])}
                                 >
                                   <AlertTriangle className="h-4 w-4 mr-1" />
                                   Parcial
@@ -755,6 +755,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                                     onClick={() => setDevolucionDialog({
                                       open: true,
                                       paradaId: parada.id,
+                                      marcarParcialAlGuardar: false,
                                       pedidoDetalles: parada.pedido?.detalles || [],
                                     })}
                                   >
@@ -989,7 +990,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           hojaRutaId={hojaRutaId}
           paradaId={devolucionDialog.paradaId}
           pedidoDetalles={devolucionDialog.pedidoDetalles}
-          onSuccess={() => refetch()}
+          onSuccess={async () => {
+            if (devolucionDialog.marcarParcialAlGuardar && devolucionDialog.paradaId) {
+              await actualizarParada.mutateAsync({ id: devolucionDialog.paradaId, estado: 'entrega_parcial' });
+            }
+            await refetch();
+          }}
         />
       )}
 
