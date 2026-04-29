@@ -23,6 +23,8 @@ interface RefacturarHojaRutaDialogProps {
   onSuccess?: () => Promise<void> | void;
 }
 
+type PedidoAImprimir = { pedido_id: string; [key: string]: unknown };
+
 const parseCantidad = (value: string) => {
   const parsed = Number(value.replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : NaN;
@@ -44,6 +46,7 @@ export function RefacturarHojaRutaDialog({
   const [productoId, setProductoId] = useState('');
   const [nuevaCantidad, setNuevaCantidad] = useState('');
   const [resultado, setResultado] = useState<any | null>(null);
+  const [pedidosAImprimir, setPedidosAImprimir] = useState<PedidoAImprimir[]>([]);
   const [imprimiendo, setImprimiendo] = useState(false);
   const refacturar = useRefacturarHojaRuta();
   const { config: empresaConfig } = useConfiguracionComercio();
@@ -95,18 +98,23 @@ export function RefacturarHojaRutaDialog({
   })();
 
   const handleConfirmar = async () => {
-    if (!hojaRuta || errorValidacion) return;
+    if (!hojaRuta || hojaRuta.estado !== 'en_carga' || errorValidacion) return;
     const data = await refacturar.mutateAsync({
       hojaRutaId: hojaRuta.id,
       productoId,
       nuevaCantidad: nuevaCantidadNumero,
     });
     setResultado(data);
+    setPedidosAImprimir((prev) => {
+      const acumulados = new Map(prev.map((p) => [p.pedido_id, p]));
+      ((data?.pedidos_afectados || []) as PedidoAImprimir[]).forEach((p) => acumulados.set(p.pedido_id, p));
+      return Array.from(acumulados.values());
+    });
     await onSuccess?.();
   };
 
   const handleImprimirAfectados = async () => {
-    const pedidosAfectados = resultado?.pedidos_afectados || [];
+    const pedidosAfectados = pedidosAImprimir;
     if (!pedidosAfectados.length) return;
 
     setImprimiendo(true);
@@ -191,6 +199,7 @@ export function RefacturarHojaRutaDialog({
       setProductoId('');
       setNuevaCantidad('');
       setResultado(null);
+      setPedidosAImprimir([]);
     }
     onOpenChange(nextOpen);
   };
@@ -204,11 +213,17 @@ export function RefacturarHojaRutaDialog({
             Refacturar hoja #{hojaRuta?.numero_hoja || ''}
           </SheetTitle>
           <SheetDescription>
-            Bajá la cantidad consolidada de un producto y regenerá los remitos afectados.
+            Bajá cantidades mientras la hoja está en carga y luego imprimí todos los remitos afectados juntos.
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
+          {hojaRuta?.estado !== 'en_carga' && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              La refacturación solo está disponible cuando la hoja de ruta está en carga.
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="producto-refacturar">Producto</Label>
             <select
@@ -296,9 +311,22 @@ export function RefacturarHojaRutaDialog({
                   </div>
                 ))}
               </div>
-              <Button onClick={handleImprimirAfectados} disabled={imprimiendo} className="w-full">
+              <Button onClick={handleImprimirAfectados} disabled={imprimiendo || pedidosAImprimir.length === 0} className="w-full">
                 {imprimiendo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
-                Imprimir remitos nuevos
+                Imprimir todos los remitos ajustados ({pedidosAImprimir.length})
+              </Button>
+            </div>
+          )}
+
+          {!resultado && pedidosAImprimir.length > 0 && (
+            <div className="rounded-lg border bg-muted/40 p-4 text-sm flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Remitos acumulados para imprimir</p>
+                <p className="text-muted-foreground">Se imprimirán todos los pedidos ajustados en esta refacturación.</p>
+              </div>
+              <Button variant="outline" onClick={handleImprimirAfectados} disabled={imprimiendo}>
+                {imprimiendo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
+                Imprimir ({pedidosAImprimir.length})
               </Button>
             </div>
           )}
@@ -308,7 +336,7 @@ export function RefacturarHojaRutaDialog({
               Cerrar
             </Button>
             {!resultado && (
-              <Button onClick={handleConfirmar} disabled={!!errorValidacion || refacturar.isPending}>
+              <Button onClick={handleConfirmar} disabled={hojaRuta?.estado !== 'en_carga' || !!errorValidacion || refacturar.isPending}>
                 {refacturar.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
                 Confirmar refacturación
               </Button>

@@ -507,7 +507,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                     Forzar confirmación
                   </Button>
                 )}
-                {(hojaRuta.paradas?.length || 0) > 0 && (
+                {hojaRuta.estado === 'en_carga' && (hojaRuta.paradas?.length || 0) > 0 && (
                   <Button
                     size="sm"
                     variant="outline"
