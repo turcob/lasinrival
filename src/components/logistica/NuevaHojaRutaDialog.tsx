@@ -205,7 +205,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       <style id="remito-styles">${REMITO_STYLES}</style>
       </head><body>
         ${remitosHTML}
-        ${buildRemitoOrientationToolbar('landscape')}
+        ${buildRemitoOrientationToolbar()}
       </body></html>
     `);
     ventana.document.close();

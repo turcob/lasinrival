@@ -310,7 +310,7 @@ export function ConsolidadoFinalZona() {
       <style id="remito-styles">${REMITO_STYLES}</style>
       </head><body>
         ${remitosHTML}
-        ${buildRemitoOrientationToolbar('landscape')}
+        ${buildRemitoOrientationToolbar()}
       </body></html>
     `);
     ventana.document.close();
