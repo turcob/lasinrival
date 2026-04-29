@@ -252,6 +252,20 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     }
   };
 
+  const handleEstadoParada = async (paradaId: string, estado: ParadaEstado, pedidoDetalles: any[] = []) => {
+    if (estado === 'entrega_parcial') {
+      setDevolucionDialog({
+        open: true,
+        paradaId,
+        marcarParcialAlGuardar: true,
+        pedidoDetalles,
+      });
+      return;
+    }
+
+    await actualizarParada.mutateAsync({ id: paradaId, estado });
+  };
+
   const handleForzarConfirmacion = async () => {
     if (!hojaRuta) return;
     if (!confirm('¿Confirmar manualmente la carga sin esperar al responsable en la app?\n\nQuedará registrado como confirmación forzada desde el sistema web.')) return;
