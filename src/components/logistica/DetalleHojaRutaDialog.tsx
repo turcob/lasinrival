@@ -383,7 +383,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     }] : []),
   ].filter((e) => e.fecha).sort((a, b) => new Date(a.fecha as string).getTime() - new Date(b.fecha as string).getTime()) : [];
 
-  const imprimirListadoParadas = (hoja: any) => {
+  type CobroListado = { monto?: number | null; medio_pago?: string | null; parada_id?: string | null; parada?: { id?: string | null } | null; forma_pago?: { nombre?: string | null } | null };
+  type DevolucionListado = { cantidad?: number | null; parada_id?: string | null; parada?: { id?: string | null } | null; pedido_detalle?: { precio_unitario?: number | null; descuento_porcentaje?: number | null } | null };
+  type ParadaListado = NonNullable<HojaRuta['paradas']>[number];
+  type ItemListado = { parada: ParadaListado; aCobrar: number; rechazado: number; cobrado: number; saldo: number; medios: Array<[string, number]> };
+
+  const imprimirListadoParadas = (hoja: HojaRuta) => {
     const ventana = window.open('', '_blank', 'width=900,height=600');
     if (!ventana) {
       alert('No se pudo abrir la ventana de impresión. Verifique que los popups estén habilitados.');
@@ -408,15 +413,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     const formatCurrency = (v: number) =>
       new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
-    const getCobrosParadaListado = (paradaId: string) => (cobros || [])
-      .filter((c: any) => (c.parada_id || c.parada?.id) === paradaId);
+    const getCobrosParadaListado = (paradaId: string) => ((cobros || []) as CobroListado[])
+      .filter((c) => (c.parada_id || c.parada?.id) === paradaId);
 
-    const getDevolucionImporteListado = (parada: any) => {
+    const getDevolucionImporteListado = (parada: ParadaListado) => {
       const totalOriginal = Number(parada.pedido?.total) || 0;
       if (parada.estado === 'rechazado' || parada.estado === 'no_entregado') return totalOriginal;
-      return productosRechazadosControl
-        .filter((d: any) => (d.parada_id || d.parada?.id) === parada.id)
-        .reduce((sum: number, d: any) => {
+      return (productosRechazadosControl as DevolucionListado[])
+        .filter((d) => (d.parada_id || d.parada?.id) === parada.id)
+        .reduce((sum, d) => {
           const precio = Number(d.pedido_detalle?.precio_unitario) || 0;
           const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
           return sum + ((Number(d.cantidad) || 0) * precio * (1 - descuento / 100));
@@ -424,10 +429,10 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     };
 
     const paradas = (hoja.paradas || [])
-      .filter((p: any) => p.pedido)
-      .map((parada: any) => {
+      .filter((p): p is ParadaListado & { pedido: NonNullable<ParadaListado['pedido']> } => Boolean(p.pedido))
+      .map((parada): ItemListado => {
         const cobrosParada = getCobrosParadaListado(parada.id);
-        const mediosMap = cobrosParada.reduce((map: Map<string, number>, c: any) => {
+        const mediosMap = cobrosParada.reduce((map: Map<string, number>, c) => {
           const medio = c.forma_pago?.nombre || c.medio_pago || 'Efectivo';
           map.set(medio, (map.get(medio) || 0) + (Number(c.monto) || 0));
           return map;
@@ -446,7 +451,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       });
     const FILAS_POR_PAGINA = 38;
 
-    const generarFilas = (items: any[], startIndex: number) => items.map((item: any, i: number) => {
+    const generarFilas = (items: ItemListado[], startIndex: number) => items.map((item, i: number) => {
       const parada = item.parada;
       const pedido = parada.pedido;
       const cliente = pedido.cliente;
@@ -475,11 +480,11 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       `;
     }).join('');
 
-    const totalACobrar = paradas.reduce((sum: number, item: any) => sum + item.aCobrar, 0);
-    const totalRechazado = paradas.reduce((sum: number, item: any) => sum + item.rechazado, 0);
-    const totalCobrado = paradas.reduce((sum: number, item: any) => sum + item.cobrado, 0);
-    const totalSaldo = paradas.reduce((sum: number, item: any) => sum + item.saldo, 0);
-    const totalesMedios = paradas.reduce((map: Map<string, number>, item: any) => {
+    const totalACobrar = paradas.reduce((sum, item) => sum + item.aCobrar, 0);
+    const totalRechazado = paradas.reduce((sum, item) => sum + item.rechazado, 0);
+    const totalCobrado = paradas.reduce((sum, item) => sum + item.cobrado, 0);
+    const totalSaldo = paradas.reduce((sum, item) => sum + item.saldo, 0);
+    const totalesMedios = paradas.reduce((map: Map<string, number>, item) => {
       item.medios.forEach(([medio, monto]: [string, number]) => {
         map.set(medio, (map.get(medio) || 0) + monto);
       });
@@ -493,7 +498,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     `).join('') || '<tr><td colspan="2">Sin cobros registrados</td></tr>';
 
     // Dividir en páginas de 50 filas
-    const paginas: any[][] = [];
+    const paginas: ItemListado[][] = [];
     for (let i = 0; i < paradas.length; i += FILAS_POR_PAGINA) {
       paginas.push(paradas.slice(i, i + FILAS_POR_PAGINA));
     }
