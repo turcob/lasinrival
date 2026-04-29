@@ -333,6 +333,18 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
     return s + ((Number(d.cantidad) || 0) * precio * (1 - descuento / 100));
   }, 0);
+  const totalesPorProducto = Array.from(devoluciones.reduce((map: Map<string, any>, d: any) => {
+    const producto = d.pedido_detalle?.producto;
+    const codigo = String(producto?.codigo_articulo || 'SIN CODIGO');
+    const existente = map.get(codigo) || {
+      codigo,
+      producto: producto?.descripcion || 'Producto',
+      cantidad: 0,
+    };
+    existente.cantidad += Number(d.cantidad) || 0;
+    map.set(codigo, existente);
+    return map;
+  }, new Map<string, any>()).values()).sort((a: any, b: any) => a.codigo.localeCompare(b.codigo));
   const formatCurrency = (value: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Productos Rechazados - HR #${hojaRuta.numero_hoja}</title>
   <style>
@@ -359,6 +371,9 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     .firma-box { text-align: center; width: 200px; }
     .firma-line { border-top: 1px solid #1a1a1a; margin-bottom: 4px; }
     .firma-label { font-size: 10px; color: #6b7280; }
+    .page-break { page-break-before: always; break-before: page; }
+    .summary-title { font-size: 18px; font-weight: 800; color: #92400e; margin-bottom: 6px; text-align: center; }
+    .summary-subtitle { font-size: 11px; color: #78716c; margin-bottom: 16px; text-align: center; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style></head><body>
     <div class="header">
@@ -433,6 +448,42 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     </div>
 
     <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+
+    <div class="page-break">
+      <div class="summary-title">RESUMEN TOTAL POR PRODUCTO</div>
+      <div class="summary-subtitle">Hoja de Ruta #${escapeHtml(hojaRuta.numero_hoja)} — Productos rechazados sin discriminar por cliente</div>
+
+      <div class="info-bar">
+        <div>Total productos: <span>${totalesPorProducto.length}</span></div>
+        <div>Total unidades rechazadas: <span>${totalUnidades}</span></div>
+        <div>Zona: <span>${escapeHtml(zonaTexto)}</span></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th style="width:160px;">Código de producto</th>
+            <th>Producto</th>
+            <th style="width:120px;text-align:center;">Cantidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${totalesPorProducto.map((item: any, i: number) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td class="codigo">${escapeHtml(item.codigo)}</td>
+              <td>${escapeHtml(item.producto)}</td>
+              <td style="text-align:center;font-weight:800;">${item.cantidad}</td>
+            </tr>
+          `).join('')}
+          <tr class="total-row">
+            <td colspan="3" style="text-align:right;">TOTAL UNIDADES</td>
+            <td style="text-align:center;">${totalUnidades}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </body></html>`;
   openPrintWindow(html);
 }
