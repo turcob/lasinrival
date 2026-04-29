@@ -310,16 +310,43 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     ...((hojaRuta.paradas || []).flatMap((parada: any) => {
       const cobrosParada = (cobros || []).filter((c: any) => c.parada?.id === parada.id);
       const devolucionesParada = productosRechazadosControl.filter((d: any) => (d.parada_id || d.parada?.id) === parada.id);
+      const totalOriginal = Number(parada.pedido?.total) || 0;
+      const totalDevoluciones = devolucionesParada.reduce((sum: number, d: any) => {
+        const precio = Number(d.pedido_detalle?.precio_unitario) || 0;
+        const descuento = Number(d.pedido_detalle?.descuento_porcentaje) || 0;
+        return sum + ((Number(d.cantidad) || 0) * precio * (1 - descuento / 100));
+      }, 0);
+      const totalEsperado = getTotalEsperadoParada(parada.id, parada.estado, totalOriginal);
+      const totalCobrado = cobrosParada.reduce((sum: number, c: any) => sum + (Number(c.monto) || 0), 0);
+      const saldo = Math.max(totalEsperado - totalCobrado, 0);
+      const estadoEntrega = estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado;
+      const estadoCobranza = parada.estado === 'rechazado' || parada.estado === 'no_entregado'
+        ? 'No corresponde cobrar por rechazo/no entrega'
+        : totalEsperado <= 0
+          ? 'Sin importe a cobrar'
+          : totalCobrado >= totalEsperado
+            ? 'Cobranza completa'
+            : totalCobrado > 0
+              ? 'Cobranza parcial'
+              : 'Sin cobranza registrada';
+      const detalleCobros = cobrosParada.length > 0
+        ? cobrosParada.map((c: any) => `${formatDateTime(c.created_at)} ${c.forma_pago?.nombre || c.medio_pago || 'Efectivo'} ${formatMoney(Number(c.monto) || 0)}${c.referencia ? ` ref. ${c.referencia}` : ''}`).join(' | ')
+        : 'No hubo pagos registrados';
       return [
         {
           fecha: parada.created_at,
           titulo: `Parada ${parada.orden} asignada`,
-          detalle: `Pedido #${parada.pedido?.numero_pedido || '-'} · Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Importe original: ${formatMoney(parada.pedido?.total || 0)}.`,
+          detalle: `Pedido #${parada.pedido?.numero_pedido || '-'} · Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Fecha pedido: ${parada.pedido?.fecha_pedido ? formatDateTime(parada.pedido.fecha_pedido) : '-'} · Importe original: ${formatMoney(totalOriginal)}.`,
+        },
+        {
+          fecha: parada.hora_salida || parada.hora_llegada || parada.updated_at || parada.created_at,
+          titulo: `Resumen de parada ${parada.orden}: ${estadoEntrega}`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Pedido #${parada.pedido?.numero_pedido || '-'} · Llegada: ${formatDateTime(parada.hora_llegada)} · Salida: ${formatDateTime(parada.hora_salida)} · Estado entrega: ${estadoEntrega} · Importe original: ${formatMoney(totalOriginal)} · Rechazos/devoluciones: ${formatMoney(totalDevoluciones)} · Neto a cobrar: ${formatMoney(totalEsperado)} · Cobrado: ${formatMoney(totalCobrado)} · Saldo: ${formatMoney(saldo)} · Estado cobranza: ${estadoCobranza} · Pagos: ${detalleCobros}${parada.observaciones ? ` · Observaciones: ${parada.observaciones}` : ''}.`,
         },
         ...(parada.hora_llegada ? [{
           fecha: parada.hora_llegada,
           titulo: `Llegada a parada ${parada.orden}`,
-          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Estado actual: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}.`,
+          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Hora de llegada: ${formatDateTime(parada.hora_llegada)} · Estado actual: ${estadoEntrega} · Importe esperado al llegar: ${formatMoney(totalEsperado)}.`,
         }] : []),
         ...devolucionesParada.map((d: any) => {
           const precio = d.pedido_detalle?.precio_unitario || 0;
@@ -334,12 +361,12 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         ...cobrosParada.map((c: any) => ({
           fecha: c.created_at,
           titulo: `Cobro registrado en parada ${parada.orden}`,
-          detalle: `Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Monto: ${formatMoney(c.monto || 0)} · Forma de pago: ${c.forma_pago?.nombre || c.medio_pago || 'Efectivo'}${c.referencia ? ` · Referencia: ${c.referencia}` : ''}${c.observaciones ? ` · Obs.: ${c.observaciones}` : ''}.`,
+          detalle: `Fecha/hora: ${formatDateTime(c.created_at)} · Cliente: ${parada.pedido?.cliente?.nombre || '-'} · Pedido #${parada.pedido?.numero_pedido || '-'} · Monto cobrado: ${formatMoney(Number(c.monto) || 0)} · Forma de pago: ${c.forma_pago?.nombre || c.medio_pago || 'Efectivo'} · Neto a cobrar de la parada: ${formatMoney(totalEsperado)} · Total cobrado en la parada: ${formatMoney(totalCobrado)} · Saldo luego de cobranzas: ${formatMoney(saldo)}${c.referencia ? ` · Referencia: ${c.referencia}` : ''}${c.observaciones ? ` · Obs.: ${c.observaciones}` : ''}.`,
         })),
         ...(parada.hora_salida ? [{
           fecha: parada.hora_salida,
           titulo: `Parada ${parada.orden} finalizada`,
-          detalle: `Resultado: ${estadoParadaConfig[parada.estado as ParadaEstado]?.label || parada.estado}${parada.observaciones ? ` · Observaciones: ${parada.observaciones}` : ''}.`,
+          detalle: `Fecha/hora salida: ${formatDateTime(parada.hora_salida)} · Resultado: ${estadoEntrega} · Cobranza: ${estadoCobranza} · Neto a cobrar: ${formatMoney(totalEsperado)} · Cobrado: ${formatMoney(totalCobrado)} · Saldo: ${formatMoney(saldo)}${parada.observaciones ? ` · Observaciones: ${parada.observaciones}` : ''}.`,
         }] : []),
       ];
     })),
