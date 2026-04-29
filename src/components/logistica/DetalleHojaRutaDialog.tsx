@@ -194,6 +194,43 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     return getTotalNeto(paradaId, totalPedido);
   };
 
+  const devolucionesRegistradas = devoluciones || [];
+  const paradasConDevolucion = new Set(
+    devolucionesRegistradas.map((d: any) => d.parada_id || d.parada?.id).filter(Boolean)
+  );
+  const productosRechazadosControl = hojaRuta
+    ? [
+        ...devolucionesRegistradas,
+        ...(hojaRuta.paradas || [])
+          .filter((parada: any) => parada.estado === 'rechazado' && !paradasConDevolucion.has(parada.id))
+          .flatMap((parada: any) =>
+            (parada.pedido?.detalles || []).map((detalle: any) => ({
+              id: `rechazo-total-${parada.id}-${detalle.id}`,
+              cantidad: detalle.cantidad_entregada ?? detalle.cantidad_pedida ?? 0,
+              motivo: 'rechazo_cliente',
+              detalle_motivo: parada.observaciones || 'Pedido completo rechazado',
+              reingresado_stock: false,
+              created_at: parada.hora_llegada || parada.updated_at || parada.created_at,
+              parada_id: parada.id,
+              parada: {
+                id: parada.id,
+                orden: parada.orden,
+                pedido: {
+                  numero_pedido: parada.pedido?.numero_pedido,
+                  cliente: parada.pedido?.cliente,
+                },
+              },
+              pedido_detalle: {
+                id: detalle.id,
+                precio_unitario: 0,
+                descuento_porcentaje: 0,
+                producto: detalle.producto,
+              },
+            }))
+          ),
+      ]
+    : [];
+
   if (!hojaRutaId) return null;
 
   const getNextEstado = (current: HojaRutaEstado): HojaRutaEstado | null => {
