@@ -505,6 +505,16 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                     Forzar confirmación
                   </Button>
                 )}
+                {(hojaRuta.paradas?.length || 0) > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRefacturarOpen(true)}
+                  >
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Refacturar hoja
+                  </Button>
+                )}
                 {hojaRuta.estado !== 'completada' && hojaRuta.estado !== 'cancelada' && hojaRuta.estado !== 'en_carga' && (
                   <Button
                     size="sm"
