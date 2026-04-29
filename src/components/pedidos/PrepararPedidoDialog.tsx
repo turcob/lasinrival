@@ -56,6 +56,20 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
 };
 
+const inferirDescuentoLinea = (detalle: PedidoDetalle): number => {
+  const descuentoGuardado = detalle.descuento_porcentaje || 0;
+  if (descuentoGuardado > 0) return descuentoGuardado;
+
+  const bruto = detalle.cantidad_pedida * detalle.precio_unitario;
+  const subtotal = detalle.subtotal || 0;
+  if (bruto <= 0 || subtotal <= 0 || subtotal >= bruto - 0.01) return 0;
+
+  const descuentoInferido = (1 - subtotal / bruto) * 100;
+  return descuentoInferido > 0 && descuentoInferido <= 100
+    ? Math.round(descuentoInferido * 100) / 100
+    : 0;
+};
+
 export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, onNavigate }: PrepararPedidoDialogProps) {
   const [lineas, setLineas] = useState<LineaPreparacion[]>([]);
   const [busquedaProducto, setBusquedaProducto] = useState('');
@@ -109,7 +123,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
     if (open && pedido?.detalles) {
       setLineas(pedido.detalles.map((d: PedidoDetalle) => {
         const esPorPeso = isProductoPorPeso(d.producto?.unidad_medida || 'UN');
-        const descuentoLinea = d.descuento_porcentaje || 0;
+        const descuentoLinea = inferirDescuentoLinea(d);
         const precioConDescuento = d.precio_unitario * (1 - descuentoLinea / 100);
         return {
           detalleId: d.id,
@@ -120,7 +134,7 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
           cantidadPedida: d.cantidad_pedida,
           inputValue: formatCantidadInicial(d.cantidad_pedida, esPorPeso),
           cantidadPreparada: d.cantidad_pedida,
-          subtotal: d.cantidad_pedida * precioConDescuento,
+          subtotal: descuentoLinea > 0 && d.subtotal > 0 ? d.subtotal : d.cantidad_pedida * precioConDescuento,
           precioUnitario: d.precio_unitario,
           descuentoPorcentaje: descuentoLinea,
         };
@@ -450,6 +464,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               const esMenor = linea.cantidadPreparada < linea.cantidadPedida;
               const esMayor = linea.cantidadPreparada > linea.cantidadPedida;
               const hayDiferencia = esMenor || esMayor;
+              const subtotalBruto = linea.cantidadPreparada * linea.precioUnitario;
+              const importeDescuento = Math.max(0, subtotalBruto - linea.subtotal);
               
               return (
                 <div 
@@ -543,12 +559,16 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
                       </div>
 
                       <div className="text-right min-w-[120px]">
-                        <p className="text-xs text-muted-foreground mb-1">Subtotal</p>
+                        <p className="text-xs text-muted-foreground mb-1">Total</p>
                         <p className={`font-bold text-lg ${
                           esMayor ? 'text-primary' : esMenor ? 'text-warning' : ''
                         }`}>
                           {formatCurrency(linea.subtotal)}
                         </p>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          <p>Importe: {formatCurrency(subtotalBruto)}</p>
+                          <p>Dto: {importeDescuento > 0 ? `-${formatCurrency(importeDescuento)}` : '-'}</p>
+                        </div>
                         <Button variant="ghost" size="sm" className="mt-2" onClick={() => eliminarLinea(linea.detalleId)}>
                           <Trash2 className="mr-1 h-4 w-4" />
                           Eliminar
