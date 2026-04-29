@@ -1109,6 +1109,43 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         />
       )}
 
+      <Dialog open={historiaOpen} onOpenChange={setHistoriaOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historia de hoja de ruta #{hojaRuta?.numero_hoja || ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm rounded-lg border bg-muted/30 p-3">
+            <div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{hojaRuta ? format(new Date(hojaRuta.fecha), 'dd/MM/yyyy', { locale: es }) : '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Chofer</p><p className="font-medium">{hojaRuta?.chofer?.nombre || '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Vehículo</p><p className="font-medium">{hojaRuta?.vehiculo?.patente || '-'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Estado</p><p className="font-medium">{hojaRuta ? estadoHojaConfig[hojaRuta.estado]?.label : '-'}</p></div>
+          </div>
+          <div className="space-y-3 py-2">
+            {eventosHistoria.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No hay movimientos registrados.</div>
+            ) : (
+              eventosHistoria.map((evento, index) => (
+                <div key={`${evento.fecha}-${index}`} className="flex gap-3 rounded-lg border p-3">
+                  <div className="flex flex-col items-center">
+                    <span className="h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">{index + 1}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                      <p className="font-semibold">{evento.titulo}</p>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(evento.fecha)}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{evento.detalle}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de reasignación de responsable */}
       <Dialog open={reasignarOpen} onOpenChange={setReasignarOpen}>
         <DialogContent className="max-w-md">
