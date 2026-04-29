@@ -768,6 +768,57 @@ export function useHojaCarga(hojaRutaId: string | undefined) {
   });
 }
 
+export function useRefacturarHojaRuta() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      hojaRutaId,
+      productoId,
+      nuevaCantidad,
+    }: {
+      hojaRutaId: string;
+      productoId: string;
+      nuevaCantidad: number;
+    }) => {
+      const { data, error } = await (supabase as any).rpc('refacturar_hoja_ruta_producto', {
+        p_hoja_ruta_id: hojaRutaId,
+        p_producto_id: productoId,
+        p_nueva_cantidad: nuevaCantidad,
+      });
+
+      if (error) throw error;
+      return data as {
+        refacturacion_id: string;
+        cantidad_anterior: number;
+        cantidad_nueva: number;
+        cantidad_descontada: number;
+        pedidos_afectados: Array<{
+          pedido_id: string;
+          numero_pedido: number;
+          detalle_id: string;
+          cantidad_anterior: number;
+          cantidad_nueva: number;
+          cantidad_descontada: number;
+          total_nuevo: number;
+        }>;
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hoja-ruta'] });
+      queryClient.invalidateQueries({ queryKey: ['hoja-carga'] });
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+      queryClient.invalidateQueries({ queryKey: ['pedido-historial'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-movimientos'] });
+      toast({ title: 'Hoja refacturada', description: 'Se actualizaron los pedidos y remitos afectados.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error al refacturar', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 // ============== PEDIDOS DISPONIBLES PARA RUTA ==============
 export function usePedidosDisponiblesParaRuta() {
   return useQuery({
