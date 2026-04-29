@@ -990,7 +990,9 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
           onOpenChange={setRendicionOpen}
           hojaRutaId={hojaRutaId}
           numeroHoja={hojaRuta.numero_hoja}
-          onSuccess={() => refetch()}
+          onSuccess={async () => {
+            await refetch();
+          }}
         />
       )}
 
