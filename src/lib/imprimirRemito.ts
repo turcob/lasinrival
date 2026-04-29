@@ -586,8 +586,8 @@ export function generarRemitoHTML(datos: DatosRemito, isLast: boolean = false): 
   return `${copiaUno}${copiaDos}${pageBreak}`;
 }
 
-/** Shared CSS styles for facturas (used in batch printing). Default landscape. */
-export const REMITO_STYLES = `${getStyles('landscape')}
+/** Shared CSS styles for facturas (used in batch printing). Fixed A4 portrait. */
+export const REMITO_STYLES = `${getStyles('a4-portrait')}
   .remito-batch-separator {
     page-break-after: auto;
     break-after: auto;
@@ -595,12 +595,12 @@ export const REMITO_STYLES = `${getStyles('landscape')}
 `;
 
 /** Builds the orientation toolbar for batch print windows. Exposed for external callers. */
-export function buildRemitoOrientationToolbar(initial: RemitoOrientation = 'landscape'): string {
+export function buildRemitoOrientationToolbar(initial: RemitoOrientation = 'a4-portrait'): string {
   return buildOrientationToolbar(initial);
 }
 
 /** Returns the styles for a given orientation. Useful for batch print windows. */
-export function getRemitoStyles(orientation: RemitoOrientation = 'landscape'): string {
+export function getRemitoStyles(orientation: RemitoOrientation = 'a4-portrait'): string {
   return `${getStyles(orientation)}
   .remito-batch-separator {
     page-break-after: auto;
