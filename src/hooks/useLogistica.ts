@@ -265,7 +265,7 @@ export function useHojaRuta(id: string | undefined) {
             vendedor:vendedores(id, nombre),
             detalles:pedido_detalles(
               id, producto_id, cantidad_pedida, cantidad_entregada, precio_unitario, descuento_porcentaje,
-              producto:productos(descripcion, codigo_articulo)
+              producto:productos(descripcion, codigo_articulo, unidad_medida)
             )
           )
         `)
@@ -744,7 +744,7 @@ export function useHojaCarga(hojaRutaId: string | undefined) {
       paradas?.forEach((parada: unknown) => {
         const p = parada as { pedido?: { detalles?: Array<{ cantidad_pedida: number; producto?: { id: string; codigo_articulo: string; descripcion: string } }> } };
         p.pedido?.detalles?.forEach((detalle) => {
-          if (detalle.producto) {
+          if (detalle.producto && detalle.cantidad_pedida > 0) {
             const existing = productosMap.get(detalle.producto.id);
             if (existing) {
               existing.cantidad_total += detalle.cantidad_pedida;
