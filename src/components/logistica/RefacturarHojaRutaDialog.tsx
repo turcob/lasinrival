@@ -129,7 +129,7 @@ export function RefacturarHojaRutaDialog({
 
       if (error) throw error;
 
-      const orden = new Map(ids.map((id: string, index: number) => [id, index]));
+      const orden = new Map<string, number>(ids.map((id: string, index: number) => [id, index]));
       const pedidosOrdenados = [...(pedidos || [])].sort(
         (a: any, b: any) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0)
       );
