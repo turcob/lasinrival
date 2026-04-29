@@ -569,6 +569,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setHistoriaOpen(true)}
+                  disabled={!hojaRuta}
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Historia
+                </Button>
                 {hojaRuta.estado === 'en_carga' && (
                   <Button
                     size="sm"
