@@ -222,8 +222,8 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               },
               pedido_detalle: {
                 id: detalle.id,
-                precio_unitario: 0,
-                descuento_porcentaje: 0,
+                precio_unitario: detalle.precio_unitario || 0,
+                descuento_porcentaje: detalle.descuento_porcentaje || 0,
                 producto: detalle.producto,
               },
             }))
