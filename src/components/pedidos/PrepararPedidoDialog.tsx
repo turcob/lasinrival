@@ -258,6 +258,8 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
 
   // Valores derivados del estado
   const totalFinal = lineas.reduce((sum, l) => sum + l.subtotal, 0);
+  const importeBrutoFinal = lineas.reduce((sum, l) => sum + l.cantidadPreparada * l.precioUnitario, 0);
+  const descuentoFinal = Math.max(0, importeBrutoFinal - totalFinal);
   const hayDiferencias = lineas.some(l => l.cantidadPreparada !== l.cantidadPedida);
 
   const buildLineasPayload = useCallback(() => (
@@ -606,10 +608,14 @@ export function PrepararPedidoDialog({ pedidoId, open, onOpenChange, pedidoIds, 
               </div>
               <Separator orientation="vertical" className="h-12 hidden md:block" />
               <div>
-                <p className="text-sm text-muted-foreground">Nuevo Total</p>
+                <p className="text-sm text-muted-foreground">Total</p>
                 <p className={`text-2xl font-bold ${hayDiferencias ? 'text-warning' : 'text-primary'}`}>
                   {formatCurrency(totalFinal)}
                 </p>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  <p>Importe: {formatCurrency(importeBrutoFinal)}</p>
+                  <p>Dto: {descuentoFinal > 0 ? `-${formatCurrency(descuentoFinal)}` : '-'}</p>
+                </div>
                 {hayDiferencias && (
                   <p className="text-xs text-muted-foreground">
                     Diferencia: {formatCurrency(totalFinal - (pedido?.total || 0))}
