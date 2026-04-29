@@ -807,17 +807,17 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
             <div className="space-y-6 lg:col-span-1">
 
             {/* Sección de Devoluciones Registradas */}
-            {devoluciones && devoluciones.length > 0 && (
+            {productosRechazadosControl.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold flex items-center gap-2">
                     <RotateCcw className="h-4 w-4 text-amber-600" />
-                    Productos Rechazados ({devoluciones.length})
+                    Productos Rechazados ({productosRechazadosControl.length})
                   </h3>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, devoluciones)}
+                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl)}
                     title="Imprimir detalle para control posterior"
                   >
                     <Printer className="h-4 w-4 mr-1" />
@@ -826,7 +826,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 </div>
                 
                 <div className="border border-amber-200 rounded-lg divide-y bg-amber-50/50 max-h-[200px] overflow-y-auto">
-                  {devoluciones.map((devolucion: any) => {
+                  {productosRechazadosControl.map((devolucion: any) => {
                     const precio = devolucion.pedido_detalle?.precio_unitario || 0;
                     const descuento = devolucion.pedido_detalle?.descuento_porcentaje || 0;
                     const precioNeto = precio * (1 - descuento / 100);
@@ -871,7 +871,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                 <div className="flex justify-end px-3">
                   <span className="text-sm font-bold text-destructive">
                     {'Total devoluciones: -$'}
-                    {devoluciones.reduce((sum: number, d: any) => {
+                    {productosRechazadosControl.reduce((sum: number, d: any) => {
                       const precio = d.pedido_detalle?.precio_unitario || 0;
                       const descuento = d.pedido_detalle?.descuento_porcentaje || 0;
                       return sum + (d.cantidad * precio * (1 - descuento / 100));
