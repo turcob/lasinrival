@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.chat-asistente]
 verify_jwt = false
 
+[functions.api-logistica]
+verify_jwt = false
+
