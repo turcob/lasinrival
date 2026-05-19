@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, Truck, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Truck, PlayCircle, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CargaTab } from '@/components/encargado/CargaTab';
@@ -72,6 +72,7 @@ export default function EncargadoHojaDetalle() {
   if (estado === 'en_ruta') {
     tabs.push({ value: 'paradas', label: 'Paradas' });
     tabs.push({ value: 'resumen', label: 'Cobros' });
+    tabs.push({ value: 'cerrar', label: 'Cerrar' });
   }
   if (estado === 'completada' || estado === 'rendida') {
     tabs.push({ value: 'rendicion', label: 'Rendición' });
@@ -138,6 +139,33 @@ export default function EncargadoHojaDetalle() {
               </TabsContent>
               <TabsContent value="resumen" className="mt-3">
                 <ResumenCobrosTab hojaRutaId={hoja.id} />
+              </TabsContent>
+              <TabsContent value="cerrar" className="mt-3">
+                <Card>
+                  <CardContent className="p-4 space-y-3 text-center">
+                    <CheckCircle2 className="h-12 w-12 mx-auto text-primary" />
+                    <p className="text-sm">
+                      Cuando termines todas las entregas, cerrá la ruta para poder rendir lo cobrado.
+                    </p>
+                    {(() => {
+                      const pend = paradas.filter((p: any) => p.estado === 'pendiente').length;
+                      return pend > 0 ? (
+                        <p className="text-xs text-amber-700">
+                          Quedan {pend} parada{pend !== 1 ? 's' : ''} pendiente{pend !== 1 ? 's' : ''}.
+                        </p>
+                      ) : null;
+                    })()}
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      disabled={cambiarEstado.isPending}
+                      onClick={() => cambiarEstado.mutate({ id: hoja.id, estado: 'completada' })}
+                    >
+                      {cambiarEstado.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      Cerrar ruta y rendir
+                    </Button>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </>
           )}
