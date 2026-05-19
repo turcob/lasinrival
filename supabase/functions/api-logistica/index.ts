@@ -32,6 +32,7 @@ const ESTADOS_PARADA = [
   "rechazado",
   "no_entregado",
 ];
+const ESTADOS_CARGA_ITEM = ["pendiente", "cargado", "faltante", "parcial"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -76,6 +77,9 @@ Deno.serve(async (req) => {
           "GET    /hojas-ruta/:id/rendicion",
           "POST   /rendiciones           { hoja_ruta_id, total_efectivo, total_transferencias, total_qr, total_tarjeta, total_general, diferencia?, observaciones?, caja_id? }",
           "PATCH  /rendiciones/:id       { ...mismos campos (solo si estado='pendiente') }",
+          "GET    /hojas-ruta/:id/carga-items",
+          "PATCH  /carga-items/:id       { cantidad_cargada?, estado?, observaciones? }",
+          "POST   /hojas-ruta/:id/confirmar-carga  { forzar?: boolean, observaciones? }",
         ],
       });
     }
@@ -165,6 +169,89 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (error) return json({ error: error.message }, 400);
         return json({ rendicion: data });
+      }
+
+      // GET /hojas-ruta/:id/carga-items
+      if (parts.length === 3 && parts[2] === "carga-items" && method === "GET") {
+        const id = parts[1];
+        const { data, error } = await supabase
+          .from("hoja_ruta_carga_items")
+          .select(
+            "id, hoja_ruta_id, pedido_id, producto_id, cantidad_esperada, cantidad_cargada, estado, observaciones, verificado_por, verificado_at",
+          )
+          .eq("hoja_ruta_id", id)
+          .order("pedido_id");
+        if (error) return json({ error: error.message }, 400);
+        return json({ items: data ?? [] });
+      }
+
+      // POST /hojas-ruta/:id/confirmar-carga
+      // Cierra la carga manualmente y pasa la hoja a 'carga_confirmada'.
+      // Si todos los items ya están no-pendientes, el trigger del backend
+      // ya lo hace automáticamente, pero este endpoint permite forzar el cierre.
+      if (
+        parts.length === 3 &&
+        parts[2] === "confirmar-carga" &&
+        method === "POST"
+      ) {
+        const id = parts[1];
+        const body = await req.json().catch(() => ({}));
+        const forzar = Boolean(body?.forzar ?? false);
+
+        // Verificar estado actual
+        const { data: hoja, error: eh } = await supabase
+          .from("hojas_ruta")
+          .select("id, estado")
+          .eq("id", id)
+          .maybeSingle();
+        if (eh) return json({ error: eh.message }, 400);
+        if (!hoja) return json({ error: "Hoja no encontrada o sin permisos" }, 404);
+        if (hoja.estado !== "en_carga") {
+          return json(
+            { error: `La hoja no está 'en_carga' (estado actual: ${hoja.estado})` },
+            400,
+          );
+        }
+
+        // Chequear items pendientes
+        const { data: items, error: ei } = await supabase
+          .from("hoja_ruta_carga_items")
+          .select("id, estado")
+          .eq("hoja_ruta_id", id);
+        if (ei) return json({ error: ei.message }, 400);
+
+        const pendientes = (items ?? []).filter((i) => i.estado === "pendiente");
+        if (pendientes.length > 0 && !forzar) {
+          return json(
+            {
+              error:
+                "Hay items pendientes de verificar. Marcalos como cargado/faltante/parcial, o enviá { forzar: true }.",
+              items_pendientes: pendientes.length,
+            },
+            400,
+          );
+        }
+
+        const patch: Record<string, unknown> = {
+          estado: "carga_confirmada",
+          carga_confirmada_at: new Date().toISOString(),
+          carga_confirmada_por: userData.user.id,
+          carga_forzada: forzar && pendientes.length > 0,
+        };
+        if (typeof body?.observaciones === "string") {
+          patch.observaciones = body.observaciones;
+        }
+
+        const { data, error } = await supabase
+          .from("hojas_ruta")
+          .update(patch)
+          .eq("id", id)
+          .eq("estado", "en_carga")
+          .select()
+          .maybeSingle();
+        if (error) return json({ error: error.message }, 400);
+        if (!data) return json({ error: "No se pudo confirmar la carga" }, 400);
+        return json({ hoja_ruta: data });
       }
 
       // PATCH /hojas-ruta/:id  { estado }
@@ -300,6 +387,59 @@ Deno.serve(async (req) => {
         .single();
       if (error) return json({ error: error.message }, 400);
       return json({ devolucion: data }, 201);
+    }
+
+    // ===== /carga-items/:id  PATCH =====
+    // Marca un item de carga como cargado/faltante/parcial.
+    // Cuando todos los items quedan en estado != 'pendiente', el trigger
+    // `auto_confirmar_carga_hoja_ruta` cambia la hoja a 'carga_confirmada' solo.
+    if (parts[0] === "carga-items" && parts.length === 2 && method === "PATCH") {
+      const id = parts[1];
+      const body = await req.json().catch(() => ({}));
+      const patch: Record<string, unknown> = {
+        verificado_por: userData.user.id,
+        verificado_at: new Date().toISOString(),
+      };
+      if (body?.estado !== undefined) {
+        const est = String(body.estado);
+        if (!ESTADOS_CARGA_ITEM.includes(est)) {
+          return json(
+            {
+              error: `Estado inválido. Permitidos: ${ESTADOS_CARGA_ITEM.join(", ")}`,
+            },
+            400,
+          );
+        }
+        patch.estado = est;
+      }
+      if (body?.cantidad_cargada !== undefined && body?.cantidad_cargada !== null) {
+        const n = Number(body.cantidad_cargada);
+        if (!Number.isFinite(n) || n < 0) {
+          return json({ error: "cantidad_cargada inválida" }, 400);
+        }
+        patch.cantidad_cargada = n;
+      }
+      if (typeof body?.observaciones === "string") {
+        patch.observaciones = body.observaciones;
+      }
+
+      const { data, error } = await supabase
+        .from("hoja_ruta_carga_items")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 400);
+      if (!data) {
+        return json(
+          {
+            error:
+              "Item no encontrado o sin permisos (la hoja debe estar 'en_carga' y vos ser responsable)",
+          },
+          404,
+        );
+      }
+      return json({ item: data });
     }
 
     // ===== /rendiciones =====
