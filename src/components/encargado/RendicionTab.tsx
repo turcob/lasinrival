@@ -5,14 +5,54 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { useCobrosHojaRuta, useRendicionHojaRuta } from '@/hooks/useLogistica';
+import { useCobrosHojaRuta, useRendicionHojaRuta, useHojaRuta } from '@/hooks/useLogistica';
 import { clasificarMedioPago, useGuardarRendicion } from '@/hooks/useEncargado';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Banknote, Smartphone, CreditCard, DollarSign, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+
+const iconoMedio = (tipo: string) => {
+  if (tipo === 'efectivo') return <Banknote className="h-4 w-4" />;
+  if (tipo === 'transferencias' || tipo === 'qr') return <Smartphone className="h-4 w-4" />;
+  if (tipo === 'tarjeta') return <CreditCard className="h-4 w-4" />;
+  return <DollarSign className="h-4 w-4" />;
+};
+
+const fmt = (n: number) => `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 
 export function RendicionTab({ hojaRutaId, numeroHoja }: { hojaRutaId: string; numeroHoja: number }) {
   const { data: cobros = [] } = useCobrosHojaRuta(hojaRutaId);
   const { data: rendicion } = useRendicionHojaRuta(hojaRutaId);
+  const { data: hoja } = useHojaRuta(hojaRutaId);
   const guardar = useGuardarRendicion();
+
+  const paradas: any[] = (hoja as any)?.paradas ?? [];
+
+  // Resumen de paradas por estado
+  const resumenParadas = useMemo(() => {
+    const r = { entregado: 0, parcial: 0, rechazado: 0, pendiente: 0, total: paradas.length };
+    paradas.forEach((p: any) => {
+      if (p.estado === 'entregado') r.entregado++;
+      else if (p.estado === 'entrega_parcial') r.parcial++;
+      else if (p.estado === 'rechazado' || p.estado === 'no_entregado') r.rechazado++;
+      else r.pendiente++;
+    });
+    return r;
+  }, [paradas]);
+
+  // Agrupar cobros por cliente
+  const cobrosPorCliente = useMemo(() => {
+    const map = new Map<string, { cliente: string; total: number; medios: Set<string> }>();
+    cobros.forEach((c: any) => {
+      const cliente = c.pedido?.cliente?.nombre
+        ?? paradas.find((p: any) => p.id === c.parada?.id)?.pedido?.cliente?.nombre
+        ?? `Pedido #${c.pedido?.numero_pedido ?? '?'}`;
+      const cur = map.get(cliente) ?? { cliente, total: 0, medios: new Set<string>() };
+      cur.total += Number(c.monto);
+      const fp = c.forma_pago?.nombre ?? c.medio_pago ?? '';
+      if (fp) cur.medios.add(fp);
+      map.set(cliente, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [cobros, paradas]);
 
   const esperado = useMemo(() => {
     const t: Record<string, number> = { efectivo: 0, transferencias: 0, qr: 0, tarjeta: 0 };
@@ -86,6 +126,87 @@ export function RendicionTab({ hojaRutaId, numeroHoja }: { hojaRutaId: string; n
           Estado: {rendicion.estado}
         </Badge>
       )}
+
+      {/* Resumen de paradas */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">RESUMEN DE ENTREGAS</p>
+        <div className="grid grid-cols-4 gap-2">
+          <Card className="border-green-500/30 bg-green-500/5">
+            <CardContent className="p-2 text-center">
+              <CheckCircle2 className="h-4 w-4 mx-auto text-green-700 mb-1" />
+              <p className="text-lg font-bold text-green-700">{resumenParadas.entregado}</p>
+              <p className="text-[10px] text-muted-foreground">Entregadas</p>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="p-2 text-center">
+              <AlertTriangle className="h-4 w-4 mx-auto text-amber-700 mb-1" />
+              <p className="text-lg font-bold text-amber-700">{resumenParadas.parcial}</p>
+              <p className="text-[10px] text-muted-foreground">Parciales</p>
+            </CardContent>
+          </Card>
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardContent className="p-2 text-center">
+              <XCircle className="h-4 w-4 mx-auto text-red-700 mb-1" />
+              <p className="text-lg font-bold text-red-700">{resumenParadas.rechazado}</p>
+              <p className="text-[10px] text-muted-foreground">Rechazadas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-2 text-center">
+              <p className="text-lg font-bold">{resumenParadas.total}</p>
+              <p className="text-[10px] text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Totales por medio (esperado) */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">COBRADO POR MEDIO DE PAGO</p>
+        <Card>
+          <CardContent className="p-0 divide-y">
+            {(['efectivo','transferencias','qr','tarjeta'] as const).map((k) => (
+              esperado[k] > 0 ? (
+                <div key={k} className="flex items-center justify-between p-3">
+                  <div className="flex items-center gap-2">
+                    {iconoMedio(k)}
+                    <span className="capitalize text-sm">{k === 'qr' ? 'QR / MP' : k}</span>
+                  </div>
+                  <span className="font-semibold">{fmt(esperado[k])}</span>
+                </div>
+              ) : null
+            ))}
+            <div className="flex items-center justify-between p-3 bg-primary/5">
+              <span className="font-semibold">Total cobrado</span>
+              <span className="font-bold">{fmt(totalEsperado)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detalle por cliente */}
+      {cobrosPorCliente.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">DETALLE POR CLIENTE ({cobrosPorCliente.length})</p>
+          <Card>
+            <CardContent className="p-0 divide-y">
+              {cobrosPorCliente.map((c, i) => (
+                <div key={i} className="p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="text-sm font-medium truncate flex-1">{c.cliente}</p>
+                    <span className="font-semibold text-sm">{fmt(c.total)}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{Array.from(c.medios).join(' · ')}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Form de declaración */}
+      <p className="text-xs font-medium text-muted-foreground pt-2">DECLARAR MONTOS RENDIDOS</p>
       <Card><CardContent className="p-3 space-y-3">
         <Row label="Efectivo" value={efectivo} setter={setEfectivo} expected={esperado.efectivo} />
         <Row label="Transferencias" value={transferencias} setter={setTransferencias} expected={esperado.transferencias} />
