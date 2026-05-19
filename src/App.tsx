@@ -39,6 +39,8 @@ import ReportePagos from "./pages/ReportePagos";
 import HorariosZona from "./pages/HorariosZona";
 import Devoluciones from "./pages/Devoluciones";
 import DetalleEntregas from "./pages/DetalleEntregas";
+import Encargado from "./pages/Encargado";
+import EncargadoHojaDetalle from "./pages/EncargadoHojaDetalle";
 
 const queryClient = new QueryClient();
 
@@ -101,6 +103,8 @@ function AppRoutes() {
       <Route path="/horarios-zona" element={<ProtectedRoute><HorariosZona /></ProtectedRoute>} />
       <Route path="/devoluciones" element={<ProtectedRoute><Devoluciones /></ProtectedRoute>} />
       <Route path="/detalle-entregas" element={<ProtectedRoute><DetalleEntregas /></ProtectedRoute>} />
+      <Route path="/encargado" element={<ProtectedRoute redirectPath="/encargado"><Encargado /></ProtectedRoute>} />
+      <Route path="/encargado/:id" element={<ProtectedRoute><EncargadoHojaDetalle /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
