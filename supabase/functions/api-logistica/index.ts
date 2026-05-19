@@ -73,6 +73,9 @@ Deno.serve(async (req) => {
           "PATCH  /paradas/:id           { estado, observaciones? }",
           "POST   /cobros                { parada_id, pedido_id, forma_pago_id, monto, referencia?, observaciones? }",
           "POST   /devoluciones          { parada_id, pedido_detalle_id, cantidad, motivo, detalle_motivo? }",
+          "GET    /hojas-ruta/:id/rendicion",
+          "POST   /rendiciones           { hoja_ruta_id, total_efectivo, total_transferencias, total_qr, total_tarjeta, total_general, diferencia?, observaciones?, caja_id? }",
+          "PATCH  /rendiciones/:id       { ...mismos campos (solo si estado='pendiente') }",
         ],
       });
     }
@@ -150,6 +153,18 @@ Deno.serve(async (req) => {
           cobros: cobros ?? [],
           devoluciones: devoluciones ?? [],
         });
+      }
+
+      // GET /hojas-ruta/:id/rendicion
+      if (parts.length === 3 && parts[2] === "rendicion" && method === "GET") {
+        const id = parts[1];
+        const { data, error } = await supabase
+          .from("hoja_ruta_rendiciones")
+          .select("*")
+          .eq("hoja_ruta_id", id)
+          .maybeSingle();
+        if (error) return json({ error: error.message }, 400);
+        return json({ rendicion: data });
       }
 
       // PATCH /hojas-ruta/:id  { estado }
@@ -285,6 +300,82 @@ Deno.serve(async (req) => {
         .single();
       if (error) return json({ error: error.message }, 400);
       return json({ devolucion: data }, 201);
+    }
+
+    // ===== /rendiciones =====
+    if (parts[0] === "rendiciones") {
+      // POST /rendiciones
+      if (parts.length === 1 && method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        if (!body?.hoja_ruta_id) return json({ error: "Falta hoja_ruta_id" }, 400);
+
+        const totEf = Number(body.total_efectivo ?? 0);
+        const totTr = Number(body.total_transferencias ?? 0);
+        const totQr = Number(body.total_qr ?? 0);
+        const totTa = Number(body.total_tarjeta ?? 0);
+        const totGen = Number(body.total_general ?? (totEf + totTr + totQr + totTa));
+        const dif = Number(body.diferencia ?? 0);
+
+        const { data, error } = await supabase
+          .from("hoja_ruta_rendiciones")
+          .insert({
+            hoja_ruta_id: body.hoja_ruta_id,
+            usuario_id: userData.user.id,
+            total_efectivo: totEf,
+            total_transferencias: totTr,
+            total_qr: totQr,
+            total_tarjeta: totTa,
+            total_general: totGen,
+            diferencia: dif,
+            caja_id: body.caja_id ?? null,
+            observaciones: body.observaciones ?? null,
+            estado: "pendiente",
+          })
+          .select()
+          .single();
+        if (error) return json({ error: error.message }, 400);
+        return json({ rendicion: data }, 201);
+      }
+
+      // PATCH /rendiciones/:id (solo si pendiente — lo valida la RLS)
+      if (parts.length === 2 && method === "PATCH") {
+        const id = parts[1];
+        const body = await req.json().catch(() => ({}));
+        const patch: Record<string, unknown> = {};
+        const num = (k: string) => {
+          if (body?.[k] !== undefined && body?.[k] !== null) {
+            const n = Number(body[k]);
+            if (Number.isFinite(n)) patch[k] = n;
+          }
+        };
+        num("total_efectivo");
+        num("total_transferencias");
+        num("total_qr");
+        num("total_tarjeta");
+        num("total_general");
+        num("diferencia");
+        if (body?.caja_id !== undefined) patch.caja_id = body.caja_id;
+        if (typeof body?.observaciones === "string") patch.observaciones = body.observaciones;
+
+        if (Object.keys(patch).length === 0) {
+          return json({ error: "Nada para actualizar" }, 400);
+        }
+
+        const { data, error } = await supabase
+          .from("hoja_ruta_rendiciones")
+          .update(patch)
+          .eq("id", id)
+          .select()
+          .maybeSingle();
+        if (error) return json({ error: error.message }, 400);
+        if (!data) {
+          return json(
+            { error: "Rendición no encontrada, sin permisos, o ya aprobada/rechazada" },
+            404,
+          );
+        }
+        return json({ rendicion: data });
+      }
     }
 
     return json({ error: "Ruta no encontrada", path: fullPath, method }, 404);
