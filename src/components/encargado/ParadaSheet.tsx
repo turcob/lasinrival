@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, PackageX, Clock, Loader2, MinusCircle } from 'lucide-react';
 import { useActualizarEstadoParada, type HojaRutaParada } from '@/hooks/useLogistica';
-import { useCobrosParada } from '@/hooks/useLogistica';
+import { useCobrosParada, useDevolucionesParada } from '@/hooks/useLogistica';
 import { CobrarSheet } from './CobrarSheet';
 import { DevolucionSheet } from './DevolucionSheet';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ interface ParadaSheetProps {
 export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSheetProps) {
   const cambiarEstado = useActualizarEstadoParada();
   const { data: cobros = [] } = useCobrosParada(parada?.id);
+  const { data: devoluciones = [] } = useDevolucionesParada(parada?.id);
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [devolverOpen, setDevolverOpen] = useState(false);
   const [noEntregadoOpen, setNoEntregadoOpen] = useState(false);
@@ -26,7 +27,14 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
 
   if (!parada) return null;
 
-  const totalPedido = Number(parada.pedido?.total ?? 0);
+  const totalPedidoOriginal = Number(parada.pedido?.total ?? 0);
+  const montoRechazado = (devoluciones as any[]).reduce((s, d) => {
+    const precio = Number(d.pedido_detalle?.precio_unitario ?? 0);
+    const desc = Number(d.pedido_detalle?.descuento_porcentaje ?? 0);
+    const neto = precio * (1 - desc / 100);
+    return s + neto * Number(d.cantidad ?? 0);
+  }, 0);
+  const totalPedido = Math.max(0, totalPedidoOriginal - montoRechazado);
   const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0);
   const saldo = totalPedido - montoCobrado;
   const yaEntregado = ['entregado', 'entrega_parcial', 'rechazado', 'no_entregado'].includes(parada.estado);
@@ -59,8 +67,20 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
           <div className="space-y-4 py-4">
             <Card>
               <CardContent className="p-3 space-y-1 text-sm">
+                {montoRechazado > 0 && (
+                  <>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Pedido original:</span>
+                      <span className="line-through">${totalPedidoOriginal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-700">
+                      <span>Rechazado:</span>
+                      <span>-${montoRechazado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total:</span>
+                  <span className="text-muted-foreground">Total a cobrar:</span>
                   <span className="font-semibold">${totalPedido.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {montoCobrado > 0 && (
