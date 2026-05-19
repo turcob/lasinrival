@@ -1,83 +1,97 @@
-Sí, entiendo la idea general. Lo que querés es que desde Logística se pueda ajustar una hoja de ruta ya armada cuando el total consolidado de un producto no coincide con lo que realmente se quiere llevar/facturar, bajando cantidades en pedidos/remitos existentes y reimprimiendo el remito corregido.
+## Vista del Encargado — `/encargado`
 
-Plan propuesto:
+Mini-app responsive (mobile-first) que permite al encargado/chofer hacer todo el ciclo de una hoja de ruta desde el celular sin tocar el backoffice de Logística.
 
-1. Agregar botón “Refacturar hoja”
-   - Ubicación: dentro del detalle de una Hoja de Ruta, junto a las acciones principales.
-   - Al presionarlo abrirá una pantalla lateral/modal de refacturación para esa hoja.
-   - Solo se podrá usar si la hoja tiene pedidos/paradas cargados.
+### Acceso y permisos
+- Ruta nueva **`/encargado`**, fuera del sidebar (no aparece en `AppSidebar`).
+- Protegida con `AuthProvider`: requiere usuario logueado y vinculado a un `empleados` (verificar `empleados.user_id = auth.uid()`).
+- Filtra hojas solo donde el user es `responsable_id`, o `chofer_id` si no hay responsable (mismo criterio que `is_route_owner`).
+- No toca nada del módulo `/logistica` actual.
 
-2. Pantalla de refacturación
-   - Mostrar un selector de producto con el consolidado de la hoja:
-     - código
-     - descripción
-     - cantidad total actual contemplada entre todos los pedidos/facturas/remitos de la hoja
-   - Al seleccionar un producto, pedir “Nueva cantidad”.
-   - Validaciones:
-     - La nueva cantidad debe ser menor que la cantidad actual.
-     - No permitir aumentar cantidades en este flujo.
-     - No permitir cantidades negativas.
-     - Mostrar cuánto se va a descontar: `cantidad actual - nueva cantidad`.
-
-3. Regla para descontar de pedidos/remitos
-   - Buscar todas las facturas/pedidos de esa hoja que contienen ese producto.
-   - Ordenarlas desde la que menos cantidad tiene de ese producto hacia la que más tiene.
-   - Ir quitando cantidad desde esas facturas hasta completar la diferencia.
-   - Ejemplo:
-     - Pedido A tiene 3
-     - Pedido B tiene 4
-     - Pedido C tiene 5
-     - Total actual: 12
-     - Nueva cantidad: 10
-     - Diferencia a quitar: 2
-     - Se descuenta primero del pedido que menos tiene: Pedido A pasa de 3 a 1.
-   - Si la diferencia fuera mayor que el primer pedido, se seguirá con el siguiente hasta completar.
-
-4. Actualización de datos
-   - Actualizar `pedido_detalles` del/los pedidos afectados:
-     - `cantidad_pedida`
-     - `cantidad_entregada`
-     - `subtotal`
-   - Recalcular y actualizar el total/subtotal de cada pedido afectado.
-   - Registrar en historial del pedido una observación del tipo:
-     - “Refacturación hoja de ruta #44: producto X ajustado de 3 a 1”.
-   - Refrescar la hoja de carga para que el consolidado muestre la nueva cantidad.
-
-5. Anulación/remito anterior y generación del nuevo
-   - Como el sistema actualmente imprime el remito usando el número del pedido y los datos actuales del pedido, el “remito anterior” no existe como archivo separado guardado en base de datos.
-   - Por eso, en esta primera implementación la anulación será funcional/operativa:
-     - se registra en el historial que el remito anterior quedó anulado por refacturación;
-     - se actualizan los valores del pedido;
-     - se habilita/imprime el nuevo remito con cantidades e importes corregidos.
-   - Al finalizar la refacturación, se mostrará un resumen de pedidos afectados y un botón para imprimir los nuevos remitos afectados.
-
-6. Impresión posterior
-   - Reutilizar el formato actual de remitos A4 fijo.
-   - No tocar el layout bloqueado de `src/lib/imprimirRemito.ts`; solo usarlo para generar remitos con los datos nuevos.
-   - El usuario podrá imprimir los remitos afectados inmediatamente después del ajuste.
-
-Flujo esperado:
+### Pantallas
 
 ```text
-Detalle Hoja de Ruta
-  -> Refacturar hoja
-  -> Seleccionar producto consolidado
-  -> Ver cantidad actual total
-  -> Ingresar nueva cantidad menor
-  -> Confirmar
-  -> Sistema descuenta desde el pedido con menor cantidad
-  -> Actualiza pedidos/totales
-  -> Registra historial/anulación operativa
-  -> Muestra resumen
-  -> Imprimir remitos nuevos afectados
+1. Listado de hojas
+   ├─ Pendientes hoy: cards grandes con #hoja, fecha, estado, cant. paradas
+   └─ Tap → entra al Detalle
+
+2. Detalle de hoja  (header sticky con estado + acción principal)
+   Según estado:
+   ├─ en_carga          → tab "Carga"  → confirmar mercadería
+   ├─ carga_confirmada  → botón "Salir a ruta" (PATCH estado=en_ruta)
+   ├─ en_ruta           → tab "Paradas" (default) + tab "Resumen $"
+   └─ completada        → tab "Rendición" (crear/editar)
+
+3. Carga (cuando estado=en_carga)
+   - Lista agrupada por producto con cantidad_esperada
+   - Cada item: botones rápidos [✓ Cargado] [△ Parcial: input cant] [✗ Faltante]
+   - Footer: progreso "X de Y verificados"
+   - Botón "Confirmar carga" → POST /hojas-ruta/:id/confirmar-carga
+     (si quedan pendientes muestra alert para confirmar con forzar:true)
+
+4. Paradas (cuando estado=en_ruta)
+   - Lista vertical de paradas, ordenadas por `orden`, swipe / tap
+   - Card por parada: nombre cliente, dirección, total pedido, badge estado
+   - Tap → modal/sheet con 4 acciones grandes:
+       [Entregado completo]  → si saldo>0 abre Cobrar
+       [Entrega parcial]     → abre Cobrar + queda saldo
+       [Rechazado]           → abre Devoluciones
+       [No entregado]        → solo motivo
+
+5. Cobrar (sheet mobile-first, sin diálogo de cheque)
+   - Total adeudado del pedido
+   - Botones grandes por forma de pago (efectivo, transferencia, QR, tarjeta)
+   - Cada selección abre input numérico de monto + referencia opcional
+   - Lista de cobros parciales agregados, con suma corriente
+   - Botón "Confirmar entrega" → crea N cobros + PATCH parada estado=entregado|entrega_parcial
+
+6. Devolución (cuando rechaza)
+   - Lista los productos del pedido, selecciono cantidad a devolver por línea
+   - Motivo (chips: rechazo_cliente, vencido, roto, otro)
+   - Toggle "Reingresar a stock"
+   - Confirmar → POST devoluciones + PATCH parada estado=rechazado
+
+7. Resumen $ (tab dentro del detalle, cuando hay cobros)
+   - Vista compacta de lo cobrado por medio de pago (suma)
+   - Total cobrado vs total esperado
+
+8. Rendición (cuando estado=completada y no hay rendición aprobada)
+   - Auto-calcula totales por medio de pago desde los cobros
+   - Inputs editables "declarado" por cada medio
+   - Muestra diferencia
+   - Observaciones
+   - Botón "Enviar rendición" → INSERT hoja_ruta_rendiciones estado=pendiente
+   - Si ya existe y está pendiente → permite editar (UPDATE)
+   - Si está aprobada/rechazada → solo lectura
 ```
 
-Notas técnicas:
-- No voy a modificar el archivo de formato de impresión del remito salvo que sea estrictamente necesario, porque hay una regla del proyecto que bloquea cambios de layout/dimensiones/estilos ahí.
-- Para que esto sea seguro y consistente, conviene encapsular la operación de refacturación en una función de backend/base de datos o en un hook que haga todos los updates de forma controlada. Si el proyecto permite migración, lo ideal es una función transaccional para evitar que quede un pedido parcialmente actualizado si algo falla.
-- También revisaría si existe movimiento de cuenta corriente ya generado por el pedido preparado; si lo hay, hay que ajustar o registrar la diferencia para que la deuda del cliente no quede con el importe viejo. En el plan base, además del total del pedido, se debe corregir el movimiento asociado al concepto del remito/pedido si corresponde.
+### Reuso de lógica existente
+- Hook `useLogistica.ts` ya trae hojas, paradas, cobros y devoluciones con filtros — se reusa.
+- Toda la lógica de RLS / triggers (auto pasar a `carga_confirmada`, auto `despachado` al pasar pedido a entregado, impacto en cuenta corriente al rendir) **ya funciona en backend**; la nueva vista solo es UI nueva que llama a las mismas mutaciones que hoy hace `RegistrarCobroDialog`, `RegistrarDevolucionDialog`, `RendicionHojaRutaDialog`.
+- Se extraen las funciones de mutación a hooks pequeños (`useEncargadoActions`) para no duplicar SQL.
+- Sin tocar componentes ni rutas existentes de `/logistica`.
 
-Confirmación de entendimiento del ejemplo:
-- Si el producto X suma 12 entre 3 remitos/facturas y se refactura a 10, hay que quitar 2 unidades.
-- Se quita empezando por el pedido/remito que menos unidades tiene de X.
-- Ese remito queda marcado como anulado/corregido en historial y se imprime uno nuevo con la cantidad e importe actualizados.
+### Detalles técnicos
+
+- Stack: React Router (agregar `<Route path="/encargado">` y `/encargado/:hojaId` en `App.tsx`), Tailwind, shadcn (Sheet, Tabs, Card, Button, Input).
+- Mobile-first: containers `max-w-md mx-auto`, headers sticky con safe-area, touch targets ≥ 48px, tipografía base 16px.
+- Estado: TanStack Query con `staleTime: 30s` e `invalidate` después de cada mutación. Pull-to-refresh con botón refrescar en header.
+- Sin dependencias nuevas.
+- Archivos nuevos esperados:
+  - `src/pages/Encargado.tsx` (listado)
+  - `src/pages/EncargadoHojaDetalle.tsx` (tabs según estado)
+  - `src/components/encargado/CargaTab.tsx`
+  - `src/components/encargado/ParadasTab.tsx`
+  - `src/components/encargado/CobrarSheet.tsx` (versión simplificada mobile, sin cheque detallado)
+  - `src/components/encargado/DevolucionSheet.tsx`
+  - `src/components/encargado/RendicionTab.tsx`
+  - `src/components/encargado/ResumenCobrosTab.tsx`
+  - `src/hooks/useEncargadoHojas.ts`
+  - `src/hooks/useEncargadoActions.ts`
+- Registrar las rutas en `src/App.tsx`. La ruta queda fuera del `MainLayout` (sin sidebar) usando layout propio compacto.
+
+### Fuera de alcance
+- No cambio nada en `/logistica` ni en la UI admin.
+- No agrego cheque/QR detallado en cobro mobile (queda transferencia con referencia simple); si más adelante se necesita cheque desde mobile, se suma como iteración.
+- No incluyo mapas/ruteo GPS.
+- No incluyo offline-first (requiere conexión).
