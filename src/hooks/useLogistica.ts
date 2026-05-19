@@ -1029,6 +1029,8 @@ export function useDevolucionesParada(paradaId: string | undefined) {
           created_at,
           pedido_detalle:pedido_detalles(
             id,
+            precio_unitario,
+            descuento_porcentaje,
             producto:productos(codigo_articulo, descripcion)
           )
         `)

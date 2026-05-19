@@ -96,11 +96,19 @@ export function DevolucionSheet({
           reingresarStock: reingresar,
         });
       }
-      await cambiarEstado.mutateAsync({
-        id: paradaId,
-        estado: 'rechazado',
-        observaciones: detalleMotivo || undefined,
-      });
+      // Si se rechazaron TODOS los items del pedido en su totalidad → estado 'rechazado'.
+      // Caso contrario, dejamos la parada pendiente para que el encargado registre
+      // el cobro por la diferencia y elija "Entrega parcial" o "Entrega completa".
+      const rechazoTotal =
+        items.length > 0 &&
+        items.every((i) => i.cantidad_devolver >= i.cantidad_pedida && i.cantidad_pedida > 0);
+      if (rechazoTotal) {
+        await cambiarEstado.mutateAsync({
+          id: paradaId,
+          estado: 'rechazado',
+          observaciones: detalleMotivo || undefined,
+        });
+      }
       onSuccess();
       onOpenChange(false);
     } catch (e) { /* manejado por hook */ }
