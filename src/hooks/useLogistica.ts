@@ -405,15 +405,19 @@ export function useCambiarEstadoHojaRuta() {
         updateData.carga_forzada = !!forzada;
       }
 
-      const { error } = await supabase
+      const { data: hojaActualizada, error } = await supabase
         .from('hojas_ruta')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id, estado')
+        .maybeSingle();
       if (error) throw error;
+      if (!hojaActualizada) throw new Error('No se pudo cambiar el estado de esta hoja. Verificá que siga asignada a tu usuario.');
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['hojas-ruta'] });
-      queryClient.invalidateQueries({ queryKey: ['hoja-ruta'] });
+      queryClient.invalidateQueries({ queryKey: ['hoja-ruta', vars.id] });
+      queryClient.invalidateQueries({ queryKey: ['encargado-hojas'] });
       toast({ title: 'Estado actualizado' });
     },
     onError: (error) => {
