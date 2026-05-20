@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { useRegistrarDevolucion, useActualizarEstadoParada, type DevolucionMotivo } from '@/hooks/useLogistica';
+import { useRegistrarDevolucion, type DevolucionMotivo } from '@/hooks/useLogistica';
 import { PackageX, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -47,7 +47,6 @@ export function DevolucionSheet({
   open, onOpenChange, hojaRutaId, paradaId, pedidoDetalles, clienteNombre, onSuccess,
 }: DevolucionSheetProps) {
   const registrar = useRegistrarDevolucion();
-  const cambiarEstado = useActualizarEstadoParada();
   const { toast } = useToast();
   const [items, setItems] = useState<ItemDevolucion[]>([]);
   const [detalleMotivo, setDetalleMotivo] = useState('');
@@ -96,19 +95,10 @@ export function DevolucionSheet({
           reingresarStock: reingresar,
         });
       }
-      // Si se rechazaron TODOS los items del pedido en su totalidad → estado 'rechazado'.
-      // Caso contrario, dejamos la parada pendiente para que el encargado registre
-      // el cobro por la diferencia y elija "Entrega parcial" o "Entrega completa".
-      const rechazoTotal =
-        items.length > 0 &&
-        items.every((i) => i.cantidad_devolver >= i.cantidad_pedida && i.cantidad_pedida > 0);
-      if (rechazoTotal) {
-        await cambiarEstado.mutateAsync({
-          id: paradaId,
-          estado: 'rechazado',
-          observaciones: detalleMotivo || undefined,
-        });
-      }
+      // Nunca auto-marcamos la parada como 'rechazado' acá: el encargado debe
+      // volver y elegir "Cobrar y entregar" (con la diferencia) o, si rechazó
+      // todo, "No se pudo entregar". Así nunca se bloquea el cobro de la
+      // mercadería que sí quedó en el cliente.
       onSuccess();
       onOpenChange(false);
     } catch (e) { /* manejado por hook */ }
@@ -195,10 +185,10 @@ export function DevolucionSheet({
           <div className="max-w-md mx-auto">
             <Button
               variant="destructive" size="lg" className="w-full h-14"
-              disabled={registrar.isPending || cambiarEstado.isPending || aRechazar.length === 0}
+              disabled={registrar.isPending || aRechazar.length === 0}
               onClick={handleSubmit}
             >
-              {(registrar.isPending || cambiarEstado.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {registrar.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Confirmar rechazo
             </Button>
           </div>
