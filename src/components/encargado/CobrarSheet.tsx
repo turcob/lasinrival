@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useFormasPago, useRegistrarCobrosEncargado, clasificarMedioPago } from '@/hooks/useEncargado';
 import { useActualizarEstadoParada } from '@/hooks/useLogistica';
-import { Banknote, CreditCard, Smartphone, DollarSign, Trash2, Loader2 } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, DollarSign, Trash2, Loader2, Camera, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CobrarSheetProps {
@@ -28,6 +28,7 @@ interface Renglon {
   forma_pago_id: string;
   monto: number;
   referencia: string;
+  foto?: File | null;
 }
 
 const iconoFP = (nombre: string) => {
@@ -65,7 +66,7 @@ export function CobrarSheet({
   const agregarMedio = (formaPagoId: string) => {
     // Si ya existe, sumar al primero con ese medio el saldo pendiente
     const restante = Math.max(0, saldo - totalCobros);
-    setRenglones([...renglones, { forma_pago_id: formaPagoId, monto: restante, referencia: '' }]);
+    setRenglones([...renglones, { forma_pago_id: formaPagoId, monto: restante, referencia: '', foto: null }]);
   };
 
   const eliminar = (idx: number) => setRenglones(renglones.filter((_, i) => i !== idx));
@@ -87,8 +88,13 @@ export function CobrarSheet({
       await registrar.mutateAsync({
         hojaRutaId, paradaId, pedidoId, totalPedido,
         montoCobradoPrevio,
-        cobros: renglones.map(r => ({ forma_pago_id: r.forma_pago_id, monto: r.monto, referencia: r.referencia })),
-      });
+        cobros: renglones.map(r => ({
+          forma_pago_id: r.forma_pago_id,
+          monto: r.monto,
+          referencia: r.referencia,
+          foto: r.foto ?? null,
+        })) as any,
+      } as any);
       await cambiarEstado.mutateAsync({
         id: paradaId,
         estado: montoRechazado > 0.01 ? 'entrega_parcial' : 'entregado',
@@ -168,6 +174,7 @@ export function CobrarSheet({
               <p className="text-xs font-medium text-muted-foreground">COBROS</p>
               {renglones.map((r, i) => {
                 const fp = formasPago.find(f => f.id === r.forma_pago_id);
+                const esTransferencia = clasificarMedioPago(fp?.nombre ?? '') === 'transferencias';
                 return (
                   <Card key={i}>
                     <CardContent className="p-3 space-y-2">
@@ -193,6 +200,45 @@ export function CobrarSheet({
                         value={r.referencia}
                         onChange={(e) => actualizar(i, { referencia: e.target.value })}
                       />
+                      {esTransferencia && (
+                        <div>
+                          <input
+                            id={`foto-cobro-${i}`}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] ?? null;
+                              actualizar(i, { foto: file });
+                            }}
+                          />
+                          <label htmlFor={`foto-cobro-${i}`}>
+                            <Button
+                              type="button"
+                              variant={r.foto ? 'default' : 'outline'}
+                              className="w-full h-11 gap-2"
+                              asChild
+                            >
+                              <span>
+                                {r.foto ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                                {r.foto ? `Comprobante: ${r.foto.name}` : 'Adjuntar comprobante de transferencia'}
+                              </span>
+                            </Button>
+                          </label>
+                          {r.foto && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full h-8 text-xs text-muted-foreground mt-1"
+                              onClick={() => actualizar(i, { foto: null })}
+                            >
+                              Quitar comprobante
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

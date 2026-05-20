@@ -218,18 +218,37 @@ export function useRegistrarCobrosEncargado() {
       cobros: Array<{ forma_pago_id: string; monto: number; referencia?: string }>;
     }) => {
       if (!user) throw new Error('Usuario no autenticado');
-      const validos = cobros.filter(c => c.forma_pago_id && c.monto > 0);
+      const validos = (cobros as Array<{ forma_pago_id: string; monto: number; referencia?: string; foto?: File | null }>)
+        .filter(c => c.forma_pago_id && c.monto > 0);
       if (validos.length === 0) throw new Error('Ingresá al menos un cobro válido');
 
-      const payload = validos.map(c => ({
-        hoja_ruta_id: hojaRutaId,
-        parada_id: paradaId,
-        pedido_id: pedidoId,
-        forma_pago_id: c.forma_pago_id,
-        monto: c.monto,
-        referencia: c.referencia || null,
-        usuario_id: user.id,
-      }));
+      // Subir fotos (si las hay) y armar payload
+      const payload: any[] = [];
+      for (const c of validos) {
+        let foto_path: string | null = null;
+        let foto_nombre: string | null = null;
+        if (c.foto) {
+          const ext = (c.foto.name.split('.').pop() || 'jpg').toLowerCase();
+          const path = `${hojaRutaId}/${paradaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from('comprobantes-cobros')
+            .upload(path, c.foto, { contentType: c.foto.type || 'image/jpeg', upsert: false });
+          if (upErr) throw new Error(`Error subiendo comprobante: ${upErr.message}`);
+          foto_path = path;
+          foto_nombre = c.foto.name;
+        }
+        payload.push({
+          hoja_ruta_id: hojaRutaId,
+          parada_id: paradaId,
+          pedido_id: pedidoId,
+          forma_pago_id: c.forma_pago_id,
+          monto: c.monto,
+          referencia: c.referencia || null,
+          usuario_id: user.id,
+          foto_comprobante_path: foto_path,
+          foto_comprobante_nombre: foto_nombre,
+        });
+      }
 
       const { error } = await supabase.from('hoja_ruta_cobros').insert(payload);
       if (error) throw error;
