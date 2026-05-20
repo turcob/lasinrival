@@ -38,27 +38,20 @@ export function RendicionTab({ hojaRutaId, numeroHoja }: { hojaRutaId: string; n
     return r;
   }, [paradas]);
 
-  // Agrupar cobros por cliente
-  const cobrosPorCliente = useMemo(() => {
-    const map = new Map<string, { cliente: string; total: number; medios: Set<string> }>();
-    cobros.forEach((c: any) => {
-      const cliente = c.pedido?.cliente?.nombre
-        ?? paradas.find((p: any) => p.id === c.parada?.id)?.pedido?.cliente?.nombre
-        ?? `Pedido #${c.pedido?.numero_pedido ?? '?'}`;
-      const cur = map.get(cliente) ?? { cliente, total: 0, medios: new Set<string>() };
-      cur.total += Number(c.monto);
-      const fp = c.forma_pago?.nombre ?? c.medio_pago ?? '';
-      if (fp) cur.medios.add(fp);
-      map.set(cliente, cur);
-    });
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [cobros, paradas]);
-
   const esperado = useMemo(() => {
     const t: Record<string, number> = { efectivo: 0, transferencias: 0, qr: 0, tarjeta: 0 };
     cobros.forEach((c: any) => {
       const tipo = clasificarMedioPago(c.forma_pago?.nombre ?? c.medio_pago ?? '');
       if (tipo !== 'otro') t[tipo] += Number(c.monto);
+    });
+    return t;
+  }, [cobros]);
+
+  const cantidadesPorMedio = useMemo(() => {
+    const t: Record<string, number> = { efectivo: 0, transferencias: 0, qr: 0, tarjeta: 0 };
+    cobros.forEach((c: any) => {
+      const tipo = clasificarMedioPago(c.forma_pago?.nombre ?? c.medio_pago ?? '');
+      if (tipo !== 'otro') t[tipo] += 1;
     });
     return t;
   }, [cobros]);
@@ -172,6 +165,9 @@ export function RendicionTab({ hojaRutaId, numeroHoja }: { hojaRutaId: string; n
                   <div className="flex items-center gap-2">
                     {iconoMedio(k)}
                     <span className="capitalize text-sm">{k === 'qr' ? 'QR / MP' : k}</span>
+                    <Badge variant="secondary" className="text-[10px] h-5">
+                      {cantidadesPorMedio[k]} {cantidadesPorMedio[k] === 1 ? 'cobro' : 'cobros'}
+                    </Badge>
                   </div>
                   <span className="font-semibold">{fmt(esperado[k])}</span>
                 </div>
@@ -184,26 +180,6 @@ export function RendicionTab({ hojaRutaId, numeroHoja }: { hojaRutaId: string; n
           </CardContent>
         </Card>
       </div>
-
-      {/* Detalle por cliente */}
-      {cobrosPorCliente.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">DETALLE POR CLIENTE ({cobrosPorCliente.length})</p>
-          <Card>
-            <CardContent className="p-0 divide-y">
-              {cobrosPorCliente.map((c, i) => (
-                <div key={i} className="p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <p className="text-sm font-medium truncate flex-1">{c.cliente}</p>
-                    <span className="font-semibold text-sm">{fmt(c.total)}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">{Array.from(c.medios).join(' · ')}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Form de declaración */}
       <p className="text-xs font-medium text-muted-foreground pt-2">DECLARAR MONTOS RENDIDOS</p>
