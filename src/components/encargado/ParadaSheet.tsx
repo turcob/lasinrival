@@ -26,16 +26,20 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   const [continuarACobro, setContinuarACobro] = useState(false);
   const [rechazadoOpen, setRechazadoOpen] = useState(false);
   const [obs, setObs] = useState('');
+  const [rechazoPendiente, setRechazoPendiente] = useState(0);
 
   if (!parada) return null;
 
   const totalPedidoOriginal = Number(parada.pedido?.total ?? 0);
-  const montoRechazado = (devoluciones as any[]).reduce((s, d) => {
+  const montoRechazadoQuery = (devoluciones as any[]).reduce((s, d) => {
     const precio = Number(d.pedido_detalle?.precio_unitario ?? 0);
     const desc = Number(d.pedido_detalle?.descuento_porcentaje ?? 0);
     const neto = precio * (1 - desc / 100);
     return s + neto * Number(d.cantidad ?? 0);
   }, 0);
+  // Usamos el máximo entre lo que devuelve la query y lo recién rechazado
+  // para evitar que un refetch tardío muestre el total sin descuento.
+  const montoRechazado = Math.max(montoRechazadoQuery, rechazoPendiente);
   const totalPedido = Math.max(0, totalPedidoOriginal - montoRechazado);
   const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0);
   const saldo = totalPedido - montoCobrado;
@@ -196,8 +200,10 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
             return;
           }
           setContinuarACobro(false);
-          // Calcular total proyectado restando lo recién rechazado al saldo actual.
-          const nuevoTotal = Math.max(0, totalPedido - montoRechazadoAhora);
+          // Sumar al rechazo previo (de la query) lo recién rechazado.
+          const totalRechazadoNuevo = montoRechazadoQuery + montoRechazadoAhora;
+          setRechazoPendiente(totalRechazadoNuevo);
+          const nuevoTotal = Math.max(0, totalPedidoOriginal - totalRechazadoNuevo);
           const nuevoSaldo = Math.max(0, nuevoTotal - montoCobrado);
           if (nuevoSaldo <= 0.01) {
             // Rechazo total (o no queda saldo): marcar parada como rechazada, no abrir cobro.
