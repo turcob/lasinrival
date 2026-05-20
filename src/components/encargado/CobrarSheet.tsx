@@ -9,6 +9,7 @@ import { useFormasPago, useRegistrarCobrosEncargado, clasificarMedioPago } from 
 import { useActualizarEstadoParada } from '@/hooks/useLogistica';
 import { Banknote, CreditCard, Smartphone, DollarSign, Trash2, Loader2, Camera, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { isNativePlatform, tomarFotoNativa } from '@/lib/nativeCamera';
 
 interface CobrarSheetProps {
   open: boolean;
@@ -52,6 +53,11 @@ export function CobrarSheet({
   const saldo = Math.max(0, totalPedido - montoCobradoPrevio);
   const [renglones, setRenglones] = useState<Renglon[]>([]);
   const [observaciones, setObservaciones] = useState('');
+  const [esNativo, setEsNativo] = useState(false);
+
+  useEffect(() => {
+    isNativePlatform().then(setEsNativo);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -202,30 +208,47 @@ export function CobrarSheet({
                       />
                       {esTransferencia && (
                         <div>
-                          <input
-                            id={`foto-cobro-${i}`}
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] ?? null;
-                              actualizar(i, { foto: file });
-                            }}
-                          />
-                          <label htmlFor={`foto-cobro-${i}`}>
+                          {esNativo ? (
                             <Button
                               type="button"
                               variant={r.foto ? 'default' : 'outline'}
                               className="w-full h-11 gap-2"
-                              asChild
+                              onClick={async () => {
+                                const file = await tomarFotoNativa();
+                                if (file) actualizar(i, { foto: file });
+                              }}
                             >
-                              <span>
-                                {r.foto ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
-                                {r.foto ? `Comprobante: ${r.foto.name}` : 'Adjuntar comprobante de transferencia'}
-                              </span>
+                              {r.foto ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                              {r.foto ? `Comprobante adjunto` : 'Tomar foto / elegir comprobante'}
                             </Button>
-                          </label>
+                          ) : (
+                            <>
+                              <input
+                                id={`foto-cobro-${i}`}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] ?? null;
+                                  actualizar(i, { foto: file });
+                                }}
+                              />
+                              <label htmlFor={`foto-cobro-${i}`}>
+                                <Button
+                                  type="button"
+                                  variant={r.foto ? 'default' : 'outline'}
+                                  className="w-full h-11 gap-2"
+                                  asChild
+                                >
+                                  <span>
+                                    {r.foto ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                                    {r.foto ? `Comprobante: ${r.foto.name}` : 'Adjuntar comprobante de transferencia'}
+                                  </span>
+                                </Button>
+                              </label>
+                            </>
+                          )}
                           {r.foto && (
                             <Button
                               type="button"
