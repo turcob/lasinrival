@@ -1231,6 +1231,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         onSuccess={() => refetch()}
       />
 
+      {/* Visor de comprobante */}
+      <Dialog open={!!comprobanteUrl} onOpenChange={(o) => !o && setComprobanteUrl(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          {comprobanteUrl && (
+            <img src={comprobanteUrl} alt="Comprobante de transferencia" className="w-full h-auto rounded" />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de Rendición */}
       {hojaRuta && (
         <RendicionHojaRutaDialog
