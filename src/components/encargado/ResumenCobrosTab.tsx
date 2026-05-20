@@ -1,8 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { useCobrosHojaRuta, useHojaRuta, useDevolucionesHojaRuta } from '@/hooks/useLogistica';
 import { clasificarMedioPago } from '@/hooks/useEncargado';
-import { useMemo } from 'react';
-import { PackageX } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { PackageX, Image as ImageIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const MOTIVO_LABEL: Record<string, string> = {
   rechazo_cliente: 'Rechazo cliente',
@@ -76,6 +79,30 @@ export function ResumenCobrosTab({ hojaRutaId }: { hojaRutaId: string }) {
   }, [devoluciones, paradas]);
 
   const totalRechazado = rechazosPorCliente.reduce((s, c) => s + c.total, 0);
+
+  const comprobantes = useMemo(() => {
+    return (cobros as any[])
+      .filter((c) => c.foto_comprobante_path)
+      .map((c) => ({
+        id: c.id,
+        path: c.foto_comprobante_path as string,
+        nombre: c.foto_comprobante_nombre as string | null,
+        forma: c.forma_pago?.nombre ?? c.medio_pago ?? '',
+        monto: Number(c.monto),
+        cliente: c.pedido?.cliente?.nombre
+          ?? paradas.find((p: any) => p.id === c.parada?.id)?.pedido?.cliente?.nombre
+          ?? `Pedido #${c.pedido?.numero_pedido ?? '?'}`,
+      }));
+  }, [cobros, paradas]);
+
+  const [verImg, setVerImg] = useState<string | null>(null);
+
+  const verComprobante = async (path: string) => {
+    const { data, error } = await supabase.storage
+      .from('comprobantes-cobros')
+      .createSignedUrl(path, 600);
+    if (!error && data?.signedUrl) setVerImg(data.signedUrl);
+  };
 
   return (
     <div className="space-y-2">
@@ -159,6 +186,38 @@ export function ResumenCobrosTab({ hojaRutaId }: { hojaRutaId: string }) {
           </Card>
         </div>
       )}
+
+      {comprobantes.length > 0 && (
+        <div className="pt-4">
+          <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+            <ImageIcon className="h-3.5 w-3.5" />
+            COMPROBANTES DE TRANSFERENCIA ({comprobantes.length})
+          </p>
+          <Card>
+            <CardContent className="p-0 divide-y">
+              {comprobantes.map((c) => (
+                <div key={c.id} className="p-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{c.cliente}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {c.forma} · ${c.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => verComprobante(c.path)}>
+                    <ImageIcon className="h-3.5 w-3.5 mr-1" /> Ver
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Dialog open={!!verImg} onOpenChange={(o) => !o && setVerImg(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          {verImg && <img src={verImg} alt="Comprobante" className="w-full h-auto rounded" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

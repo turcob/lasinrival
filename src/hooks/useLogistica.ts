@@ -922,6 +922,8 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
           referencia,
           observaciones,
           created_at,
+          foto_comprobante_path,
+          foto_comprobante_nombre,
           forma_pago:formas_pago(id, nombre),
           pedido:pedidos(numero_pedido),
           parada:hoja_ruta_paradas(id)
