@@ -47,7 +47,8 @@ import {
   RotateCcw,
   X,
   UserCog,
-  History
+  History,
+  Image as ImageIcon
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -141,6 +142,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     montoCobrado: number;
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [refacturarOpen, setRefacturarOpen] = useState(false);
   const [historiaOpen, setHistoriaOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
@@ -1153,9 +1155,26 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                           {cobro.forma_pago?.nombre || cobro.medio_pago || 'Efectivo'}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(cobro.created_at), 'dd/MM HH:mm', { locale: es })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {cobro.foto_comprobante_path && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2"
+                            onClick={async () => {
+                              const { data } = await supabase.storage
+                                .from('comprobantes-cobros')
+                                .createSignedUrl(cobro.foto_comprobante_path, 600);
+                              if (data?.signedUrl) setComprobanteUrl(data.signedUrl);
+                            }}
+                          >
+                            <ImageIcon className="h-3.5 w-3.5 mr-1" /> Ver
+                          </Button>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(cobro.created_at), 'dd/MM HH:mm', { locale: es })}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1211,6 +1230,15 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
         montoCobrado={cobroDialog.montoCobrado}
         onSuccess={() => refetch()}
       />
+
+      {/* Visor de comprobante */}
+      <Dialog open={!!comprobanteUrl} onOpenChange={(o) => !o && setComprobanteUrl(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          {comprobanteUrl && (
+            <img src={comprobanteUrl} alt="Comprobante de transferencia" className="w-full h-auto rounded" />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de Rendición */}
       {hojaRuta && (
