@@ -136,12 +136,14 @@ export function DevolucionSheet({
                 </div>
                 <div className="flex gap-2 items-center">
                   <Input
-                    type="number" inputMode="decimal" min={0} max={item.cantidad_pedida}
+                    type="number" inputMode="decimal" step="0.001" min={0} max={item.cantidad_pedida}
                     placeholder="Cant. a rechazar"
                     className="h-11 text-base"
                     value={item.cantidad_devolver || ''}
                     onChange={(e) => {
-                      const v = Math.min(Number(e.target.value) || 0, item.cantidad_pedida);
+                      const raw = e.target.value.replace(',', '.');
+                      const parsed = parseFloat(raw);
+                      const v = Math.min(isNaN(parsed) ? 0 : parsed, item.cantidad_pedida);
                       setItems(items.map((x, i) => i === idx ? { ...x, cantidad_devolver: v } : x));
                     }}
                   />
