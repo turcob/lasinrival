@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, PackageX, Clock, Loader2, MinusCircle } from 'lucide-react';
+import { CheckCircle2, PackageX, Loader2, XCircle, Package } from 'lucide-react';
 import { useActualizarEstadoParada, type HojaRutaParada } from '@/hooks/useLogistica';
 import { useCobrosParada, useDevolucionesParada } from '@/hooks/useLogistica';
 import { CobrarSheet } from './CobrarSheet';
@@ -20,9 +20,11 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   const cambiarEstado = useActualizarEstadoParada();
   const { data: cobros = [] } = useCobrosParada(parada?.id);
   const { data: devoluciones = [] } = useDevolucionesParada(parada?.id);
+  const [tipoEntregaOpen, setTipoEntregaOpen] = useState(false);
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [devolverOpen, setDevolverOpen] = useState(false);
-  const [noEntregadoOpen, setNoEntregadoOpen] = useState(false);
+  const [continuarACobro, setContinuarACobro] = useState(false);
+  const [rechazadoOpen, setRechazadoOpen] = useState(false);
   const [obs, setObs] = useState('');
 
   if (!parada) return null;
@@ -44,15 +46,15 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
     onOpenChange(false);
   };
 
-  const handleNoEntregado = async () => {
+  const handleRechazado = async () => {
     await cambiarEstado.mutateAsync({ id: parada.id, estado: 'no_entregado', observaciones: obs });
-    setNoEntregadoOpen(false);
+    setRechazadoOpen(false);
     onOpenChange(false);
   };
 
   return (
     <>
-      <Sheet open={open && !cobrarOpen && !devolverOpen && !noEntregadoOpen} onOpenChange={onOpenChange}>
+      <Sheet open={open && !tipoEntregaOpen && !cobrarOpen && !devolverOpen && !rechazadoOpen} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="h-auto max-h-[90vh] overflow-y-auto">
           <SheetHeader className="text-left">
             <SheetTitle className="text-lg">{parada.pedido?.cliente?.nombre}</SheetTitle>
@@ -103,12 +105,10 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
             ) : (
               <div className="space-y-2">
                 {saldo > 0 ? (
-                  <>
-                    <Button size="lg" className="w-full h-14 bg-green-600 hover:bg-green-700 text-base" onClick={() => setCobrarOpen(true)}>
-                      <CheckCircle2 className="h-5 w-5 mr-2" />
-                      Cobrar y entregar
-                    </Button>
-                  </>
+                  <Button size="lg" className="w-full h-14 bg-green-600 hover:bg-green-700 text-base" onClick={() => setTipoEntregaOpen(true)}>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Cobrar y entregar
+                  </Button>
                 ) : (
                   <Button size="lg" className="w-full h-14 bg-green-600 hover:bg-green-700 text-base" onClick={handleEntregaSinCobro}>
                     {cambiarEstado.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -117,17 +117,54 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
                   </Button>
                 )}
 
-                <Button size="lg" variant="outline" className="w-full h-12 border-amber-500 text-amber-700 hover:bg-amber-50" onClick={() => setDevolverOpen(true)}>
-                  <PackageX className="h-4 w-4 mr-2" />
-                  Rechazó mercadería
-                </Button>
-
-                <Button size="lg" variant="outline" className="w-full h-12" onClick={() => setNoEntregadoOpen(true)}>
-                  <Clock className="h-4 w-4 mr-2" />
-                  No se pudo entregar
+                <Button size="lg" variant="outline" className="w-full h-12 border-destructive/40 text-destructive hover:bg-destructive/5" onClick={() => setRechazadoOpen(true)}>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Rechazado
                 </Button>
               </div>
             )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Selector parcial / total */}
+      <Sheet open={tipoEntregaOpen} onOpenChange={setTipoEntregaOpen}>
+        <SheetContent side="bottom" className="h-auto">
+          <SheetHeader className="text-left">
+            <SheetTitle>¿Cómo es la entrega?</SheetTitle>
+            <SheetDescription>Elegí si el cliente acepta todo el pedido o rechaza algunos productos.</SheetDescription>
+          </SheetHeader>
+          <div className="py-4 space-y-2">
+            <Button
+              size="lg"
+              className="w-full h-16 bg-green-600 hover:bg-green-700 text-base justify-start"
+              onClick={() => {
+                setTipoEntregaOpen(false);
+                setCobrarOpen(true);
+              }}
+            >
+              <CheckCircle2 className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Entrega completa</div>
+                <div className="text-xs opacity-90">El cliente acepta todo el pedido</div>
+              </div>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full h-16 border-amber-500 text-amber-700 hover:bg-amber-50 justify-start"
+              onClick={() => {
+                setTipoEntregaOpen(false);
+                setContinuarACobro(true);
+                setDevolverOpen(true);
+              }}
+            >
+              <PackageX className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Entrega parcial</div>
+                <div className="text-xs opacity-80">El cliente rechaza algunos productos</div>
+              </div>
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
@@ -151,14 +188,22 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
         paradaId={parada.id}
         pedidoDetalles={(parada.pedido?.detalles ?? []) as any}
         clienteNombre={parada.pedido?.cliente?.nombre ?? 'Cliente'}
-        onSuccess={() => { onOpenChange(false); }}
+        onSuccess={() => {
+          if (continuarACobro) {
+            setContinuarACobro(false);
+            // El total se recalcula automáticamente al refrescar devoluciones
+            setTimeout(() => setCobrarOpen(true), 250);
+          } else {
+            onOpenChange(false);
+          }
+        }}
       />
 
-      <Sheet open={noEntregadoOpen} onOpenChange={setNoEntregadoOpen}>
+      <Sheet open={rechazadoOpen} onOpenChange={setRechazadoOpen}>
         <SheetContent side="bottom" className="h-auto">
           <SheetHeader className="text-left">
-            <SheetTitle>Marcar como no entregado</SheetTitle>
-            <SheetDescription>Indicá el motivo (cliente cerrado, ausente, dirección errónea, etc.)</SheetDescription>
+            <SheetTitle>Marcar como rechazado</SheetTitle>
+            <SheetDescription>Indicá el motivo (cliente cerrado, ausente, rechazó el pedido completo, dirección errónea, etc.)</SheetDescription>
           </SheetHeader>
           <div className="py-4 space-y-3">
             <Textarea
@@ -167,8 +212,8 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
               value={obs}
               onChange={(e) => setObs(e.target.value)}
             />
-            <Button className="w-full h-12" onClick={handleNoEntregado} disabled={cambiarEstado.isPending}>
-              <MinusCircle className="h-4 w-4 mr-2" />
+            <Button className="w-full h-12" variant="destructive" onClick={handleRechazado} disabled={cambiarEstado.isPending}>
+              <XCircle className="h-4 w-4 mr-2" />
               Confirmar
             </Button>
           </div>
