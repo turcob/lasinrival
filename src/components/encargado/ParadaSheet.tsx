@@ -188,13 +188,27 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
         paradaId={parada.id}
         pedidoDetalles={(parada.pedido?.detalles ?? []) as any}
         clienteNombre={parada.pedido?.cliente?.nombre ?? 'Cliente'}
-        onSuccess={() => {
-          if (continuarACobro) {
-            setContinuarACobro(false);
+        onSuccess={(montoRechazadoAhora) => {
+          if (!continuarACobro) {
+            onOpenChange(false);
+            return;
+          }
+          setContinuarACobro(false);
+          // Calcular total proyectado restando lo recién rechazado al saldo actual.
+          const nuevoTotal = Math.max(0, totalPedido - montoRechazadoAhora);
+          const nuevoSaldo = Math.max(0, nuevoTotal - montoCobrado);
+          if (nuevoSaldo <= 0.01) {
+            // Rechazo total (o no queda saldo): marcar parada como rechazada, no abrir cobro.
+            cambiarEstado
+              .mutateAsync({
+                id: parada.id,
+                estado: 'no_entregado',
+                observaciones: 'Rechazo total de la mercadería',
+              })
+              .finally(() => onOpenChange(false));
+          } else {
             // El total se recalcula automáticamente al refrescar devoluciones
             setTimeout(() => setCobrarOpen(true), 250);
-          } else {
-            onOpenChange(false);
           }
         }}
       />
