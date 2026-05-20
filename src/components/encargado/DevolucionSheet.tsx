@@ -27,6 +27,7 @@ interface ItemDevolucion {
   cantidad_pedida: number;
   cantidad_devolver: number;
   motivo: DevolucionMotivo | '';
+  precio_neto: number;
 }
 
 interface DevolucionSheetProps {
@@ -37,10 +38,12 @@ interface DevolucionSheetProps {
   pedidoDetalles: Array<{
     id: string;
     cantidad_pedida: number;
+    precio_unitario?: number | null;
+    descuento_porcentaje?: number | null;
     producto?: { descripcion: string; codigo_articulo: string };
   }>;
   clienteNombre: string;
-  onSuccess: () => void;
+  onSuccess: (montoRechazadoAhora: number) => void;
 }
 
 export function DevolucionSheet({
@@ -61,6 +64,7 @@ export function DevolucionSheet({
         cantidad_pedida: d.cantidad_pedida,
         cantidad_devolver: 0,
         motivo: '',
+        precio_neto: Number(d.precio_unitario ?? 0) * (1 - Number(d.descuento_porcentaje ?? 0) / 100),
       })));
       setDetalleMotivo('');
       setReingresar(true);
@@ -95,11 +99,10 @@ export function DevolucionSheet({
           reingresarStock: reingresar,
         });
       }
-      // Nunca auto-marcamos la parada como 'rechazado' acá: el encargado debe
-      // volver y elegir "Cobrar y entregar" (con la diferencia) o, si rechazó
-      // todo, "No se pudo entregar". Así nunca se bloquea el cobro de la
-      // mercadería que sí quedó en el cliente.
-      onSuccess();
+      const montoRechazadoAhora = aRechazar.reduce(
+        (s, it) => s + it.precio_neto * it.cantidad_devolver, 0
+      );
+      onSuccess(montoRechazadoAhora);
       onOpenChange(false);
     } catch (e) { /* manejado por hook */ }
   };
