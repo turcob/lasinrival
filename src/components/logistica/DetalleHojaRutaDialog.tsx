@@ -47,7 +47,8 @@ import {
   RotateCcw,
   X,
   UserCog,
-  History
+  History,
+  Image as ImageIcon
 } from 'lucide-react';
 import { RegistrarCobroDialog } from './RegistrarCobroDialog';
 import { RendicionHojaRutaDialog } from './RendicionHojaRutaDialog';
@@ -1153,9 +1154,26 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                           {cobro.forma_pago?.nombre || cobro.medio_pago || 'Efectivo'}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(cobro.created_at), 'dd/MM HH:mm', { locale: es })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {cobro.foto_comprobante_path && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2"
+                            onClick={async () => {
+                              const { data } = await supabase.storage
+                                .from('comprobantes-cobros')
+                                .createSignedUrl(cobro.foto_comprobante_path, 600);
+                              if (data?.signedUrl) setComprobanteUrl(data.signedUrl);
+                            }}
+                          >
+                            <ImageIcon className="h-3.5 w-3.5 mr-1" /> Ver
+                          </Button>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(cobro.created_at), 'dd/MM HH:mm', { locale: es })}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
