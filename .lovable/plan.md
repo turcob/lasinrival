@@ -1,35 +1,19 @@
-## Reestructurar flujo de parada en `/encargado`
+## Simplificar footer de `CobrarSheet`
 
-### Objetivo
-Simplificar las acciones de una parada a **2 botones** y unificar el rechazo de mercadería dentro del flujo de cobro.
+Como el tipo de entrega (completa / parcial) ya se elige antes en `ParadaSheet`, el `CobrarSheet` no necesita los dos botones del footer.
 
-### Cambios en `src/components/encargado/ParadaSheet.tsx`
+### Cambio en `src/components/encargado/CobrarSheet.tsx`
 
-**1. Reemplazar los 3 botones por 2:**
-- **"Cobrar y entregar"** (verde) — abre un selector de tipo de entrega.
-- **"Rechazado"** (anteriormente "No se pudo entregar") — mantiene el flujo actual de marcar como `no_entregado` con motivo. Solo cambia el label y el ícono a algo más asociado a rechazo (ej. `XCircle`).
+Reemplazar el grid de 2 botones (líneas 208-225) por un único botón **"Confirmar cobro"** ancho completo:
 
-**2. Nuevo paso intermedio al tocar "Cobrar y entregar":**
-Mostrar un Sheet con dos opciones:
-- **"Entrega completa"** → va directo al `CobrarSheet` con el total del pedido.
-- **"Entrega parcial"** → abre primero el `DevolucionSheet` (selección de productos que el cliente no acepta y cantidad). Al guardar la devolución, automáticamente continúa al `CobrarSheet` con el total recalculado (total original − monto rechazado).
+- Llama a `handleConfirmar(...)` con un único modo.
+- Deshabilitado si `totalCobros <= 0` o `saldoFinal > 0.01` (debe cobrarse todo el saldo restante, que ya está recalculado con las devoluciones aplicadas).
+- Para el estado de la parada: si existieron devoluciones previas la parada se marca `entrega_parcial`; si no, `entregado`. Esto se puede inferir comparando `montoCobradoPrevio + totalCobros` vs el total original, pero como `CobrarSheet` solo recibe `totalPedido` ya ajustado, lo más simple es: pasar un prop nuevo opcional `huboDevolucion: boolean` desde `ParadaSheet` y usarlo para decidir el estado final. Alternativa más simple aún (preferida): siempre marcar `entregado` cuando el saldo queda en 0 — la información de devolución ya queda registrada en la tabla de devoluciones, así que el estado `entrega_parcial` deja de usarse desde este flujo.
 
-**3. Encadenado parcial → cobro:**
-- Cuando el usuario confirma la devolución en flujo "parcial", en lugar de cerrar todo, abrir `CobrarSheet`.
-- Implementar con un estado `flujoEntrega: 'idle' | 'eligiendo' | 'parcial-devolucion' | 'parcial-cobro' | 'total-cobro'` en `ParadaSheet`.
-- `DevolucionSheet` ya soporta `onSuccess` callback — se usa para avanzar al cobro cuando `flujoEntrega === 'parcial-devolucion'`.
+Voy con la alternativa simple: **siempre `entregado`** al confirmar, ya que el saldo se cobra completo.
 
-**4. Mantener compatibilidad:**
-- El botón "Rechazó mercadería" independiente se elimina (queda integrado en "parcial").
-- El cálculo de `totalPedido` (con monto rechazado descontado) ya existe y se reutiliza tal cual.
-- El estado de la parada sigue siendo `pendiente` hasta que el cobro/entrega se confirme (como ya quedó arreglado en iteraciones previas).
+### Limpieza adicional
+- Quitar el parámetro `'completo' | 'parcial'` de `handleConfirmar` (queda sin parámetro).
+- Mantener la validación de "Falta cobrar el saldo total".
 
-### Detalle UX del selector parcial/total
-Sheet inferior con título "¿Cómo es la entrega?" y dos botones grandes:
-- "Entrega completa — el cliente acepta todo"
-- "Entrega parcial — el cliente rechaza algunos productos"
-
-### Archivos a modificar
-- `src/components/encargado/ParadaSheet.tsx` (único archivo)
-
-No se tocan `DevolucionSheet`, `CobrarSheet`, ni hooks. No hay cambios de schema.
+Sin cambios en otros archivos.
