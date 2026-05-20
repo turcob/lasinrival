@@ -1,27 +1,35 @@
-## Cierre del módulo `/encargado`
+## Reestructurar flujo de parada en `/encargado`
 
-Faltan 2 pasos para que el módulo mobile-first quede operativo y compile:
+### Objetivo
+Simplificar las acciones de una parada a **2 botones** y unificar el rechazo de mercadería dentro del flujo de cobro.
 
-### 1. Crear página de detalle de hoja de ruta
-**Archivo nuevo:** `src/pages/EncargadoHojaDetalle.tsx`
+### Cambios en `src/components/encargado/ParadaSheet.tsx`
 
-- Layout mobile-first (`max-w-md mx-auto`, header sticky con back, #hoja, estado).
-- Carga la hoja por `:id` usando `useEncargadoHojas` (filtrada por responsable/chofer).
-- Tabs dinámicas según estado:
-  - `en_carga` → `CargaTab` + botón "Confirmar carga".
-  - `carga_confirmada` → botón "Salir a ruta" (pasa a `en_ruta`).
-  - `en_ruta` → `ParadasTab` + `ResumenCobrosTab`.
-  - `completada` / `rendida` → `RendicionTab` + `ResumenCobrosTab` (read-only si ya rendida).
-- Reusa los componentes ya creados en `src/components/encargado/`.
+**1. Reemplazar los 3 botones por 2:**
+- **"Cobrar y entregar"** (verde) — abre un selector de tipo de entrega.
+- **"Rechazado"** (anteriormente "No se pudo entregar") — mantiene el flujo actual de marcar como `no_entregado` con motivo. Solo cambia el label y el ícono a algo más asociado a rechazo (ej. `XCircle`).
 
-### 2. Registrar rutas en `src/App.tsx`
-- `/encargado` → `<Encargado />` (listado), protegida con `ProtectedRoute`.
-- `/encargado/:id` → `<EncargadoHojaDetalle />`, protegida con `ProtectedRoute`.
-- Sin tocar sidebar ni `/logistica`.
+**2. Nuevo paso intermedio al tocar "Cobrar y entregar":**
+Mostrar un Sheet con dos opciones:
+- **"Entrega completa"** → va directo al `CobrarSheet` con el total del pedido.
+- **"Entrega parcial"** → abre primero el `DevolucionSheet` (selección de productos que el cliente no acepta y cantidad). Al guardar la devolución, automáticamente continúa al `CobrarSheet` con el total recalculado (total original − monto rechazado).
 
-### Verificación
-- Compilación limpia.
-- Navegar `/encargado` muestra solo hojas del usuario logueado.
-- Detalle muestra tabs correctas por estado y permite ejecutar el flujo end-to-end (confirmar carga → ruta → paradas/cobros/devoluciones → rendición).
+**3. Encadenado parcial → cobro:**
+- Cuando el usuario confirma la devolución en flujo "parcial", en lugar de cerrar todo, abrir `CobrarSheet`.
+- Implementar con un estado `flujoEntrega: 'idle' | 'eligiendo' | 'parcial-devolucion' | 'parcial-cobro' | 'total-cobro'` en `ParadaSheet`.
+- `DevolucionSheet` ya soporta `onSuccess` callback — se usa para avanzar al cobro cuando `flujoEntrega === 'parcial-devolucion'`.
 
-Sin cambios de schema, sin nuevas dependencias, sin tocar `/logistica`.
+**4. Mantener compatibilidad:**
+- El botón "Rechazó mercadería" independiente se elimina (queda integrado en "parcial").
+- El cálculo de `totalPedido` (con monto rechazado descontado) ya existe y se reutiliza tal cual.
+- El estado de la parada sigue siendo `pendiente` hasta que el cobro/entrega se confirme (como ya quedó arreglado en iteraciones previas).
+
+### Detalle UX del selector parcial/total
+Sheet inferior con título "¿Cómo es la entrega?" y dos botones grandes:
+- "Entrega completa — el cliente acepta todo"
+- "Entrega parcial — el cliente rechaza algunos productos"
+
+### Archivos a modificar
+- `src/components/encargado/ParadaSheet.tsx` (único archivo)
+
+No se tocan `DevolucionSheet`, `CobrarSheet`, ni hooks. No hay cambios de schema.
