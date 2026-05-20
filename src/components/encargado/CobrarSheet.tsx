@@ -71,12 +71,12 @@ export function CobrarSheet({
     setRenglones(renglones.map((r, i) => i === idx ? { ...r, ...patch } : r));
   };
 
-  const handleConfirmar = async (modo: 'completo' | 'parcial') => {
+  const handleConfirmar = async () => {
     if (renglones.length === 0 || totalCobros <= 0) {
       toast({ title: 'Ingresá al menos un cobro', variant: 'destructive' });
       return;
     }
-    if (modo === 'completo' && saldoFinal > 0.01) {
+    if (saldoFinal > 0.01) {
       toast({ title: 'Falta cobrar el saldo total', description: `Faltan $${saldoFinal.toFixed(2)}`, variant: 'destructive' });
       return;
     }
@@ -88,7 +88,7 @@ export function CobrarSheet({
       });
       await cambiarEstado.mutateAsync({
         id: paradaId,
-        estado: modo === 'completo' ? 'entregado' : 'entrega_parcial',
+        estado: 'entregado',
         observaciones: observaciones || undefined,
       });
       onSuccess();
@@ -205,22 +205,14 @@ export function CobrarSheet({
 
         {/* Footer sticky con acciones */}
         <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background p-3 shadow-lg">
-          <div className="max-w-md mx-auto grid grid-cols-2 gap-2">
+          <div className="max-w-md mx-auto">
             <Button
-              variant="outline" size="lg" className="h-14"
-              disabled={registrar.isPending || cambiarEstado.isPending || totalCobros <= 0}
-              onClick={() => handleConfirmar('parcial')}
-            >
-              {(registrar.isPending || cambiarEstado.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Entrega parcial
-            </Button>
-            <Button
-              size="lg" className="h-14"
+              size="lg" className="w-full h-14"
               disabled={registrar.isPending || cambiarEstado.isPending || saldoFinal > 0.01 || totalCobros <= 0}
-              onClick={() => handleConfirmar('completo')}
+              onClick={handleConfirmar}
             >
               {(registrar.isPending || cambiarEstado.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Entrega completa
+              Confirmar cobro
             </Button>
           </div>
         </div>
