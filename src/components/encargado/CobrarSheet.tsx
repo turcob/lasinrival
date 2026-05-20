@@ -91,7 +91,7 @@ export function CobrarSheet({
       });
       await cambiarEstado.mutateAsync({
         id: paradaId,
-        estado: 'entregado',
+        estado: montoRechazado > 0.01 ? 'entrega_parcial' : 'entregado',
         observaciones: observaciones || undefined,
       });
       onSuccess();
