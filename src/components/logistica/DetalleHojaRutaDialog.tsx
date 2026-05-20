@@ -142,6 +142,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
     montoCobrado: number;
   }>({ open: false, paradaId: '', pedidoId: '', totalPedido: 0, montoCobrado: 0 });
   const [rendicionOpen, setRendicionOpen] = useState(false);
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [refacturarOpen, setRefacturarOpen] = useState(false);
   const [historiaOpen, setHistoriaOpen] = useState(false);
   const [devolucionDialog, setDevolucionDialog] = useState<{
