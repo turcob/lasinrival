@@ -31,7 +31,7 @@ const formSchema = z.object({
   fecha: z.string().min(1, 'La fecha es requerida'),
   vehiculo_id: z.string().optional(),
   chofer_id: z.string().optional(),
-  responsable_id: z.string().optional(),
+  responsable_id: z.string().min(1, 'El encargado es requerido'),
   hora_salida_estimada: z.string().optional(),
   observaciones: z.string().optional(),
 });
@@ -327,7 +327,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
             </div>
 
             <div className="space-y-2 col-span-2">
-              <Label htmlFor="responsable_id">Responsable</Label>
+              <Label htmlFor="responsable_id">Responsable *</Label>
               <select
                 id="responsable_id"
                 {...register('responsable_id')}
@@ -338,6 +338,9 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
                   <option key={e.id} value={e.id}>{e.nombre}</option>
                 ))}
               </select>
+              {errors.responsable_id && (
+                <p className="text-sm text-destructive">{errors.responsable_id.message}</p>
+              )}
               {responsables.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                   No hay empleados con rol "Responsable". Asigná el rol desde Usuarios.
