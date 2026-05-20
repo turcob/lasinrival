@@ -20,6 +20,8 @@ interface CobrarSheetProps {
   montoCobradoPrevio: number;
   clienteNombre: string;
   onSuccess: () => void;
+  totalOriginal?: number;
+  montoRechazado?: number;
 }
 
 interface Renglon {
@@ -39,6 +41,7 @@ const iconoFP = (nombre: string) => {
 export function CobrarSheet({
   open, onOpenChange, hojaRutaId, paradaId, pedidoId,
   totalPedido, montoCobradoPrevio, clienteNombre, onSuccess,
+  totalOriginal, montoRechazado = 0,
 }: CobrarSheetProps) {
   const { data: formasPago = [] } = useFormasPago();
   const registrar = useRegistrarCobrosEncargado();
@@ -114,6 +117,25 @@ export function CobrarSheet({
         </div>
 
         <div className="p-4 space-y-4 pb-32">
+          {montoRechazado > 0.01 && totalOriginal != null && (
+            <Card className="bg-amber-500/5 border-amber-500/30">
+              <CardContent className="p-3 space-y-1 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Total pedido:</span>
+                  <span className="line-through">${totalOriginal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-amber-700">
+                  <span>Rechazado:</span>
+                  <span>-${montoRechazado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t font-semibold">
+                  <span>Total final:</span>
+                  <span>${totalPedido.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Saldo a cobrar */}
           <Card className="bg-primary/5 border-primary/30">
             <CardContent className="p-3 flex justify-between items-center">

@@ -176,6 +176,8 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
         paradaId={parada.id}
         pedidoId={parada.pedido_id}
         totalPedido={totalPedido}
+        totalOriginal={totalPedidoOriginal}
+        montoRechazado={montoRechazado}
         montoCobradoPrevio={montoCobrado}
         clienteNombre={parada.pedido?.cliente?.nombre ?? 'Cliente'}
         onSuccess={() => { onOpenChange(false); }}
