@@ -315,7 +315,7 @@ export function imprimirWorkflowLogistica() {
   openPrintWindow(html);
 }
 
-export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[]) {
+export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[], devolucionesVendedor: any[] = []) {
   const escapeHtml = (value: unknown) => String(value ?? '-')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -346,6 +346,52 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
     return map;
   }, new Map<string, any>()).values()).sort((a: any, b: any) => a.codigo.localeCompare(b.codigo));
   const formatCurrency = (value: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
+  const totalDevVendedor = devolucionesVendedor.reduce((s: number, d: any) => s + (Number(d.monto) || 0), 0);
+  const devolucionesVendedorHtml = devolucionesVendedor.length > 0 ? `
+    <div class="page-break">
+      <div class="summary-title">DEVOLUCIONES DEL VENDEDOR</div>
+      <div class="summary-subtitle">Hoja de Ruta #${escapeHtml(hojaRuta.numero_hoja)} — Descuentos aplicados a cobros (envases, ajustes, etc.)</div>
+
+      <div class="info-bar">
+        <div>Total registros: <span>${devolucionesVendedor.length}</span></div>
+        <div>Importe total: <span>$ ${formatCurrency(totalDevVendedor)}</span></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th style="width:110px;">Fecha</th>
+            <th>Cliente / Pedido</th>
+            <th>Descripción</th>
+            <th style="width:140px;text-align:right;">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${devolucionesVendedor.map((d: any, i: number) => {
+            const pedido = d.parada?.pedido;
+            const cliente = pedido?.cliente;
+            const fecha = d.created_at ? new Date(d.created_at).toLocaleString('es-AR') : '-';
+            const clienteTxt = cliente?.nombre
+              ? `${cliente.nombre}${pedido?.numero_pedido ? ` — #${pedido.numero_pedido}` : ''}`
+              : '-';
+            return `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(fecha)}</td>
+              <td>${escapeHtml(clienteTxt)}</td>
+              <td style="white-space:pre-wrap;">${escapeHtml(d.descripcion)}</td>
+              <td style="text-align:right;font-weight:700;">$ ${formatCurrency(Number(d.monto) || 0)}</td>
+            </tr>`;
+          }).join('')}
+          <tr class="total-row">
+            <td colspan="4" style="text-align:right;">TOTAL DEVOLUCIONES VENDEDOR</td>
+            <td style="text-align:right;">$ ${formatCurrency(totalDevVendedor)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  ` : '';
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Productos Rechazados - HR #${hojaRuta.numero_hoja}</title>
   <style>
     @page { size: A4; margin: 12mm; }
@@ -484,6 +530,7 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[])
         </tbody>
       </table>
     </div>
+    ${devolucionesVendedorHtml}
   </body></html>`;
   openPrintWindow(html);
 }

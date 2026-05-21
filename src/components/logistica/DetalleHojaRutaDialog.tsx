@@ -17,6 +17,7 @@ import {
   type HojaRutaEstado,
   type ParadaEstado
 } from '@/hooks/useLogistica';
+import { useDevolucionesVendedorHojaRuta } from '@/hooks/useEncargado';
 import {
   Dialog,
   DialogContent,
@@ -86,6 +87,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const { data: hojaRuta, isLoading, refetch } = useHojaRuta(hojaRutaId || undefined);
   const { data: cobros } = useCobrosHojaRuta(hojaRutaId || undefined);
   const { data: devoluciones } = useDevolucionesHojaRuta(hojaRutaId || undefined);
+  const { data: devolucionesVendedor = [] } = useDevolucionesVendedorHojaRuta(hojaRutaId || undefined);
   const { data: rendicionExistente } = useRendicionHojaRuta(hojaRutaId || undefined);
   const { data: productosCarga = [] } = useHojaCarga(hojaRutaId || undefined);
   const cambiarEstado = useCambiarEstadoHojaRuta();
@@ -1072,7 +1074,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl)}
+                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl, devolucionesVendedor)}
                     title="Imprimir detalle para control posterior"
                   >
                     <Printer className="h-4 w-4 mr-1" />
