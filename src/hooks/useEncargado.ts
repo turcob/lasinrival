@@ -476,6 +476,7 @@ export function useRegistrarVentaRechazado() {
       queryClient.invalidateQueries({ queryKey: ['stock-rechazado', vars.hoja_ruta_id] });
       queryClient.invalidateQueries({ queryKey: ['ventas-rechazados', vars.hoja_ruta_id] });
       queryClient.invalidateQueries({ queryKey: ['cobros-hoja-ruta', vars.hoja_ruta_id] });
+      queryClient.invalidateQueries({ queryKey: ['ventas-rechazados-parada', vars.parada_id] });
       toast({ title: 'Venta registrada', description: 'Se sumará a la rendición' });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
