@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, PackageX, Loader2, XCircle, Package } from 'lucide-react';
 import { useActualizarEstadoParada, type HojaRutaParada } from '@/hooks/useLogistica';
 import { useCobrosParada, useDevolucionesParada } from '@/hooks/useLogistica';
+import { useDevolucionesVendedorParada } from '@/hooks/useEncargado';
 import { CobrarSheet } from './CobrarSheet';
 import { DevolucionSheet } from './DevolucionSheet';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +21,7 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   const cambiarEstado = useActualizarEstadoParada();
   const { data: cobros = [] } = useCobrosParada(parada?.id);
   const { data: devoluciones = [] } = useDevolucionesParada(parada?.id);
+  const { data: devolucionesVendedor = [] } = useDevolucionesVendedorParada(parada?.id);
   const [tipoEntregaOpen, setTipoEntregaOpen] = useState(false);
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [devolverOpen, setDevolverOpen] = useState(false);
@@ -41,7 +43,8 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   // para evitar que un refetch tardío muestre el total sin descuento.
   const montoRechazado = Math.max(montoRechazadoQuery, rechazoPendiente);
   const totalPedido = Math.max(0, totalPedidoOriginal - montoRechazado);
-  const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0);
+  const totalDevVendedor = (devolucionesVendedor as any[]).reduce((s, d) => s + Number(d.monto ?? 0), 0);
+  const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0) + totalDevVendedor;
   const saldo = totalPedido - montoCobrado;
   const yaEntregado = ['entregado', 'entrega_parcial', 'rechazado', 'no_entregado'].includes(parada.estado);
 
