@@ -984,7 +984,32 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
       }
 
       // Combinar y ordenar por fecha
-      const todosCobros = [...(cobrosNuevos || []), ...cobrosLegacy].sort(
+      // Ventas de stock rechazado durante la ruta — se suman a la rendición como cobros sintéticos
+      const { data: ventasRech } = await (supabase as any)
+        .from('hoja_ruta_ventas_rechazados')
+        .select(`
+          id, monto_total, observaciones, created_at, parada_id,
+          forma_pago:formas_pago(id, nombre),
+          cliente:clientes(nombre),
+          producto:productos(codigo_articulo, descripcion)
+        `)
+        .eq('hoja_ruta_id', hojaRutaId)
+        .order('created_at');
+
+      const ventasComoCobros = (ventasRech ?? []).map((v: any) => ({
+        id: `vr-${v.id}`,
+        monto: Number(v.monto_total),
+        referencia: `Venta stock rechazado · ${v.producto?.codigo_articulo ?? ''} ${v.producto?.descripcion ?? ''}`.trim(),
+        observaciones: v.observaciones ?? null,
+        created_at: v.created_at,
+        forma_pago: v.forma_pago,
+        pedido: { numero_pedido: 0, cliente: v.cliente ?? null } as any,
+        parada: { id: v.parada_id },
+        medio_pago: v.forma_pago?.nombre ?? '',
+        es_venta_rechazado: true,
+      }));
+
+      const todosCobros = [...(cobrosNuevos || []), ...cobrosLegacy, ...ventasComoCobros].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
 
