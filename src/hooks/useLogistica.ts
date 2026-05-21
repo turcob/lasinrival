@@ -987,27 +987,47 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
       // Ventas de stock rechazado durante la ruta — se suman a la rendición como cobros sintéticos
       const { data: ventasRech } = await (supabase as any)
         .from('hoja_ruta_ventas_rechazados')
-        .select(`
-          id, monto_total, observaciones, created_at, parada_id,
-          forma_pago:formas_pago(id, nombre),
-          cliente:clientes(nombre),
-          producto:productos(codigo_articulo, descripcion)
-        `)
+        .select('id, monto_total, observaciones, created_at, parada_id, forma_pago_id, cliente_id, producto_id')
         .eq('hoja_ruta_id', hojaRutaId)
         .order('created_at');
 
-      const ventasComoCobros = (ventasRech ?? []).map((v: any) => ({
+      const ventasRows = ventasRech ?? [];
+      const productoIds = Array.from(new Set(ventasRows.map((v: any) => v.producto_id).filter(Boolean))) as string[];
+      const clienteIds = Array.from(new Set(ventasRows.map((v: any) => v.cliente_id).filter(Boolean))) as string[];
+      const formaPagoIds = Array.from(new Set(ventasRows.map((v: any) => v.forma_pago_id).filter(Boolean))) as string[];
+
+      const [productosRes, clientesRes, formasRes] = await Promise.all([
+        productoIds.length ? supabase.from('productos').select('id, codigo_articulo, descripcion').in('id', productoIds) : Promise.resolve({ data: [], error: null }),
+        clienteIds.length ? supabase.from('clientes').select('id, nombre').in('id', clienteIds) : Promise.resolve({ data: [], error: null }),
+        formaPagoIds.length ? supabase.from('formas_pago').select('id, nombre').in('id', formaPagoIds) : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (productosRes.error) throw productosRes.error;
+      if (clientesRes.error) throw clientesRes.error;
+      if (formasRes.error) throw formasRes.error;
+
+      const productos = new Map((productosRes.data ?? []).map((p: any) => [p.id, p]));
+      const clientes = new Map((clientesRes.data ?? []).map((c: any) => [c.id, c]));
+      const formas = new Map((formasRes.data ?? []).map((f: any) => [f.id, f]));
+
+      const ventasComoCobros = ventasRows.map((v: any) => {
+        const producto = productos.get(v.producto_id);
+        const cliente = clientes.get(v.cliente_id);
+        const formaPago = formas.get(v.forma_pago_id);
+
+        return ({
         id: `vr-${v.id}`,
         monto: Number(v.monto_total),
-        referencia: `Venta stock rechazado · ${v.producto?.codigo_articulo ?? ''} ${v.producto?.descripcion ?? ''}`.trim(),
+        referencia: `Venta stock rechazado · ${producto?.codigo_articulo ?? ''} ${producto?.descripcion ?? ''}`.trim(),
         observaciones: v.observaciones ?? null,
         created_at: v.created_at,
-        forma_pago: v.forma_pago,
-        pedido: { numero_pedido: 0, cliente: v.cliente ?? null } as any,
+        forma_pago: formaPago ?? null,
+        pedido: { numero_pedido: 0, cliente: cliente ?? null } as any,
         parada: { id: v.parada_id },
-        medio_pago: v.forma_pago?.nombre ?? '',
+        medio_pago: formaPago?.nombre ?? '',
         es_venta_rechazado: true,
-      }));
+        });
+      });
 
       const todosCobros = [...(cobrosNuevos || []), ...cobrosLegacy, ...ventasComoCobros].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()

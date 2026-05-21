@@ -400,22 +400,58 @@ export function useVentasRechazadosHojaRuta(hojaRutaId: string | undefined) {
     queryKey: ['ventas-rechazados', hojaRutaId],
     queryFn: async () => {
       if (!hojaRutaId) return [];
-      const { data, error } = await (supabase as any)
-        .from('hoja_ruta_ventas_rechazados')
-        .select(`
-          id, cantidad, precio_unitario, monto_total, observaciones, created_at,
-          producto:productos(codigo_articulo, descripcion),
-          cliente:clientes(nombre),
-          forma_pago:formas_pago(id, nombre),
-          parada_id
-        `)
-        .eq('hoja_ruta_id', hojaRutaId)
-        .order('created_at');
-      if (error) throw error;
-      return data ?? [];
+      return fetchVentasRechazados({ hojaRutaId });
     },
     enabled: !!hojaRutaId,
   });
+}
+
+const uniqueIds = (values: Array<string | null | undefined>) =>
+  Array.from(new Set(values.filter(Boolean) as string[]));
+
+async function fetchVentasRechazados({ hojaRutaId, paradaId }: { hojaRutaId?: string; paradaId?: string }) {
+  let query = (supabase as any)
+    .from('hoja_ruta_ventas_rechazados')
+    .select('id, hoja_ruta_id, parada_id, cliente_id, producto_id, cantidad, precio_unitario, monto_total, forma_pago_id, observaciones, created_at')
+    .order('created_at');
+
+  if (hojaRutaId) query = query.eq('hoja_ruta_id', hojaRutaId);
+  if (paradaId) query = query.eq('parada_id', paradaId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const productoIds = uniqueIds(rows.map((v: any) => v.producto_id));
+  const clienteIds = uniqueIds(rows.map((v: any) => v.cliente_id));
+  const formaPagoIds = uniqueIds(rows.map((v: any) => v.forma_pago_id));
+
+  const [productosRes, clientesRes, formasRes] = await Promise.all([
+    productoIds.length
+      ? supabase.from('productos').select('id, codigo_articulo, descripcion').in('id', productoIds)
+      : Promise.resolve({ data: [], error: null }),
+    clienteIds.length
+      ? supabase.from('clientes').select('id, nombre').in('id', clienteIds)
+      : Promise.resolve({ data: [], error: null }),
+    formaPagoIds.length
+      ? supabase.from('formas_pago').select('id, nombre').in('id', formaPagoIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (productosRes.error) throw productosRes.error;
+  if (clientesRes.error) throw clientesRes.error;
+  if (formasRes.error) throw formasRes.error;
+
+  const productos = new Map((productosRes.data ?? []).map((p: any) => [p.id, p]));
+  const clientes = new Map((clientesRes.data ?? []).map((c: any) => [c.id, c]));
+  const formas = new Map((formasRes.data ?? []).map((f: any) => [f.id, f]));
+
+  return rows.map((v: any) => ({
+    ...v,
+    producto: productos.get(v.producto_id) ?? null,
+    cliente: clientes.get(v.cliente_id) ?? null,
+    forma_pago: formas.get(v.forma_pago_id) ?? null,
+  }));
 }
 
 export function useVentasRechazadosParada(paradaId: string | undefined) {
@@ -423,17 +459,7 @@ export function useVentasRechazadosParada(paradaId: string | undefined) {
     queryKey: ['ventas-rechazados-parada', paradaId],
     queryFn: async () => {
       if (!paradaId) return [];
-      const { data, error } = await (supabase as any)
-        .from('hoja_ruta_ventas_rechazados')
-        .select(`
-          id, cantidad, precio_unitario, monto_total, observaciones, created_at,
-          producto:productos(codigo_articulo, descripcion),
-          forma_pago:formas_pago(id, nombre)
-        `)
-        .eq('parada_id', paradaId)
-        .order('created_at');
-      if (error) throw error;
-      return data ?? [];
+      return fetchVentasRechazados({ paradaId });
     },
     enabled: !!paradaId,
   });
