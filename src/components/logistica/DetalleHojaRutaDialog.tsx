@@ -1074,7 +1074,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl)}
+                    onClick={() => imprimirDevolucionesHojaRuta(hojaRuta, productosRechazadosControl, devolucionesVendedor)}
                     title="Imprimir detalle para control posterior"
                   >
                     <Printer className="h-4 w-4 mr-1" />
