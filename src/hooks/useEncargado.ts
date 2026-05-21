@@ -209,6 +209,7 @@ export function useRegistrarCobrosEncargado() {
       totalPedido,
       montoCobradoPrevio,
       cobros,
+      devolucionesVendedor,
     }: {
       hojaRutaId: string;
       paradaId: string;
@@ -216,11 +217,13 @@ export function useRegistrarCobrosEncargado() {
       totalPedido: number;
       montoCobradoPrevio: number;
       cobros: Array<{ forma_pago_id: string; monto: number; referencia?: string }>;
+      devolucionesVendedor?: Array<{ monto: number; descripcion: string }>;
     }) => {
       if (!user) throw new Error('Usuario no autenticado');
       const validos = (cobros as Array<{ forma_pago_id: string; monto: number; referencia?: string; foto?: File | null }>)
         .filter(c => c.forma_pago_id && c.monto > 0);
-      if (validos.length === 0) throw new Error('Ingresá al menos un cobro válido');
+      const devs = (devolucionesVendedor || []).filter(d => d.monto > 0 && (d.descripcion || '').trim());
+      if (validos.length === 0 && devs.length === 0) throw new Error('Ingresá al menos un cobro o devolución');
 
       // Subir fotos (si las hay) y armar payload
       const payload: any[] = [];
@@ -250,11 +253,29 @@ export function useRegistrarCobrosEncargado() {
         });
       }
 
-      const { error } = await supabase.from('hoja_ruta_cobros').insert(payload);
-      if (error) throw error;
+      if (payload.length > 0) {
+        const { error } = await supabase.from('hoja_ruta_cobros').insert(payload);
+        if (error) throw error;
+      }
+
+      // Devoluciones del vendedor (descuento aplicado al cobro)
+      let totalDevoluciones = 0;
+      if (devs.length > 0) {
+        const { error: devErr } = await supabase
+          .from('hoja_ruta_devoluciones_vendedor' as any)
+          .insert(devs.map(d => ({
+            hoja_ruta_id: hojaRutaId,
+            parada_id: paradaId,
+            monto: d.monto,
+            descripcion: d.descripcion,
+            usuario_id: user.id,
+          })));
+        if (devErr) throw devErr;
+        totalDevoluciones = devs.reduce((s, d) => s + Number(d.monto), 0);
+      }
 
       const totalNuevo = validos.reduce((s, c) => s + Number(c.monto), 0);
-      const acumulado = montoCobradoPrevio + totalNuevo;
+      const acumulado = montoCobradoPrevio + totalNuevo + totalDevoluciones;
       await supabase
         .from('pedidos')
         .update({
@@ -267,8 +288,176 @@ export function useRegistrarCobrosEncargado() {
       queryClient.invalidateQueries({ queryKey: ['cobros-parada', vars.paradaId] });
       queryClient.invalidateQueries({ queryKey: ['cobros-hoja-ruta', vars.hojaRutaId] });
       queryClient.invalidateQueries({ queryKey: ['hoja-ruta', vars.hojaRutaId] });
+      queryClient.invalidateQueries({ queryKey: ['devoluciones-vendedor', vars.paradaId] });
+      queryClient.invalidateQueries({ queryKey: ['devoluciones-vendedor-hoja', vars.hojaRutaId] });
     },
     onError: (e: Error) => toast({ title: 'Error al cobrar', description: e.message, variant: 'destructive' }),
+  });
+}
+
+// ============== DEVOLUCIONES DEL VENDEDOR ==============
+export function useDevolucionesVendedorParada(paradaId: string | undefined) {
+  return useQuery({
+    queryKey: ['devoluciones-vendedor', paradaId],
+    queryFn: async () => {
+      if (!paradaId) return [];
+      const { data, error } = await (supabase as any)
+        .from('hoja_ruta_devoluciones_vendedor')
+        .select('id, monto, descripcion, created_at')
+        .eq('parada_id', paradaId)
+        .order('created_at');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!paradaId,
+  });
+}
+
+export function useDevolucionesVendedorHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['devoluciones-vendedor-hoja', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return [];
+      const { data, error } = await (supabase as any)
+        .from('hoja_ruta_devoluciones_vendedor')
+        .select(`
+          id, monto, descripcion, created_at, parada_id,
+          parada:hoja_ruta_paradas(id, pedido:pedidos(numero_pedido, cliente:clientes(nombre)))
+        `)
+        .eq('hoja_ruta_id', hojaRutaId)
+        .order('created_at');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!hojaRutaId,
+  });
+}
+
+// ============== STOCK DISPONIBLE RECHAZADO + VENTAS ==============
+export function useStockRechazadoHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['stock-rechazado', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return [];
+      // Devoluciones registradas en esta hoja (productos rechazados por clientes)
+      const { data: devs, error: e1 } = await supabase
+        .from('hoja_ruta_devoluciones')
+        .select(`
+          cantidad,
+          pedido_detalle:pedido_detalles(
+            producto_id, precio_unitario, descuento_porcentaje,
+            producto:productos(id, codigo_articulo, descripcion, unidad_medida)
+          )
+        `)
+        .eq('hoja_ruta_id', hojaRutaId);
+      if (e1) throw e1;
+
+      // Ventas ya realizadas del stock rechazado
+      const { data: vendidos, error: e2 } = await (supabase as any)
+        .from('hoja_ruta_ventas_rechazados')
+        .select('producto_id, cantidad')
+        .eq('hoja_ruta_id', hojaRutaId);
+      if (e2) throw e2;
+
+      const map = new Map<string, {
+        producto_id: string; codigo: string; descripcion: string; unidad: string;
+        precio_sugerido: number; rechazado: number; vendido: number; disponible: number;
+      }>();
+
+      (devs ?? []).forEach((d: any) => {
+        const pd = d.pedido_detalle;
+        if (!pd?.producto_id || !pd?.producto) return;
+        const precio = Number(pd.precio_unitario ?? 0) * (1 - Number(pd.descuento_porcentaje ?? 0) / 100);
+        const cur = map.get(pd.producto_id) ?? {
+          producto_id: pd.producto_id,
+          codigo: pd.producto.codigo_articulo ?? '-',
+          descripcion: pd.producto.descripcion ?? 'Producto',
+          unidad: pd.producto.unidad_medida ?? 'UN',
+          precio_sugerido: precio,
+          rechazado: 0, vendido: 0, disponible: 0,
+        };
+        cur.rechazado += Number(d.cantidad ?? 0);
+        if (precio > 0 && cur.precio_sugerido === 0) cur.precio_sugerido = precio;
+        map.set(pd.producto_id, cur);
+      });
+
+      (vendidos ?? []).forEach((v: any) => {
+        const cur = map.get(v.producto_id);
+        if (cur) cur.vendido += Number(v.cantidad ?? 0);
+      });
+
+      return Array.from(map.values())
+        .map(x => ({ ...x, disponible: Math.max(0, x.rechazado - x.vendido) }))
+        .sort((a, b) => a.codigo.localeCompare(b.codigo));
+    },
+    enabled: !!hojaRutaId,
+    staleTime: 15_000,
+  });
+}
+
+export function useVentasRechazadosHojaRuta(hojaRutaId: string | undefined) {
+  return useQuery({
+    queryKey: ['ventas-rechazados', hojaRutaId],
+    queryFn: async () => {
+      if (!hojaRutaId) return [];
+      const { data, error } = await (supabase as any)
+        .from('hoja_ruta_ventas_rechazados')
+        .select(`
+          id, cantidad, precio_unitario, monto_total, observaciones, created_at,
+          producto:productos(codigo_articulo, descripcion),
+          cliente:clientes(nombre),
+          forma_pago:formas_pago(id, nombre),
+          parada_id
+        `)
+        .eq('hoja_ruta_id', hojaRutaId)
+        .order('created_at');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!hojaRutaId,
+  });
+}
+
+export function useRegistrarVentaRechazado() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (data: {
+      hoja_ruta_id: string;
+      parada_id: string;
+      cliente_id: string;
+      producto_id: string;
+      cantidad: number;
+      precio_unitario: number;
+      forma_pago_id: string;
+      observaciones?: string;
+    }) => {
+      if (!user) throw new Error('Usuario no autenticado');
+      const monto_total = Number(data.cantidad) * Number(data.precio_unitario);
+      const { error } = await (supabase as any)
+        .from('hoja_ruta_ventas_rechazados')
+        .insert({
+          hoja_ruta_id: data.hoja_ruta_id,
+          parada_id: data.parada_id,
+          cliente_id: data.cliente_id,
+          producto_id: data.producto_id,
+          cantidad: data.cantidad,
+          precio_unitario: data.precio_unitario,
+          monto_total,
+          forma_pago_id: data.forma_pago_id,
+          observaciones: data.observaciones || null,
+          usuario_id: user.id,
+        });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['stock-rechazado', vars.hoja_ruta_id] });
+      queryClient.invalidateQueries({ queryKey: ['ventas-rechazados', vars.hoja_ruta_id] });
+      queryClient.invalidateQueries({ queryKey: ['cobros-hoja-ruta', vars.hoja_ruta_id] });
+      toast({ title: 'Venta registrada', description: 'Se sumará a la rendición' });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 }
 

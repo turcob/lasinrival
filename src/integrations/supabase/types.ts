@@ -1645,6 +1645,36 @@ export type Database = {
           },
         ]
       }
+      hoja_ruta_devoluciones_vendedor: {
+        Row: {
+          created_at: string
+          descripcion: string
+          hoja_ruta_id: string
+          id: string
+          monto: number
+          parada_id: string
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion: string
+          hoja_ruta_id: string
+          id?: string
+          monto: number
+          parada_id: string
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string
+          hoja_ruta_id?: string
+          id?: string
+          monto?: number
+          parada_id?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       hoja_ruta_paradas: {
         Row: {
           created_at: string
@@ -1815,6 +1845,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hoja_ruta_ventas_rechazados: {
+        Row: {
+          cantidad: number
+          cliente_id: string
+          cobro_id: string | null
+          created_at: string
+          forma_pago_id: string
+          hoja_ruta_id: string
+          id: string
+          monto_total: number
+          observaciones: string | null
+          parada_id: string
+          precio_unitario: number
+          producto_id: string
+          usuario_id: string
+        }
+        Insert: {
+          cantidad: number
+          cliente_id: string
+          cobro_id?: string | null
+          created_at?: string
+          forma_pago_id: string
+          hoja_ruta_id: string
+          id?: string
+          monto_total?: number
+          observaciones?: string | null
+          parada_id: string
+          precio_unitario?: number
+          producto_id: string
+          usuario_id: string
+        }
+        Update: {
+          cantidad?: number
+          cliente_id?: string
+          cobro_id?: string | null
+          created_at?: string
+          forma_pago_id?: string
+          hoja_ruta_id?: string
+          id?: string
+          monto_total?: number
+          observaciones?: string | null
+          parada_id?: string
+          precio_unitario?: number
+          producto_id?: string
+          usuario_id?: string
+        }
+        Relationships: []
       }
       hojas_ruta: {
         Row: {

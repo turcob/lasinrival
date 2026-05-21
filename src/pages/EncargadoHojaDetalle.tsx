@@ -13,6 +13,7 @@ import { CargaTab } from '@/components/encargado/CargaTab';
 import { ParadasTab } from '@/components/encargado/ParadasTab';
 import { ResumenCobrosTab } from '@/components/encargado/ResumenCobrosTab';
 import { RendicionTab } from '@/components/encargado/RendicionTab';
+import { StockRechazadoTab } from '@/components/encargado/StockRechazadoTab';
 
 const estadoColor = (e: string) => {
   if (e === 'en_carga') return 'bg-amber-500/10 text-amber-700 border-amber-500/30';
@@ -71,11 +72,13 @@ export default function EncargadoHojaDetalle() {
   if (estado === 'carga_confirmada') tabs.push({ value: 'salir', label: 'Salir a ruta' });
   if (estado === 'en_ruta') {
     tabs.push({ value: 'paradas', label: 'Paradas' });
+    tabs.push({ value: 'stock', label: 'Stock rech.' });
     tabs.push({ value: 'resumen', label: 'Cobros' });
     tabs.push({ value: 'cerrar', label: 'Cerrar' });
   }
   if (estado === 'completada' || estado === 'rendida') {
     tabs.push({ value: 'rendicion', label: 'Rendición' });
+    tabs.push({ value: 'stock', label: 'Stock rech.' });
     tabs.push({ value: 'resumen', label: 'Cobros' });
   }
   if (tabs.length === 0) tabs.push({ value: 'info', label: 'Info' });
@@ -137,6 +140,9 @@ export default function EncargadoHojaDetalle() {
               <TabsContent value="paradas" className="mt-3">
                 <ParadasTab hojaRutaId={hoja.id} paradas={paradas} />
               </TabsContent>
+              <TabsContent value="stock" className="mt-3">
+                <StockRechazadoTab hojaRutaId={hoja.id} />
+              </TabsContent>
               <TabsContent value="resumen" className="mt-3">
                 <ResumenCobrosTab hojaRutaId={hoja.id} />
               </TabsContent>
@@ -183,6 +189,9 @@ export default function EncargadoHojaDetalle() {
                 ) : (
                   <RendicionTab hojaRutaId={hoja.id} numeroHoja={hoja.numero_hoja} />
                 )}
+              </TabsContent>
+              <TabsContent value="stock" className="mt-3">
+                <StockRechazadoTab hojaRutaId={hoja.id} />
               </TabsContent>
               <TabsContent value="resumen" className="mt-3">
                 <ResumenCobrosTab hojaRutaId={hoja.id} />
