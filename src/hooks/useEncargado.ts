@@ -418,6 +418,27 @@ export function useVentasRechazadosHojaRuta(hojaRutaId: string | undefined) {
   });
 }
 
+export function useVentasRechazadosParada(paradaId: string | undefined) {
+  return useQuery({
+    queryKey: ['ventas-rechazados-parada', paradaId],
+    queryFn: async () => {
+      if (!paradaId) return [];
+      const { data, error } = await (supabase as any)
+        .from('hoja_ruta_ventas_rechazados')
+        .select(`
+          id, cantidad, precio_unitario, monto_total, observaciones, created_at,
+          producto:productos(codigo_articulo, descripcion),
+          forma_pago:formas_pago(id, nombre)
+        `)
+        .eq('parada_id', paradaId)
+        .order('created_at');
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!paradaId,
+  });
+}
+
 export function useRegistrarVentaRechazado() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -455,6 +476,7 @@ export function useRegistrarVentaRechazado() {
       queryClient.invalidateQueries({ queryKey: ['stock-rechazado', vars.hoja_ruta_id] });
       queryClient.invalidateQueries({ queryKey: ['ventas-rechazados', vars.hoja_ruta_id] });
       queryClient.invalidateQueries({ queryKey: ['cobros-hoja-ruta', vars.hoja_ruta_id] });
+      queryClient.invalidateQueries({ queryKey: ['ventas-rechazados-parada', vars.parada_id] });
       toast({ title: 'Venta registrada', description: 'Se sumará a la rendición' });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),

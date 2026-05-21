@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, PackageX, Loader2, XCircle, Package } from 'lucide-react';
 import { useActualizarEstadoParada, type HojaRutaParada } from '@/hooks/useLogistica';
 import { useCobrosParada, useDevolucionesParada } from '@/hooks/useLogistica';
-import { useDevolucionesVendedorParada } from '@/hooks/useEncargado';
+import { useDevolucionesVendedorParada, useVentasRechazadosParada } from '@/hooks/useEncargado';
 import { CobrarSheet } from './CobrarSheet';
 import { DevolucionSheet } from './DevolucionSheet';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +22,7 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   const { data: cobros = [] } = useCobrosParada(parada?.id);
   const { data: devoluciones = [] } = useDevolucionesParada(parada?.id);
   const { data: devolucionesVendedor = [] } = useDevolucionesVendedorParada(parada?.id);
+  const { data: ventasExtra = [] } = useVentasRechazadosParada(parada?.id);
   const [tipoEntregaOpen, setTipoEntregaOpen] = useState(false);
   const [cobrarOpen, setCobrarOpen] = useState(false);
   const [devolverOpen, setDevolverOpen] = useState(false);
@@ -44,8 +45,10 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   const montoRechazado = Math.max(montoRechazadoQuery, rechazoPendiente);
   const totalPedido = Math.max(0, totalPedidoOriginal - montoRechazado);
   const totalDevVendedor = (devolucionesVendedor as any[]).reduce((s, d) => s + Number(d.monto ?? 0), 0);
-  const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0) + totalDevVendedor;
-  const saldo = totalPedido - montoCobrado;
+  const totalVentasExtra = (ventasExtra as any[]).reduce((s, v) => s + Number(v.monto_total ?? 0), 0);
+  const montoCobrado = cobros.reduce((s, c: any) => s + Number(c.monto), 0) + totalDevVendedor + totalVentasExtra;
+  const totalConExtras = totalPedido + totalVentasExtra;
+  const saldo = totalConExtras - montoCobrado;
   const yaEntregado = ['entregado', 'entrega_parcial', 'rechazado', 'no_entregado'].includes(parada.estado);
 
   const handleEntregaSinCobro = async () => {
@@ -92,6 +95,12 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
                   <span className="text-muted-foreground">Total a cobrar:</span>
                   <span className="font-semibold">${totalPedido.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
+                {totalVentasExtra > 0 && (
+                  <div className="flex justify-between text-blue-700">
+                    <span>Adicional vendido (stock rechazado):</span>
+                    <span>+${totalVentasExtra.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 {montoCobrado > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Cobrado:</span>
@@ -104,6 +113,30 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
                 </div>
               </CardContent>
             </Card>
+
+            {ventasExtra.length > 0 && (
+              <Card className="border-blue-200 bg-blue-50/40">
+                <CardContent className="p-3 space-y-1">
+                  <p className="text-xs font-medium text-blue-900 mb-1 flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5" />
+                    PRODUCTOS EXTRA VENDIDOS ({ventasExtra.length})
+                  </p>
+                  <ul className="space-y-1">
+                    {(ventasExtra as any[]).map((v) => (
+                      <li key={v.id} className="flex justify-between gap-2 text-[11px]">
+                        <span className="min-w-0 flex-1 text-foreground/80">
+                          <span className="font-mono">{v.producto?.codigo_articulo ?? '-'}</span> · {v.producto?.descripcion ?? 'Producto'}
+                          <span className="text-muted-foreground"> — {Number(v.cantidad)} ud × ${Number(v.precio_unitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })} · {v.forma_pago?.nombre ?? ''}</span>
+                        </span>
+                        <span className="font-medium text-blue-800 whitespace-nowrap">
+                          ${Number(v.monto_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
 
             {yaEntregado ? (
               <div className="text-center text-sm text-muted-foreground py-2">
