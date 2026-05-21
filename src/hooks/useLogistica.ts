@@ -992,9 +992,9 @@ export function useCobrosHojaRuta(hojaRutaId: string | undefined) {
         .order('created_at');
 
       const ventasRows = ventasRech ?? [];
-      const productoIds = Array.from(new Set(ventasRows.map((v: any) => v.producto_id).filter(Boolean)));
-      const clienteIds = Array.from(new Set(ventasRows.map((v: any) => v.cliente_id).filter(Boolean)));
-      const formaPagoIds = Array.from(new Set(ventasRows.map((v: any) => v.forma_pago_id).filter(Boolean)));
+      const productoIds = Array.from(new Set(ventasRows.map((v: any) => v.producto_id).filter(Boolean))) as string[];
+      const clienteIds = Array.from(new Set(ventasRows.map((v: any) => v.cliente_id).filter(Boolean))) as string[];
+      const formaPagoIds = Array.from(new Set(ventasRows.map((v: any) => v.forma_pago_id).filter(Boolean))) as string[];
 
       const [productosRes, clientesRes, formasRes] = await Promise.all([
         productoIds.length ? supabase.from('productos').select('id, codigo_articulo, descripcion').in('id', productoIds) : Promise.resolve({ data: [], error: null }),
