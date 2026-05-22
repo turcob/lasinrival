@@ -523,10 +523,22 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
+            {selectedPedidosIdsVisibles.length > 0 && selectedPedidosIdsVisibles.some((id) => !remitosImpresos.has(id)) && (
+              <p className="text-xs text-destructive mr-auto self-center">
+                Imprimí los remitos antes de crear la hoja de ruta.
+              </p>
+            )}
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={crearHojaRuta.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                crearHojaRuta.isPending ||
+                selectedPedidosIdsVisibles.length === 0 ||
+                selectedPedidosIdsVisibles.some((id) => !remitosImpresos.has(id))
+              }
+            >
               {crearHojaRuta.isPending ? 'Creando...' : 'Crear Hoja de Ruta'}
             </Button>
           </div>
