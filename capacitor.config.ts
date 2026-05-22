@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Encargado Las Inrival',
   webDir: 'dist',
   server: {
-    url: 'https://11d72e36-3a2b-40aa-b811-312fd7797cbb.lovableproject.com?forceHideBadge=true',
+    url: 'https://lasinrival.lovable.app/encargado',
     cleartext: true,
   },
   android: {
