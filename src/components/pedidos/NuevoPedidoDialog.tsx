@@ -576,3 +576,77 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
     </Dialog>
   );
 }
+
+interface ClienteOption {
+  id: string;
+  nombre: string;
+  codigo_cliente: string | null;
+}
+
+function ClienteCombobox({
+  clientes,
+  value,
+  onChange,
+}: {
+  clientes: ClienteOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = clientes.find((c) => c.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected
+              ? `${selected.codigo_cliente ? `[${selected.codigo_cliente}] ` : ''}${selected.nombre}`
+              : 'Seleccionar cliente'}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command
+          filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder="Buscar por nombre o código..." />
+          <CommandList>
+            <CommandEmpty>Sin resultados</CommandEmpty>
+            <CommandGroup>
+              {clientes.map((c) => {
+                const label = `${c.codigo_cliente ? `[${c.codigo_cliente}] ` : ''}${c.nombre}`;
+                return (
+                  <CommandItem
+                    key={c.id}
+                    value={`${c.codigo_cliente ?? ''} ${c.nombre}`}
+                    onSelect={() => {
+                      onChange(c.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value === c.id ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {label}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
