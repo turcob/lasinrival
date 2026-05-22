@@ -48,6 +48,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   const [filtroZona, setFiltroZona] = useState<string>('');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('');
   const [filtroOrigen, setFiltroOrigen] = useState<'sin_web' | 'solo_web' | 'todos'>('sin_web');
+  const [remitosImpresos, setRemitosImpresos] = useState<Set<string>>(new Set());
   
   const { data: vehiculos = [] } = useVehiculos();
   const { data: pedidosDisponibles = [] } = usePedidosDisponiblesParaRuta();
@@ -209,6 +210,11 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
       </body></html>
     `);
     ventana.document.close();
+    setRemitosImpresos((prev) => {
+      const next = new Set(prev);
+      pedidos.forEach((p: any) => next.add(p.id));
+      return next;
+    });
   };
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
@@ -242,6 +248,11 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
   };
 
   const onSubmit = async (values: FormValues) => {
+    const faltantes = selectedPedidosIdsVisibles.filter((id) => !remitosImpresos.has(id));
+    if (faltantes.length > 0) {
+      alert(`Debés imprimir los remitos antes de crear la hoja de ruta. Faltan ${faltantes.length} remito(s) por imprimir.`);
+      return;
+    }
     await crearHojaRuta.mutateAsync({
       fecha: values.fecha,
       vehiculo_id: values.vehiculo_id || undefined,
@@ -253,6 +264,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
     });
     reset();
     setSelectedPedidos([]);
+    setRemitosImpresos(new Set());
     setFiltroZona('');
     setFiltroVendedor('');
     setFiltroOrigen('sin_web');
