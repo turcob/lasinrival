@@ -1,7 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X, Edit } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, AlertTriangle, Sparkles, X, Edit, Check, ChevronsUpDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
@@ -334,18 +344,11 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientes?.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.codigo_cliente ? `[${c.codigo_cliente}] ` : ''}{c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ClienteCombobox
+                clientes={clientes ?? []}
+                value={clienteId}
+                onChange={setClienteId}
+              />
             </div>
             <div className="space-y-2">
               <Label>Vendedor</Label>
@@ -571,5 +574,79 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface ClienteOption {
+  id: string;
+  nombre: string;
+  codigo_cliente: string | null;
+}
+
+function ClienteCombobox({
+  clientes,
+  value,
+  onChange,
+}: {
+  clientes: ClienteOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = clientes.find((c) => c.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected
+              ? `${selected.codigo_cliente ? `[${selected.codigo_cliente}] ` : ''}${selected.nombre}`
+              : 'Seleccionar cliente'}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command
+          filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder="Buscar por nombre o código..." />
+          <CommandList>
+            <CommandEmpty>Sin resultados</CommandEmpty>
+            <CommandGroup>
+              {clientes.map((c) => {
+                const label = `${c.codigo_cliente ? `[${c.codigo_cliente}] ` : ''}${c.nombre}`;
+                return (
+                  <CommandItem
+                    key={c.id}
+                    value={`${c.codigo_cliente ?? ''} ${c.nombre}`}
+                    onSelect={() => {
+                      onChange(c.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value === c.id ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {label}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
