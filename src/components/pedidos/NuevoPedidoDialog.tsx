@@ -344,18 +344,11 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientes?.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.codigo_cliente ? `[${c.codigo_cliente}] ` : ''}{c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ClienteCombobox
+                clientes={clientes ?? []}
+                value={clienteId}
+                onChange={setClienteId}
+              />
             </div>
             <div className="space-y-2">
               <Label>Vendedor</Label>
