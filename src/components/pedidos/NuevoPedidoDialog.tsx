@@ -619,7 +619,7 @@ function ClienteCombobox({
           }}
         >
           <CommandInput placeholder="Buscar por nombre o código..." />
-          <CommandList>
+          <CommandList className="max-h-[400px] overflow-y-auto">
             <CommandEmpty>Sin resultados</CommandEmpty>
             <CommandGroup>
               {clientes.map((c) => {
