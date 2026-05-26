@@ -79,13 +79,23 @@ export function NuevoPedidoDialog({ open, onOpenChange, onEditarPedidoExistente 
   const { data: clientes } = useQuery({
     queryKey: ['clientes-activos'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nombre, codigo_cliente, lista_precio_id')
-        .eq('activo', true)
-        .order('nombre');
-      if (error) throw error;
-      return data;
+      const all: any[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('id, nombre, codigo_cliente, lista_precio_id')
+          .eq('activo', true)
+          .order('nombre')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return all;
     },
   });
 
@@ -619,7 +629,7 @@ function ClienteCombobox({
           }}
         >
           <CommandInput placeholder="Buscar por nombre o código..." />
-          <CommandList>
+          <CommandList className="max-h-[400px] overflow-y-auto">
             <CommandEmpty>Sin resultados</CommandEmpty>
             <CommandGroup>
               {clientes.map((c) => {
