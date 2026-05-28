@@ -1,0 +1,1 @@
+-- See /tmp/update.sql for full content; inserting inline below
