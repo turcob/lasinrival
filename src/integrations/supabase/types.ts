@@ -4643,6 +4643,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_localidades_clientes: { Args: { p_data: Json }; Returns: number }
       is_route_owner: { Args: { route_id: string }; Returns: boolean }
       is_route_responsable: { Args: { route_id: string }; Returns: boolean }
       is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
