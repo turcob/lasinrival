@@ -594,6 +594,7 @@ export type Database = {
           id: string
           limite_credito: number | null
           lista_precio_id: string | null
+          localidad: string | null
           monto_adeudado_bloqueo_override: number | null
           motivo_bloqueo: string | null
           nombre: string
@@ -622,6 +623,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          localidad?: string | null
           monto_adeudado_bloqueo_override?: number | null
           motivo_bloqueo?: string | null
           nombre: string
@@ -650,6 +652,7 @@ export type Database = {
           id?: string
           limite_credito?: number | null
           lista_precio_id?: string | null
+          localidad?: string | null
           monto_adeudado_bloqueo_override?: number | null
           motivo_bloqueo?: string | null
           nombre?: string
