@@ -553,7 +553,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="direccion">Dirección</Label>
                   <Input
@@ -561,6 +561,16 @@ export default function Clientes() {
                     value={formData.direccion}
                     onChange={(e) =>
                       setFormData({ ...formData, direccion: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="localidad">Localidad</Label>
+                  <Input
+                    id="localidad"
+                    value={formData.localidad}
+                    onChange={(e) =>
+                      setFormData({ ...formData, localidad: e.target.value })
                     }
                   />
                 </div>
