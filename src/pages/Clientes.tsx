@@ -367,6 +367,7 @@ export default function Clientes() {
       telefono: cliente.telefono || '',
       email: cliente.email || '',
       direccion: cliente.direccion || '',
+      localidad: cliente.localidad || '',
       lista_precio_id: cliente.lista_precio_id || '',
       zona_id: cliente.zona_id || '',
       vendedor_id: cliente.vendedor_id || '',
