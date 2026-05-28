@@ -284,6 +284,7 @@ export default function Clientes() {
         telefono: formData.telefono || null,
         email: formData.email || null,
         direccion: formData.direccion || null,
+        localidad: formData.localidad || null,
         lista_precio_id: formData.lista_precio_id || null,
         zona_id: formData.zona_id || null,
         vendedor_id: formData.vendedor_id || null,
