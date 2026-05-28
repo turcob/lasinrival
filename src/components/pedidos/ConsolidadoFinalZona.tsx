@@ -279,6 +279,7 @@ export function ConsolidadoFinalZona() {
           nombre: pedido.cliente?.nombre || '-',
           codigoCliente: pedido.cliente?.codigo_cliente || undefined,
           direccion: (pedido.cliente as any)?.direccion || '',
+          localidad: (pedido.cliente as any)?.localidad || undefined,
           cuit: (pedido.cliente as any)?.dni_cuit || '',
           zona: zonaNombre || undefined,
         },
