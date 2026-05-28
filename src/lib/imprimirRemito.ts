@@ -18,6 +18,7 @@ interface DatosRemito {
     nombre: string;
     codigoCliente?: string;
     direccion: string;
+    localidad?: string;
     cuit: string;
     zona?: string;
   };
@@ -439,6 +440,9 @@ function buildFacturaHTML(datos: DatosRemito): string {
   clientItems.push(`<div class="cb-item"><span class="cb-label">Cliente:</span><span class="cb-value">${datos.cliente.nombre}</span></div>`);
   if (datos.cliente.direccion) {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Dir:</span><span class="cb-value">${datos.cliente.direccion}</span></div>`);
+  }
+  if (datos.cliente.localidad) {
+    clientItems.push(`<div class="cb-item"><span class="cb-label">Loc:</span><span class="cb-value">${datos.cliente.localidad}</span></div>`);
   }
   if (datos.cliente.zona) {
     clientItems.push(`<div class="cb-item"><span class="cb-label">Zona:</span><span class="cb-value">${datos.cliente.zona}</span></div>`);

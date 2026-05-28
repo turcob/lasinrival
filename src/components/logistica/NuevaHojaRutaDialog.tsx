@@ -175,6 +175,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
           nombre: pedido.cliente?.nombre || '-',
           codigoCliente: pedido.cliente?.codigo_cliente || undefined,
           direccion: pedido.cliente?.direccion || '',
+          localidad: pedido.cliente?.localidad || undefined,
           cuit: pedido.cliente?.dni_cuit || '',
           zona: zonaNombre || undefined,
         },
