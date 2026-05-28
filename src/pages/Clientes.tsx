@@ -62,6 +62,7 @@ interface Cliente {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  localidad: string | null;
   lista_precio_id: string | null;
   zona_id: string | null;
   vendedor_id: string | null;
@@ -116,6 +117,7 @@ export default function Clientes() {
     telefono: '',
     email: '',
     direccion: '',
+    localidad: '',
     lista_precio_id: '',
     zona_id: '',
     vendedor_id: '',
@@ -282,6 +284,7 @@ export default function Clientes() {
         telefono: formData.telefono || null,
         email: formData.email || null,
         direccion: formData.direccion || null,
+        localidad: formData.localidad || null,
         lista_precio_id: formData.lista_precio_id || null,
         zona_id: formData.zona_id || null,
         vendedor_id: formData.vendedor_id || null,
@@ -364,6 +367,7 @@ export default function Clientes() {
       telefono: cliente.telefono || '',
       email: cliente.email || '',
       direccion: cliente.direccion || '',
+      localidad: cliente.localidad || '',
       lista_precio_id: cliente.lista_precio_id || '',
       zona_id: cliente.zona_id || '',
       vendedor_id: cliente.vendedor_id || '',
@@ -383,6 +387,7 @@ export default function Clientes() {
       telefono: '',
       email: '',
       direccion: '',
+      localidad: '',
       lista_precio_id: '',
       zona_id: '',
       vendedor_id: '',
@@ -548,7 +553,7 @@ export default function Clientes() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="direccion">Dirección</Label>
                   <Input
@@ -556,6 +561,16 @@ export default function Clientes() {
                     value={formData.direccion}
                     onChange={(e) =>
                       setFormData({ ...formData, direccion: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="localidad">Localidad</Label>
+                  <Input
+                    id="localidad"
+                    value={formData.localidad}
+                    onChange={(e) =>
+                      setFormData({ ...formData, localidad: e.target.value })
                     }
                   />
                 </div>
