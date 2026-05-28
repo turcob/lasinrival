@@ -387,6 +387,7 @@ export default function Clientes() {
       telefono: '',
       email: '',
       direccion: '',
+      localidad: '',
       lista_precio_id: '',
       zona_id: '',
       vendedor_id: '',
