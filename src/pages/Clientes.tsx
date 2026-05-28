@@ -62,6 +62,7 @@ interface Cliente {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  localidad: string | null;
   lista_precio_id: string | null;
   zona_id: string | null;
   vendedor_id: string | null;
