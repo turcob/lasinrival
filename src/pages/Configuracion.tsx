@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Save, Building2, MapPin, Phone, Mail, AlertTriangle, CheckCircle2, Palette, ShieldAlert, FileText, Printer } from 'lucide-react';
 import { imprimirWorkflowVentas, imprimirWorkflowCobros, imprimirWorkflowLogistica } from '@/lib/imprimirWorkflows';
+import { getPcAlias, setPcAlias } from '@/lib/printMeta';
 import {
   Card,
   CardContent,
@@ -254,6 +255,8 @@ export default function Configuracion() {
         title="Configuración del Comercio"
         description="Administra los datos de tu comercio para facturación electrónica"
       />
+
+      <PcAliasCard />
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 md:grid-cols-2">
