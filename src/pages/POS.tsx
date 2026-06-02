@@ -314,6 +314,13 @@ export default function POS() {
     return () => clearTimeout(timer);
   }, [clienteSearchTerm]);
 
+  // Forzar pago directo cuando el cliente no permite cuenta corriente
+  useEffect(() => {
+    if (selectedCliente && selectedCliente.permite_cuenta_corriente === false && clienteModalidadPago === 'cuenta_corriente') {
+      setClienteModalidadPago('pago_directo');
+    }
+  }, [selectedCliente, clienteModalidadPago]);
+
   // Server-side search for employees with debounce
   useEffect(() => {
     if (!empleadoSearchTerm || empleadoSearchTerm.length < 2) {
