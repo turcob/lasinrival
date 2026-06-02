@@ -1,4 +1,8 @@
 interface ReciboData {
+}
+import { getPrintMetaHTML } from './printMeta';
+
+interface __ReciboDataPlaceholder {
   empleadoNombre: string;
   mes: number;
   anio: number;

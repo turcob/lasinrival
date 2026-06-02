@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getPrintMetaHTML } from './printMeta';
 
 interface LineaDetalle {
   codigo: string;
@@ -183,6 +184,7 @@ export function imprimirDetallePedido(datos: DatosDetallePedido) {
           <span class="summary-right">UNIDADES: ${totalItems}</span>
         </div>
       </div>
+      ${getPrintMetaHTML()}
       <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
     </body>
     </html>
