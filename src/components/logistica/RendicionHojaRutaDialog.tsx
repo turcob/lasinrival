@@ -717,5 +717,12 @@ export function RendicionHojaRutaDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <SubsanarCobroDialog
+      open={!!cobroASubsanar}
+      onOpenChange={(v) => { if (!v) setCobroASubsanar(null); }}
+      cobro={cobroASubsanar}
+      onSuccess={() => { setCobroASubsanar(null); loadData(); }}
+    />
+    </>
   );
 }
