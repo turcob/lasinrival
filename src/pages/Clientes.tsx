@@ -292,6 +292,7 @@ export default function Clientes() {
         vendedor_id: formData.vendedor_id || null,
         numero_terminal_clover: formData.numero_terminal_clover || null,
         facturas_adeudadas_bloqueo_override: formData.facturas_adeudadas_bloqueo_override ? parseInt(formData.facturas_adeudadas_bloqueo_override) : null,
+        permite_cuenta_corriente: formData.permite_cuenta_corriente,
       };
 
       if (selectedCliente) {
