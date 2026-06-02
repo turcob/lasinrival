@@ -2556,13 +2556,22 @@ export default function POS() {
                           </Label>
                         </div>
                         <div className="flex items-start space-x-2 p-2 rounded border border-muted hover:bg-muted/50 cursor-pointer">
-                          <RadioGroupItem value="cuenta_corriente" id="cliente-modalidad-cc" className="mt-0.5" />
-                          <Label htmlFor="cliente-modalidad-cc" className="flex-1 cursor-pointer">
+                          <RadioGroupItem
+                            value="cuenta_corriente"
+                            id="cliente-modalidad-cc"
+                            className="mt-0.5"
+                            disabled={selectedCliente?.permite_cuenta_corriente === false}
+                          />
+                          <Label htmlFor="cliente-modalidad-cc" className={`flex-1 cursor-pointer ${selectedCliente?.permite_cuenta_corriente === false ? 'opacity-50' : ''}`}>
                             <div className="flex items-center gap-2">
                               <Wallet className="h-4 w-4 text-secondary-foreground" />
                               <span className="font-medium">Cuenta Corriente</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">Carga el total como deuda</p>
+                            <p className="text-xs text-muted-foreground">
+                              {selectedCliente?.permite_cuenta_corriente === false
+                                ? 'Cliente sin habilitación de CC'
+                                : 'Carga el total como deuda'}
+                            </p>
                           </Label>
                         </div>
                       </RadioGroup>
