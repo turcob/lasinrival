@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getPrintMetaHTML } from '@/lib/printMeta';
 import { formatZonasResumen } from '@/lib/hojaRutaZonas';
+import { SubsanarCobroDialog } from './SubsanarCobroDialog';
 
 interface Cobro {
   id: string;
@@ -23,6 +24,7 @@ interface Cobro {
   forma_pago: { id: string; nombre: string };
   pedido: { id: string; numero_pedido: number; cliente_id: string };
   parada: { id: string };
+  subsanado_administrativo?: boolean | null;
 }
 
 interface ResumenPorMedio {
@@ -46,7 +48,9 @@ export function RendicionHojaRutaDialog({
   numeroHoja,
   onSuccess,
 }: RendicionHojaRutaDialogProps) {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const esAdmin = hasRole('admin') || hasRole('encargado');
+  const [cobroASubsanar, setCobroASubsanar] = useState<Cobro | null>(null);
   const [loading, setLoading] = useState(false);
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [resumen, setResumen] = useState<ResumenPorMedio[]>([]);
@@ -79,6 +83,7 @@ export function RendicionHojaRutaDialog({
           id,
           monto,
           referencia,
+          subsanado_administrativo,
           forma_pago:formas_pago(id, nombre),
           pedido:pedidos(id, numero_pedido, cliente_id),
           parada:hoja_ruta_paradas(id)
