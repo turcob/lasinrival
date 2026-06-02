@@ -450,7 +450,8 @@ serve(async (req) => {
     // Complex payloads can cause the push to be silently dropped
     const notificationPayload = {
       title: title || 'Nueva Solicitud de Descuento',
-      body: body || 'Tienes una nueva solicitud pendiente'
+      body: body || 'Tienes una nueva solicitud pendiente',
+      data: data || {}
     };
     
     console.log('Sending minimal iOS-compatible payload:', JSON.stringify(notificationPayload));
