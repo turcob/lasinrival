@@ -620,6 +620,24 @@ export default function Clientes() {
                 </div>
               </div>
 
+              <div className="rounded-lg border p-3 flex items-start gap-3 bg-muted/30">
+                <Switch
+                  id="permite_cc"
+                  checked={formData.permite_cuenta_corriente}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, permite_cuenta_corriente: checked })
+                  }
+                />
+                <div className="flex-1">
+                  <Label htmlFor="permite_cc" className="font-semibold">
+                    Permite facturar en cuenta corriente
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Si está apagado, este cliente solo puede comprar con pago directo (no se le puede facturar a cuenta corriente).
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
