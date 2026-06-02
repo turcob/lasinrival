@@ -350,7 +350,7 @@ export default function POS() {
     try {
       const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
-        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id').eq('activo', true).order('nombre'),
+        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).neq('destino', 'paladini').order('orden'),
