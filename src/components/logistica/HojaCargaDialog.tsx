@@ -11,6 +11,7 @@ import { Printer, Package, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getPrintMetaHTML } from '@/lib/printMeta';
+import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 
 interface HojaCargaDialogProps {
   hojaRutaId: string | null;
@@ -32,6 +33,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
     }
 
     const fechaFormateada = format(new Date(hojaRuta.fecha), 'dd/MM/yyyy', { locale: es });
+    const zonasTxt = formatZonasResumen((hojaRuta as any).paradas);
 
     const filasHTML = productos.map((p) => `
       <tr>
@@ -46,7 +48,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Hoja de Carga - Ruta #${hojaRuta.numero_hoja}</title>
+        <title>Hoja de Carga - Ruta #${hojaRuta.numero_hoja}${zonasTxt ? ' - ' + zonasTxt : ''}</title>
         <style>
           @media print {
             body { margin: 0; padding: 0; }
@@ -178,7 +180,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
         <div class="container">
           <div class="header">
             <div class="header-title">HOJA DE CARGA</div>
-            <div class="header-numero">Ruta #${hojaRuta.numero_hoja}</div>
+            <div class="header-numero">Ruta #${hojaRuta.numero_hoja}${zonasTxt ? ' — Zona: ' + zonasTxt : ''}</div>
           </div>
           <div class="info-bar">
             <div class="info-item"><label>Fecha:</label><span>${fechaFormateada}</span></div>
@@ -228,7 +230,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
           <SheetTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Hoja de Carga
+              Hoja de Carga {hojaRuta && formatZonasResumen((hojaRuta as any).paradas) ? `— ${formatZonasResumen((hojaRuta as any).paradas)}` : ''}
             </span>
             <Button 
               variant="outline" 
