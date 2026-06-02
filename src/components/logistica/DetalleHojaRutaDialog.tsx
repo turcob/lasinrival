@@ -645,6 +645,11 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
                 Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
+                {hojaRuta && formatZonasResumen(hojaRuta.paradas as any) && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    — Zona: {formatZonasResumen(hojaRuta.paradas as any)}
+                  </span>
+                )}
               </h2>
               <p className="text-sm text-muted-foreground">Detalle y gestión de entregas</p>
             </div>
