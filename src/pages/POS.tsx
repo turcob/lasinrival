@@ -102,6 +102,7 @@ interface Cliente {
   nombre: string;
   dni_cuit: string | null;
   condicion_iva?: number;
+  permite_cuenta_corriente?: boolean;
 }
 
 interface Empleado {
