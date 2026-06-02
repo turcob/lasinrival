@@ -551,6 +551,41 @@ export function RendicionHojaRutaDialog({
             </CardContent>
           </Card>
 
+          {/* Reclasificación administrativa de cobros (solo admin/encargado) */}
+          {esAdmin && cobros.filter(c => c.forma_pago.id !== 'legacy').length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Detalle de cobros · Reclasificación administrativa
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  {cobros.filter(c => c.forma_pago.id !== 'legacy').map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 py-1 border-b last:border-0">
+                      <div className="text-xs">
+                        <span className="font-medium">#{c.pedido.numero_pedido || '—'}</span>
+                        {' · '}
+                        <span>{c.forma_pago.nombre}</span>
+                        {c.subsanado_administrativo && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">subsanado</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium">
+                          ${Number(c.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <Button size="sm" variant="ghost" onClick={() => setCobroASubsanar(c)}>
+                          Reclasificar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Montos declarados */}
           <Card>
             <CardHeader className="pb-2">
