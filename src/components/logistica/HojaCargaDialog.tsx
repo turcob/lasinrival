@@ -10,6 +10,7 @@ import { useHojaRuta, useHojaCarga } from '@/hooks/useLogistica';
 import { Printer, Package, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getPrintMetaHTML } from '@/lib/printMeta';
 
 interface HojaCargaDialogProps {
   hojaRutaId: string | null;
