@@ -296,7 +296,7 @@ export default function POS() {
       try {
         const { data, error } = await supabase
           .from('clientes')
-          .select('id, nombre, dni_cuit, condicion_iva, lista_precio_id')
+          .select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente')
           .eq('activo', true)
           .or(`nombre.ilike.%${clienteSearchTerm}%,dni_cuit.ilike.%${clienteSearchTerm}%`)
           .order('nombre')
