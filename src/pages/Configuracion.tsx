@@ -678,3 +678,46 @@ export default function Configuracion() {
     </MainLayout>
   );
 }
+
+function PcAliasCard() {
+  const [alias, setAlias] = useState<string>(() => getPcAlias());
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    setPcAlias(alias);
+    setSaved(true);
+    toast.success('Alias de PC guardado en este dispositivo');
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Printer className="h-5 w-5" />
+          Alias de esta PC
+        </CardTitle>
+        <CardDescription>
+          Se imprime en todos los documentos (excepto facturas) junto al usuario y la fecha/hora. Se guarda en este dispositivo.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+          <div className="flex-1 space-y-2">
+            <Label htmlFor="pc_alias">Nombre / Alias</Label>
+            <Input
+              id="pc_alias"
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              placeholder="Ej: Caja 1 / Depósito / Administración"
+            />
+          </div>
+          <Button type="button" onClick={handleSave}>
+            <Save className="mr-2 h-4 w-4" />
+            {saved ? 'Guardado' : 'Guardar'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
