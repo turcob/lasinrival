@@ -14,6 +14,7 @@ import { FileCheck, Banknote, Smartphone, CreditCard, AlertTriangle, CheckCircle
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getPrintMetaHTML } from '@/lib/printMeta';
+import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 
 interface Cobro {
   id: string;
@@ -55,6 +56,7 @@ export function RendicionHojaRutaDialog({
   const [totalEntregado, setTotalEntregado] = useState<number>(0);
   const [totalRechazado, setTotalRechazado] = useState<number>(0);
   const [totalDevoluciones, setTotalDevoluciones] = useState<number>(0);
+  const [zonasTitulo, setZonasTitulo] = useState<string>('');
 
   // Montos declarados por el chofer
   const [efectivoDeclarado, setEfectivoDeclarado] = useState<number>(0);
@@ -86,10 +88,11 @@ export function RendicionHojaRutaDialog({
       // También cargar cobros de la tabla legacy
       const { data: paradas } = await supabase
         .from('hoja_ruta_paradas')
-        .select('id, estado, pedido:pedidos(total)')
+        .select('id, estado, pedido:pedidos(total, cliente:clientes(zona:zonas(nombre)))')
         .eq('hoja_ruta_id', hojaRutaId);
       
       const paradasIds = paradas?.map(p => p.id) || [];
+      setZonasTitulo(formatZonasResumen(paradas as any));
 
       // Calcular total entregado vs rechazado por estado de parada
       let entregadoSum = 0;
@@ -466,7 +469,7 @@ export function RendicionHojaRutaDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-primary" />
-            Rendición de Cobranza - Hoja #{numeroHoja}
+            Rendición de Cobranza - Hoja #{numeroHoja}{zonasTitulo ? ` — Zona: ${zonasTitulo}` : ''}
           </DialogTitle>
           <DialogDescription>
             Declara los montos recaudados para cerrar la hoja de ruta
