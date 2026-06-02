@@ -32,6 +32,7 @@ import { NuevaHojaRutaDialog } from '@/components/logistica/NuevaHojaRutaDialog'
 import { DetalleHojaRutaDialog } from '@/components/logistica/DetalleHojaRutaDialog';
 import { VehiculoFormDialog } from '@/components/logistica/VehiculoFormDialog';
 import { HojaCargaDialog } from '@/components/logistica/HojaCargaDialog';
+import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 
 const estadoConfig: Record<HojaRutaEstado, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   planificada: { label: 'Planificada', variant: 'secondary' },
@@ -133,7 +134,14 @@ export default function Logistica() {
       key: 'numero_hoja',
       header: '#', 
       render: (h: typeof hojasRuta[0]) => (
-        <span className="font-mono font-medium">#{h.numero_hoja}</span>
+        <div className="flex flex-col">
+          <span className="font-mono font-medium">#{h.numero_hoja}</span>
+          {formatZonasResumen(h.paradas as any) && (
+            <span className="text-[11px] text-muted-foreground">
+              {formatZonasResumen(h.paradas as any)}
+            </span>
+          )}
+        </div>
       )
     },
     { 
