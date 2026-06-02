@@ -624,6 +624,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       </head>
       <body>
         ${paginasHTML}
+        ${getPrintMetaHTML()}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>

@@ -206,6 +206,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
           <div class="firma-block"><div class="firma-dots"></div><div class="firma-label">Responsable de Carga</div></div>
           <div class="firma-block"><div class="firma-dots"></div><div class="firma-label">Chofer</div></div>
         </div>
+        ${getPrintMetaHTML()}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>
