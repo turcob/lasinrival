@@ -69,6 +69,7 @@ interface Cliente {
   activo: boolean;
   bloqueado: boolean;
   facturas_adeudadas_bloqueo_override: number | null;
+  permite_cuenta_corriente?: boolean;
   listas_precios?: { nombre: string } | null;
   zonas?: { codigo: string; nombre: string } | null;
   vendedores?: { codigo: string; nombre: string } | null;
@@ -124,6 +125,7 @@ export default function Clientes() {
     numero_terminal_clover: '',
     activo: true,
     facturas_adeudadas_bloqueo_override: '',
+    permite_cuenta_corriente: true,
   });
 
   // Filters
@@ -374,6 +376,7 @@ export default function Clientes() {
       numero_terminal_clover: (cliente as any).numero_terminal_clover || '',
       activo: cliente.activo,
       facturas_adeudadas_bloqueo_override: cliente.facturas_adeudadas_bloqueo_override?.toString() || '',
+      permite_cuenta_corriente: (cliente as any).permite_cuenta_corriente ?? true,
     });
     setDialogOpen(true);
   };
@@ -394,6 +397,7 @@ export default function Clientes() {
       numero_terminal_clover: '',
       activo: true,
       facturas_adeudadas_bloqueo_override: '',
+      permite_cuenta_corriente: true,
     });
   };
 
