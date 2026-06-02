@@ -1,4 +1,4 @@
-const CACHE_NAME = 'descuentos-pwa-v5';
+const CACHE_NAME = 'descuentos-pwa-v6';
 const urlsToCache = [
   '/admin-descuentos',
   '/auth',
@@ -7,7 +7,7 @@ const urlsToCache = [
 
 // Install event - cache essential files
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker v5');
+  console.log('[SW] Installing service worker v6');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker v5');
+  console.log('[SW] Activating service worker v6');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -77,7 +77,8 @@ self.addEventListener('push', (event) => {
   const handlePush = async () => {
     let title = 'Nueva Solicitud';
     let body = 'Tienes una nueva solicitud de descuento';
-    
+    let payloadData = {};
+
     // Try to get data from push event
     if (event.data) {
       try {
@@ -87,6 +88,7 @@ self.addEventListener('push', (event) => {
         const data = JSON.parse(text);
         title = data.title || title;
         body = data.body || body;
+        payloadData = data.data || {};
         console.log('[SW] Parsed push data - title:', title, 'body:', body);
       } catch (e) {
         console.log('[SW] Could not parse push data:', e);
@@ -103,7 +105,8 @@ self.addEventListener('push', (event) => {
       await self.registration.showNotification(title, {
         body: body,
         icon: '/icons/icon-192.png',
-        tag: 'descuento-' + Date.now()
+        tag: 'descuento-' + (payloadData.solicitud_id || Date.now()),
+        data: payloadData
       });
       console.log('[SW] Notification shown successfully');
     } catch (notifError) {
@@ -131,19 +134,28 @@ self.addEventListener('push', (event) => {
 
 // Notification click event
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked');
+  console.log('[SW] Notification clicked', event.notification.data);
   event.notification.close();
+
+  const data = event.notification.data || {};
+  const targetUrl = data.solicitud_id
+    ? `/admin-descuentos?solicitud=${data.solicitud_id}`
+    : '/admin-descuentos';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
         for (const client of clientList) {
           if (client.url.includes('/admin-descuentos') && 'focus' in client) {
+            if ('navigate' in client && data.solicitud_id) {
+              return client.navigate(targetUrl).then(() => client.focus()).catch(() => client.focus());
+            }
+            client.postMessage({ type: 'FOCUS_SOLICITUD', solicitud_id: data.solicitud_id });
             return client.focus();
           }
         }
         if (clients.openWindow) {
-          return clients.openWindow('/admin-descuentos');
+          return clients.openWindow(targetUrl);
         }
       })
   );
