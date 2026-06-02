@@ -599,6 +599,7 @@ export type Database = {
           motivo_bloqueo: string | null
           nombre: string
           numero_terminal_clover: string | null
+          permite_cuenta_corriente: boolean
           provincia_id: string | null
           telefono: string | null
           telefono_contacto: string | null
@@ -628,6 +629,7 @@ export type Database = {
           motivo_bloqueo?: string | null
           nombre: string
           numero_terminal_clover?: string | null
+          permite_cuenta_corriente?: boolean
           provincia_id?: string | null
           telefono?: string | null
           telefono_contacto?: string | null
@@ -657,6 +659,7 @@ export type Database = {
           motivo_bloqueo?: string | null
           nombre?: string
           numero_terminal_clover?: string | null
+          permite_cuenta_corriente?: boolean
           provincia_id?: string | null
           telefono?: string | null
           telefono_contacto?: string | null
@@ -1521,11 +1524,16 @@ export type Database = {
           foto_comprobante_path: string | null
           hoja_ruta_id: string
           id: string
+          medio_pago_original_id: string | null
           monto: number
           observaciones: string | null
           parada_id: string
           pedido_id: string
           referencia: string | null
+          subsanado_administrativo: boolean
+          subsanado_at: string | null
+          subsanado_observaciones: string | null
+          subsanado_por: string | null
           usuario_id: string
         }
         Insert: {
@@ -1535,11 +1543,16 @@ export type Database = {
           foto_comprobante_path?: string | null
           hoja_ruta_id: string
           id?: string
+          medio_pago_original_id?: string | null
           monto?: number
           observaciones?: string | null
           parada_id: string
           pedido_id: string
           referencia?: string | null
+          subsanado_administrativo?: boolean
+          subsanado_at?: string | null
+          subsanado_observaciones?: string | null
+          subsanado_por?: string | null
           usuario_id: string
         }
         Update: {
@@ -1549,11 +1562,16 @@ export type Database = {
           foto_comprobante_path?: string | null
           hoja_ruta_id?: string
           id?: string
+          medio_pago_original_id?: string | null
           monto?: number
           observaciones?: string | null
           parada_id?: string
           pedido_id?: string
           referencia?: string | null
+          subsanado_administrativo?: boolean
+          subsanado_at?: string | null
+          subsanado_observaciones?: string | null
+          subsanado_por?: string | null
           usuario_id?: string
         }
         Relationships: [
