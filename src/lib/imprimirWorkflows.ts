@@ -1,3 +1,5 @@
+import { getPrintMetaHTML } from './printMeta';
+
 const baseStyles = `
   <style>
     @page { size: A4; margin: 15mm; }
