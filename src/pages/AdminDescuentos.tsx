@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useSolicitudesDescuento } from '@/hooks/useSolicitudesDescuento';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { SolicitudCard } from '@/components/admin/SolicitudCard';
@@ -13,6 +13,9 @@ import { supabase } from '@/integrations/supabase/client';
 export default function AdminDescuentos() {
   const { user, hasRole, loading: authLoading } = useAuth();
   const { solicitudes, loading, error, rechazarSolicitud, refetch } = useSolicitudesDescuento();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusSolicitudId = searchParams.get('solicitud');
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const { 
     permission, 
     isSupported, 
@@ -30,6 +33,29 @@ export default function AdminDescuentos() {
 
   // Check admin role
   const isAdmin = hasRole('admin');
+
+  // Listen for FOCUS_SOLICITUD message from service worker
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'FOCUS_SOLICITUD' && event.data.solicitud_id) {
+        setSearchParams({ solicitud: event.data.solicitud_id }, { replace: true });
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handler);
+    return () => navigator.serviceWorker?.removeEventListener('message', handler);
+  }, [setSearchParams]);
+
+  // Scroll & highlight target solicitud when present
+  useEffect(() => {
+    if (!focusSolicitudId || loading) return;
+    const el = document.getElementById(`solicitud-${focusSolicitudId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightId(focusSolicitudId);
+      const t = setTimeout(() => setHighlightId(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [focusSolicitudId, loading, solicitudes]);
 
   // Request notification permission and subscribe on mount if not already subscribed
   useEffect(() => {
@@ -308,12 +334,21 @@ export default function AdminDescuentos() {
           </div>
         ) : (
           solicitudes.map((solicitud) => (
-            <SolicitudCard
+            <div
               key={solicitud.id}
-              solicitud={solicitud}
-              onRechazar={handleRechazar}
-              isProcessing={processingId === solicitud.id}
-            />
+              id={`solicitud-${solicitud.id}`}
+              className={
+                highlightId === solicitud.id
+                  ? 'ring-4 ring-primary rounded-lg transition-all'
+                  : ''
+              }
+            >
+              <SolicitudCard
+                solicitud={solicitud}
+                onRechazar={handleRechazar}
+                isProcessing={processingId === solicitud.id}
+              />
+            </div>
           ))
         )}
       </div>
