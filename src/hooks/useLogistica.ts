@@ -216,7 +216,14 @@ export function useHojasRuta(filtros?: { estado?: HojaRutaEstado; fecha?: string
           *,
           vehiculo:vehiculos(id, patente, marca, modelo),
           chofer:empleados!hojas_ruta_chofer_id_fkey(id, nombre),
-          responsable:empleados!hojas_ruta_responsable_id_fkey(id, nombre)
+          responsable:empleados!hojas_ruta_responsable_id_fkey(id, nombre),
+          paradas:hoja_ruta_paradas(
+            id,
+            pedido:pedidos(
+              id,
+              cliente:clientes(id, zona:zonas(nombre))
+            )
+          )
         `)
         .order('fecha', { ascending: false })
         .order('numero_hoja', { ascending: false });

@@ -102,6 +102,7 @@ interface Cliente {
   nombre: string;
   dni_cuit: string | null;
   condicion_iva?: number;
+  permite_cuenta_corriente?: boolean;
 }
 
 interface Empleado {
@@ -295,7 +296,7 @@ export default function POS() {
       try {
         const { data, error } = await supabase
           .from('clientes')
-          .select('id, nombre, dni_cuit, condicion_iva, lista_precio_id')
+          .select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente')
           .eq('activo', true)
           .or(`nombre.ilike.%${clienteSearchTerm}%,dni_cuit.ilike.%${clienteSearchTerm}%`)
           .order('nombre')
@@ -312,6 +313,13 @@ export default function POS() {
 
     return () => clearTimeout(timer);
   }, [clienteSearchTerm]);
+
+  // Forzar pago directo cuando el cliente no permite cuenta corriente
+  useEffect(() => {
+    if (selectedCliente && selectedCliente.permite_cuenta_corriente === false && clienteModalidadPago === 'cuenta_corriente') {
+      setClienteModalidadPago('pago_directo');
+    }
+  }, [selectedCliente, clienteModalidadPago]);
 
   // Server-side search for employees with debounce
   useEffect(() => {
@@ -349,7 +357,7 @@ export default function POS() {
     try {
       const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
-        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id').eq('activo', true).order('nombre'),
+        supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).neq('destino', 'paladini').order('orden'),
@@ -2548,13 +2556,22 @@ export default function POS() {
                           </Label>
                         </div>
                         <div className="flex items-start space-x-2 p-2 rounded border border-muted hover:bg-muted/50 cursor-pointer">
-                          <RadioGroupItem value="cuenta_corriente" id="cliente-modalidad-cc" className="mt-0.5" />
-                          <Label htmlFor="cliente-modalidad-cc" className="flex-1 cursor-pointer">
+                          <RadioGroupItem
+                            value="cuenta_corriente"
+                            id="cliente-modalidad-cc"
+                            className="mt-0.5"
+                            disabled={selectedCliente?.permite_cuenta_corriente === false}
+                          />
+                          <Label htmlFor="cliente-modalidad-cc" className={`flex-1 cursor-pointer ${selectedCliente?.permite_cuenta_corriente === false ? 'opacity-50' : ''}`}>
                             <div className="flex items-center gap-2">
                               <Wallet className="h-4 w-4 text-secondary-foreground" />
                               <span className="font-medium">Cuenta Corriente</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">Carga el total como deuda</p>
+                            <p className="text-xs text-muted-foreground">
+                              {selectedCliente?.permite_cuenta_corriente === false
+                                ? 'Cliente sin habilitación de CC'
+                                : 'Carga el total como deuda'}
+                            </p>
                           </Label>
                         </div>
                       </RadioGroup>

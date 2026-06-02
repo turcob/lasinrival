@@ -14,6 +14,8 @@ import { FileCheck, Banknote, Smartphone, CreditCard, AlertTriangle, CheckCircle
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getPrintMetaHTML } from '@/lib/printMeta';
+import { formatZonasResumen } from '@/lib/hojaRutaZonas';
+import { SubsanarCobroDialog } from './SubsanarCobroDialog';
 
 interface Cobro {
   id: string;
@@ -22,6 +24,7 @@ interface Cobro {
   forma_pago: { id: string; nombre: string };
   pedido: { id: string; numero_pedido: number; cliente_id: string };
   parada: { id: string };
+  subsanado_administrativo?: boolean | null;
 }
 
 interface ResumenPorMedio {
@@ -45,7 +48,9 @@ export function RendicionHojaRutaDialog({
   numeroHoja,
   onSuccess,
 }: RendicionHojaRutaDialogProps) {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const esAdmin = hasRole('admin') || hasRole('encargado');
+  const [cobroASubsanar, setCobroASubsanar] = useState<Cobro | null>(null);
   const [loading, setLoading] = useState(false);
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [resumen, setResumen] = useState<ResumenPorMedio[]>([]);
@@ -55,6 +60,7 @@ export function RendicionHojaRutaDialog({
   const [totalEntregado, setTotalEntregado] = useState<number>(0);
   const [totalRechazado, setTotalRechazado] = useState<number>(0);
   const [totalDevoluciones, setTotalDevoluciones] = useState<number>(0);
+  const [zonasTitulo, setZonasTitulo] = useState<string>('');
 
   // Montos declarados por el chofer
   const [efectivoDeclarado, setEfectivoDeclarado] = useState<number>(0);
@@ -77,6 +83,7 @@ export function RendicionHojaRutaDialog({
           id,
           monto,
           referencia,
+          subsanado_administrativo,
           forma_pago:formas_pago(id, nombre),
           pedido:pedidos(id, numero_pedido, cliente_id),
           parada:hoja_ruta_paradas(id)
@@ -86,10 +93,11 @@ export function RendicionHojaRutaDialog({
       // También cargar cobros de la tabla legacy
       const { data: paradas } = await supabase
         .from('hoja_ruta_paradas')
-        .select('id, estado, pedido:pedidos(total)')
+        .select('id, estado, pedido:pedidos(total, cliente:clientes(zona:zonas(nombre)))')
         .eq('hoja_ruta_id', hojaRutaId);
       
       const paradasIds = paradas?.map(p => p.id) || [];
+      setZonasTitulo(formatZonasResumen(paradas as any));
 
       // Calcular total entregado vs rechazado por estado de parada
       let entregadoSum = 0;
@@ -461,12 +469,13 @@ export function RendicionHojaRutaDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-primary" />
-            Rendición de Cobranza - Hoja #{numeroHoja}
+            Rendición de Cobranza - Hoja #{numeroHoja}{zonasTitulo ? ` — Zona: ${zonasTitulo}` : ''}
           </DialogTitle>
           <DialogDescription>
             Declara los montos recaudados para cerrar la hoja de ruta
@@ -542,6 +551,41 @@ export function RendicionHojaRutaDialog({
               )}
             </CardContent>
           </Card>
+
+          {/* Reclasificación administrativa de cobros (solo admin/encargado) */}
+          {esAdmin && cobros.filter(c => c.forma_pago.id !== 'legacy').length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Detalle de cobros · Reclasificación administrativa
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  {cobros.filter(c => c.forma_pago.id !== 'legacy').map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 py-1 border-b last:border-0">
+                      <div className="text-xs">
+                        <span className="font-medium">#{c.pedido.numero_pedido || '—'}</span>
+                        {' · '}
+                        <span>{c.forma_pago.nombre}</span>
+                        {c.subsanado_administrativo && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">subsanado</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium">
+                          ${Number(c.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <Button size="sm" variant="ghost" onClick={() => setCobroASubsanar(c)}>
+                          Reclasificar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Montos declarados */}
           <Card>
@@ -674,5 +718,12 @@ export function RendicionHojaRutaDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <SubsanarCobroDialog
+      open={!!cobroASubsanar}
+      onOpenChange={(v) => { if (!v) setCobroASubsanar(null); }}
+      cobro={cobroASubsanar}
+      onSuccess={() => { setCobroASubsanar(null); loadData(); }}
+    />
+    </>
   );
 }

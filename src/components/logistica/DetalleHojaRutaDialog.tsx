@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
 import { getPrintMetaHTML } from '@/lib/printMeta';
+import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 import { Button } from '@/components/ui/button';
 import { 
   useHojaRuta,
@@ -528,7 +529,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       <div class="header">
         <div class="header-title">COBRANZAS POR CLIENTE</div>
         <div class="header-info">
-          <span>Hoja de Ruta #${hoja.numero_hoja}</span>
+          <span>Hoja de Ruta #${hoja.numero_hoja}${formatZonasResumen((hoja as any).paradas) ? ' — Zona: ' + formatZonasResumen((hoja as any).paradas) : ''}</span>
           <span>Fecha: ${fechaHoja}</span>
           <span>Chofer: ${hoja.chofer?.nombre || '-'} | Vehículo: ${hoja.vehiculo?.patente || '-'}</span>
         </div>
@@ -570,7 +571,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Listado Paradas - Ruta #${hoja.numero_hoja}</title>
+        <title>Listado Paradas - Ruta #${hoja.numero_hoja}${formatZonasResumen((hoja as any).paradas) ? ' - ' + formatZonasResumen((hoja as any).paradas) : ''}</title>
         <style>
           @media print {
             body { margin: 0; padding: 0; }
@@ -644,6 +645,11 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
                 Hoja de Ruta #{hojaRuta?.numero_hoja || '...'}
+                {hojaRuta && formatZonasResumen(hojaRuta.paradas as any) && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    — Zona: {formatZonasResumen(hojaRuta.paradas as any)}
+                  </span>
+                )}
               </h2>
               <p className="text-sm text-muted-foreground">Detalle y gestión de entregas</p>
             </div>
