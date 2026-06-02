@@ -529,7 +529,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       <div class="header">
         <div class="header-title">COBRANZAS POR CLIENTE</div>
         <div class="header-info">
-          <span>Hoja de Ruta #${hoja.numero_hoja}</span>
+          <span>Hoja de Ruta #${hoja.numero_hoja}${formatZonasResumen((hoja as any).paradas) ? ' — Zona: ' + formatZonasResumen((hoja as any).paradas) : ''}</span>
           <span>Fecha: ${fechaHoja}</span>
           <span>Chofer: ${hoja.chofer?.nombre || '-'} | Vehículo: ${hoja.vehiculo?.patente || '-'}</span>
         </div>
@@ -571,7 +571,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Listado Paradas - Ruta #${hoja.numero_hoja}</title>
+        <title>Listado Paradas - Ruta #${hoja.numero_hoja}${formatZonasResumen((hoja as any).paradas) ? ' - ' + formatZonasResumen((hoja as any).paradas) : ''}</title>
         <style>
           @media print {
             body { margin: 0; padding: 0; }
