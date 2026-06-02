@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { FileCheck, Banknote, Smartphone, CreditCard, AlertTriangle, CheckCircle, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getPrintMetaHTML } from '@/lib/printMeta';
 
 interface Cobro {
   id: string;
@@ -348,7 +349,7 @@ export function RendicionHojaRutaDialog({
           <div class="firma-box"><div class="linea">Chofer / Repartidor</div></div>
           <div class="firma-box"><div class="linea">Responsable</div></div>
         </div>
-
+        ${getPrintMetaHTML()}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>

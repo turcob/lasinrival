@@ -69,6 +69,7 @@ interface Cliente {
   activo: boolean;
   bloqueado: boolean;
   facturas_adeudadas_bloqueo_override: number | null;
+  permite_cuenta_corriente?: boolean;
   listas_precios?: { nombre: string } | null;
   zonas?: { codigo: string; nombre: string } | null;
   vendedores?: { codigo: string; nombre: string } | null;
@@ -124,6 +125,7 @@ export default function Clientes() {
     numero_terminal_clover: '',
     activo: true,
     facturas_adeudadas_bloqueo_override: '',
+    permite_cuenta_corriente: true,
   });
 
   // Filters
@@ -290,6 +292,7 @@ export default function Clientes() {
         vendedor_id: formData.vendedor_id || null,
         numero_terminal_clover: formData.numero_terminal_clover || null,
         facturas_adeudadas_bloqueo_override: formData.facturas_adeudadas_bloqueo_override ? parseInt(formData.facturas_adeudadas_bloqueo_override) : null,
+        permite_cuenta_corriente: formData.permite_cuenta_corriente,
       };
 
       if (selectedCliente) {
@@ -374,6 +377,7 @@ export default function Clientes() {
       numero_terminal_clover: (cliente as any).numero_terminal_clover || '',
       activo: cliente.activo,
       facturas_adeudadas_bloqueo_override: cliente.facturas_adeudadas_bloqueo_override?.toString() || '',
+      permite_cuenta_corriente: (cliente as any).permite_cuenta_corriente ?? true,
     });
     setDialogOpen(true);
   };
@@ -394,6 +398,7 @@ export default function Clientes() {
       numero_terminal_clover: '',
       activo: true,
       facturas_adeudadas_bloqueo_override: '',
+      permite_cuenta_corriente: true,
     });
   };
 
@@ -612,6 +617,24 @@ export default function Clientes() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Dejar vacío para usar el valor global ({bloqueoConfig.facturas_adeudadas_bloqueo})
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-3 flex items-start gap-3 bg-muted/30">
+                <Switch
+                  id="permite_cc"
+                  checked={formData.permite_cuenta_corriente}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, permite_cuenta_corriente: checked })
+                  }
+                />
+                <div className="flex-1">
+                  <Label htmlFor="permite_cc" className="font-semibold">
+                    Permite facturar en cuenta corriente
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Si está apagado, este cliente solo puede comprar con pago directo (no se le puede facturar a cuenta corriente).
                   </p>
                 </div>
               </div>

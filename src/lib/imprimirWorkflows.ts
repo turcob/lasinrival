@@ -1,3 +1,5 @@
+import { getPrintMetaHTML } from './printMeta';
+
 const baseStyles = `
   <style>
     @page { size: A4; margin: 15mm; }
@@ -141,7 +143,7 @@ export function imprimirWorkflowVentas() {
       </div>
     </div>
 
-    <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+    <div class="footer">Documento generado el ${new Date().toLocaleDateString("es-AR")} — Sistema de Gestión Comercial</div>${getPrintMetaHTML()}
   </body></html>`;
   openPrintWindow(html);
 }
@@ -231,7 +233,7 @@ export function imprimirWorkflowCobros() {
       </div>
     </div>
 
-    <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+    <div class="footer">Documento generado el ${new Date().toLocaleDateString("es-AR")} — Sistema de Gestión Comercial</div>${getPrintMetaHTML()}
   </body></html>`;
   openPrintWindow(html);
 }
@@ -310,7 +312,7 @@ export function imprimirWorkflowLogistica() {
       </div>
     </div>
 
-    <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+    <div class="footer">Documento generado el ${new Date().toLocaleDateString("es-AR")} — Sistema de Gestión Comercial</div>${getPrintMetaHTML()}
   </body></html>`;
   openPrintWindow(html);
 }
@@ -493,7 +495,7 @@ export function imprimirDevolucionesHojaRuta(hojaRuta: any, devoluciones: any[],
       <div class="firma-box"><div class="firma-line"></div><div class="firma-label">Responsable</div></div>
     </div>
 
-    <div class="footer">Documento generado el ${new Date().toLocaleDateString('es-AR')} — Sistema de Gestión Comercial</div>
+    <div class="footer">Documento generado el ${new Date().toLocaleDateString("es-AR")} — Sistema de Gestión Comercial</div>${getPrintMetaHTML()}
 
     <div class="page-break">
       <div class="summary-title">RESUMEN TOTAL POR PRODUCTO</div>

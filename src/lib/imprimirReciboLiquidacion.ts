@@ -1,3 +1,5 @@
+import { getPrintMetaHTML } from './printMeta';
+
 interface ReciboData {
   empleadoNombre: string;
   mes: number;
@@ -249,6 +251,7 @@ export function imprimirReciboLiquidacion(data: ReciboData) {
         <p>Este recibo es comprobante de pago válido. Conserve este documento.</p>
         <p>Emitido el ${new Date().toLocaleString('es-AR')}</p>
       </div>
+      ${getPrintMetaHTML()}
 
       <div class="no-print" style="text-align: center; margin-top: 30px;">
         <button onclick="window.print()" style="padding: 10px 30px; font-size: 14px; cursor: pointer; background: #333; color: white; border: none; border-radius: 5px;">

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { setPrintUserName } from '@/lib/printMeta';
 
 interface Profile {
   id: string;
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileRes.data) {
         setProfile(profileRes.data as Profile);
+        setPrintUserName((profileRes.data as Profile).nombre);
       }
       
       if (rolesRes.data) {
@@ -112,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setPrintUserName(null);
   };
 
   const hasRole = (role: string) => {

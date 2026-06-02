@@ -1,4 +1,5 @@
 import type { ProductoConsolidadoItem } from '@/hooks/useConsolidadoPedidos';
+import { getPrintMetaHTML } from './printMeta';
 
 interface ConsolidadoPrintData {
   noPesables: ProductoConsolidadoItem[];
@@ -84,6 +85,7 @@ export function imprimirConsolidado(data: ConsolidadoPrintData) {
       ${renderSeccion('📦 No Pesables', data.noPesables)}
       ${renderSeccion('❄️ Frescos / Fríos', data.frios)}
       ${renderSeccion('⚖️ Pesables (KG)', data.pesables, true)}
+      ${getPrintMetaHTML()}
     </body>
     </html>
   `;

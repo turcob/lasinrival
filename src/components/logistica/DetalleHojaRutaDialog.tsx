@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
+import { getPrintMetaHTML } from '@/lib/printMeta';
 import { Button } from '@/components/ui/button';
 import { 
   useHojaRuta,
@@ -624,6 +625,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
       </head>
       <body>
         ${paginasHTML}
+        ${getPrintMetaHTML()}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>

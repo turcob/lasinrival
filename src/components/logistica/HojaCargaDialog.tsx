@@ -10,6 +10,7 @@ import { useHojaRuta, useHojaCarga } from '@/hooks/useLogistica';
 import { Printer, Package, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getPrintMetaHTML } from '@/lib/printMeta';
 
 interface HojaCargaDialogProps {
   hojaRutaId: string | null;
@@ -206,6 +207,7 @@ export function HojaCargaDialog({ hojaRutaId, open, onOpenChange }: HojaCargaDia
           <div class="firma-block"><div class="firma-dots"></div><div class="firma-label">Responsable de Carga</div></div>
           <div class="firma-block"><div class="firma-dots"></div><div class="firma-label">Chofer</div></div>
         </div>
+        ${getPrintMetaHTML()}
         <button class="print-button no-print" onclick="window.print()">🖨️ Imprimir</button>
       </body>
       </html>
