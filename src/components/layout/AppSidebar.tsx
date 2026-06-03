@@ -27,7 +27,8 @@ import {
   FileCheck,
   Building2,
   PackageX,
-  Route as RouteIcon
+  Route as RouteIcon,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,6 +78,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Cheques', href: '/cheques', icon: FileCheck, module: 'cheques' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
   { title: 'Reporte Pagos', href: '/reporte-pagos', icon: BarChart3, module: 'clientes' },
+  { title: 'Pendientes de Chofer', href: '/pendientes-chofer', icon: Wallet, module: 'empleados' },
   { title: 'Inventario', href: '/inventario', icon: Archive, module: 'inventario' },
   { title: 'Reportes', href: '/reportes', icon: BarChart3, module: 'reportes' },
 ];
