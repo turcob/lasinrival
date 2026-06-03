@@ -369,6 +369,16 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const montoTotal = parseFloat(monto.replace(',', '.')) || 0;
   const restanteEnCuenta = requiereFormaPago ? Math.max(0, montoTotal - totalLineas) : 0;
 
+  const totalFacturasSeleccionadas = useMemo(() => {
+    return comprasPago
+      .filter(c => facturasPagoSeleccionadas.includes(c.id))
+      .reduce((s, c) => s + Number(c.monto), 0);
+  }, [comprasPago, facturasPagoSeleccionadas]);
+
+  const excedenteAFavor = facturasPagoSeleccionadas.length > 0
+    ? Math.max(0, montoTotal - totalFacturasSeleccionadas)
+    : 0;
+
   const agregarLinea = () => setLineasPago([...lineasPago, nuevaLinea()]);
 
   const eliminarLinea = (id: string) => {
