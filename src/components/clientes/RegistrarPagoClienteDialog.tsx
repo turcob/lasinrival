@@ -1105,6 +1105,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                   )}
                 </p>
               )}
+              {excedenteAFavor > 0 && (
+                <p className="text-xs text-green-600 font-medium">
+                  Se cancelará{facturasPagoSeleccionadas.length > 1 ? 'n' : ''} la{facturasPagoSeleccionadas.length > 1 ? 's' : ''} factura{facturasPagoSeleccionadas.length > 1 ? 's' : ''} seleccionada{facturasPagoSeleccionadas.length > 1 ? 's' : ''} y quedará{' '}
+                  <span className="font-bold">{formatCurrency(excedenteAFavor)}</span> a favor del cliente.
+                </p>
+              )}
             </div>
           )}
 
