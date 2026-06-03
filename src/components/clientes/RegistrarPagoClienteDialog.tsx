@@ -369,6 +369,16 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
   const montoTotal = parseFloat(monto.replace(',', '.')) || 0;
   const restanteEnCuenta = requiereFormaPago ? Math.max(0, montoTotal - totalLineas) : 0;
 
+  const totalFacturasSeleccionadas = useMemo(() => {
+    return comprasPago
+      .filter(c => facturasPagoSeleccionadas.includes(c.id))
+      .reduce((s, c) => s + Number(c.monto), 0);
+  }, [comprasPago, facturasPagoSeleccionadas]);
+
+  const excedenteAFavor = facturasPagoSeleccionadas.length > 0
+    ? Math.max(0, montoTotal - totalFacturasSeleccionadas)
+    : 0;
+
   const agregarLinea = () => setLineasPago([...lineasPago, nuevaLinea()]);
 
   const eliminarLinea = (id: string) => {
@@ -587,6 +597,10 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       conceptoFinal = `Pago imputado a Fact. ${facturasRef}`;
     } else if (facturasRef && conceptoFinal) {
       conceptoFinal = `${conceptoFinal} - Fact. ${facturasRef}`;
+    }
+
+    if (excedenteAFavor > 0) {
+      conceptoFinal = `${conceptoFinal || 'Pago'} - Excedente ${formatCurrency(excedenteAFavor)} a favor del cliente`;
     }
 
     setLoading(true);
@@ -1093,6 +1107,12 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
                   {facturasPagoSeleccionadas.length} factura(s) seleccionada(s) - Total: {formatCurrency(
                     comprasPago.filter(c => facturasPagoSeleccionadas.includes(c.id)).reduce((s, c) => s + c.monto, 0)
                   )}
+                </p>
+              )}
+              {excedenteAFavor > 0 && (
+                <p className="text-xs text-green-600 font-medium">
+                  Se cancelará{facturasPagoSeleccionadas.length > 1 ? 'n' : ''} la{facturasPagoSeleccionadas.length > 1 ? 's' : ''} factura{facturasPagoSeleccionadas.length > 1 ? 's' : ''} seleccionada{facturasPagoSeleccionadas.length > 1 ? 's' : ''} y quedará{' '}
+                  <span className="font-bold">{formatCurrency(excedenteAFavor)}</span> a favor del cliente.
                 </p>
               )}
             </div>
