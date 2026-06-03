@@ -41,6 +41,7 @@ import Devoluciones from "./pages/Devoluciones";
 import DetalleEntregas from "./pages/DetalleEntregas";
 import Encargado from "./pages/Encargado";
 import EncargadoHojaDetalle from "./pages/EncargadoHojaDetalle";
+import PendientesChofer from "./pages/PendientesChofer";
 
 const queryClient = new QueryClient();
 
@@ -105,6 +106,7 @@ function AppRoutes() {
       <Route path="/detalle-entregas" element={<ProtectedRoute><DetalleEntregas /></ProtectedRoute>} />
       <Route path="/encargado" element={<ProtectedRoute redirectPath="/encargado"><Encargado /></ProtectedRoute>} />
       <Route path="/encargado/:id" element={<ProtectedRoute><EncargadoHojaDetalle /></ProtectedRoute>} />
+      <Route path="/pendientes-chofer" element={<ProtectedRoute><PendientesChofer /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
