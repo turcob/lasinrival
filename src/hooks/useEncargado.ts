@@ -225,6 +225,32 @@ export function useRegistrarCobrosEncargado() {
       const devs = (devolucionesVendedor || []).filter(d => d.monto > 0 && (d.descripcion || '').trim());
       if (validos.length === 0 && devs.length === 0) throw new Error('Ingresá al menos un cobro o devolución');
 
+      // Obtener cliente y número de pedido para impactar cuenta corriente
+      const { data: pedidoInfo } = await supabase
+        .from('pedidos')
+        .select('cliente_id, numero_pedido')
+        .eq('id', pedidoId)
+        .maybeSingle();
+
+      // Cargar nombres de las formas de pago utilizadas para clasificar
+      const formaPagoIds = Array.from(new Set(validos.map(v => v.forma_pago_id)));
+      const formasMap = new Map<string, string>();
+      if (formaPagoIds.length > 0) {
+        const { data: formas } = await supabase
+          .from('formas_pago')
+          .select('id, nombre')
+          .in('id', formaPagoIds);
+        (formas ?? []).forEach((f: any) => formasMap.set(f.id, f.nombre));
+      }
+
+      // Obtener número de hoja para el concepto
+      const { data: hojaInfo } = await supabase
+        .from('hojas_ruta')
+        .select('numero_hoja')
+        .eq('id', hojaRutaId)
+        .maybeSingle();
+      const numeroHoja = hojaInfo?.numero_hoja ?? null;
+
       // Subir fotos (si las hay) y armar payload
       const payload: any[] = [];
       for (const c of validos) {
@@ -256,6 +282,34 @@ export function useRegistrarCobrosEncargado() {
       if (payload.length > 0) {
         const { error } = await supabase.from('hoja_ruta_cobros').insert(payload);
         if (error) throw error;
+
+        // Impactar cuenta corriente del cliente EN TIEMPO REAL.
+        // - Efectivo => estado_imputacion = 'confirmado' (impacta saldo al instante)
+        // - Transferencia / QR / Cheque / Tarjeta => 'pendiente' (cae en /imputacion para validar)
+        if (pedidoInfo?.cliente_id) {
+          const concepto = numeroHoja
+            ? `Cobro en entrega - Pedido #${pedidoInfo.numero_pedido ?? '-'} - HR #${numeroHoja}`
+            : `Cobro en entrega - Pedido #${pedidoInfo.numero_pedido ?? '-'}`;
+          const movs = validos.map(c => {
+            const nombreFP = formasMap.get(c.forma_pago_id) ?? '';
+            const tipo = clasificarMedioPago(nombreFP);
+            const esEfectivo = tipo === 'efectivo';
+            return {
+              cliente_id: pedidoInfo.cliente_id,
+              tipo: 'pago' as const,
+              monto: c.monto,
+              concepto,
+              forma_pago_id: c.forma_pago_id,
+              numero_operacion: c.referencia || null,
+              usuario_registro_id: user.id,
+              estado_imputacion: esEfectivo ? 'confirmado' : 'pendiente',
+            };
+          });
+          if (movs.length > 0) {
+            const { error: movErr } = await supabase.from('cliente_movimientos').insert(movs);
+            if (movErr) console.error('[encargado] error impactar cuenta corriente en tiempo real', movErr);
+          }
+        }
       }
 
       // Devoluciones del vendedor (descuento aplicado al cobro)
