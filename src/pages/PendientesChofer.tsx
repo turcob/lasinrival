@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, Ban, Wallet } from 'lucide-react';
+import { CheckCircle2, Ban } from 'lucide-react';
 
 const ESTADO_BADGE: Record<ChoferPendiente['estado'], { label: string; variant: any }> = {
   pendiente: { label: 'Pendiente', variant: 'destructive' },
@@ -68,7 +68,6 @@ export default function PendientesChofer() {
       <PageHeader
         title="Pendientes de Chofer"
         description="Faltantes de efectivo registrados al aprobar rendiciones. Se descuentan manualmente en la liquidación mensual."
-        icon={Wallet}
       />
 
       <div className="flex flex-wrap items-end gap-3 mb-4">
