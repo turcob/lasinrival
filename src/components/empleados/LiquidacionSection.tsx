@@ -25,6 +25,10 @@ import * as XLSX from 'xlsx';
 import { PagarLiquidacionDialog } from './PagarLiquidacionDialog';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { imprimirReciboLiquidacion } from '@/lib/imprimirReciboLiquidacion';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 
 interface Empleado {
   id: string;
@@ -40,6 +44,7 @@ interface LiquidacionData {
   total_adelantos: number;
   total_comisiones: number;
   neto_a_pagar: number;
+  pendientes_chofer?: Array<{ id: string; monto: number; concepto: string; fecha: string }>;
   liquidacion_existente?: {
     id: string;
     estado: string;
@@ -74,6 +79,12 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  // Diálogo para elegir qué pendientes del chofer descontar
+  const [pendientesDialog, setPendientesDialog] = useState<{
+    liq: LiquidacionData;
+    seleccionados: Set<string>;
+  } | null>(null);
   
   // Payment dialog state
   const [pagarDialogOpen, setPagarDialogOpen] = useState(false);
@@ -116,6 +127,13 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
         .eq('mes', selectedMes)
         .eq('anio', selectedAnio);
 
+      // Fetch pendientes_chofer aún sin descontar (estado=pendiente) para los empleados activos
+      const { data: pendientesChofer } = await (supabase as any)
+        .from('chofer_pendientes')
+        .select('id, empleado_id, monto, concepto, fecha')
+        .eq('estado', 'pendiente')
+        .in('empleado_id', empleadosActivos.map(e => e.id));
+
       const liquidacionesData: LiquidacionData[] = empleadosActivos.map(emp => {
         const empMovimientos = movimientos?.filter(m => m.empleado_id === emp.id) || [];
         
@@ -136,6 +154,10 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
 
         const liquidacion_existente = liquidacionesExistentes?.find(l => l.empleado_id === emp.id);
 
+        const pendientes_chofer = (pendientesChofer ?? [])
+          .filter((p: any) => p.empleado_id === emp.id)
+          .map((p: any) => ({ id: p.id, monto: Number(p.monto), concepto: p.concepto, fecha: p.fecha }));
+
         return {
           empleado: emp,
           sueldo_base,
@@ -143,6 +165,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           total_adelantos,
           total_comisiones,
           neto_a_pagar,
+          pendientes_chofer,
           liquidacion_existente: liquidacion_existente ? {
             id: liquidacion_existente.id,
             estado: liquidacion_existente.estado,
@@ -159,23 +182,33 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     }
   };
 
-  const generarLiquidacion = async (data: LiquidacionData) => {
+  const generarLiquidacion = async (data: LiquidacionData, pendientesIds: string[] = []) => {
     if (!user) return;
     setProcessingId(data.empleado.id);
 
     try {
+      // Calcular monto de pendientes seleccionados para descontar
+      const pendientesSeleccionados = (data.pendientes_chofer ?? []).filter(p => pendientesIds.includes(p.id));
+      const totalPendientes = pendientesSeleccionados.reduce((s, p) => s + p.monto, 0);
+      const total_descuentos = data.total_compras + data.total_adelantos + totalPendientes;
+      const neto_final = data.sueldo_base + data.total_comisiones - total_descuentos;
+
       // Create liquidacion record
-      const { error: liqError } = await supabase.from('empleado_liquidaciones').insert([{
-        empleado_id: data.empleado.id,
-        mes: selectedMes,
-        anio: selectedAnio,
-        sueldo_base: data.sueldo_base,
-        total_descuentos: data.total_compras + data.total_adelantos,
-        total_comisiones: data.total_comisiones,
-        neto_a_pagar: data.neto_a_pagar,
-        estado: 'pendiente',
-        usuario_id: user.id,
-      }]);
+      const { data: liqInsertada, error: liqError } = await supabase
+        .from('empleado_liquidaciones')
+        .insert([{
+          empleado_id: data.empleado.id,
+          mes: selectedMes,
+          anio: selectedAnio,
+          sueldo_base: data.sueldo_base,
+          total_descuentos,
+          total_comisiones: data.total_comisiones,
+          neto_a_pagar: neto_final,
+          estado: 'pendiente',
+          usuario_id: user.id,
+        }])
+        .select('id')
+        .single();
 
       if (liqError) {
         if (liqError.code === '23505') {
@@ -184,6 +217,15 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           throw liqError;
         }
         return;
+      }
+
+      // Marcar pendientes seleccionados como descontados
+      if (pendientesIds.length > 0 && liqInsertada?.id) {
+        const { error: pErr } = await (supabase as any)
+          .from('chofer_pendientes')
+          .update({ estado: 'descontado', liquidacion_id: liqInsertada.id })
+          .in('id', pendientesIds);
+        if (pErr) console.error('Error al marcar pendientes como descontados', pErr);
       }
 
       // Create liquidacion movement to clear the account
@@ -206,6 +248,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
       toast.error('Error al generar la liquidación');
     } finally {
       setProcessingId(null);
+      setPendientesDialog(null);
     }
   };
 
@@ -369,10 +412,20 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                       {!liq.liquidacion_existente ? (
                         <Button 
                           size="sm" 
-                          onClick={() => generarLiquidacion(liq)}
+                          onClick={() => {
+                            if ((liq.pendientes_chofer?.length ?? 0) > 0) {
+                              setPendientesDialog({ liq, seleccionados: new Set(liq.pendientes_chofer!.map(p => p.id)) });
+                            } else {
+                              generarLiquidacion(liq);
+                            }
+                          }}
                           disabled={processingId === liq.empleado.id}
                         >
-                          {processingId === liq.empleado.id ? 'Generando...' : 'Generar'}
+                          {processingId === liq.empleado.id
+                            ? 'Generando...'
+                            : (liq.pendientes_chofer?.length ?? 0) > 0
+                              ? `Generar (${liq.pendientes_chofer!.length} pend.)`
+                              : 'Generar'}
                         </Button>
                       ) : liq.liquidacion_existente.estado === 'pendiente' ? (
                         <Button 
@@ -428,6 +481,53 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           userId={user.id}
         />
       )}
+
+      {/* Diálogo para seleccionar pendientes del chofer */}
+      <Dialog open={!!pendientesDialog} onOpenChange={(v) => { if (!v) setPendientesDialog(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Pendientes de Chofer — {pendientesDialog?.liq.empleado.nombre}</DialogTitle>
+          </DialogHeader>
+          {pendientesDialog && (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {pendientesDialog.liq.pendientes_chofer!.map(p => {
+                const checked = pendientesDialog.seleccionados.has(p.id);
+                return (
+                  <label key={p.id} className="flex items-start gap-3 p-2 rounded border cursor-pointer hover:bg-muted/50">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) => {
+                        const next = new Set(pendientesDialog.seleccionados);
+                        if (v) next.add(p.id); else next.delete(p.id);
+                        setPendientesDialog({ ...pendientesDialog, seleccionados: next });
+                      }}
+                    />
+                    <div className="flex-1 text-sm">
+                      <div className="font-medium">{p.concepto}</div>
+                      <div className="text-xs text-muted-foreground">{p.fecha}</div>
+                    </div>
+                    <div className="font-semibold text-destructive">
+                      ${p.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendientesDialog(null)}>Cancelar</Button>
+            <Button
+              onClick={() => pendientesDialog && generarLiquidacion(
+                pendientesDialog.liq,
+                Array.from(pendientesDialog.seleccionados),
+              )}
+              disabled={processingId === pendientesDialog?.liq.empleado.id}
+            >
+              Generar liquidación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -1065,6 +1065,174 @@ export function useRendicionHojaRuta(hojaRutaId: string | undefined) {
   });
 }
 
+// ============== APROBAR / RECHAZAR RENDICIÓN ==============
+// Al aprobar, si la diferencia de efectivo es negativa (faltó), genera un
+// pendiente del chofer que luego se descuenta manualmente en la liquidación.
+export function useAprobarRendicion() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({
+      rendicionId,
+      decision,
+      observaciones,
+    }: {
+      rendicionId: string;
+      decision: 'aprobada' | 'rechazada';
+      observaciones?: string;
+    }) => {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: rendicion, error: rErr } = await supabase
+        .from('hoja_ruta_rendiciones')
+        .select('id, hoja_ruta_id, total_efectivo, observaciones, estado')
+        .eq('id', rendicionId)
+        .maybeSingle();
+      if (rErr) throw rErr;
+      if (!rendicion) throw new Error('Rendición no encontrada');
+
+      // Actualizar estado de la rendición
+      const { error: upErr } = await supabase
+        .from('hoja_ruta_rendiciones')
+        .update({
+          estado: decision,
+          observaciones: observaciones ?? rendicion.observaciones,
+        } as any)
+        .eq('id', rendicionId);
+      if (upErr) throw upErr;
+
+      if (decision !== 'aprobada') return { rendicion, pendienteCreado: false };
+
+      // Si aprobada → calcular faltante de efectivo y crear pendiente del chofer
+      const { data: hoja } = await supabase
+        .from('hojas_ruta')
+        .select('id, numero_hoja, chofer_id, responsable_id')
+        .eq('id', rendicion.hoja_ruta_id)
+        .maybeSingle();
+
+      const empleadoId = hoja?.chofer_id ?? hoja?.responsable_id ?? null;
+      if (!empleadoId) return { rendicion, pendienteCreado: false };
+
+      // Efectivo esperado = suma de hoja_ruta_cobros cuyo forma_pago sea "efectivo"
+      const { data: cobros } = await supabase
+        .from('hoja_ruta_cobros')
+        .select('monto, forma_pago:formas_pago(nombre)')
+        .eq('hoja_ruta_id', rendicion.hoja_ruta_id);
+
+      const esperadoEfectivo = (cobros ?? [])
+        .filter((c: any) => {
+          const n = (c.forma_pago?.nombre ?? '').toLowerCase();
+          return n.includes('efectivo');
+        })
+        .reduce((s: number, c: any) => s + Number(c.monto), 0);
+
+      const declaradoEfectivo = Number(rendicion.total_efectivo ?? 0);
+      const faltante = esperadoEfectivo - declaradoEfectivo;
+
+      if (faltante > 0.01) {
+        const { error: pErr } = await (supabase as any)
+          .from('chofer_pendientes')
+          .insert({
+            empleado_id: empleadoId,
+            hoja_ruta_id: rendicion.hoja_ruta_id,
+            rendicion_id: rendicion.id,
+            monto: faltante,
+            concepto: `Faltante de efectivo - HR #${hoja?.numero_hoja ?? '-'}`,
+            usuario_registro_id: user.id,
+          });
+        if (pErr) throw pErr;
+        return { rendicion, pendienteCreado: true, faltante };
+      }
+
+      return { rendicion, pendienteCreado: false };
+    },
+    onSuccess: (res, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['rendicion-hoja-ruta'] });
+      queryClient.invalidateQueries({ queryKey: ['chofer-pendientes'] });
+      if (res.pendienteCreado) {
+        toast({
+          title: 'Rendición aprobada',
+          description: `Se generó un pendiente del chofer por $${Number(res.faltante).toLocaleString('es-AR', { minimumFractionDigits: 2 })}.`,
+        });
+      } else {
+        toast({ title: vars.decision === 'aprobada' ? 'Rendición aprobada' : 'Rendición rechazada' });
+      }
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+}
+
+// ============== PENDIENTES DE CHOFER ==============
+export interface ChoferPendiente {
+  id: string;
+  empleado_id: string;
+  hoja_ruta_id: string;
+  rendicion_id: string | null;
+  monto: number;
+  concepto: string;
+  fecha: string;
+  estado: 'pendiente' | 'descontado' | 'saldado_manual' | 'anulado';
+  liquidacion_id: string | null;
+  observaciones: string | null;
+  created_at: string;
+  empleado?: { id: string; nombre: string } | null;
+  hoja_ruta?: { numero_hoja: number } | null;
+}
+
+export function useChoferPendientes(params?: {
+  empleadoId?: string;
+  estado?: ChoferPendiente['estado'] | 'todos';
+}) {
+  return useQuery({
+    queryKey: ['chofer-pendientes', params],
+    queryFn: async () => {
+      let q = (supabase as any)
+        .from('chofer_pendientes')
+        .select(`
+          *,
+          empleado:empleados(id, nombre),
+          hoja_ruta:hojas_ruta(numero_hoja)
+        `)
+        .order('created_at', { ascending: false });
+      if (params?.empleadoId) q = q.eq('empleado_id', params.empleadoId);
+      if (params?.estado && params.estado !== 'todos') q = q.eq('estado', params.estado);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as ChoferPendiente[];
+    },
+  });
+}
+
+export function useActualizarChoferPendiente() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      estado,
+      observaciones,
+    }: {
+      id: string;
+      estado: ChoferPendiente['estado'];
+      observaciones?: string;
+    }) => {
+      const patch: Record<string, unknown> = { estado };
+      if (observaciones !== undefined) patch.observaciones = observaciones;
+      const { error } = await (supabase as any)
+        .from('chofer_pendientes')
+        .update(patch)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chofer-pendientes'] });
+      toast({ title: 'Pendiente actualizado' });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+}
+
 // ============== DEVOLUCIONES QUERY ==============
 export function useDevolucionesParada(paradaId: string | undefined) {
   return useQuery({

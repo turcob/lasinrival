@@ -442,6 +442,54 @@ export type Database = {
           },
         ]
       }
+      chofer_pendientes: {
+        Row: {
+          concepto: string
+          created_at: string
+          empleado_id: string
+          estado: string
+          fecha: string
+          hoja_ruta_id: string
+          id: string
+          liquidacion_id: string | null
+          monto: number
+          observaciones: string | null
+          rendicion_id: string | null
+          updated_at: string
+          usuario_registro_id: string
+        }
+        Insert: {
+          concepto: string
+          created_at?: string
+          empleado_id: string
+          estado?: string
+          fecha?: string
+          hoja_ruta_id: string
+          id?: string
+          liquidacion_id?: string | null
+          monto: number
+          observaciones?: string | null
+          rendicion_id?: string | null
+          updated_at?: string
+          usuario_registro_id: string
+        }
+        Update: {
+          concepto?: string
+          created_at?: string
+          empleado_id?: string
+          estado?: string
+          fecha?: string
+          hoja_ruta_id?: string
+          id?: string
+          liquidacion_id?: string | null
+          monto?: number
+          observaciones?: string | null
+          rendicion_id?: string | null
+          updated_at?: string
+          usuario_registro_id?: string
+        }
+        Relationships: []
+      }
       cliente_movimiento_imputaciones: {
         Row: {
           created_at: string | null
