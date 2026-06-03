@@ -599,6 +599,10 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
       conceptoFinal = `${conceptoFinal} - Fact. ${facturasRef}`;
     }
 
+    if (excedenteAFavor > 0) {
+      conceptoFinal = `${conceptoFinal || 'Pago'} - Excedente ${formatCurrency(excedenteAFavor)} a favor del cliente`;
+    }
+
     setLoading(true);
     try {
       if (requiereFormaPago && !requiereSelectorCompra && !(esNotaCredito && ncLibre)) {
