@@ -198,6 +198,15 @@ export function RegistrarPagoClienteDialog({ open, onOpenChange, clienteId, onSu
     }
   }, [tipo, open, clienteId]);
 
+  // Auto-actualizar el monto total a pagar con la suma de las facturas seleccionadas
+  useEffect(() => {
+    if (facturasPagoSeleccionadas.length === 0) return;
+    const total = comprasPago
+      .filter(c => facturasPagoSeleccionadas.includes(c.id))
+      .reduce((s, c) => s + Number(c.monto), 0);
+    setMonto(total.toFixed(2));
+  }, [facturasPagoSeleccionadas, comprasPago]);
+
   useEffect(() => {
     if (compraSeleccionada) {
       const compra = comprasCliente.find(c => c.id === compraSeleccionada);
