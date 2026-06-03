@@ -614,44 +614,8 @@ export function useGuardarRendicion() {
       } else {
         const { error } = await supabase.from('hoja_ruta_rendiciones').insert(row);
         if (error) throw error;
-
-        // Impactar cuenta corriente en la primera rendición
-        if (impactarCuentaCorriente) {
-          const { data: cobros } = await supabase
-            .from('hoja_ruta_cobros')
-            .select(`monto, forma_pago_id, pedido:pedidos(numero_pedido, cliente_id)`)
-            .eq('hoja_ruta_id', hojaRutaId);
-
-          const porCliente = new Map<string, { total: number; formaPagoId: string | null; pedidos: number[] }>();
-          (cobros ?? []).forEach((c: any) => {
-            const clienteId = c.pedido?.cliente_id;
-            if (!clienteId) return;
-            const cur = porCliente.get(clienteId) ?? { total: 0, formaPagoId: c.forma_pago_id ?? null, pedidos: [] };
-            cur.total += Number(c.monto);
-            const num = c.pedido?.numero_pedido;
-            if (num && !cur.pedidos.includes(num)) cur.pedidos.push(num);
-            porCliente.set(clienteId, cur);
-          });
-
-          const movimientos = Array.from(porCliente.entries())
-            .filter(([_, v]) => v.total > 0)
-            .map(([clienteId, v]) => ({
-              cliente_id: clienteId,
-              tipo: 'pago',
-              monto: v.total,
-              concepto: v.pedidos.length
-                ? `Cobro en entrega - Pedido(s) #${v.pedidos.join(', #')} - HR #${numeroHoja}`
-                : `Cobro en entrega - HR #${numeroHoja}`,
-              forma_pago_id: v.formaPagoId,
-              usuario_registro_id: user.id,
-              estado_imputacion: 'confirmado',
-            }));
-
-          if (movimientos.length) {
-            const { error: movErr } = await supabase.from('cliente_movimientos').insert(movimientos);
-            if (movErr) console.error('[encargado] error impactar cuenta corriente', movErr);
-          }
-        }
+        // NOTA: el impacto en cuenta corriente ya se realiza en tiempo real al registrar
+        // cada cobro (useRegistrarCobrosEncargado). La rendición es solo control.
       }
 
       // Asegurar que la hoja queda completada
