@@ -16,6 +16,7 @@ import { es } from 'date-fns/locale';
 import { getPrintMetaHTML } from '@/lib/printMeta';
 import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 import { SubsanarCobroDialog } from './SubsanarCobroDialog';
+import { useAprobarRendicion } from '@/hooks/useLogistica';
 
 interface Cobro {
   id: string;
@@ -50,6 +51,7 @@ export function RendicionHojaRutaDialog({
 }: RendicionHojaRutaDialogProps) {
   const { user, hasRole } = useAuth();
   const esAdmin = hasRole('admin') || hasRole('encargado');
+  const aprobarRendicion = useAprobarRendicion();
   const [cobroASubsanar, setCobroASubsanar] = useState<Cobro | null>(null);
   const [loading, setLoading] = useState(false);
   const [cobros, setCobros] = useState<Cobro[]>([]);
@@ -648,6 +650,42 @@ export function RendicionHojaRutaDialog({
             }>
               Estado: {rendicionExistente.estado.charAt(0).toUpperCase() + rendicionExistente.estado.slice(1)}
             </Badge>
+          )}
+
+          {/* Acciones de aprobación (solo admin/encargado, sobre rendiciones pendientes) */}
+          {esAdmin && rendicionExistente && rendicionExistente.estado === 'pendiente' && (
+            <div className="flex gap-2 border-t pt-3">
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  await aprobarRendicion.mutateAsync({
+                    rendicionId: rendicionExistente.id,
+                    decision: 'rechazada',
+                    observaciones,
+                  });
+                  onSuccess();
+                  onOpenChange(false);
+                }}
+                disabled={aprobarRendicion.isPending}
+              >
+                Rechazar rendición
+              </Button>
+              <Button
+                onClick={async () => {
+                  await aprobarRendicion.mutateAsync({
+                    rendicionId: rendicionExistente.id,
+                    decision: 'aprobada',
+                    observaciones,
+                  });
+                  onSuccess();
+                  onOpenChange(false);
+                }}
+                disabled={aprobarRendicion.isPending}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Aprobar rendición
+              </Button>
+            </div>
           )}
 
           <div className="flex justify-end gap-3">
