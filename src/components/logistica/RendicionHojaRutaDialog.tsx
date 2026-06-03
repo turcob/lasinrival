@@ -394,61 +394,8 @@ export function RendicionHojaRutaDialog({
       } else {
         const { error } = await supabase.from('hoja_ruta_rendiciones').insert(rendicionData);
         if (error) throw error;
-
-        // Solo impactar cuenta corriente en la primera rendición (no al actualizar)
-        // Agrupar cobros por cliente para crear un movimiento consolidado por cliente
-        const cobrosPorCliente = new Map<string, { 
-          clienteId: string; 
-          total: number; 
-          formaPagoId: string | null;
-          pedidosNums: number[];
-        }>();
-
-        cobros.forEach(cobro => {
-          if (cobro.pedido.cliente_id) {
-            const existing = cobrosPorCliente.get(cobro.pedido.cliente_id);
-            if (existing) {
-              existing.total += cobro.monto;
-              if (cobro.pedido.numero_pedido > 0 && !existing.pedidosNums.includes(cobro.pedido.numero_pedido)) {
-                existing.pedidosNums.push(cobro.pedido.numero_pedido);
-              }
-            } else {
-              cobrosPorCliente.set(cobro.pedido.cliente_id, {
-                clienteId: cobro.pedido.cliente_id,
-                total: cobro.monto,
-                formaPagoId: cobro.forma_pago.id !== 'legacy' ? cobro.forma_pago.id : null,
-                pedidosNums: cobro.pedido.numero_pedido > 0 ? [cobro.pedido.numero_pedido] : [],
-              });
-            }
-          }
-        });
-
-        // Crear movimientos de pago en cuenta corriente para cada cliente
-        const movimientos = Array.from(cobrosPorCliente.values())
-          .filter(c => c.total > 0)
-          .map(c => ({
-            cliente_id: c.clienteId,
-            tipo: 'pago',
-            monto: c.total,
-            concepto: c.pedidosNums.length > 0 
-              ? `Cobro en entrega - Pedido(s) #${c.pedidosNums.join(', #')} - HR #${numeroHoja}`
-              : `Cobro en entrega - Hoja Ruta #${numeroHoja}`,
-            forma_pago_id: c.formaPagoId,
-            usuario_registro_id: user.id,
-            estado_imputacion: 'confirmado',
-          }));
-
-        if (movimientos.length > 0) {
-          const { error: movError } = await supabase
-            .from('cliente_movimientos')
-            .insert(movimientos);
-          
-          if (movError) {
-            console.error('Error al impactar cuenta corriente:', movError);
-            // No lanzamos error para no bloquear la rendición
-            toast.warning('Rendición guardada, pero hubo un error al impactar cuenta corriente');
-          }
-        }
+        // NOTA: el impacto en cuenta corriente se realiza en tiempo real al
+        // registrar cada cobro en la app del cobrador (clasificado por medio).
       }
 
       // Actualizar estado de la hoja de ruta a "completada"
