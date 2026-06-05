@@ -420,7 +420,7 @@ function buildFacturaHTML(datos: DatosRemito): string {
       <td class="cell mono">${linea.codigo}</td>
       <td class="cell">${linea.descripcion}</td>
       <td class="cell center">${linea.unidadMedida || 'UNI'}</td>
-      <td class="cell center">${linea.descuento > 0 ? linea.descuento.toFixed(0) + '%' : ''}</td>
+      <td class="cell center">${linea.descuento > 0 ? (Math.round(linea.descuento * 100) / 100).toString() + '%' : ''}</td>
       <td class="cell center bold">${linea.cantidad}</td>
       <td class="cell right">${formatCurrency(linea.precioUnitario)}</td>
       <td class="cell right bold">${formatCurrency(linea.subtotal)}</td>
