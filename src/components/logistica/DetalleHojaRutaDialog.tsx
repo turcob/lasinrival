@@ -397,6 +397,42 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   type ParadaListado = NonNullable<HojaRuta['paradas']>[number];
   type ItemListado = { parada: ParadaListado; aCobrar: number; rechazado: number; cobrado: number; saldo: number; medios: Array<[string, number]> };
 
+  const handleReimprimirRemito = (pedido: any) => {
+    if (!pedido) return;
+    const zonaNombre = pedido.cliente?.zona?.nombre;
+    imprimirRemito({
+      numeroPedido: pedido.numero_pedido,
+      fecha: new Date(pedido.fecha_pedido),
+      cliente: {
+        nombre: pedido.cliente?.nombre || '-',
+        codigoCliente: pedido.cliente?.codigo_cliente || undefined,
+        direccion: pedido.cliente?.direccion || '',
+        localidad: pedido.cliente?.localidad || undefined,
+        cuit: pedido.cliente?.dni_cuit || '',
+        zona: zonaNombre || undefined,
+      },
+      vendedor: pedido.vendedor?.nombre,
+      empresa: empresaConfig ? {
+        razonSocial: empresaConfig.nombre_fantasia || empresaConfig.razon_social,
+        cuit: empresaConfig.cuit,
+        direccion: [empresaConfig.direccion, empresaConfig.localidad, empresaConfig.provincia].filter(Boolean).join(', '),
+        telefono: empresaConfig.telefono || undefined,
+      } : undefined,
+      lineas: (pedido.detalles || [])
+        .filter((d: any) => d.producto)
+        .map((d: any) => ({
+          codigo: d.producto.codigo_articulo,
+          descripcion: d.producto.descripcion,
+          unidadMedida: d.producto.unidad_medida || 'UNI',
+          cantidad: d.cantidad_pedida,
+          precioUnitario: d.precio_unitario,
+          descuento: d.descuento_porcentaje ?? 0,
+          subtotal: d.subtotal,
+        })),
+      total: pedido.total,
+    });
+  };
+
   const imprimirListadoParadas = (hoja: HojaRuta) => {
     const ventana = window.open('', '_blank', 'width=900,height=600');
     if (!ventana) {
