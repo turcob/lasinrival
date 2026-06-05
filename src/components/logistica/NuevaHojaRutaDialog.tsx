@@ -179,7 +179,7 @@ export function NuevaHojaRutaDialog({ open, onOpenChange }: NuevaHojaRutaDialogP
           cuit: pedido.cliente?.dni_cuit || '',
           zona: zonaNombre || undefined,
         },
-        vendedor: undefined,
+        vendedor: pedido.vendedor?.nombre,
         empresa: empresaConfig ? {
           razonSocial: empresaConfig.nombre_fantasia || empresaConfig.razon_social,
           cuit: empresaConfig.cuit,
