@@ -925,6 +925,17 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
                               <span className="font-mono font-semibold">
                                 #{parada.pedido?.numero_pedido}
                               </span>
+                              {parada.pedido && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => handleReimprimirRemito(parada.pedido)}
+                                >
+                                  <Printer className="h-3 w-3 mr-1" />
+                                  Remito
+                                </Button>
+                              )}
                               <IconEstado className={`h-4 w-4 ${estadoConfig.className}`} />
                               <span className={`text-sm ${estadoConfig.className}`}>
                                 {estadoConfig.label}
