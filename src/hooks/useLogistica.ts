@@ -848,7 +848,7 @@ export function usePedidosDisponiblesParaRuta() {
         .select(`
           id, numero_pedido, fecha_pedido, total, estado, tipo_pedido, observaciones,
           cliente:clientes(id, nombre, direccion, localidad, telefono, zona_id, vendedor_id, codigo_cliente, dni_cuit),
-          vendedor_id
+          vendedor:vendedores(id, nombre)
         `)
         .eq('estado', 'preparado');  // Solo pedidos preparados
 
