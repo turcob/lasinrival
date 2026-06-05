@@ -98,6 +98,7 @@ export function DetalleHojaRutaDialog({ hojaRutaId, open, onOpenChange }: Detall
   const actualizarParada = useActualizarEstadoParada();
   const eliminarParada = useEliminarParada();
   const actualizarHojaRuta = useActualizarHojaRuta();
+  const { config: empresaConfig } = useConfiguracionComercio();
 
   // Reasignación de responsable
   const [reasignarOpen, setReasignarOpen] = useState(false);
