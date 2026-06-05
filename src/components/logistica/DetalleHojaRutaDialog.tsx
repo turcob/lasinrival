@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { imprimirDevolucionesHojaRuta } from '@/lib/imprimirWorkflows';
 import { getPrintMetaHTML } from '@/lib/printMeta';
+import { imprimirRemito } from '@/lib/imprimirRemito';
+import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
 import { formatZonasResumen } from '@/lib/hojaRutaZonas';
 import { Button } from '@/components/ui/button';
 import { 
