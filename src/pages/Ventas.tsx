@@ -487,7 +487,7 @@ export default function Ventas() {
       setAnularDialogOpen(false);
       setMotivoAnulacion('');
       setSelectedVenta(null);
-      fetchVentas(isAdmin);
+      fetchVentas();
       setRefreshTotales(prev => prev + 1);
     } catch (error) {
       console.error('Error anulando venta:', error);
