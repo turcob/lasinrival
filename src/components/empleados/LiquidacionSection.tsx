@@ -139,6 +139,49 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
         .eq('estado', 'pendiente')
         .in('empleado_id', empleadosActivos.map(e => e.id));
 
+      // Vendedores vinculados a los empleados (para cruzar pedidos)
+      const { data: vendedoresData } = await supabase
+        .from('vendedores')
+        .select('id, empleado_id')
+        .in('empleado_id', empleadosActivos.map(e => e.id));
+      const vendedorIds = (vendedoresData ?? []).map((v: any) => v.id);
+      const vendedorByEmpleado = new Map<string, string[]>();
+      (vendedoresData ?? []).forEach((v: any) => {
+        const arr = vendedorByEmpleado.get(v.empleado_id) ?? [];
+        arr.push(v.id);
+        vendedorByEmpleado.set(v.empleado_id, arr);
+      });
+
+      // Pedidos despachados (web/reparto) entregados en el rango
+      const endDateNext = new Date(endDate);
+      endDateNext.setDate(endDateNext.getDate() + 1);
+      const endDateNextStr = endDateNext.toISOString().split('T')[0];
+
+      let pedidosDespachados: any[] = [];
+      if (vendedorIds.length > 0) {
+        const { data: pedData } = await supabase
+          .from('pedidos')
+          .select('id, vendedor_id, total, estado, fecha_entrega_real, fecha_pedido, tipo_pedido')
+          .in('vendedor_id', vendedorIds)
+          .eq('estado', 'despachado');
+        pedidosDespachados = (pedData ?? []).filter((p: any) => {
+          const f = p.fecha_entrega_real || p.fecha_pedido;
+          if (!f) return false;
+          const fd = f.split('T')[0];
+          return fd >= startDate && fd <= endDate;
+        });
+      }
+
+      // Ventas tradicionales confirmadas del empleado
+      const { data: ventasData } = await supabase
+        .from('ventas')
+        .select('id, empleado_id, total, estado, anulada, fecha')
+        .in('empleado_id', empleadosActivos.map(e => e.id))
+        .eq('anulada', false)
+        .eq('estado', 'confirmada')
+        .gte('fecha', startDate)
+        .lte('fecha', endDateNextStr);
+
       const liquidacionesData: LiquidacionData[] = empleadosActivos.map(emp => {
         const empMovimientos = movimientos?.filter(m => m.empleado_id === emp.id) || [];
         
@@ -150,9 +193,21 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           .filter(m => m.tipo === 'adelanto')
           .reduce((sum, m) => sum + Number(m.monto), 0);
         
-        const total_comisiones = empMovimientos
+        const comision_manual = empMovimientos
           .filter(m => m.tipo === 'comision')
           .reduce((sum, m) => sum + Number(m.monto), 0);
+
+        // Cálculo automático
+        const vendIds = vendedorByEmpleado.get(emp.id) ?? [];
+        const ventas_web_monto = pedidosDespachados
+          .filter((p: any) => vendIds.includes(p.vendedor_id))
+          .reduce((s: number, p: any) => s + Number(p.total || 0), 0);
+        const ventas_tradicional_monto = (ventasData ?? [])
+          .filter((v: any) => v.empleado_id === emp.id)
+          .reduce((s: number, v: any) => s + Number(v.total || 0), 0);
+        const comision_porcentaje = Number(emp.comision_porcentaje || 0);
+        const comision_auto = (ventas_web_monto + ventas_tradicional_monto) * (comision_porcentaje / 100);
+        const total_comisiones = comision_manual + comision_auto;
 
         const sueldo_base = Number(emp.sueldo_base) || 0;
         const neto_a_pagar = sueldo_base + total_comisiones - total_compras - total_adelantos;
@@ -182,6 +237,11 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           total_compras,
           total_adelantos,
           total_comisiones,
+          comision_porcentaje,
+          ventas_web_monto,
+          ventas_tradicional_monto,
+          comision_auto,
+          comision_manual,
           neto_a_pagar,
           pendientes_chofer,
           overlap,
