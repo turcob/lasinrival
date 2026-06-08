@@ -314,21 +314,44 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="comision_porcentaje">Comisión (%)</Label>
-            <Input
-              id="comision_porcentaje"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={formData.comision_porcentaje}
-              onChange={(e) => setFormData({ ...formData, comision_porcentaje: e.target.value })}
-              placeholder="0.00"
-            />
-            <p className="text-xs text-muted-foreground">
-              Porcentaje aplicado sobre las ventas del empleado para el cálculo de comisiones en liquidaciones.
-            </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="comision_porcentaje">Comisión (%)</Label>
+              <Input
+                id="comision_porcentaje"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={formData.comision_porcentaje}
+                onChange={(e) => setFormData({ ...formData, comision_porcentaje: e.target.value })}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Porcentaje aplicado sobre las ventas del empleado para el cálculo de comisiones en liquidaciones.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tipo_liquidacion">Tipo de Liquidación</Label>
+              <Select
+                value={formData.tipo_liquidacion}
+                onValueChange={(value) => setFormData({ ...formData, tipo_liquidacion: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar frecuencia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_LIQUIDACION.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Frecuencia con la que se calcula y paga la liquidación del empleado.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
