@@ -553,7 +553,10 @@ export default function Ventas() {
       key: 'numero_comprobante',
       header: 'Nº Comprobante',
       render: (item: Venta) => (
-        <span className="font-mono font-medium">#{item.numero_comprobante.toString().padStart(8, '0')}</span>
+        <span className="font-mono font-medium">
+          {item._es_pedido ? 'P-' : '#'}
+          {item.numero_comprobante.toString().padStart(item._es_pedido ? 6 : 8, '0')}
+        </span>
       ),
     },
     {
@@ -572,6 +575,16 @@ export default function Ventas() {
       render: (item: Venta) => item.clientes?.nombre || 'Consumidor Final',
     },
     {
+      key: 'origen',
+      header: 'Origen',
+      render: (item: Venta) => {
+        const origen = origenPorVenta[item.id] || 'mostrador';
+        const label = origen.charAt(0).toUpperCase() + origen.slice(1);
+        const variant = origen === 'web' ? 'default' : origen === 'reparto' ? 'secondary' : 'outline';
+        return <Badge variant={variant as any}>{label}</Badge>;
+      },
+    },
+    {
       key: 'total',
       header: 'Total',
       render: (item: Venta) => (
@@ -585,7 +598,11 @@ export default function Ventas() {
       header: 'Estado',
       render: (item: Venta) => (
         <div className="flex items-center gap-2">
-          {item.anulada ? (
+          {item._es_pedido ? (
+            <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+              {item._pedido_estado || 'Pedido'}
+            </Badge>
+          ) : item.anulada ? (
             <Badge variant="destructive">Anulada</Badge>
           ) : item.estado === 'pedido' ? (
             <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
@@ -610,7 +627,7 @@ export default function Ventas() {
           <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)} title="Ver detalle">
             <Eye className="h-4 w-4" />
           </Button>
-          {item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+          {!item._es_pedido && item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
             <Button 
               variant="ghost" 
               size="icon" 
@@ -624,7 +641,7 @@ export default function Ventas() {
               <Printer className="h-4 w-4 text-primary" />
             </Button>
           )}
-          {!item.anulada && canAnular && (
+          {!item._es_pedido && !item.anulada && canAnular && (
             <Button
               variant="ghost"
               size="icon"
