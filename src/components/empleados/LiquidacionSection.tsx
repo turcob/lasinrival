@@ -32,6 +32,7 @@ interface Empleado {
   nombre: string;
   sueldo_base: number;
   activo: boolean;
+  comision_porcentaje?: number;
 }
 
 interface LiquidacionData {
@@ -40,6 +41,11 @@ interface LiquidacionData {
   total_compras: number;
   total_adelantos: number;
   total_comisiones: number;
+  comision_porcentaje: number;
+  ventas_web_monto: number;
+  ventas_tradicional_monto: number;
+  comision_auto: number;
+  comision_manual: number;
   neto_a_pagar: number;
   pendientes_chofer?: Array<{ id: string; monto: number; concepto: string; fecha: string }>;
   overlap?: Array<{ id: string; fecha_desde: string; fecha_hasta: string; estado: string; neto_a_pagar: number }>;
