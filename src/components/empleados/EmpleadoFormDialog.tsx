@@ -39,6 +39,7 @@ interface Empleado {
   activo: boolean;
   sucursal_id: string | null;
   comision_porcentaje?: number;
+  tipo_liquidacion?: string;
 }
 
 interface EmpleadoFormDialogProps {
@@ -85,6 +86,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
     sucursal_id: '',
     activo: true,
     comision_porcentaje: '',
+    tipo_liquidacion: 'mensual',
   });
 
   useEffect(() => {
@@ -103,6 +105,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: empleado.sucursal_id || '',
         activo: empleado.activo,
         comision_porcentaje: empleado.comision_porcentaje?.toString() || '',
+        tipo_liquidacion: empleado.tipo_liquidacion || 'mensual',
       });
     } else {
       setFormData({
@@ -119,6 +122,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: '',
         activo: true,
         comision_porcentaje: '',
+        tipo_liquidacion: 'mensual',
       });
     }
   }, [empleado, open]);
@@ -142,6 +146,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: formData.sucursal_id || null,
         activo: formData.activo,
         comision_porcentaje: parseFloat(formData.comision_porcentaje) || 0,
+        tipo_liquidacion: formData.tipo_liquidacion || 'mensual',
       };
 
       if (empleado) {
