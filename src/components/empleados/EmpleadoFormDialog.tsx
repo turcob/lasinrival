@@ -70,6 +70,12 @@ const ESTADOS_CIVILES = [
   'Unión de hecho',
 ];
 
+const TIPOS_LIQUIDACION = [
+  { value: 'mensual', label: 'Mensual' },
+  { value: 'quincenal', label: 'Quincenal' },
+  { value: 'semanal', label: 'Semanal' },
+];
+
 export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, onSuccess }: EmpleadoFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
