@@ -39,6 +39,7 @@ interface Empleado {
   activo: boolean;
   sucursal_id: string | null;
   comision_porcentaje?: number;
+  tipo_liquidacion?: string;
 }
 
 interface EmpleadoFormDialogProps {
@@ -69,6 +70,12 @@ const ESTADOS_CIVILES = [
   'Unión de hecho',
 ];
 
+const TIPOS_LIQUIDACION = [
+  { value: 'mensual', label: 'Mensual' },
+  { value: 'quincenal', label: 'Quincenal' },
+  { value: 'semanal', label: 'Semanal' },
+];
+
 export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, onSuccess }: EmpleadoFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -85,6 +92,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
     sucursal_id: '',
     activo: true,
     comision_porcentaje: '',
+    tipo_liquidacion: 'mensual',
   });
 
   useEffect(() => {
@@ -103,6 +111,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: empleado.sucursal_id || '',
         activo: empleado.activo,
         comision_porcentaje: empleado.comision_porcentaje?.toString() || '',
+        tipo_liquidacion: empleado.tipo_liquidacion || 'mensual',
       });
     } else {
       setFormData({
@@ -119,6 +128,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: '',
         activo: true,
         comision_porcentaje: '',
+        tipo_liquidacion: 'mensual',
       });
     }
   }, [empleado, open]);
@@ -142,6 +152,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         sucursal_id: formData.sucursal_id || null,
         activo: formData.activo,
         comision_porcentaje: parseFloat(formData.comision_porcentaje) || 0,
+        tipo_liquidacion: formData.tipo_liquidacion || 'mensual',
       };
 
       if (empleado) {
@@ -303,21 +314,44 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="comision_porcentaje">Comisión (%)</Label>
-            <Input
-              id="comision_porcentaje"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={formData.comision_porcentaje}
-              onChange={(e) => setFormData({ ...formData, comision_porcentaje: e.target.value })}
-              placeholder="0.00"
-            />
-            <p className="text-xs text-muted-foreground">
-              Porcentaje aplicado sobre las ventas del empleado para el cálculo de comisiones en liquidaciones.
-            </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="comision_porcentaje">Comisión (%)</Label>
+              <Input
+                id="comision_porcentaje"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={formData.comision_porcentaje}
+                onChange={(e) => setFormData({ ...formData, comision_porcentaje: e.target.value })}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Porcentaje aplicado sobre las ventas del empleado para el cálculo de comisiones en liquidaciones.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tipo_liquidacion">Tipo de Liquidación</Label>
+              <Select
+                value={formData.tipo_liquidacion}
+                onValueChange={(value) => setFormData({ ...formData, tipo_liquidacion: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar frecuencia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_LIQUIDACION.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Frecuencia con la que se calcula y paga la liquidación del empleado.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

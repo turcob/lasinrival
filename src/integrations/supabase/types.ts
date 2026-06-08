@@ -1442,6 +1442,7 @@ export type Database = {
           sucursal_id: string | null
           sueldo_base: number | null
           telefono: string | null
+          tipo_liquidacion: string
           updated_at: string | null
           user_id: string | null
         }
@@ -1461,6 +1462,7 @@ export type Database = {
           sucursal_id?: string | null
           sueldo_base?: number | null
           telefono?: string | null
+          tipo_liquidacion?: string
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1480,6 +1482,7 @@ export type Database = {
           sucursal_id?: string | null
           sueldo_base?: number | null
           telefono?: string | null
+          tipo_liquidacion?: string
           updated_at?: string | null
           user_id?: string | null
         }
