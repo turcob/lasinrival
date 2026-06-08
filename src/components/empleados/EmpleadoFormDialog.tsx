@@ -38,6 +38,7 @@ interface Empleado {
   cbu_cuenta: string | null;
   activo: boolean;
   sucursal_id: string | null;
+  comision_porcentaje?: number;
 }
 
 interface EmpleadoFormDialogProps {
@@ -83,6 +84,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
     cbu_cuenta: '',
     sucursal_id: '',
     activo: true,
+    comision_porcentaje: '',
   });
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         cbu_cuenta: empleado.cbu_cuenta || '',
         sucursal_id: empleado.sucursal_id || '',
         activo: empleado.activo,
+        comision_porcentaje: empleado.comision_porcentaje?.toString() || '',
       });
     } else {
       setFormData({
@@ -115,6 +118,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         cbu_cuenta: '',
         sucursal_id: '',
         activo: true,
+        comision_porcentaje: '',
       });
     }
   }, [empleado, open]);
@@ -137,6 +141,7 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
         cbu_cuenta: formData.cbu_cuenta || null,
         sucursal_id: formData.sucursal_id || null,
         activo: formData.activo,
+        comision_porcentaje: parseFloat(formData.comision_porcentaje) || 0,
       };
 
       if (empleado) {
@@ -296,6 +301,23 @@ export function EmpleadoFormDialog({ open, onOpenChange, empleado, sucursales, o
                 placeholder="CBU o número de cuenta"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="comision_porcentaje">Comisión (%)</Label>
+            <Input
+              id="comision_porcentaje"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={formData.comision_porcentaje}
+              onChange={(e) => setFormData({ ...formData, comision_porcentaje: e.target.value })}
+              placeholder="0.00"
+            />
+            <p className="text-xs text-muted-foreground">
+              Porcentaje aplicado sobre las ventas del empleado para el cálculo de comisiones en liquidaciones.
+            </p>
           </div>
 
           <div className="space-y-2">

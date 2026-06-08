@@ -1430,6 +1430,7 @@ export type Database = {
           activo: boolean | null
           cargo: string | null
           cbu_cuenta: string | null
+          comision_porcentaje: number
           created_at: string | null
           direccion: string | null
           dni: string | null
@@ -1448,6 +1449,7 @@ export type Database = {
           activo?: boolean | null
           cargo?: string | null
           cbu_cuenta?: string | null
+          comision_porcentaje?: number
           created_at?: string | null
           direccion?: string | null
           dni?: string | null
@@ -1466,6 +1468,7 @@ export type Database = {
           activo?: boolean | null
           cargo?: string | null
           cbu_cuenta?: string | null
+          comision_porcentaje?: number
           created_at?: string | null
           direccion?: string | null
           dni?: string | null

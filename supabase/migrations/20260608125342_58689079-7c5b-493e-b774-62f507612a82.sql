@@ -1,0 +1,1 @@
+ALTER TABLE public.empleados ADD COLUMN IF NOT EXISTS comision_porcentaje numeric(5,2) NOT NULL DEFAULT 0;
