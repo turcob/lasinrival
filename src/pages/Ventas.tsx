@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -77,7 +77,7 @@ interface Venta {
   cliente_id: string | null;
   caja_id: string | null;
   estado: string;
-  clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number } | null;
+  clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number; vendedor_id?: string | null } | null;
   profiles?: { nombre: string } | null;
   comprobantes_afip?: ComprobanteAfip[] | null;
 }
@@ -119,6 +119,8 @@ export default function Ventas() {
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [pagosPorVenta, setPagosPorVenta] = useState<Record<string, VentaPago[]>>({});
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
+  const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([]);
+  const [origenPorVenta, setOrigenPorVenta] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [anularDialogOpen, setAnularDialogOpen] = useState(false);
@@ -129,6 +131,8 @@ export default function Ventas() {
   
   // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
+  const [filtroVendedor, setFiltroVendedor] = useState<string>('todos');
+  const [filtroOrigen, setFiltroOrigen] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<string>('confirmada');
   const [fechaDesde, setFechaDesde] = useState<Date | undefined>(undefined);
   const [fechaHasta, setFechaHasta] = useState<Date | undefined>(undefined);
@@ -146,11 +150,11 @@ export default function Ventas() {
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
-    fetchVentas(isAdmin);
-    if (isAdmin) {
-      fetchUsuarios();
-    }
-  }, [isAdmin]);
+    fetchVentas();
+    fetchUsuarios();
+    fetchVendedores();
+    fetchOrigenes();
+  }, []);
 
   // Fetch payment breakdown via RPC whenever filters change
   useEffect(() => {
@@ -200,22 +204,54 @@ export default function Ventas() {
     setUsuarios(data || []);
   };
 
-  const fetchVentas = async (adminAccess: boolean) => {
+  const fetchVendedores = async () => {
+    const { data } = await supabase
+      .from('vendedores')
+      .select('id, nombre')
+      .order('nombre');
+    setVendedores(data || []);
+  };
+
+  const fetchOrigenes = async () => {
+    // Fetch all pedidos linked to a venta, paginated to bypass 1K limit
+    const pageSize = 1000;
+    let from = 0;
+    const map: Record<string, string> = {};
+    while (true) {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('venta_id, tipo_pedido')
+        .not('venta_id', 'is', null)
+        .range(from, from + pageSize - 1);
+      if (error) {
+        console.error('Error fetching pedidos origenes:', error);
+        break;
+      }
+      (data || []).forEach((p: any) => {
+        if (p.venta_id) map[p.venta_id] = p.tipo_pedido || 'reparto';
+      });
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
+    }
+    setOrigenPorVenta(map);
+  };
+
+  const fetchVentas = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('ventas')
         .select(`
           *,
-          clientes(nombre, dni_cuit, condicion_iva),
+          clientes(nombre, dni_cuit, condicion_iva, vendedor_id),
           comprobantes_afip(*)
         `)
         .order('fecha', { ascending: false });
 
       if (error) throw error;
       
-      // Fetch profiles for each venta if admin
-      if (adminAccess && data && data.length > 0) {
+      // Fetch profiles for each venta
+      if (data && data.length > 0) {
         const userIds = [...new Set(data.map(v => v.usuario_id))];
         const { data: profilesData } = await supabase
           .from('profiles')
@@ -264,6 +300,22 @@ export default function Ventas() {
         return false;
       }
       
+      // Filtro por vendedor (del cliente)
+      if (filtroVendedor !== 'todos') {
+        const vId = v.clientes?.vendedor_id || null;
+        if (filtroVendedor === 'sin_vendedor') {
+          if (vId) return false;
+        } else if (vId !== filtroVendedor) {
+          return false;
+        }
+      }
+
+      // Filtro por origen
+      if (filtroOrigen !== 'todos') {
+        const origen = origenPorVenta[v.id] || 'mostrador';
+        if (origen !== filtroOrigen) return false;
+      }
+
       // Filtro por estado
       if (filtroEstado !== 'todos' && v.estado !== filtroEstado) {
         return false;
@@ -282,10 +334,32 @@ export default function Ventas() {
       
       return true;
     });
-  }, [ventas, filtroUsuario, filtroEstado, fechaDesde, fechaHasta]);
+  }, [ventas, filtroUsuario, filtroVendedor, filtroOrigen, filtroEstado, fechaDesde, fechaHasta, origenPorVenta]);
 
-  // Use RPC-based totals instead of client-side calculation
-  const totalesPorMedioPago = rpcTotales;
+  // If vendor/origen filters are active, RPC totals are inaccurate — compute client-side from filtered ventas.
+  const totalesPorMedioPago = useMemo(() => {
+    const usaClientSide = filtroVendedor !== 'todos' || filtroOrigen !== 'todos';
+    if (!usaClientSide) return rpcTotales;
+
+    const totales: Record<string, number> = {};
+    let totalGeneral = 0;
+    let countVentas = 0;
+    let countPedidos = 0;
+    ventasFiltradas.forEach(v => {
+      if (v.anulada) return;
+      if (v.estado === 'pedido') {
+        countPedidos += 1;
+      } else {
+        countVentas += 1;
+        totalGeneral += Number(v.total) || 0;
+        (pagosPorVenta[v.id] || []).forEach(p => {
+          const nombre = p.formas_pago?.nombre || 'Otro';
+          totales[nombre] = (totales[nombre] || 0) + (Number(p.monto) || 0);
+        });
+      }
+    });
+    return { totales, totalGeneral, countVentas, countPedidos };
+  }, [rpcTotales, ventasFiltradas, pagosPorVenta, filtroVendedor, filtroOrigen]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -413,7 +487,7 @@ export default function Ventas() {
       setAnularDialogOpen(false);
       setMotivoAnulacion('');
       setSelectedVenta(null);
-      fetchVentas(isAdmin);
+      fetchVentas();
       setRefreshTotales(prev => prev + 1);
     } catch (error) {
       console.error('Error anulando venta:', error);
@@ -434,11 +508,11 @@ export default function Ventas() {
       header: 'Fecha',
       render: (item: Venta) => format(new Date(item.fecha), 'dd/MM/yyyy HH:mm', { locale: es }),
     },
-    ...(isAdmin ? [{
+    {
       key: 'vendedor',
-      header: 'Vendedor',
+      header: 'Usuario',
       render: (item: Venta) => item.profiles?.nombre || 'Sin asignar',
-    }] : []),
+    },
     {
       key: 'cliente',
       header: 'Cliente',
@@ -526,22 +600,51 @@ export default function Ventas() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        {isAdmin && (
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrar por vendedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los usuarios</SelectItem>
-                {usuarios.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Usuario que cargó" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los usuarios</SelectItem>
+              {usuarios.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <UserCheck className="h-4 w-4 text-muted-foreground" />
+          <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Vendedor del cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los vendedores</SelectItem>
+              <SelectItem value="sin_vendedor">Sin vendedor</SelectItem>
+              {vendedores.map((v) => (
+                <SelectItem key={v.id} value={v.id}>{v.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-muted-foreground" />
+          <Select value={filtroOrigen} onValueChange={setFiltroOrigen}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Origen" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los orígenes</SelectItem>
+              <SelectItem value="mostrador">Mostrador</SelectItem>
+              <SelectItem value="web">Web</SelectItem>
+              <SelectItem value="reparto">Reparto</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex items-center gap-2">
           <ClipboardList className="h-4 w-4 text-muted-foreground" />

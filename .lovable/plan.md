@@ -1,45 +1,41 @@
-## Problema
-
-Hoy, cuando el encargado marca una parada como **"Rechazado"** desde `ParadaSheet` (botón rojo + motivo), solo se actualiza el estado de la parada a `no_entregado` y se guarda la observación. **No se registran devoluciones por cada producto del pedido**, así que:
-
-- Los productos **no aparecen en "Stock Rechazado"** disponibles para revender en otra parada.
-- **No se generan Notas de Crédito pendientes** para que administración apruebe el reingreso al stock central.
-
-En cambio, el flujo de "Entrega parcial → rechazo total" sí registra devoluciones (vía `DevolucionSheet`) y por eso funciona como el usuario espera.
-
 ## Objetivo
 
-Que el botón "Rechazado" (rechazo total) tenga el mismo comportamiento que un rechazo ítem por ítem, pero aplicado a **todos los productos del pedido automáticamente**.
+En `src/pages/Ventas.tsx` agregar más filtros para poder ver, por ejemplo, "ventas de pedidos que entraron por la web" y no solo las de mostrador/mayorista.
 
 ## Cambios
 
-### `src/components/encargado/ParadaSheet.tsx`
+### 1. Filtro "Usuario que cargó" visible a todos los roles
+Hoy solo se muestra a admin. Se quita el `isAdmin &&` del selector y de la columna "Vendedor" de la tabla, para que cualquier usuario con acceso a Ventas pueda usarlo y ver quién cargó cada venta.
 
-Reemplazar `handleRechazado` para que, además de cambiar el estado a `no_entregado`:
+### 2. Nuevo filtro "Vendedor (del cliente)"
+- Trae la lista desde `vendedores` (id, nombre).
+- Cada venta se asocia al vendedor a través de `clientes.vendedor_id`.
+- Se agrega `vendedor_id` al `select` de `clientes(...)` en `fetchVentas`.
+- Selector con opciones: Todos / Sin vendedor / lista de vendedores.
+- Visible a todos los roles.
 
-1. Recorra `parada.pedido.detalles` y, por cada renglón con cantidad > 0, llame al hook existente `useRegistrarDevolucion` (mutación `registrarDevolucion`) con:
-   - `hoja_ruta_id`, `parada_id`, `pedido_detalle_id`
-   - `cantidad = cantidad_pedida` del renglón
-   - `motivo = 'rechazo_cliente'`
-   - `detalle_motivo = obs` (la observación que ya escribe el encargado)
-   - `reingresarStock = true` (default; lo aprueba administración al confirmar la NC)
-2. Recién después llamar a `cambiarEstado` con `estado: 'no_entregado'` y la observación.
-3. Manejar errores: si falla algún ítem mostrar toast y no cerrar el sheet.
+### 3. Nuevo filtro "Origen"
+Opciones: Todos / Mostrador / Web / Reparto.
 
-Esto reutiliza exactamente el mismo camino que ya usa el rechazo parcial → genera entradas en `hoja_ruta_devoluciones` (las habilita en la pestaña "Stock Rechazado") y crea `notas_credito_pendientes` por cada producto.
+Cómo se determina el origen de una venta:
+- Se hace una consulta `pedidos` (id, venta_id, tipo_pedido) `where venta_id IS NOT NULL`, paginada con `.range()` siguiendo la regla de "Large Dataset Fetching" del proyecto.
+- Se arma un `Map<venta_id, tipo_pedido>`.
+- Venta con entrada en el map → origen = `tipo_pedido` (`'web'` o `'reparto'`).
+- Venta sin entrada → origen = `'mostrador'`.
 
-### Texto del botón
+### 4. Aplicación de filtros y totales
+- `ventasFiltradas` (useMemo) incorpora los 2 filtros nuevos además de los existentes (estado, fecha, usuario).
+- La tarjeta "Resumen de Totales" hoy usa el RPC `get_ventas_totales_por_medio_pago`, que no conoce los filtros de vendedor/origen. Cuando alguno de los dos nuevos esté activo (distinto de "todos"), los totales y el desglose por medio de pago se calculan client-side a partir de `ventasFiltradas` + `pagosPorVenta` para que los números coincidan con la tabla. Si ambos están en "todos", se mantiene el RPC tal cual.
 
-Mantener "Rechazado" como hoy (no se toca terminología). El estado en BD sigue siendo `no_entregado` para no romper datos históricos.
+### 5. UI
+Los tres selectores (Usuario, Vendedor, Origen) se renderizan en la fila de filtros existente, antes de Estado/Fecha. Se respetan los estilos actuales (Select de shadcn con ícono Lucide a la izquierda).
 
-## Lo que NO cambia
+## Archivos tocados
 
-- Esquema de base de datos: ningún cambio.
-- Lógica del módulo Logística web: las NC pendientes siguen siendo aprobadas desde administración como hoy.
-- Flujo de "Entrega parcial": queda igual.
-- El badge de estado en `ParadasTab` sigue mostrando "No entregado" (o lo que esté hoy).
+- `src/pages/Ventas.tsx` (único archivo modificado).
 
-## Riesgos
+## Fuera de alcance
 
-- Si el pedido tiene muchos ítems, la operación hace N inserts secuenciales. Es aceptable porque las paradas suelen tener pocos renglones; igualmente se puede ejecutar con `Promise.all` para acelerar.
-- Si se vuelve a presionar "Rechazado" sobre una parada ya rechazada se duplicarían las devoluciones. Mitigación: `handleRechazado` ya no se puede invocar si `yaEntregado` (el botón no se muestra en ese caso).
+- No se modifican RPCs ni el esquema de base de datos.
+- No se cambian permisos: cualquier usuario que ya entra a la pantalla de Ventas verá los nuevos filtros.
+- No se toca la pantalla de Pedidos ni la lógica de creación de ventas.
