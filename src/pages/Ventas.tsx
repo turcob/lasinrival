@@ -159,7 +159,6 @@ export default function Ventas() {
     fetchVentas();
     fetchUsuarios();
     fetchVendedores();
-    fetchOrigenes();
   }, []);
 
   // Fetch payment breakdown via RPC whenever filters change
