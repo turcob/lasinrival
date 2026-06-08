@@ -533,7 +533,22 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                       -${liq.total_adelantos.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      +${liq.total_comisiones.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      <div
+                        className="cursor-help"
+                        title={
+                          `Auto (${liq.comision_porcentaje}%): $${liq.comision_auto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+                          `  • Ventas web: $${liq.ventas_web_monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+                          `  • Ventas tradicionales: $${liq.ventas_tradicional_monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\n` +
+                          `Manual (movimientos): $${liq.comision_manual.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                        }
+                      >
+                        +${liq.total_comisiones.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        {liq.comision_auto > 0 && (
+                          <div className="text-[10px] text-muted-foreground font-normal">
+                            {liq.comision_porcentaje}% · web ${liq.ventas_web_monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })} + trad ${liq.ventas_tradicional_monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-bold">
                       ${liq.neto_a_pagar.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
