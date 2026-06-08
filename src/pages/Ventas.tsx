@@ -434,6 +434,24 @@ export default function Ventas() {
     setSelectedVenta(venta);
     
     try {
+      if (venta._es_pedido && venta._pedido_id) {
+        const { data: pdData } = await supabase
+          .from('pedido_detalles')
+          .select('id, cantidad_pedida, precio_unitario, descuento_porcentaje, subtotal, productos(codigo_articulo, descripcion)')
+          .eq('pedido_id', venta._pedido_id);
+        const mapped: VentaDetalle[] = (pdData || []).map((d: any) => ({
+          id: d.id,
+          cantidad: Number(d.cantidad_pedida) || 0,
+          precio_unitario: Number(d.precio_unitario) || 0,
+          descuento: Number(d.descuento_porcentaje) || 0,
+          subtotal: Number(d.subtotal) || 0,
+          productos: d.productos || null,
+        }));
+        setDetalles(mapped);
+        setPagos([]);
+        setDetalleDialogOpen(true);
+        return;
+      }
       const [detallesRes, pagosRes] = await Promise.all([
         supabase
           .from('venta_detalles')
