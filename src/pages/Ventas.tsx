@@ -360,9 +360,13 @@ export default function Ventas() {
         if (origen !== filtroOrigen) return false;
       }
 
-      // Filtro por estado
-      if (filtroEstado !== 'todos' && v.estado !== filtroEstado) {
-        return false;
+      // Filtro por estado (los pedidos web/reparto se muestran salvo cuando se filtra explícitamente por estado="pedido")
+      if (filtroEstado !== 'todos') {
+        if (v._es_pedido) {
+          if (filtroEstado === 'pedido') return false;
+        } else if (v.estado !== filtroEstado) {
+          return false;
+        }
       }
       
       // Filtro por fecha
@@ -391,6 +395,11 @@ export default function Ventas() {
     let countPedidos = 0;
     ventasFiltradas.forEach(v => {
       if (v.anulada) return;
+      if (v._es_pedido) {
+        countPedidos += 1;
+        totalGeneral += Number(v.total) || 0;
+        return;
+      }
       if (v.estado === 'pedido') {
         countPedidos += 1;
       } else {
