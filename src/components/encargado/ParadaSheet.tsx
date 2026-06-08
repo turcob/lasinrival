@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2, PackageX, Loader2, XCircle, Package } from 'lucide-react';
-import { useActualizarEstadoParada, type HojaRutaParada } from '@/hooks/useLogistica';
+import { useActualizarEstadoParada, useRegistrarDevolucion, type HojaRutaParada } from '@/hooks/useLogistica';
 import { useCobrosParada, useDevolucionesParada } from '@/hooks/useLogistica';
 import { useDevolucionesVendedorParada, useVentasRechazadosParada } from '@/hooks/useEncargado';
 import { CobrarSheet } from './CobrarSheet';
@@ -19,6 +19,7 @@ interface ParadaSheetProps {
 
 export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSheetProps) {
   const cambiarEstado = useActualizarEstadoParada();
+  const registrarDevolucion = useRegistrarDevolucion();
   const { data: cobros = [] } = useCobrosParada(parada?.id);
   const { data: devoluciones = [] } = useDevolucionesParada(parada?.id);
   const { data: devolucionesVendedor = [] } = useDevolucionesVendedorParada(parada?.id);
@@ -57,9 +58,37 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
   };
 
   const handleRechazado = async () => {
-    await cambiarEstado.mutateAsync({ id: parada.id, estado: 'no_entregado', observaciones: obs });
-    setRechazadoOpen(false);
-    onOpenChange(false);
+    try {
+      // Registrar devolución por cada producto del pedido para que el stock
+      // quede disponible para revender y se generen NCs pendientes (igual
+      // que el flujo de rechazo parcial).
+      const detalles = (parada.pedido?.detalles ?? []) as any[];
+      const yaRechazadosPorDetalle = new Map<string, number>();
+      for (const d of devoluciones as any[]) {
+        const did = d.pedido_detalle_id as string;
+        yaRechazadosPorDetalle.set(did, (yaRechazadosPorDetalle.get(did) ?? 0) + Number(d.cantidad ?? 0));
+      }
+      for (const det of detalles) {
+        const cantPedida = Number(det.cantidad_pedida ?? 0);
+        const yaRech = yaRechazadosPorDetalle.get(det.id) ?? 0;
+        const restante = cantPedida - yaRech;
+        if (restante <= 0) continue;
+        await registrarDevolucion.mutateAsync({
+          hoja_ruta_id: hojaRutaId,
+          parada_id: parada.id,
+          pedido_detalle_id: det.id,
+          cantidad: restante,
+          motivo: 'rechazo_cliente',
+          detalle_motivo: obs || undefined,
+          reingresarStock: true,
+        });
+      }
+      await cambiarEstado.mutateAsync({ id: parada.id, estado: 'no_entregado', observaciones: obs });
+      setRechazadoOpen(false);
+      onOpenChange(false);
+    } catch (e) {
+      // El hook de devolución ya muestra toast con el error; no cerramos el sheet.
+    }
   };
 
   return (
