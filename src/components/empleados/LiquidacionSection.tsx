@@ -4,13 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -20,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, CheckCircle, FileText, Printer } from 'lucide-react';
+import { Download, CheckCircle, FileText, Printer, AlertTriangle, History } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PagarLiquidacionDialog } from './PagarLiquidacionDialog';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
@@ -29,6 +22,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Empleado {
   id: string;
@@ -45,6 +42,7 @@ interface LiquidacionData {
   total_comisiones: number;
   neto_a_pagar: number;
   pendientes_chofer?: Array<{ id: string; monto: number; concepto: string; fecha: string }>;
+  overlap?: Array<{ id: string; fecha_desde: string; fecha_hasta: string; estado: string; neto_a_pagar: number }>;
   liquidacion_existente?: {
     id: string;
     estado: string;
@@ -57,28 +55,29 @@ interface LiquidacionSectionProps {
 }
 
 const MESES = [
-  { value: 1, label: 'Enero' },
-  { value: 2, label: 'Febrero' },
-  { value: 3, label: 'Marzo' },
-  { value: 4, label: 'Abril' },
-  { value: 5, label: 'Mayo' },
-  { value: 6, label: 'Junio' },
-  { value: 7, label: 'Julio' },
-  { value: 8, label: 'Agosto' },
-  { value: 9, label: 'Septiembre' },
-  { value: 10, label: 'Octubre' },
-  { value: 11, label: 'Noviembre' },
-  { value: 12, label: 'Diciembre' },
+  { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' }, { value: 3, label: 'Marzo' },
+  { value: 4, label: 'Abril' }, { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+  { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' }, { value: 9, label: 'Septiembre' },
+  { value: 10, label: 'Octubre' }, { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' },
 ];
 
 export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionProps) {
   const { user } = useAuth();
   const { config } = useConfiguracionComercio();
-  const [selectedMes, setSelectedMes] = useState(new Date().getMonth() + 1);
-  const [selectedAnio, setSelectedAnio] = useState(new Date().getFullYear());
+  const today = new Date();
+  const [fechaDesde, setFechaDesde] = useState(format(startOfMonth(today), 'yyyy-MM-dd'));
+  const [fechaHasta, setFechaHasta] = useState(format(endOfMonth(today), 'yyyy-MM-dd'));
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [historial, setHistorial] = useState<any[]>([]);
+  const [historialOpen, setHistorialOpen] = useState(false);
+
+  // Diálogo de confirmación por solapamiento de fechas
+  const [overlapConfirm, setOverlapConfirm] = useState<{
+    liq: LiquidacionData;
+    pendientesIds: string[];
+  } | null>(null);
 
   // Diálogo para elegir qué pendientes del chofer descontar
   const [pendientesDialog, setPendientesDialog] = useState<{
@@ -97,21 +96,20 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     totalDescuentos: number;
   } | null>(null);
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
   useEffect(() => {
     calcularLiquidaciones();
-  }, [selectedMes, selectedAnio, empleados]);
+  }, [fechaDesde, fechaHasta, empleados]);
 
   const calcularLiquidaciones = async () => {
     setLoading(true);
     try {
       const empleadosActivos = empleados.filter(e => e.activo);
-      
-      // Get date range for the selected month
-      const startDate = `${selectedAnio}-${String(selectedMes).padStart(2, '0')}-01`;
-      const endDate = new Date(selectedAnio, selectedMes, 0).toISOString().split('T')[0];
+      const startDate = fechaDesde;
+      const endDate = fechaHasta;
+      if (!startDate || !endDate || startDate > endDate) {
+        setLiquidaciones([]);
+        return;
+      }
 
       // Fetch movimientos for the period
       const { data: movimientos } = await supabase
@@ -120,12 +118,13 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
         .gte('fecha', startDate)
         .lte('fecha', endDate);
 
-      // Fetch existing liquidaciones
+      // Fetch existing liquidaciones que solapen con el rango seleccionado
       const { data: liquidacionesExistentes } = await supabase
         .from('empleado_liquidaciones')
         .select('*')
-        .eq('mes', selectedMes)
-        .eq('anio', selectedAnio);
+        .in('empleado_id', empleadosActivos.map(e => e.id))
+        .lte('fecha_desde', endDate)
+        .gte('fecha_hasta', startDate);
 
       // Fetch pendientes_chofer aún sin descontar (estado=pendiente) para los empleados activos
       const { data: pendientesChofer } = await (supabase as any)
@@ -152,7 +151,20 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
         const sueldo_base = Number(emp.sueldo_base) || 0;
         const neto_a_pagar = sueldo_base + total_comisiones - total_compras - total_adelantos;
 
-        const liquidacion_existente = liquidacionesExistentes?.find(l => l.empleado_id === emp.id);
+        const overlapAll = (liquidacionesExistentes ?? []).filter(l => l.empleado_id === emp.id);
+        // "existente" estricta = rango exactamente igual
+        const liquidacion_existente = overlapAll.find(l =>
+          l.fecha_desde === startDate && l.fecha_hasta === endDate
+        );
+        const overlap = overlapAll
+          .filter(l => !(l.fecha_desde === startDate && l.fecha_hasta === endDate))
+          .map(l => ({
+            id: l.id,
+            fecha_desde: l.fecha_desde,
+            fecha_hasta: l.fecha_hasta,
+            estado: l.estado,
+            neto_a_pagar: Number(l.neto_a_pagar),
+          }));
 
         const pendientes_chofer = (pendientesChofer ?? [])
           .filter((p: any) => p.empleado_id === emp.id)
@@ -166,6 +178,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           total_comisiones,
           neto_a_pagar,
           pendientes_chofer,
+          overlap,
           liquidacion_existente: liquidacion_existente ? {
             id: liquidacion_existente.id,
             estado: liquidacion_existente.estado,
@@ -182,6 +195,32 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     }
   };
 
+  const cargarHistorial = async () => {
+    const empleadosActivos = empleados.filter(e => e.activo);
+    const { data } = await supabase
+      .from('empleado_liquidaciones')
+      .select('*')
+      .in('empleado_id', empleadosActivos.map(e => e.id))
+      .order('fecha_desde', { ascending: false })
+      .limit(100);
+    setHistorial(data ?? []);
+  };
+
+  const handleGenerarClick = (liq: LiquidacionData) => {
+    const startPendientes = () => {
+      if ((liq.pendientes_chofer?.length ?? 0) > 0) {
+        setPendientesDialog({ liq, seleccionados: new Set(liq.pendientes_chofer!.map(p => p.id)) });
+      } else {
+        generarLiquidacion(liq);
+      }
+    };
+    if ((liq.overlap?.length ?? 0) > 0) {
+      setOverlapConfirm({ liq, pendientesIds: [] });
+      return;
+    }
+    startPendientes();
+  };
+
   const generarLiquidacion = async (data: LiquidacionData, pendientesIds: string[] = []) => {
     if (!user) return;
     setProcessingId(data.empleado.id);
@@ -193,13 +232,19 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
       const total_descuentos = data.total_compras + data.total_adelantos + totalPendientes;
       const neto_final = data.sueldo_base + data.total_comisiones - total_descuentos;
 
+      const desdeDate = parseISO(fechaDesde);
+      const mes = desdeDate.getMonth() + 1;
+      const anio = desdeDate.getFullYear();
+
       // Create liquidacion record
       const { data: liqInsertada, error: liqError } = await supabase
         .from('empleado_liquidaciones')
         .insert([{
           empleado_id: data.empleado.id,
-          mes: selectedMes,
-          anio: selectedAnio,
+          mes,
+          anio,
+          fecha_desde: fechaDesde,
+          fecha_hasta: fechaHasta,
           sueldo_base: data.sueldo_base,
           total_descuentos,
           total_comisiones: data.total_comisiones,
@@ -234,7 +279,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           empleado_id: data.empleado.id,
           tipo: 'liquidacion',
           monto: data.total_compras + data.total_adelantos,
-          concepto: `Liquidación ${MESES.find(m => m.value === selectedMes)?.label} ${selectedAnio}`,
+          concepto: `Liquidación ${format(parseISO(fechaDesde), 'dd/MM/yyyy')} - ${format(parseISO(fechaHasta), 'dd/MM/yyyy')}`,
           fecha: new Date().toISOString().split('T')[0],
           usuario_registro_id: user.id,
         }]);
@@ -242,6 +287,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
 
       toast.success('Liquidación generada correctamente');
       calcularLiquidaciones();
+      if (historialOpen) cargarHistorial();
       onRefresh();
     } catch (error) {
       console.error('Error generating liquidacion:', error);
@@ -249,6 +295,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     } finally {
       setProcessingId(null);
       setPendientesDialog(null);
+      setOverlapConfirm(null);
     }
   };
 
@@ -268,14 +315,16 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
 
   const handlePagoSuccess = () => {
     calcularLiquidaciones();
+    if (historialOpen) cargarHistorial();
     onRefresh();
   };
 
   const handleReimprimirRecibo = (liq: LiquidacionData) => {
+    const desdeDate = parseISO(fechaDesde);
     const success = imprimirReciboLiquidacion({
       empleadoNombre: liq.empleado.nombre,
-      mes: selectedMes,
-      anio: selectedAnio,
+      mes: desdeDate.getMonth() + 1,
+      anio: desdeDate.getFullYear(),
       sueldoBase: liq.sueldo_base,
       totalComisiones: liq.total_comisiones,
       totalDescuentos: liq.total_compras + liq.total_adelantos,
@@ -310,8 +359,24 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Liquidaciones');
-    XLSX.writeFile(wb, `Liquidaciones_${MESES.find(m => m.value === selectedMes)?.label}_${selectedAnio}.xlsx`);
+    XLSX.writeFile(wb, `Liquidaciones_${fechaDesde}_a_${fechaHasta}.xlsx`);
     toast.success('Archivo exportado correctamente');
+  };
+
+  const setPresetMes = () => {
+    setFechaDesde(format(startOfMonth(today), 'yyyy-MM-dd'));
+    setFechaHasta(format(endOfMonth(today), 'yyyy-MM-dd'));
+  };
+  const setPresetQuincena = (segunda: boolean) => {
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    if (!segunda) {
+      setFechaDesde(format(new Date(y, m, 1), 'yyyy-MM-dd'));
+      setFechaHasta(format(new Date(y, m, 15), 'yyyy-MM-dd'));
+    } else {
+      setFechaDesde(format(new Date(y, m, 16), 'yyyy-MM-dd'));
+      setFechaHasta(format(endOfMonth(today), 'yyyy-MM-dd'));
+    }
   };
 
   const totalNeto = liquidaciones.reduce((sum, l) => sum + l.neto_a_pagar, 0);
@@ -319,40 +384,39 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Liquidación de Sueldos
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Select value={String(selectedMes)} onValueChange={(v) => setSelectedMes(Number(v))}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MESES.map((mes) => (
-                  <SelectItem key={mes.value} value={String(mes.value)}>
-                    {mes.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedAnio)} onValueChange={(v) => setSelectedAnio(Number(v))}>
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((year) => (
-                  <SelectItem key={year} value={String(year)}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={exportarExcel}>
-              <Download className="h-4 w-4 mr-1" />
-              Excel
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={exportarExcel}>
+                <Download className="h-4 w-4 mr-1" /> Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                const next = !historialOpen;
+                setHistorialOpen(next);
+                if (next) cargarHistorial();
+              }}>
+                <History className="h-4 w-4 mr-1" /> Historial
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <Label className="text-xs">Desde</Label>
+              <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="w-44" />
+            </div>
+            <div>
+              <Label className="text-xs">Hasta</Label>
+              <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="w-44" />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              <Button variant="ghost" size="sm" onClick={setPresetMes}>Mes actual</Button>
+              <Button variant="ghost" size="sm" onClick={() => setPresetQuincena(false)}>1ª Quincena</Button>
+              <Button variant="ghost" size="sm" onClick={() => setPresetQuincena(true)}>2ª Quincena</Button>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -383,7 +447,16 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
               <TableBody>
                 {liquidaciones.map((liq) => (
                   <TableRow key={liq.empleado.id}>
-                    <TableCell className="font-medium">{liq.empleado.nombre}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {liq.empleado.nombre}
+                        {(liq.overlap?.length ?? 0) > 0 && !liq.liquidacion_existente && (
+                          <span title={`${liq.overlap!.length} liquidación(es) solapan con este rango`}>
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       ${liq.sueldo_base.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                     </TableCell>
@@ -412,13 +485,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                       {!liq.liquidacion_existente ? (
                         <Button 
                           size="sm" 
-                          onClick={() => {
-                            if ((liq.pendientes_chofer?.length ?? 0) > 0) {
-                              setPendientesDialog({ liq, seleccionados: new Set(liq.pendientes_chofer!.map(p => p.id)) });
-                            } else {
-                              generarLiquidacion(liq);
-                            }
-                          }}
+                          onClick={() => handleGenerarClick(liq)}
                           disabled={processingId === liq.empleado.id}
                         >
                           {processingId === liq.empleado.id
@@ -460,6 +527,52 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
                 </p>
               </div>
             </div>
+            {historialOpen && (
+              <div className="mt-6 pt-4 border-t">
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <History className="h-4 w-4" /> Historial de liquidaciones
+                </h3>
+                {historial.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin liquidaciones registradas.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empleado</TableHead>
+                        <TableHead>Período</TableHead>
+                        <TableHead className="text-right">Neto</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Pago</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historial.map((h) => {
+                        const emp = empleados.find(e => e.id === h.empleado_id);
+                        const desde = h.fecha_desde ? format(parseISO(h.fecha_desde), 'dd/MM/yyyy', { locale: es }) : '—';
+                        const hasta = h.fecha_hasta ? format(parseISO(h.fecha_hasta), 'dd/MM/yyyy', { locale: es }) : '—';
+                        return (
+                          <TableRow key={h.id}>
+                            <TableCell>{emp?.nombre ?? h.empleado_id.slice(0, 8)}</TableCell>
+                            <TableCell className="text-sm">{desde} → {hasta}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              ${Number(h.neto_a_pagar).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={h.estado === 'pagada' ? 'default' : 'secondary'}>
+                                {h.estado}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {h.fecha_pago ? format(parseISO(h.fecha_pago), 'dd/MM/yyyy') : '—'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            )}
           </>
         )}
       </CardContent>
@@ -472,8 +585,8 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           liquidacionId={liquidacionAPagar.id}
           empleadoNombre={liquidacionAPagar.empleadoNombre}
           monto={liquidacionAPagar.monto}
-          mes={selectedMes}
-          anio={selectedAnio}
+          mes={parseISO(fechaDesde).getMonth() + 1}
+          anio={parseISO(fechaDesde).getFullYear()}
           sueldoBase={liquidacionAPagar.sueldoBase}
           totalComisiones={liquidacionAPagar.totalComisiones}
           totalDescuentos={liquidacionAPagar.totalDescuentos}
@@ -481,6 +594,65 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
           userId={user.id}
         />
       )}
+
+      {/* Diálogo de confirmación por solapamiento */}
+      <Dialog open={!!overlapConfirm} onOpenChange={(v) => { if (!v) setOverlapConfirm(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Período solapado
+            </DialogTitle>
+          </DialogHeader>
+          {overlapConfirm && (
+            <div className="space-y-3">
+              <p className="text-sm">
+                <strong>{overlapConfirm.liq.empleado.nombre}</strong> ya tiene liquidaciones que se superponen
+                con el rango <strong>{format(parseISO(fechaDesde), 'dd/MM/yyyy')}</strong> →{' '}
+                <strong>{format(parseISO(fechaHasta), 'dd/MM/yyyy')}</strong>:
+              </p>
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {overlapConfirm.liq.overlap!.map(o => (
+                  <div key={o.id} className="text-sm border rounded p-2 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">
+                        {format(parseISO(o.fecha_desde), 'dd/MM/yyyy')} → {format(parseISO(o.fecha_hasta), 'dd/MM/yyyy')}
+                      </div>
+                      <Badge variant={o.estado === 'pagada' ? 'default' : 'secondary'} className="mt-1">
+                        {o.estado}
+                      </Badge>
+                    </div>
+                    <div className="font-semibold">
+                      ${o.neto_a_pagar.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si continuás, podés estar liquidando dos veces los mismos movimientos del período.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOverlapConfirm(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!overlapConfirm) return;
+                const liq = overlapConfirm.liq;
+                setOverlapConfirm(null);
+                if ((liq.pendientes_chofer?.length ?? 0) > 0) {
+                  setPendientesDialog({ liq, seleccionados: new Set(liq.pendientes_chofer!.map(p => p.id)) });
+                } else {
+                  generarLiquidacion(liq);
+                }
+              }}
+            >
+              Continuar de todos modos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo para seleccionar pendientes del chofer */}
       <Dialog open={!!pendientesDialog} onOpenChange={(v) => { if (!v) setPendientesDialog(null); }}>

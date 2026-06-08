@@ -1298,6 +1298,8 @@ export type Database = {
           created_at: string | null
           empleado_id: string
           estado: string | null
+          fecha_desde: string | null
+          fecha_hasta: string | null
           fecha_pago: string | null
           forma_pago_id: string | null
           id: string
@@ -1315,6 +1317,8 @@ export type Database = {
           created_at?: string | null
           empleado_id: string
           estado?: string | null
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
           fecha_pago?: string | null
           forma_pago_id?: string | null
           id?: string
@@ -1332,6 +1336,8 @@ export type Database = {
           created_at?: string | null
           empleado_id?: string
           estado?: string | null
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
           fecha_pago?: string | null
           forma_pago_id?: string | null
           id?: string
