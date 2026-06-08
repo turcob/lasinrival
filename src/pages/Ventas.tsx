@@ -80,6 +80,12 @@ interface Venta {
   clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number; vendedor_id?: string | null } | null;
   profiles?: { nombre: string } | null;
   comprobantes_afip?: ComprobanteAfip[] | null;
+  // Synthetic-row markers for web/reparto pedidos shown alongside real ventas
+  _es_pedido?: boolean;
+  _pedido_id?: string;
+  _tipo_pedido?: string;
+  _numero_pedido?: number;
+  _pedido_estado?: string;
 }
 
 interface VentaDetalle {
@@ -153,7 +159,6 @@ export default function Ventas() {
     fetchVentas();
     fetchUsuarios();
     fetchVendedores();
-    fetchOrigenes();
   }, []);
 
   // Fetch payment breakdown via RPC whenever filters change
@@ -212,30 +217,6 @@ export default function Ventas() {
     setVendedores(data || []);
   };
 
-  const fetchOrigenes = async () => {
-    // Fetch all pedidos linked to a venta, paginated to bypass 1K limit
-    const pageSize = 1000;
-    let from = 0;
-    const map: Record<string, string> = {};
-    while (true) {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('venta_id, tipo_pedido')
-        .not('venta_id', 'is', null)
-        .range(from, from + pageSize - 1);
-      if (error) {
-        console.error('Error fetching pedidos origenes:', error);
-        break;
-      }
-      (data || []).forEach((p: any) => {
-        if (p.venta_id) map[p.venta_id] = p.tipo_pedido || 'reparto';
-      });
-      if (!data || data.length < pageSize) break;
-      from += pageSize;
-    }
-    setOrigenPorVenta(map);
-  };
-
   const fetchVentas = async () => {
     setLoading(true);
     try {
@@ -249,24 +230,87 @@ export default function Ventas() {
         .order('fecha', { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch profiles for each venta
-      if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(v => v.usuario_id))];
+
+      const ventasReales = (data || []) as any[];
+      const origenMap: Record<string, string> = {};
+
+      // Origen para ventas reales: mapear via pedidos.venta_id (legacy)
+      // y para pedidos web/reparto crear filas sintéticas (no tienen venta).
+      const pedidosPaginados: any[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data: pData, error: pErr } = await supabase
+          .from('pedidos')
+          .select(`
+            id, numero_pedido, fecha_pedido, subtotal, descuento, total,
+            usuario_id, cliente_id, estado, tipo_pedido, venta_id,
+            clientes(nombre, dni_cuit, condicion_iva, vendedor_id)
+          `)
+          .or('venta_id.not.is.null,tipo_pedido.in.(web,reparto)')
+          .order('fecha_pedido', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (pErr) {
+          console.error('Error fetching pedidos:', pErr);
+          break;
+        }
+        pedidosPaginados.push(...(pData || []));
+        if (!pData || pData.length < pageSize) break;
+        from += pageSize;
+      }
+
+      // Map para ventas reales -> origen del pedido vinculado
+      pedidosPaginados.forEach((p: any) => {
+        if (p.venta_id) origenMap[p.venta_id] = p.tipo_pedido || 'reparto';
+      });
+
+      // Filas sintéticas: pedidos web/reparto sin venta asociada
+      const sinteticos: any[] = pedidosPaginados
+        .filter((p: any) => !p.venta_id && (p.tipo_pedido === 'web' || p.tipo_pedido === 'reparto'))
+        .map((p: any) => {
+          origenMap[p.id] = p.tipo_pedido;
+          return {
+            id: p.id,
+            numero_comprobante: p.numero_pedido,
+            fecha: p.fecha_pedido,
+            subtotal: Number(p.subtotal) || 0,
+            descuento: Number(p.descuento) || 0,
+            total: Number(p.total) || 0,
+            anulada: false,
+            motivo_anulacion: null,
+            fecha_anulacion: null,
+            usuario_id: p.usuario_id,
+            cliente_id: p.cliente_id,
+            caja_id: null,
+            estado: 'confirmada',
+            clientes: p.clientes || null,
+            comprobantes_afip: [],
+            _es_pedido: true,
+            _pedido_id: p.id,
+            _tipo_pedido: p.tipo_pedido,
+            _numero_pedido: p.numero_pedido,
+            _pedido_estado: p.estado,
+          };
+        });
+
+      // Profiles para ambas listas
+      const allRows = [...ventasReales, ...sinteticos];
+      const userIds = [...new Set(allRows.map(v => v.usuario_id).filter(Boolean))];
+      let profilesMap = new Map<string, any>();
+      if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, nombre')
           .in('id', userIds);
-        
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
-        const ventasWithProfiles = data.map(v => ({
-          ...v,
-          profiles: profilesMap.get(v.usuario_id) || null
-        }));
-        setVentas(ventasWithProfiles);
-      } else {
-        setVentas(data || []);
+        profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
       }
+
+      const rowsWithProfiles = allRows
+        .map((v: any) => ({ ...v, profiles: profilesMap.get(v.usuario_id) || null }))
+        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+      setVentas(rowsWithProfiles);
+      setOrigenPorVenta(origenMap);
 
       // Fetch all payments - no filter to avoid URL length issues with large datasets
       const { data: pagosData } = await supabase
@@ -316,9 +360,13 @@ export default function Ventas() {
         if (origen !== filtroOrigen) return false;
       }
 
-      // Filtro por estado
-      if (filtroEstado !== 'todos' && v.estado !== filtroEstado) {
-        return false;
+      // Filtro por estado (los pedidos web/reparto se muestran salvo cuando se filtra explícitamente por estado="pedido")
+      if (filtroEstado !== 'todos') {
+        if (v._es_pedido) {
+          if (filtroEstado === 'pedido') return false;
+        } else if (v.estado !== filtroEstado) {
+          return false;
+        }
       }
       
       // Filtro por fecha
@@ -347,6 +395,11 @@ export default function Ventas() {
     let countPedidos = 0;
     ventasFiltradas.forEach(v => {
       if (v.anulada) return;
+      if (v._es_pedido) {
+        countPedidos += 1;
+        totalGeneral += Number(v.total) || 0;
+        return;
+      }
       if (v.estado === 'pedido') {
         countPedidos += 1;
       } else {
@@ -381,6 +434,24 @@ export default function Ventas() {
     setSelectedVenta(venta);
     
     try {
+      if (venta._es_pedido && venta._pedido_id) {
+        const { data: pdData } = await supabase
+          .from('pedido_detalles')
+          .select('id, cantidad_pedida, precio_unitario, descuento_porcentaje, subtotal, productos(codigo_articulo, descripcion)')
+          .eq('pedido_id', venta._pedido_id);
+        const mapped: VentaDetalle[] = (pdData || []).map((d: any) => ({
+          id: d.id,
+          cantidad: Number(d.cantidad_pedida) || 0,
+          precio_unitario: Number(d.precio_unitario) || 0,
+          descuento: Number(d.descuento_porcentaje) || 0,
+          subtotal: Number(d.subtotal) || 0,
+          productos: d.productos || null,
+        }));
+        setDetalles(mapped);
+        setPagos([]);
+        setDetalleDialogOpen(true);
+        return;
+      }
       const [detallesRes, pagosRes] = await Promise.all([
         supabase
           .from('venta_detalles')
@@ -500,7 +571,10 @@ export default function Ventas() {
       key: 'numero_comprobante',
       header: 'Nº Comprobante',
       render: (item: Venta) => (
-        <span className="font-mono font-medium">#{item.numero_comprobante.toString().padStart(8, '0')}</span>
+        <span className="font-mono font-medium">
+          {item._es_pedido ? 'P-' : '#'}
+          {item.numero_comprobante.toString().padStart(item._es_pedido ? 6 : 8, '0')}
+        </span>
       ),
     },
     {
@@ -519,6 +593,16 @@ export default function Ventas() {
       render: (item: Venta) => item.clientes?.nombre || 'Consumidor Final',
     },
     {
+      key: 'origen',
+      header: 'Origen',
+      render: (item: Venta) => {
+        const origen = origenPorVenta[item.id] || 'mostrador';
+        const label = origen.charAt(0).toUpperCase() + origen.slice(1);
+        const variant = origen === 'web' ? 'default' : origen === 'reparto' ? 'secondary' : 'outline';
+        return <Badge variant={variant as any}>{label}</Badge>;
+      },
+    },
+    {
       key: 'total',
       header: 'Total',
       render: (item: Venta) => (
@@ -532,7 +616,11 @@ export default function Ventas() {
       header: 'Estado',
       render: (item: Venta) => (
         <div className="flex items-center gap-2">
-          {item.anulada ? (
+          {item._es_pedido ? (
+            <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+              {item._pedido_estado || 'Pedido'}
+            </Badge>
+          ) : item.anulada ? (
             <Badge variant="destructive">Anulada</Badge>
           ) : item.estado === 'pedido' ? (
             <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
@@ -557,7 +645,7 @@ export default function Ventas() {
           <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)} title="Ver detalle">
             <Eye className="h-4 w-4" />
           </Button>
-          {item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+          {!item._es_pedido && item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
             <Button 
               variant="ghost" 
               size="icon" 
@@ -571,7 +659,7 @@ export default function Ventas() {
               <Printer className="h-4 w-4 text-primary" />
             </Button>
           )}
-          {!item.anulada && canAnular && (
+          {!item._es_pedido && !item.anulada && canAnular && (
             <Button
               variant="ghost"
               size="icon"
