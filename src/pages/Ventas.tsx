@@ -217,30 +217,6 @@ export default function Ventas() {
     setVendedores(data || []);
   };
 
-  const fetchOrigenes = async () => {
-    // Fetch all pedidos linked to a venta, paginated to bypass 1K limit
-    const pageSize = 1000;
-    let from = 0;
-    const map: Record<string, string> = {};
-    while (true) {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('venta_id, tipo_pedido')
-        .not('venta_id', 'is', null)
-        .range(from, from + pageSize - 1);
-      if (error) {
-        console.error('Error fetching pedidos origenes:', error);
-        break;
-      }
-      (data || []).forEach((p: any) => {
-        if (p.venta_id) map[p.venta_id] = p.tipo_pedido || 'reparto';
-      });
-      if (!data || data.length < pageSize) break;
-      from += pageSize;
-    }
-    setOrigenPorVenta(map);
-  };
-
   const fetchVentas = async () => {
     setLoading(true);
     try {
@@ -254,24 +230,87 @@ export default function Ventas() {
         .order('fecha', { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch profiles for each venta
-      if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(v => v.usuario_id))];
+
+      const ventasReales = (data || []) as any[];
+      const origenMap: Record<string, string> = {};
+
+      // Origen para ventas reales: mapear via pedidos.venta_id (legacy)
+      // y para pedidos web/reparto crear filas sintéticas (no tienen venta).
+      const pedidosPaginados: any[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      while (true) {
+        const { data: pData, error: pErr } = await supabase
+          .from('pedidos')
+          .select(`
+            id, numero_pedido, fecha_pedido, subtotal, descuento, total,
+            usuario_id, cliente_id, estado, tipo_pedido, venta_id,
+            clientes(nombre, dni_cuit, condicion_iva, vendedor_id)
+          `)
+          .or('venta_id.not.is.null,tipo_pedido.in.(web,reparto)')
+          .order('fecha_pedido', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (pErr) {
+          console.error('Error fetching pedidos:', pErr);
+          break;
+        }
+        pedidosPaginados.push(...(pData || []));
+        if (!pData || pData.length < pageSize) break;
+        from += pageSize;
+      }
+
+      // Map para ventas reales -> origen del pedido vinculado
+      pedidosPaginados.forEach((p: any) => {
+        if (p.venta_id) origenMap[p.venta_id] = p.tipo_pedido || 'reparto';
+      });
+
+      // Filas sintéticas: pedidos web/reparto sin venta asociada
+      const sinteticos: any[] = pedidosPaginados
+        .filter((p: any) => !p.venta_id && (p.tipo_pedido === 'web' || p.tipo_pedido === 'reparto'))
+        .map((p: any) => {
+          origenMap[p.id] = p.tipo_pedido;
+          return {
+            id: p.id,
+            numero_comprobante: p.numero_pedido,
+            fecha: p.fecha_pedido,
+            subtotal: Number(p.subtotal) || 0,
+            descuento: Number(p.descuento) || 0,
+            total: Number(p.total) || 0,
+            anulada: false,
+            motivo_anulacion: null,
+            fecha_anulacion: null,
+            usuario_id: p.usuario_id,
+            cliente_id: p.cliente_id,
+            caja_id: null,
+            estado: 'confirmada',
+            clientes: p.clientes || null,
+            comprobantes_afip: [],
+            _es_pedido: true,
+            _pedido_id: p.id,
+            _tipo_pedido: p.tipo_pedido,
+            _numero_pedido: p.numero_pedido,
+            _pedido_estado: p.estado,
+          };
+        });
+
+      // Profiles para ambas listas
+      const allRows = [...ventasReales, ...sinteticos];
+      const userIds = [...new Set(allRows.map(v => v.usuario_id).filter(Boolean))];
+      let profilesMap = new Map<string, any>();
+      if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, nombre')
           .in('id', userIds);
-        
-        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
-        const ventasWithProfiles = data.map(v => ({
-          ...v,
-          profiles: profilesMap.get(v.usuario_id) || null
-        }));
-        setVentas(ventasWithProfiles);
-      } else {
-        setVentas(data || []);
+        profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
       }
+
+      const rowsWithProfiles = allRows
+        .map((v: any) => ({ ...v, profiles: profilesMap.get(v.usuario_id) || null }))
+        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+      setVentas(rowsWithProfiles);
+      setOrigenPorVenta(origenMap);
 
       // Fetch all payments - no filter to avoid URL length issues with large datasets
       const { data: pagosData } = await supabase
