@@ -299,7 +299,8 @@ export function ParadaSheet({ open, onOpenChange, hojaRutaId, parada }: ParadaSh
               value={obs}
               onChange={(e) => setObs(e.target.value)}
             />
-            <Button className="w-full h-12" variant="destructive" onClick={handleRechazado} disabled={cambiarEstado.isPending}>
+            <Button className="w-full h-12" variant="destructive" onClick={handleRechazado} disabled={cambiarEstado.isPending || registrarDevolucion.isPending}>
+              {(cambiarEstado.isPending || registrarDevolucion.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               <XCircle className="h-4 w-4 mr-2" />
               Confirmar
             </Button>
