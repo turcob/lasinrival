@@ -80,6 +80,12 @@ interface Venta {
   clientes?: { nombre: string; dni_cuit: string | null; condicion_iva?: number; vendedor_id?: string | null } | null;
   profiles?: { nombre: string } | null;
   comprobantes_afip?: ComprobanteAfip[] | null;
+  // Synthetic-row markers for web/reparto pedidos shown alongside real ventas
+  _es_pedido?: boolean;
+  _pedido_id?: string;
+  _tipo_pedido?: string;
+  _numero_pedido?: number;
+  _pedido_estado?: string;
 }
 
 interface VentaDetalle {
