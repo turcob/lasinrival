@@ -352,6 +352,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
       }
 
       toast.success('Liquidación generada correctamente');
+      await generarExcelDetalle(data);
       calcularLiquidaciones();
       if (historialOpen) cargarHistorial();
       onRefresh();
