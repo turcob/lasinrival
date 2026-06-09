@@ -352,6 +352,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
       }
 
       toast.success('Liquidación generada correctamente');
+      await generarExcelDetalle(data);
       calcularLiquidaciones();
       if (historialOpen) cargarHistorial();
       onRefresh();
@@ -412,6 +413,7 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
   };
 
   const exportarExcel = () => {
+    // resumen general (todas las liquidaciones del listado)
     const data = liquidaciones.map(l => ({
       'Empleado': l.empleado.nombre,
       'Sueldo Base': l.sueldo_base,
@@ -427,6 +429,100 @@ export function LiquidacionSection({ empleados, onRefresh }: LiquidacionSectionP
     XLSX.utils.book_append_sheet(wb, ws, 'Liquidaciones');
     XLSX.writeFile(wb, `Liquidaciones_${fechaDesde}_a_${fechaHasta}.xlsx`);
     toast.success('Archivo exportado correctamente');
+  };
+
+  const generarExcelDetalle = async (data: LiquidacionData) => {
+    try {
+      const emp = data.empleado;
+      const pct = Number(emp.comision_porcentaje || 0);
+      const endDateNext = new Date(fechaHasta);
+      endDateNext.setDate(endDateNext.getDate() + 1);
+      const endDateNextStr = endDateNext.toISOString().split('T')[0];
+
+      // Vendedores vinculados
+      const { data: vendedoresData } = await supabase
+        .from('vendedores')
+        .select('id, nombre, empleado_id')
+        .eq('empleado_id', emp.id);
+      const vendIds = (vendedoresData ?? []).map((v: any) => v.id);
+
+      // Pedidos web/reparto despachados en rango
+      let pedidos: any[] = [];
+      if (vendIds.length > 0) {
+        const { data: pedData } = await supabase
+          .from('pedidos')
+          .select('id, numero_pedido, vendedor_id, total, estado, fecha_entrega_real, fecha_pedido, tipo_pedido, cliente:clientes(razon_social, nombre_fantasia)')
+          .in('vendedor_id', vendIds)
+          .eq('estado', 'despachado');
+        pedidos = (pedData ?? []).filter((p: any) => {
+          const f = p.fecha_entrega_real || p.fecha_pedido;
+          if (!f) return false;
+          const fd = f.split('T')[0];
+          return fd >= fechaDesde && fd <= fechaHasta;
+        });
+      }
+
+      // Ventas tradicionales confirmadas
+      const { data: ventasData } = await supabase
+        .from('ventas')
+        .select('id, numero_comprobante, total, estado, anulada, fecha, cliente:clientes(razon_social, nombre_fantasia)')
+        .eq('empleado_id', emp.id)
+        .eq('anulada', false)
+        .eq('estado', 'confirmada')
+        .gte('fecha', fechaDesde)
+        .lte('fecha', endDateNextStr);
+
+      const filasPedidos = pedidos.map((p: any) => {
+        const total = Number(p.total || 0);
+        const cliente = p.cliente?.nombre_fantasia || p.cliente?.razon_social || '';
+        return {
+          'Tipo': 'Pedido Web/Reparto',
+          'Comprobante': p.numero_pedido ? `PED-${String(p.numero_pedido).padStart(6, '0')}` : p.id,
+          'Fecha': (p.fecha_entrega_real || p.fecha_pedido || '').split('T')[0],
+          'Cliente': cliente,
+          'Total Venta': total,
+          '% Comisión': pct,
+          'Comisión': total * (pct / 100),
+        };
+      });
+
+      const filasVentas = (ventasData ?? []).map((v: any) => {
+        const total = Number(v.total || 0);
+        const cliente = v.cliente?.nombre_fantasia || v.cliente?.razon_social || '';
+        return {
+          'Tipo': 'Venta Tradicional',
+          'Comprobante': v.numero_comprobante || v.id,
+          'Fecha': (v.fecha || '').split('T')[0],
+          'Cliente': cliente,
+          'Total Venta': total,
+          '% Comisión': pct,
+          'Comisión': total * (pct / 100),
+        };
+      });
+
+      const todas = [...filasPedidos, ...filasVentas];
+      const totalVentas = todas.reduce((s, r) => s + Number(r['Total Venta'] || 0), 0);
+      const totalComision = todas.reduce((s, r) => s + Number(r['Comisión'] || 0), 0);
+
+      const filasConTotales: any[] = [...todas, {}, {
+        'Tipo': 'TOTAL',
+        'Comprobante': '',
+        'Fecha': '',
+        'Cliente': '',
+        'Total Venta': totalVentas,
+        '% Comisión': '',
+        'Comisión': totalComision,
+      }];
+
+      const ws = XLSX.utils.json_to_sheet(filasConTotales);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Detalle Comisiones');
+      const safeNombre = emp.nombre.replace(/[^a-zA-Z0-9]+/g, '_');
+      XLSX.writeFile(wb, `Liquidacion_${safeNombre}_${fechaDesde}_a_${fechaHasta}.xlsx`);
+    } catch (e) {
+      console.error('Error generando excel detalle:', e);
+      toast.error('No se pudo generar el Excel de detalle');
+    }
   };
 
   const setPresetMes = () => {
