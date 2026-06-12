@@ -324,6 +324,32 @@ export default function Productos() {
       precio_costo: 0,
     });
   };
+  
+  const exportarExcel = () => {
+    if (productos.length === 0) {
+      toast.error('No hay productos para exportar');
+      return;
+    }
+
+    const data = productos.map(p => ({
+      'Código': p.codigo_articulo,
+      'Descripción': p.descripcion,
+      'Unidad de Medida': p.unidad_medida,
+      'Categoría': p.categorias?.nombre || '-',
+      'Subcategoría': p.subcategorias?.nombre || '-',
+      'Marca': p.marcas?.nombre || '-',
+      'Precio de Costo': p.precio_costo || 0,
+      'Stock Actual': p.stock_actual || 0,
+      'Stock Mínimo': p.stock_minimo || 0,
+      'Activo': p.activo ? 'Sí' : 'No',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+    XLSX.writeFile(wb, 'Productos_y_Costos.xlsx');
+    toast.success('Archivo exportado correctamente');
+  };
 
   const filteredSubcategorias = subcategorias.filter(
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
