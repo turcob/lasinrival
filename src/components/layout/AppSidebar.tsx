@@ -192,14 +192,14 @@ export function AppSidebar() {
       <div className="flex h-full flex-col">
         {/* Header */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <Package className="h-5 w-5 text-sidebar-primary-foreground" />
-              </div>
-              <span className="font-semibold text-sidebar-foreground">{nombreSistema}</span>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-white p-0.5 border border-sidebar-border flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img src="/logo-empresa.jpg" alt="Logo" className="h-full w-full object-contain" />
             </div>
-          )}
+            {!collapsed && (
+              <span className="font-semibold text-sidebar-foreground truncate">{nombreSistema}</span>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
