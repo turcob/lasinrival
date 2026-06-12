@@ -104,13 +104,8 @@ export default function Auth() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-8">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-44 w-auto bg-white p-4 rounded-2xl shadow-md flex items-center justify-center border border-muted">
-              <img src="/logo-empresa.jpg" alt="Logo" className="h-full object-contain" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground font-medium">Iniciar Sesión</p>
-            </div>
+          <div className="h-44 w-auto bg-white p-4 rounded-2xl shadow-md flex items-center justify-center border border-muted">
+            <img src="/logo-empresa.jpg" alt="Logo" className="h-full object-contain" />
           </div>
         </div>
 
