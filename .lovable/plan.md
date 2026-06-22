@@ -1,53 +1,63 @@
-## Diagnóstico
+# Fix: Contadores de tarjetas de estado en Pedidos
 
-Revisé `src/pages/Ventas.tsx` (filtros en `ventasFiltradas` y UI de selects/calendar). Encontré dos bugs concretos y verifiqué el resto:
+## Causa raíz
 
-### Bug 1 — Filtro por fecha no funciona (causa principal)
-Los dos `CalendarComponent` (Desde/Hasta) están montados dentro de un `Popover` **sin** la clase `pointer-events-auto`. Por la regla conocida de shadcn/Radix, el calendario queda con los clicks bloqueados dentro del popover, así que el usuario abre el calendario, hace click en un día y no pasa nada: `fechaDesde`/`fechaHasta` nunca se setean → `ventasFiltradas` nunca recibe el filtro.
+En `src/pages/Pedidos.tsx` (línea 91-94), el hook `usePedidos` se llama pasando el filtro de estado activo al servidor:
 
-### Bug 2 — Filtro "Estado = Pedidos" oculta justo los pedidos
-En `ventasFiltradas`:
 ```ts
-if (filtroEstado !== 'todos') {
-  if (v._es_pedido) {
-    if (filtroEstado === 'pedido') return false; // invertido
-  } else if (v.estado !== filtroEstado) {
-    return false;
-  }
-}
+const { data: pedidos } = usePedidos({
+  estado: filtroEstado !== 'todos' ? filtroEstado : undefined,
+  tipoPedido: ...
+});
 ```
-Las filas sintéticas de pedidos web/reparto (`_es_pedido = true`) se descartan cuando el usuario elige "Pedidos", y se muestran cuando elige "Confirmadas" (porque su `estado` sintético es `'confirmada'`). Es exactamente al revés de lo esperado.
 
-### Filtros verificados OK (no se tocan)
-- **Usuario**: compara `v.usuario_id` contra el id seleccionado. Correcto.
-- **Vendedor del cliente**: lee `v.clientes?.vendedor_id` (ya viene en el `select` de `fetchVentas`). Correcto, incluido el caso "Sin vendedor".
-- **Origen**: usa `origenPorVenta[v.id]` con default `'mostrador'`. Correcto para reales y sintéticas (en sintéticas la key es el `pedido_id` que también es `v.id`).
-- **Búsqueda por Nº comprobante**: la maneja `DataTable` sobre `numero_comprobante`. Correcto.
+Esto significa que el dataset `pedidos` solo contiene los pedidos del estado seleccionado (ej. solo "pendiente"). Por eso las tarjetas de "Preparado", "Despachado" y "Rechazado" muestran 0 — no hay datos de esos estados en memoria.
 
-## Cambios
+Cuando el usuario clickea otra tarjeta, cambia `filtroEstado`, se relanza la query, y recién entonces aparece el contador de ese estado (mientras los otros vuelven a quedar en 0).
 
-Archivo único: `src/pages/Ventas.tsx`.
+## Solución propuesta
 
-1. **Calendar Desde y Hasta** (líneas ~760 y ~777): agregar `className="p-3 pointer-events-auto"` a ambos `CalendarComponent` para que los clicks lleguen al día y `onSelect` dispare el cambio de estado.
+Mover el filtrado por estado del lado servidor al lado cliente, de modo que la página siempre tenga en memoria todos los pedidos del tipo elegido (web / reparto / ambos) y los contadores se calculen siempre sobre el total real.
 
-2. **Filtro Estado** (bloque dentro de `ventasFiltradas`): reescribir la rama de `_es_pedido` para que:
-   - Con `filtroEstado === 'pedido'` → las filas sintéticas pasan (no se descartan).
-   - Con `filtroEstado === 'confirmada'` → las filas sintéticas no pasan (hoy se cuelan).
-   - Con `filtroEstado === 'todos'` → todo pasa (sin cambios).
+### Cambios en `src/pages/Pedidos.tsx`
 
-   Queda así:
+1. Quitar `estado` del parámetro de `usePedidos`:
    ```ts
-   if (filtroEstado !== 'todos') {
-     if (v._es_pedido) {
-       if (filtroEstado !== 'pedido') return false;
-     } else if (v.estado !== filtroEstado) {
-       return false;
-     }
-   }
+   const { data: pedidos, isLoading } = usePedidos({
+     tipoPedido: tipoPedidoFiltro !== 'ambos' ? tipoPedidoFiltro : undefined,
+   });
    ```
 
-## Fuera de alcance
+2. Agregar el filtro de estado dentro del `useMemo` de `pedidosFiltrados`, junto con búsqueda/fechas:
+   ```ts
+   if (filtroEstado !== 'todos') {
+     resultado = resultado.filter(p => p.estado === filtroEstado);
+   }
+   ```
+   Incluir `filtroEstado` en las dependencias del `useMemo`.
 
-- No se cambian RPCs ni esquema.
-- No se modifica la lógica de carga (`fetchVentas`) ni el resumen RPC de totales.
-- No se tocan permisos ni columnas de la tabla.
+3. Recalcular los contadores siempre sobre la lista completa filtrada por búsqueda/fecha (sin aplicar el filtro de estado), para que cada tarjeta muestre la cantidad real de pedidos visibles del dataset actual:
+   ```ts
+   const conteoPorEstado = useMemo(() => {
+     const base = (pedidos || []).filter(/* aplicar busqueda/producto/fechas, NO estado */);
+     return estadosActivos.reduce((acc, est) => {
+       acc[est] = base.filter(p => p.estado === est).length;
+       return acc;
+     }, {} as Record<PedidoEstado, number>);
+   }, [pedidos, busqueda, busquedaProducto, fechaDesde, fechaHasta]);
+   ```
+   Y reemplazar el cálculo actual del bloque `{/* Stats */}` por `conteoPorEstado[key]`.
+
+Con esto:
+- Al crear / cambiar estado / rechazar un pedido, React Query invalida `['pedidos']` (ya implementado en `usePedidos.ts`) → se refetchea el dataset completo → los contadores se actualizan automáticamente.
+- Al cambiar búsqueda, producto o fechas, los contadores se recalculan vía `useMemo`.
+- Ya no hace falta clickear una tarjeta para "refrescar".
+
+## Consideraciones técnicas
+
+- Performance: la query trae todos los pedidos (sin paginación por estado). Para volúmenes muy grandes podría ser pesado, pero hoy ya se devuelven todos los detalles anidados igual; mover el filtro a cliente no agrega carga significativa porque antes también se traían todos al cambiar de tarjeta.
+- No se tocan hooks, queries de Supabase, ni esquema. Cambio aislado a la vista.
+
+## Archivos a modificar
+
+- `src/pages/Pedidos.tsx` (único archivo)
