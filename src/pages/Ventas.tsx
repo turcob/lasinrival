@@ -220,18 +220,28 @@ export default function Ventas() {
   const fetchVentas = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ventas')
-        .select(`
-          *,
-          clientes(nombre, dni_cuit, condicion_iva, vendedor_id),
-          comprobantes_afip(*)
-        `)
-        .order('fecha', { ascending: false });
-
-      if (error) throw error;
-
-      const ventasReales = (data || []) as any[];
+      // Paginar ventas para superar el límite de 1000 filas de Supabase
+      const ventasReales: any[] = [];
+      {
+        const vPageSize = 1000;
+        let vFrom = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { data: vPage, error: vErr } = await supabase
+            .from('ventas')
+            .select(`
+              *,
+              clientes(nombre, dni_cuit, condicion_iva, vendedor_id),
+              comprobantes_afip(*)
+            `)
+            .order('fecha', { ascending: false })
+            .range(vFrom, vFrom + vPageSize - 1);
+          if (vErr) throw vErr;
+          ventasReales.push(...(vPage || []));
+          if (!vPage || vPage.length < vPageSize) break;
+          vFrom += vPageSize;
+        }
+      }
       const origenMap: Record<string, string> = {};
 
       // Origen para ventas reales: mapear via pedidos.venta_id (legacy)
