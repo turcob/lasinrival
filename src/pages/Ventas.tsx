@@ -312,22 +312,30 @@ export default function Ventas() {
       setVentas(rowsWithProfiles);
       setOrigenPorVenta(origenMap);
 
-      // Fetch all payments - no filter to avoid URL length issues with large datasets
-      const { data: pagosData } = await supabase
-        .from('venta_pagos')
-        .select('id, venta_id, monto, formas_pago(nombre)');
-
-      if (pagosData) {
-        const pagosByVenta: Record<string, VentaPago[]> = {};
-        pagosData.forEach((pago: any) => {
+      // Fetch all payments - paginated to bypass Supabase 1k row limit
+      const pageSize = 1000;
+      let offset = 0;
+      const pagosByVenta: Record<string, VentaPago[]> = {};
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data: pagosPage, error: pagosErr } = await supabase
+          .from('venta_pagos')
+          .select('id, venta_id, monto, formas_pago(nombre)')
+          .range(offset, offset + pageSize - 1);
+        if (pagosErr) {
+          console.error('Error fetching venta_pagos page:', pagosErr);
+          break;
+        }
+        if (!pagosPage || pagosPage.length === 0) break;
+        pagosPage.forEach((pago: any) => {
           const ventaId = pago.venta_id;
-          if (!pagosByVenta[ventaId]) {
-            pagosByVenta[ventaId] = [];
-          }
+          if (!pagosByVenta[ventaId]) pagosByVenta[ventaId] = [];
           pagosByVenta[ventaId].push(pago);
         });
-        setPagosPorVenta(pagosByVenta);
+        if (pagosPage.length < pageSize) break;
+        offset += pageSize;
       }
+      setPagosPorVenta(pagosByVenta);
     } catch (error) {
       console.error('Error fetching ventas:', error);
       toast.error('Error al cargar las ventas');
