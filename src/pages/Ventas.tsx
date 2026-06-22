@@ -363,7 +363,7 @@ export default function Ventas() {
       // Filtro por estado (los pedidos web/reparto se muestran salvo cuando se filtra explícitamente por estado="pedido")
       if (filtroEstado !== 'todos') {
         if (v._es_pedido) {
-          if (filtroEstado === 'pedido') return false;
+          if (filtroEstado !== 'pedido') return false;
         } else if (v.estado !== filtroEstado) {
           return false;
         }
@@ -763,6 +763,7 @@ export default function Ventas() {
                 onSelect={setFechaDesde}
                 locale={es}
                 initialFocus
+                className="p-3 pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
@@ -780,6 +781,7 @@ export default function Ventas() {
                 onSelect={setFechaHasta}
                 locale={es}
                 initialFocus
+                className="p-3 pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
