@@ -65,7 +65,7 @@ export default function Transferencias() {
 
   return (
     <MainLayout>
-      <PageHeader title="Transferencias" description="Gestión de transferencias bancarias recibidas" icon={ArrowLeftRight}>
+      <PageHeader title="Transferencias" description="Gestión de transferencias bancarias recibidas">
         <Button onClick={() => setNuevaOpen(true)}><Plus className="h-4 w-4 mr-2" />Nueva Transferencia</Button>
       </PageHeader>
 
