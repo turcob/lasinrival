@@ -28,7 +28,8 @@ import {
   Building2,
   PackageX,
   Route as RouteIcon,
-  Wallet
+  Wallet,
+  ArrowLeftRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,6 +77,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
   { title: 'Clover', href: '/clover', icon: Smartphone, module: 'clientes' },
   { title: 'Cheques', href: '/cheques', icon: FileCheck, module: 'cheques' },
+  { title: 'Transferencias', href: '/transferencias', icon: ArrowLeftRight, module: 'transferencias' },
   { title: 'Facturación', href: '/facturacion', icon: DollarSign, module: 'facturacion' },
   { title: 'Reporte Pagos', href: '/reporte-pagos', icon: BarChart3, module: 'clientes' },
   { title: 'Pendientes de Chofer', href: '/pendientes-chofer', icon: Wallet, module: 'empleados' },
