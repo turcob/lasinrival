@@ -399,11 +399,9 @@ export default function Ventas() {
     });
   }, [ventas, filtroUsuario, filtroVendedor, filtroOrigen, filtroEstado, fechaDesde, fechaHasta, origenPorVenta]);
 
-  // If vendor/origen filters are active, RPC totals are inaccurate — compute client-side from filtered ventas.
+  // Always compute client-side from filtered ventas so that origen/vendedor/fecha filters
+  // and synthetic pedidos (web/reparto) are reflected correctly in the totals.
   const totalesPorMedioPago = useMemo(() => {
-    const usaClientSide = filtroVendedor !== 'todos' || filtroOrigen !== 'todos';
-    if (!usaClientSide) return rpcTotales;
-
     const totales: Record<string, number> = {};
     let totalGeneral = 0;
     let countVentas = 0;
