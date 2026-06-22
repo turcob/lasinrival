@@ -368,13 +368,10 @@ export default function Ventas() {
         if (origen !== filtroOrigen) return false;
       }
 
-      // Filtro por estado (los pedidos web/reparto se muestran salvo cuando se filtra explícitamente por estado="pedido")
+      // Filtro por estado: las filas sintéticas de pedidos web/reparto tienen estado 'confirmada',
+      // así que se comportan como ventas confirmadas en el filtro.
       if (filtroEstado !== 'todos') {
-        if (v._es_pedido) {
-          if (filtroEstado !== 'pedido') return false;
-        } else if (v.estado !== filtroEstado) {
-          return false;
-        }
+        if (v.estado !== filtroEstado) return false;
       }
       
       // Filtro por fecha
