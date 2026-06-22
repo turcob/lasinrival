@@ -89,7 +89,6 @@ function PedidosContent() {
   const { tipo: tipoPedidoFiltro } = useTipoPedido();
 
   const { data: pedidos, isLoading } = usePedidos({
-    estado: filtroEstado !== 'todos' ? filtroEstado : undefined,
     tipoPedido: tipoPedidoFiltro !== 'ambos' ? tipoPedidoFiltro : undefined,
   });
 
@@ -102,7 +101,8 @@ function PedidosContent() {
     });
   };
 
-  const pedidosFiltrados = useMemo(() => {
+  // Lista base: aplica búsqueda, producto y fechas (NO estado). Se usa para los contadores.
+  const pedidosBase = useMemo(() => {
     let resultado = pedidos || [];
 
     // Filtro por búsqueda general (número, cliente)
@@ -138,6 +138,20 @@ function PedidosContent() {
 
     return resultado;
   }, [pedidos, busqueda, busquedaProducto, fechaDesde, fechaHasta]);
+
+  // Lista final mostrada en la tabla: aplica también el filtro de estado.
+  const pedidosFiltrados = useMemo(() => {
+    if (filtroEstado === 'todos') return pedidosBase;
+    return pedidosBase.filter(p => p.estado === filtroEstado);
+  }, [pedidosBase, filtroEstado]);
+
+  // Conteo por estado, siempre sobre la base (sin filtrar por estado).
+  const conteoPorEstado = useMemo(() => {
+    return estadosActivos.reduce((acc, est) => {
+      acc[est] = pedidosBase.filter(p => p.estado === est).length;
+      return acc;
+    }, {} as Record<PedidoEstado, number>);
+  }, [pedidosBase]);
 
   // Totales del producto filtrado
   const totalesProductoFiltrado = useMemo(() => {
@@ -278,8 +292,7 @@ function PedidosContent() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {estadosActivos.map((key) => {
                 const config = estadoConfig[key];
-                const baseList = (busqueda || busquedaProducto) ? pedidosFiltrados : (pedidos || []);
-                const count = baseList.filter(p => p.estado === key).length;
+                const count = conteoPorEstado[key] ?? 0;
                 const Icon = config.icon;
                 return (
                   <div
