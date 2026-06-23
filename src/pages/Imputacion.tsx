@@ -474,6 +474,66 @@ export default function Imputacion() {
     return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
   };
 
+  const [uploadingTransfId, setUploadingTransfId] = useState<string | null>(null);
+
+  const handleVerComprobante = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('comprobantes-cobros')
+        .createSignedUrl(path, 60 * 10);
+      if (error || !data?.signedUrl) throw error || new Error('No se pudo generar URL');
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      console.error('Error abriendo comprobante:', e);
+      toast.error('No se pudo abrir el comprobante');
+    }
+  };
+
+  const handleUploadComprobante = async (
+    mov: MovimientoPendiente,
+    file: File
+  ) => {
+    if (!mov.transferencia_id) return;
+    setUploadingTransfId(mov.transferencia_id);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `transferencias/${mov.transferencia_id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('comprobantes-cobros')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || 'image/jpeg',
+        });
+      if (upErr) throw upErr;
+
+      // Eliminar el anterior si existía
+      if (mov.foto_comprobante_path) {
+        await supabase.storage
+          .from('comprobantes-cobros')
+          .remove([mov.foto_comprobante_path])
+          .catch(() => {});
+      }
+
+      const { error: updErr } = await supabase
+        .from('transferencias')
+        .update({
+          foto_comprobante_path: fileName,
+          foto_comprobante_nombre: file.name,
+        })
+        .eq('id', mov.transferencia_id);
+      if (updErr) throw updErr;
+
+      toast.success(mov.foto_comprobante_path ? 'Comprobante reemplazado' : 'Comprobante adjuntado');
+      fetchMovimientos();
+    } catch (e: any) {
+      console.error('Error subiendo comprobante:', e);
+      toast.error('Error al subir el comprobante: ' + (e?.message || ''));
+    } finally {
+      setUploadingTransfId(null);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
