@@ -251,132 +251,72 @@ export default function Ventas() {
   const fetchVentas = async () => {
     setLoading(true);
     try {
-      // Paginar ventas para superar el límite de 1000 filas de Supabase
-      const ventasReales: any[] = [];
-      {
-        const vPageSize = 1000;
-        let vFrom = 0;
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { data: vPage, error: vErr } = await supabase
-            .from('ventas')
-            .select(`
-              *,
-              clientes(nombre, dni_cuit, condicion_iva, vendedor_id),
-              comprobantes_afip(*)
-            `)
-            .order('fecha', { ascending: false })
-            .range(vFrom, vFrom + vPageSize - 1);
-          if (vErr) throw vErr;
-          ventasReales.push(...(vPage || []));
-          if (!vPage || vPage.length < vPageSize) break;
-          vFrom += vPageSize;
-        }
+      const params: Record<string, any> = {
+        p_estado: filtroEstado,
+        p_limit: pageSize,
+        p_offset: (page - 1) * pageSize,
+      };
+      if (filtroUsuario !== 'todos') params.p_usuario_id = filtroUsuario;
+      if (filtroVendedor === 'sin_vendedor') {
+        params.p_sin_vendedor = true;
+      } else if (filtroVendedor !== 'todos') {
+        params.p_vendedor_id = filtroVendedor;
       }
+      if (filtroOrigen !== 'todos') params.p_origen = filtroOrigen;
+      if (fechaDesde) params.p_fecha_desde = startOfDay(fechaDesde).toISOString();
+      if (fechaHasta) params.p_fecha_hasta = endOfDay(fechaHasta).toISOString();
+      if (searchDebounced) params.p_search = searchDebounced;
+
+      const { data, error } = await supabase.rpc('get_ventas_lista', params);
+      if (error) throw error;
+
+      const rows = (data as any[]) || [];
+      setTotalCount(rows.length > 0 ? Number(rows[0].total_count) || 0 : 0);
+
       const origenMap: Record<string, string> = {};
-
-      // Origen para ventas reales: mapear via pedidos.venta_id (legacy)
-      // y para pedidos web/reparto crear filas sintéticas (no tienen venta).
-      const pedidosPaginados: any[] = [];
-      const pageSize = 1000;
-      let from = 0;
-      while (true) {
-        const { data: pData, error: pErr } = await supabase
-          .from('pedidos')
-          .select(`
-            id, numero_pedido, fecha_pedido, subtotal, descuento, total,
-            usuario_id, cliente_id, estado, tipo_pedido, venta_id,
-            clientes(nombre, dni_cuit, condicion_iva, vendedor_id)
-          `)
-          .or('venta_id.not.is.null,tipo_pedido.in.(web,reparto)')
-          .order('fecha_pedido', { ascending: false })
-          .range(from, from + pageSize - 1);
-        if (pErr) {
-          console.error('Error fetching pedidos:', pErr);
-          break;
-        }
-        pedidosPaginados.push(...(pData || []));
-        if (!pData || pData.length < pageSize) break;
-        from += pageSize;
-      }
-
-      // Map para ventas reales -> origen del pedido vinculado
-      pedidosPaginados.forEach((p: any) => {
-        if (p.venta_id) origenMap[p.venta_id] = p.tipo_pedido || 'reparto';
+      const pagosMap: Record<string, VentaPago[]> = {};
+      const mapped: Venta[] = rows.map((r: any) => {
+        origenMap[r.id] = r.origen || 'mostrador';
+        pagosMap[r.id] = (r.pagos || []).map((p: any) => ({
+          id: p.id,
+          monto: Number(p.monto) || 0,
+          formas_pago: p.forma_pago_nombre ? { nombre: p.forma_pago_nombre } : null,
+        }));
+        return {
+          id: r.id,
+          numero_comprobante: r.numero_comprobante,
+          fecha: r.fecha,
+          subtotal: Number(r.subtotal) || 0,
+          descuento: Number(r.descuento) || 0,
+          total: Number(r.total) || 0,
+          anulada: !!r.anulada,
+          motivo_anulacion: r.motivo_anulacion,
+          fecha_anulacion: r.fecha_anulacion,
+          usuario_id: r.usuario_id,
+          cliente_id: r.cliente_id,
+          caja_id: r.caja_id,
+          estado: r.estado,
+          clientes: r.cliente_nombre
+            ? {
+                nombre: r.cliente_nombre,
+                dni_cuit: r.cliente_dni_cuit,
+                condicion_iva: r.cliente_condicion_iva,
+                vendedor_id: r.cliente_vendedor_id,
+              }
+            : null,
+          profiles: r.usuario_nombre ? { nombre: r.usuario_nombre } : null,
+          comprobantes_afip: (r.afip || []) as ComprobanteAfip[],
+          _es_pedido: !!r.es_pedido,
+          _pedido_id: r.pedido_id || undefined,
+          _tipo_pedido: r.tipo_pedido || undefined,
+          _numero_pedido: r.es_pedido ? r.numero_comprobante : undefined,
+          _pedido_estado: r.pedido_estado || undefined,
+        };
       });
 
-      // Filas sintéticas: pedidos web/reparto sin venta asociada
-      const sinteticos: any[] = pedidosPaginados
-        .filter((p: any) => !p.venta_id && (p.tipo_pedido === 'web' || p.tipo_pedido === 'reparto'))
-        .map((p: any) => {
-          origenMap[p.id] = p.tipo_pedido;
-          return {
-            id: p.id,
-            numero_comprobante: p.numero_pedido,
-            fecha: p.fecha_pedido,
-            subtotal: Number(p.subtotal) || 0,
-            descuento: Number(p.descuento) || 0,
-            total: Number(p.total) || 0,
-            anulada: false,
-            motivo_anulacion: null,
-            fecha_anulacion: null,
-            usuario_id: p.usuario_id,
-            cliente_id: p.cliente_id,
-            caja_id: null,
-            estado: 'confirmada',
-            clientes: p.clientes || null,
-            comprobantes_afip: [],
-            _es_pedido: true,
-            _pedido_id: p.id,
-            _tipo_pedido: p.tipo_pedido,
-            _numero_pedido: p.numero_pedido,
-            _pedido_estado: p.estado,
-          };
-        });
-
-      // Profiles para ambas listas
-      const allRows = [...ventasReales, ...sinteticos];
-      const userIds = [...new Set(allRows.map(v => v.usuario_id).filter(Boolean))];
-      let profilesMap = new Map<string, any>();
-      if (userIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, nombre')
-          .in('id', userIds);
-        profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
-      }
-
-      const rowsWithProfiles = allRows
-        .map((v: any) => ({ ...v, profiles: profilesMap.get(v.usuario_id) || null }))
-        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-
-      setVentas(rowsWithProfiles);
+      setVentas(mapped);
       setOrigenPorVenta(origenMap);
-
-      // Fetch all payments - paginated to bypass Supabase 1k row limit
-      const pagosPageSize = 1000;
-      let pagosOffset = 0;
-      const pagosByVenta: Record<string, VentaPago[]> = {};
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { data: pagosPage, error: pagosErr } = await supabase
-          .from('venta_pagos')
-          .select('id, venta_id, monto, formas_pago(nombre)')
-          .range(pagosOffset, pagosOffset + pagosPageSize - 1);
-        if (pagosErr) {
-          console.error('Error fetching venta_pagos page:', pagosErr);
-          break;
-        }
-        if (!pagosPage || pagosPage.length === 0) break;
-        pagosPage.forEach((pago: any) => {
-          const ventaId = pago.venta_id;
-          if (!pagosByVenta[ventaId]) pagosByVenta[ventaId] = [];
-          pagosByVenta[ventaId].push(pago);
-        });
-        if (pagosPage.length < pagosPageSize) break;
-        pagosOffset += pagosPageSize;
-      }
-      setPagosPorVenta(pagosByVenta);
+      setPagosPorVenta(pagosMap);
     } catch (error) {
       console.error('Error fetching ventas:', error);
       toast.error('Error al cargar las ventas');
@@ -385,78 +325,11 @@ export default function Ventas() {
     }
   };
 
-  // Filtrar ventas según filtros aplicados
-  const ventasFiltradas = useMemo(() => {
-    return ventas.filter(v => {
-      // Filtro por usuario
-      if (filtroUsuario !== 'todos' && v.usuario_id !== filtroUsuario) {
-        return false;
-      }
-      
-      // Filtro por vendedor (del cliente)
-      if (filtroVendedor !== 'todos') {
-        const vId = v.clientes?.vendedor_id || null;
-        if (filtroVendedor === 'sin_vendedor') {
-          if (vId) return false;
-        } else if (vId !== filtroVendedor) {
-          return false;
-        }
-      }
+  // Server already returns filtered + paginated rows.
+  const ventasFiltradas = ventas;
 
-      // Filtro por origen
-      if (filtroOrigen !== 'todos') {
-        const origen = origenPorVenta[v.id] || 'mostrador';
-        if (origen !== filtroOrigen) return false;
-      }
-
-      // Filtro por estado: las filas sintéticas de pedidos web/reparto tienen estado 'confirmada',
-      // así que se comportan como ventas confirmadas en el filtro.
-      if (filtroEstado !== 'todos') {
-        if (v.estado !== filtroEstado) return false;
-      }
-      
-      // Filtro por fecha
-      if (fechaDesde || fechaHasta) {
-        const ventaFecha = new Date(v.fecha);
-        if (fechaDesde && ventaFecha < startOfDay(fechaDesde)) {
-          return false;
-        }
-        if (fechaHasta && ventaFecha > endOfDay(fechaHasta)) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-  }, [ventas, filtroUsuario, filtroVendedor, filtroOrigen, filtroEstado, fechaDesde, fechaHasta, origenPorVenta]);
-
-  // Always compute client-side from filtered ventas so that origen/vendedor/fecha filters
-  // and synthetic pedidos (web/reparto) are reflected correctly in the totals.
-  const totalesPorMedioPago = useMemo(() => {
-    const totales: Record<string, number> = {};
-    let totalGeneral = 0;
-    let countVentas = 0;
-    let countPedidos = 0;
-    ventasFiltradas.forEach(v => {
-      if (v.anulada) return;
-      if (v._es_pedido) {
-        countPedidos += 1;
-        totalGeneral += Number(v.total) || 0;
-        return;
-      }
-      if (v.estado === 'pedido') {
-        countPedidos += 1;
-      } else {
-        countVentas += 1;
-        totalGeneral += Number(v.total) || 0;
-        (pagosPorVenta[v.id] || []).forEach(p => {
-          const nombre = p.formas_pago?.nombre || 'Otro';
-          totales[nombre] = (totales[nombre] || 0) + (Number(p.monto) || 0);
-        });
-      }
-    });
-    return { totales, totalGeneral, countVentas, countPedidos };
-  }, [rpcTotales, ventasFiltradas, pagosPorVenta, filtroVendedor, filtroOrigen]);
+  // Use the RPC payment-breakdown totals (server-side, reflects all current filters).
+  const totalesPorMedioPago = rpcTotales;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-AR', {
