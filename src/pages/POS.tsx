@@ -1093,6 +1093,39 @@ export default function POS() {
     setMontoGenericoData(null);
   };
 
+  const handleAddPagoCheque = () => {
+    if (!chequeData || !chequeFormaPagoId) return;
+    if (!chequeData.numero_cheque.trim() || !chequeData.banco.trim() || !chequeData.emisor.trim()) {
+      toast.error('Completá número de cheque, banco y emisor');
+      return;
+    }
+    if (!chequeData.fecha_emision || !chequeData.fecha_vencimiento) {
+      toast.error('Completá las fechas de emisión y vencimiento');
+      return;
+    }
+    const monto = parseFloat(chequeData.monto.replace(',', '.'));
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('Ingrese un importe válido');
+      return;
+    }
+    const existing = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
+    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    if (monto > pendienteDisponible + 0.009) {
+      toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+      return;
+    }
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === chequeFormaPagoId);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto };
+        return next;
+      }
+      return [...prev, { forma_pago_id: chequeFormaPagoId, monto }];
+    });
+    setChequeDialogOpen(false);
+  };
+
   const removePago = (index: number) => {
     setPagos((prev) => {
       const removed = prev[index];
@@ -1100,6 +1133,11 @@ export default function POS() {
       const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
       if (removed && fpTransf && removed.forma_pago_id === fpTransf.id) {
         setTransferenciaData(null);
+      }
+      // Si se quita el cheque, limpiar los datos del cheque
+      if (removed && chequeFormaPagoId && removed.forma_pago_id === chequeFormaPagoId) {
+        setChequeData(null);
+        setChequeFormaPagoId(null);
       }
       return prev.filter((_, i) => i !== index);
     });
