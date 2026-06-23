@@ -274,6 +274,14 @@ export default function POS() {
     archivo: File | null;
   } | null>(null);
 
+  // Pago genérico (otros métodos): pedir importe antes de agregar
+  const [montoGenericoDialogOpen, setMontoGenericoDialogOpen] = useState(false);
+  const [montoGenericoData, setMontoGenericoData] = useState<{
+    formaPagoId: string;
+    formaPagoNombre: string;
+    monto: string;
+  } | null>(null);
+
   // Modal de búsqueda de productos
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
