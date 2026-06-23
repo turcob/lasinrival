@@ -61,8 +61,9 @@ interface MovimientoPendiente {
     cuit_emisor: string | null;
     observaciones: string | null;
   } | null;
-  source?: 'movimiento' | 'transferencia';
+  source?: 'movimiento' | 'transferencia' | 'cheque';
   transferencia_id?: string;
+  cheque_id?: string;
   venta_numero?: number | null;
   foto_comprobante_path?: string | null;
   foto_comprobante_nombre?: string | null;
