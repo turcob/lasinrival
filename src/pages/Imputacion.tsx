@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Search, Clock, CreditCard, Building2, FileUp } from 'lucide-react';
+import { Check, X, Search, Clock, CreditCard, Building2, FileUp, Paperclip, Eye, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -64,6 +64,8 @@ interface MovimientoPendiente {
   source?: 'movimiento' | 'transferencia';
   transferencia_id?: string;
   venta_numero?: number | null;
+  foto_comprobante_path?: string | null;
+  foto_comprobante_nombre?: string | null;
 }
 
 interface VentaPendiente {
