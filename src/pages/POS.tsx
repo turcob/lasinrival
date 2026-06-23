@@ -1737,6 +1737,36 @@ export default function POS() {
         }
       }
 
+      // Si en la venta hay un pago con Cheque, registrar el cheque
+      // en la tabla `cheques` con estado 'pendiente_validacion'.
+      if (chequeData && chequeFormaPagoId) {
+        const pagoCheque = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
+        const montoCheque = pagoCheque?.monto ?? parseFloat(chequeData.monto.replace(',', '.'));
+        const { error: chequeError } = await supabase.from('cheques').insert([{
+          tipo: chequeData.tipo,
+          estado: 'pendiente_validacion' as any,
+          numero_cheque: chequeData.numero_cheque.trim(),
+          banco: chequeData.banco.trim(),
+          sucursal_banco: chequeData.sucursal_banco.trim() || null,
+          emisor: chequeData.emisor.trim(),
+          cuit_emisor: chequeData.cuit_emisor.trim() || null,
+          cliente_id: selectedCliente?.id || null,
+          monto: montoCheque,
+          fecha_emision: chequeData.fecha_emision,
+          fecha_vencimiento: chequeData.fecha_vencimiento,
+          observaciones: chequeData.observaciones.trim() || null,
+          venta_id: venta.id,
+          usuario_registro_id: user.id,
+        } as any]);
+
+        if (chequeError) {
+          console.error('Error registrando cheque:', chequeError);
+          toast.error('Error al registrar el cheque: ' + chequeError.message);
+        } else {
+          toast.success('Cheque registrado. Quedó pendiente de validación.');
+        }
+      }
+
       // Update stock (only for real products)
       for (const item of cart) {
         if (item.producto && !item.es_temporal) {
