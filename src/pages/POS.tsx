@@ -274,6 +274,14 @@ export default function POS() {
     archivo: File | null;
   } | null>(null);
 
+  // Pago genérico (otros métodos): pedir importe antes de agregar
+  const [montoGenericoDialogOpen, setMontoGenericoDialogOpen] = useState(false);
+  const [montoGenericoData, setMontoGenericoData] = useState<{
+    formaPagoId: string;
+    formaPagoNombre: string;
+    monto: string;
+  } | null>(null);
+
   // Modal de búsqueda de productos
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
@@ -798,11 +806,15 @@ export default function POS() {
   };
 
   // Handler del botón "Continuar" del diálogo de pago.
-  // Si hay un pago con Transferencia y aún no se cargaron sus datos,
-  // abre el modal para capturarlos antes de seguir.
+  // Sólo se habilita cuando la suma de medios de pago coincide con el total.
   const handleContinuarPago = () => {
+    if (Math.abs(totalPagado - total) > 0.009) {
+      toast.error('La suma de los medios de pago debe ser igual al total de la venta');
+      return;
+    }
     const t = getPagoTransferencia();
     if (t && !transferenciaData) {
+      toast.error('Complete los datos de la transferencia');
       setTransferenciaData({
         fecha: new Date().toISOString().slice(0, 10),
         titular: '',
@@ -827,10 +839,30 @@ export default function POS() {
     if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
     if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
 
+    // Validar que el importe no exceda el pendiente
+    const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+    if (!fpTransf) return toast.error('No se encontró la forma de pago Transferencia');
+
+    const existing = pagos.find(p => p.forma_pago_id === fpTransf.id);
+    const pendienteSinTransf = total - totalPagado + (existing?.monto || 0);
+    if (importeNum > pendienteSinTransf + 0.009) {
+      return toast.error(`El importe excede el pendiente ($${pendienteSinTransf.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+    }
+
+    // Agregar o actualizar el pago de transferencia con el importe ingresado
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto: importeNum };
+        return next;
+      }
+      return [...prev, { forma_pago_id: fpTransf.id, monto: importeNum }];
+    });
+
     setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
     setTransferenciaDialogOpen(false);
-    // continuar al diálogo de facturación
-    handleOpenFacturaDialog();
+    toast.success('Transferencia agregada');
   };
 
   // Agregar pago con tarjeta
@@ -960,26 +992,77 @@ export default function POS() {
       setTarjetaDialogOpen(true);
       return;
     }
-    
-    // Otros métodos de pago
-    const pendiente = total - totalPagado;
-    if (pendiente <= 0) return;
 
-    setPagos((prev) => {
-      const existing = prev.find((p) => p.forma_pago_id === formaPagoId);
-      if (existing) {
-        return prev.map((p) =>
-          p.forma_pago_id === formaPagoId
-            ? { ...p, monto: p.monto + pendiente }
-            : p
-        );
+    const pendiente = total - totalPagado;
+    if (pendiente <= 0.009) {
+      toast.error('No hay saldo pendiente para asignar');
+      return;
+    }
+
+    // Si es Transferencia, abrir directamente el diálogo de datos (incluye importe)
+    if (fpNombre.includes('transfer')) {
+      // Si ya existe un pago de transferencia, no duplicar
+      if (pagos.some(p => p.forma_pago_id === formaPagoId)) {
+        toast.error('Ya hay un pago con Transferencia agregado');
+        return;
       }
-      return [...prev, { forma_pago_id: formaPagoId, monto: pendiente }];
+      setTransferenciaData({
+        fecha: new Date().toISOString().slice(0, 10),
+        titular: '',
+        cuil: '',
+        importe: pendiente.toFixed(2),
+        numero_operacion: '',
+        archivo: null,
+      });
+      setTransferenciaDialogOpen(true);
+      return;
+    }
+
+    // Resto de métodos de pago: pedir importe en un diálogo genérico
+    setMontoGenericoData({
+      formaPagoId,
+      formaPagoNombre: fp?.nombre || 'Pago',
+      monto: pendiente.toFixed(2),
     });
+    setMontoGenericoDialogOpen(true);
+  };
+
+  const handleAddPagoGenerico = () => {
+    if (!montoGenericoData) return;
+    const monto = parseFloat(montoGenericoData.monto.replace(',', '.'));
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('Ingrese un importe válido');
+      return;
+    }
+    const existing = pagos.find(p => p.forma_pago_id === montoGenericoData.formaPagoId);
+    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    if (monto > pendienteDisponible + 0.009) {
+      toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+      return;
+    }
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto };
+        return next;
+      }
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto }];
+    });
+    setMontoGenericoDialogOpen(false);
+    setMontoGenericoData(null);
   };
 
   const removePago = (index: number) => {
-    setPagos((prev) => prev.filter((_, i) => i !== index));
+    setPagos((prev) => {
+      const removed = prev[index];
+      // Si se quita la transferencia, limpiar los datos del comprobante
+      const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+      if (removed && fpTransf && removed.forma_pago_id === fpTransf.id) {
+        setTransferenciaData(null);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   // Nueva función para procesar venta a empleado directo a cuenta corriente
@@ -3117,6 +3200,12 @@ export default function POS() {
                     <span>${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
+                {totalPagado > total + 0.009 && (
+                  <div className="flex justify-between text-destructive">
+                    <span>Excedente:</span>
+                    <span>${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3124,7 +3213,7 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleContinuarPago} disabled={totalPagado < total}>
+              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - total) > 0.009}>
                 Continuar
               </Button>
             </div>
@@ -3135,7 +3224,13 @@ export default function POS() {
       {/* Transferencia: datos del comprobante */}
       <Dialog open={transferenciaDialogOpen} onOpenChange={(open) => {
         setTransferenciaDialogOpen(open);
-        if (!open) setTransferenciaData(null);
+        // Si se cierra sin confirmar y aún no se agregó el pago de transferencia,
+        // limpiar los datos para no dejar estado huérfano.
+        if (!open) {
+          const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+          const tieneTransfPago = fpTransf ? pagos.some(p => p.forma_pago_id === fpTransf.id) : false;
+          if (!tieneTransfPago) setTransferenciaData(null);
+        }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -3199,7 +3294,49 @@ export default function POS() {
                   Cancelar
                 </Button>
                 <Button onClick={handleConfirmarTransferencia}>
-                  Confirmar y continuar
+                  Confirmar y agregar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Importe genérico para otros medios de pago */}
+      <Dialog open={montoGenericoDialogOpen} onOpenChange={(open) => {
+        setMontoGenericoDialogOpen(open);
+        if (!open) setMontoGenericoData(null);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Importe — {montoGenericoData?.formaPagoNombre}</DialogTitle>
+          </DialogHeader>
+          {montoGenericoData && (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total venta:</span>
+                <span className="font-semibold">${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Pendiente:</span>
+                <span className="font-semibold">${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div>
+                <Label>Importe *</Label>
+                <Input
+                  autoFocus
+                  inputMode="decimal"
+                  value={montoGenericoData.monto}
+                  onChange={(e) => setMontoGenericoData({ ...montoGenericoData, monto: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddPagoGenerico(); }}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setMontoGenericoDialogOpen(false); setMontoGenericoData(null); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddPagoGenerico}>
+                  Agregar pago
                 </Button>
               </div>
             </div>
