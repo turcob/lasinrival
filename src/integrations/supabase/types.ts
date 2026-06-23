@@ -4256,7 +4256,7 @@ export type Database = {
           fecha_anulacion?: string | null
           id?: string
           motivo_anulacion?: string | null
-          numero_comprobante?: number
+          numero_comprobante: number
           subtotal?: number
           total?: number
           usuario_id: string
@@ -4302,6 +4302,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ventas_numero_counter: {
+        Row: {
+          id: number
+          ultimo_numero: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          ultimo_numero?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       visita_incidencias: {
         Row: {
@@ -4817,6 +4835,10 @@ export type Database = {
     }
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
+      crear_venta_completa: {
+        Args: { p_detalles: Json; p_pagos?: Json; p_venta: Json }
+        Returns: Json
+      }
       get_empleado_id: { Args: never; Returns: string }
       get_ventas_lista: {
         Args: {
