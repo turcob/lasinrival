@@ -3452,6 +3452,128 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
+      {/* Pago con Cheque: datos del cheque */}
+      <Dialog open={chequeDialogOpen} onOpenChange={(open) => {
+        setChequeDialogOpen(open);
+        if (!open && !pagos.some(p => p.forma_pago_id === chequeFormaPagoId)) {
+          setChequeData(null);
+          setChequeFormaPagoId(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Cheque</DialogTitle>
+          </DialogHeader>
+          {chequeData && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Tipo *</Label>
+                  <Select
+                    value={chequeData.tipo}
+                    onValueChange={(v) => setChequeData({ ...chequeData, tipo: v as 'propio' | 'terceros' })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="terceros">De Terceros</SelectItem>
+                      <SelectItem value="propio">Propio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Nº Cheque *</Label>
+                  <Input
+                    value={chequeData.numero_cheque}
+                    onChange={(e) => setChequeData({ ...chequeData, numero_cheque: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Banco *</Label>
+                  <Input
+                    value={chequeData.banco}
+                    onChange={(e) => setChequeData({ ...chequeData, banco: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Sucursal Banco</Label>
+                  <Input
+                    value={chequeData.sucursal_banco}
+                    onChange={(e) => setChequeData({ ...chequeData, sucursal_banco: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Emisor *</Label>
+                  <Input
+                    value={chequeData.emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, emisor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>CUIT Emisor</Label>
+                  <Input
+                    value={chequeData.cuit_emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, cuit_emisor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label>Cliente</Label>
+                  <Input value={selectedCliente?.nombre || 'Sin cliente'} disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Monto *</Label>
+                  <Input
+                    inputMode="decimal"
+                    value={chequeData.monto}
+                    onChange={(e) => setChequeData({ ...chequeData, monto: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pendiente: ${(total - totalPagado + (pagos.find(p => p.forma_pago_id === chequeFormaPagoId)?.monto || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Fecha Emisión *</Label>
+                  <Input
+                    type="date"
+                    value={chequeData.fecha_emision}
+                    onChange={(e) => setChequeData({ ...chequeData, fecha_emision: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Fecha Vencimiento *</Label>
+                  <Input
+                    type="date"
+                    value={chequeData.fecha_vencimiento}
+                    onChange={(e) => setChequeData({ ...chequeData, fecha_vencimiento: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Observaciones</Label>
+                <Textarea
+                  rows={2}
+                  value={chequeData.observaciones}
+                  onChange={(e) => setChequeData({ ...chequeData, observaciones: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => {
+                  setChequeDialogOpen(false);
+                  if (!pagos.some(p => p.forma_pago_id === chequeFormaPagoId)) {
+                    setChequeData(null);
+                    setChequeFormaPagoId(null);
+                  }
+                }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddPagoCheque}>
+                  Agregar cheque
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Tarjeta Dialog */}
       <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
         <DialogContent>
