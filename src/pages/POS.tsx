@@ -263,6 +263,17 @@ export default function POS() {
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
   const [efectivoEntregado, setEfectivoEntregado] = useState('');
 
+  // Pago Transferencia (datos del comprobante)
+  const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
+  const [transferenciaData, setTransferenciaData] = useState<{
+    fecha: string;
+    titular: string;
+    cuil: string;
+    importe: string;
+    numero_operacion: string;
+    archivo: File | null;
+  } | null>(null);
+
   // Modal de búsqueda de productos
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
@@ -776,6 +787,50 @@ export default function POS() {
     }
     setEmitirFactura(false);
     setFacturaDialogOpen(true);
+  };
+
+  // Detecta si hay un pago con Transferencia entre los pagos del carrito
+  const getPagoTransferencia = () => {
+    const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+    if (!fpTransf) return null;
+    const pago = pagos.find(p => p.forma_pago_id === fpTransf.id);
+    return pago ? { pago, formaPagoId: fpTransf.id } : null;
+  };
+
+  // Handler del botón "Continuar" del diálogo de pago.
+  // Si hay un pago con Transferencia y aún no se cargaron sus datos,
+  // abre el modal para capturarlos antes de seguir.
+  const handleContinuarPago = () => {
+    const t = getPagoTransferencia();
+    if (t && !transferenciaData) {
+      setTransferenciaData({
+        fecha: new Date().toISOString().slice(0, 10),
+        titular: '',
+        cuil: '',
+        importe: t.pago.monto.toFixed(2),
+        numero_operacion: '',
+        archivo: null,
+      });
+      setTransferenciaDialogOpen(true);
+      return;
+    }
+    handleOpenFacturaDialog();
+  };
+
+  const handleConfirmarTransferencia = () => {
+    if (!transferenciaData) return;
+    if (!transferenciaData.fecha) return toast.error('Ingrese la fecha del comprobante');
+    if (!transferenciaData.titular.trim()) return toast.error('Ingrese el titular de la cuenta');
+    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
+    if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
+    const importeNum = parseFloat(transferenciaData.importe.replace(',', '.'));
+    if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
+    if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
+
+    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
+    setTransferenciaDialogOpen(false);
+    // continuar al diálogo de facturación
+    handleOpenFacturaDialog();
   };
 
   // Agregar pago con tarjeta
@@ -1472,6 +1527,55 @@ export default function POS() {
 
       if (pagosError) throw pagosError;
 
+      // Si en la venta hay un pago con Transferencia, registrar el comprobante
+      // en la tabla `transferencias` con estado 'pendiente'.
+      if (transferenciaData) {
+        let fotoPath: string | null = null;
+        let fotoNombre: string | null = null;
+
+        if (transferenciaData.archivo) {
+          try {
+            const ext = transferenciaData.archivo.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `transferencias/${venta.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from('comprobantes-cobros')
+              .upload(fileName, transferenciaData.archivo, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: transferenciaData.archivo.type || 'image/jpeg',
+              });
+            if (upErr) throw upErr;
+            fotoPath = fileName;
+            fotoNombre = transferenciaData.archivo.name;
+          } catch (upErr: any) {
+            console.error('Error subiendo comprobante de transferencia:', upErr);
+            toast.warning('No se pudo adjuntar el comprobante. Podés cargarlo luego desde Transferencias.');
+          }
+        }
+
+        const { error: transfError } = await supabase.from('transferencias').insert([{
+          fecha_transferencia: transferenciaData.fecha,
+          cliente_id: selectedCliente?.id || null,
+          titular_nombre: transferenciaData.titular.trim(),
+          titular_cuil: transferenciaData.cuil,
+          numero_operacion: transferenciaData.numero_operacion.trim(),
+          importe: parseFloat(transferenciaData.importe),
+          estado: 'pendiente',
+          origen: 'venta_pos',
+          venta_id: venta.id,
+          creado_por: user.id,
+          foto_comprobante_path: fotoPath,
+          foto_comprobante_nombre: fotoNombre,
+        }]);
+
+        if (transfError) {
+          console.error('Error registrando transferencia:', transfError);
+          toast.error('Error al registrar la transferencia: ' + transfError.message);
+        } else {
+          toast.success('Transferencia registrada correctamente. Quedó pendiente de validación.');
+        }
+      }
+
       // Update stock (only for real products)
       for (const item of cart) {
         if (item.producto && !item.es_temporal) {
@@ -1634,6 +1738,7 @@ export default function POS() {
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
       setTicketDialogOpen(true);
+      setTransferenciaData(null);
       
       toast.success('Venta procesada correctamente');
       fetchData();
@@ -3019,11 +3124,86 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleOpenFacturaDialog} disabled={totalPagado < total}>
+              <Button onClick={handleContinuarPago} disabled={totalPagado < total}>
                 Continuar
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transferencia: datos del comprobante */}
+      <Dialog open={transferenciaDialogOpen} onOpenChange={(open) => {
+        setTransferenciaDialogOpen(open);
+        if (!open) setTransferenciaData(null);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Datos de la Transferencia</DialogTitle>
+          </DialogHeader>
+          {transferenciaData && (
+            <div className="space-y-3">
+              <div>
+                <Label>Fecha del comprobante *</Label>
+                <Input
+                  type="date"
+                  value={transferenciaData.fecha}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, fecha: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Titular de la cuenta *</Label>
+                <Input
+                  value={transferenciaData.titular}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, titular: e.target.value })}
+                  placeholder="Nombre y apellido / Razón social"
+                  maxLength={150}
+                />
+              </div>
+              <div>
+                <Label>CUIL / CUIT *</Label>
+                <Input
+                  inputMode="numeric"
+                  value={transferenciaData.cuil}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, cuil: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                  placeholder="11 dígitos"
+                />
+              </div>
+              <div>
+                <Label>Importe *</Label>
+                <Input
+                  inputMode="decimal"
+                  value={transferenciaData.importe}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, importe: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de comprobante / operación *</Label>
+                <Input
+                  value={transferenciaData.numero_operacion}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, numero_operacion: e.target.value })}
+                  maxLength={100}
+                />
+              </div>
+              <div>
+                <Label>Foto del comprobante (opcional)</Label>
+                <Input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,application/pdf"
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, archivo: e.target.files?.[0] || null })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG o PDF. Puede cargarse luego desde Transferencias.</p>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setTransferenciaDialogOpen(false); setTransferenciaData(null); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleConfirmarTransferencia}>
+                  Confirmar y continuar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
