@@ -1527,6 +1527,55 @@ export default function POS() {
 
       if (pagosError) throw pagosError;
 
+      // Si en la venta hay un pago con Transferencia, registrar el comprobante
+      // en la tabla `transferencias` con estado 'pendiente'.
+      if (transferenciaData) {
+        let fotoPath: string | null = null;
+        let fotoNombre: string | null = null;
+
+        if (transferenciaData.archivo) {
+          try {
+            const ext = transferenciaData.archivo.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `transferencias/${venta.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from('comprobantes-cobros')
+              .upload(fileName, transferenciaData.archivo, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: transferenciaData.archivo.type || 'image/jpeg',
+              });
+            if (upErr) throw upErr;
+            fotoPath = fileName;
+            fotoNombre = transferenciaData.archivo.name;
+          } catch (upErr: any) {
+            console.error('Error subiendo comprobante de transferencia:', upErr);
+            toast.warning('No se pudo adjuntar el comprobante. Podés cargarlo luego desde Transferencias.');
+          }
+        }
+
+        const { error: transfError } = await supabase.from('transferencias').insert([{
+          fecha_transferencia: transferenciaData.fecha,
+          cliente_id: selectedCliente?.id || null,
+          titular_nombre: transferenciaData.titular.trim(),
+          titular_cuil: transferenciaData.cuil,
+          numero_operacion: transferenciaData.numero_operacion.trim(),
+          importe: parseFloat(transferenciaData.importe),
+          estado: 'pendiente',
+          origen: 'venta_pos',
+          venta_id: venta.id,
+          creado_por: user.id,
+          foto_comprobante_path: fotoPath,
+          foto_comprobante_nombre: fotoNombre,
+        }]);
+
+        if (transfError) {
+          console.error('Error registrando transferencia:', transfError);
+          toast.error('Error al registrar la transferencia: ' + transfError.message);
+        } else {
+          toast.success('Transferencia registrada correctamente. Quedó pendiente de validación.');
+        }
+      }
+
       // Update stock (only for real products)
       for (const item of cart) {
         if (item.producto && !item.es_temporal) {
