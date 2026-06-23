@@ -4801,6 +4801,48 @@ export type Database = {
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
       get_empleado_id: { Args: never; Returns: string }
+      get_ventas_lista: {
+        Args: {
+          p_estado?: string
+          p_fecha_desde?: string
+          p_fecha_hasta?: string
+          p_limit?: number
+          p_offset?: number
+          p_origen?: string
+          p_search?: string
+          p_sin_vendedor?: boolean
+          p_usuario_id?: string
+          p_vendedor_id?: string
+        }
+        Returns: {
+          afip: Json
+          anulada: boolean
+          caja_id: string
+          cliente_condicion_iva: number
+          cliente_dni_cuit: string
+          cliente_id: string
+          cliente_nombre: string
+          cliente_vendedor_id: string
+          descuento: number
+          es_pedido: boolean
+          estado: string
+          fecha: string
+          fecha_anulacion: string
+          id: string
+          motivo_anulacion: string
+          numero_comprobante: number
+          origen: string
+          pagos: Json
+          pedido_estado: string
+          pedido_id: string
+          subtotal: number
+          tipo_pedido: string
+          total: number
+          total_count: number
+          usuario_id: string
+          usuario_nombre: string
+        }[]
+      }
       get_ventas_totales_por_medio_pago: {
         Args: {
           p_estado?: string
