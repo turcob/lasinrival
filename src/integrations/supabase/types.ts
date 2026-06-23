@@ -3811,13 +3811,15 @@ export type Database = {
       }
       transferencias: {
         Row: {
-          cliente_id: string
+          cliente_id: string | null
           cliente_movimiento_id: string | null
           cobro_id: string | null
           creado_por: string | null
           created_at: string
           estado: string
           fecha_transferencia: string
+          foto_comprobante_nombre: string | null
+          foto_comprobante_path: string | null
           id: string
           importe: number
           numero_operacion: string | null
@@ -3833,13 +3835,15 @@ export type Database = {
           venta_id: string | null
         }
         Insert: {
-          cliente_id: string
+          cliente_id?: string | null
           cliente_movimiento_id?: string | null
           cobro_id?: string | null
           creado_por?: string | null
           created_at?: string
           estado?: string
           fecha_transferencia?: string
+          foto_comprobante_nombre?: string | null
+          foto_comprobante_path?: string | null
           id?: string
           importe: number
           numero_operacion?: string | null
@@ -3855,13 +3859,15 @@ export type Database = {
           venta_id?: string | null
         }
         Update: {
-          cliente_id?: string
+          cliente_id?: string | null
           cliente_movimiento_id?: string | null
           cobro_id?: string | null
           creado_por?: string | null
           created_at?: string
           estado?: string
           fecha_transferencia?: string
+          foto_comprobante_nombre?: string | null
+          foto_comprobante_path?: string | null
           id?: string
           importe?: number
           numero_operacion?: string | null
