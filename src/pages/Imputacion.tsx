@@ -325,6 +325,23 @@ export default function Imputacion() {
     
     setProcessing(true);
     try {
+      // Caso transferencia POS / standalone → actualiza la tabla transferencias
+      if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        const { error } = await supabase
+          .from('transferencias')
+          .update({ estado: 'validada' })
+          .eq('id', selectedMovimiento.transferencia_id);
+        if (error) throw error;
+        toast.success('Transferencia validada correctamente');
+        setConfirmDialogOpen(false);
+        setSelectedMovimiento(null);
+        setSelectedVentas([]);
+        setConceptoImputacion('');
+        setVentasPendientes([]);
+        fetchMovimientos();
+        return;
+      }
+
       // Construir concepto con las facturas seleccionadas
       let conceptoFinal = selectedMovimiento.concepto || '';
       if (selectedVentas.length > 0) {
@@ -371,6 +388,20 @@ export default function Imputacion() {
     
     setProcessing(true);
     try {
+      if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        const { error } = await supabase
+          .from('transferencias')
+          .update({ estado: 'rechazada', observacion_rechazo: motivoRechazo.trim() })
+          .eq('id', selectedMovimiento.transferencia_id);
+        if (error) throw error;
+        toast.success('Transferencia rechazada');
+        setRejectDialogOpen(false);
+        setSelectedMovimiento(null);
+        setMotivoRechazo('');
+        fetchMovimientos();
+        return;
+      }
+
       const { error } = await supabase
         .from('cliente_movimientos')
         .update({
