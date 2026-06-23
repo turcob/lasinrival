@@ -1230,26 +1230,7 @@ export default function POS() {
         if (detallesError) throw detallesError;
       } else {
         // Crear nueva venta
-        const { data: newVenta, error: ventaError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: null,
-            empleado_id: selectedEmpleado.id,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          }])
-          .select()
-          .single();
-
-        if (ventaError) throw ventaError;
-        venta = newVenta;
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -1259,12 +1240,23 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            empleado_id: selectedEmpleado.id,
+            caja_id: caja.id,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'confirmada',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        const { data: newVenta } = await supabase
+          .from('ventas').select('*').eq('id', created.id).single();
+        venta = newVenta;
       }
 
       // NO crear venta_pagos - no hay pago
@@ -1435,26 +1427,7 @@ export default function POS() {
         if (detallesError) throw detallesError;
       } else {
         // Crear nueva venta
-        const { data: newVenta, error: ventaError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: selectedCliente.id,
-            empleado_id: null,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          }])
-          .select()
-          .single();
-
-        if (ventaError) throw ventaError;
-        venta = newVenta;
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -1464,12 +1437,23 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            cliente_id: selectedCliente.id,
+            caja_id: caja.id,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'confirmada',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        const { data: newVenta } = await supabase
+          .from('ventas').select('*').eq('id', created.id).single();
+        venta = newVenta;
       }
 
       // NO crear venta_pagos - no hay pago
@@ -1633,26 +1617,7 @@ export default function POS() {
 
         if (detallesError) throw detallesError;
       } else {
-        const { data: newVenta, error: ventaError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
-            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: totalFacturar,
-            estado: 'confirmada',
-          }])
-          .select()
-          .single();
-
-        if (ventaError) throw ventaError;
-        venta = newVenta;
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -1662,31 +1627,54 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
+        const pagosPayload = pagos.map((p) => ({
+          forma_pago_id: p.forma_pago_id,
+          monto: p.monto,
+          tarjeta_id: p.tarjeta_id || null,
+          cuotas: p.cuotas || null,
+          coeficiente: p.coeficiente || null,
+          efectivo_entregado: p.efectivo_entregado || null,
+          vuelto: p.vuelto || null,
+        }));
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            caja_id: caja.id,
+            subtotal,
+            descuento: totalDescuentos,
+            total: totalFacturar,
+            estado: 'confirmada',
+          } as any,
+          p_detalles: detallesPayload as any,
+          p_pagos: pagosPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        const { data: newVenta } = await supabase
+          .from('ventas').select('*').eq('id', created.id).single();
+        venta = newVenta;
       }
 
-      // Create venta_pagos with tarjeta info
-      const ventaPagos = pagos.map((p) => ({
-        venta_id: venta.id,
-        forma_pago_id: p.forma_pago_id,
-        monto: p.monto,
-        tarjeta_id: p.tarjeta_id || null,
-        cuotas: p.cuotas || null,
-        coeficiente: p.coeficiente || null,
-        efectivo_entregado: p.efectivo_entregado || null,
-        vuelto: p.vuelto || null,
-      }));
-
-      const { error: pagosError } = await supabase
-        .from('venta_pagos')
-        .insert(ventaPagos);
-
-      if (pagosError) throw pagosError;
+      // venta_pagos: cuando es venta nueva, ya fueron insertados por la RPC.
+      // Para el caso de edición de pedido existente, registramos aquí los pagos.
+      if (editingPedidoId) {
+        const ventaPagos = pagos.map((p) => ({
+          venta_id: venta.id,
+          forma_pago_id: p.forma_pago_id,
+          monto: p.monto,
+          tarjeta_id: p.tarjeta_id || null,
+          cuotas: p.cuotas || null,
+          coeficiente: p.coeficiente || null,
+          efectivo_entregado: p.efectivo_entregado || null,
+          vuelto: p.vuelto || null,
+        }));
+        const { error: pagosError } = await supabase
+          .from('venta_pagos')
+          .insert(ventaPagos);
+        if (pagosError) throw pagosError;
+      }
 
       // Si en la venta hay un pago con Transferencia, registrar el comprobante
       // en la tabla `transferencias` con estado 'pendiente'.
@@ -2017,24 +2005,7 @@ export default function POS() {
         toast.success('Pedido actualizado correctamente');
         setEditingPedidoId(null);
       } else {
-        const { data: pedido, error: pedidoError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
-            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'pedido',
-          }])
-          .select()
-          .single();
-
-        if (pedidoError) throw pedidoError;
-
-        const detalles = cart.map((item) => ({
-          venta_id: pedido.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -2044,14 +2015,21 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
-
-        toast.success(`Pedido #${pedido.numero_comprobante} guardado correctamente`);
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'pedido',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        toast.success(`Pedido #${created.numero_comprobante} guardado correctamente`);
       }
 
       setCart([]);
