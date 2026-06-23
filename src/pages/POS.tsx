@@ -263,6 +263,17 @@ export default function POS() {
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
   const [efectivoEntregado, setEfectivoEntregado] = useState('');
 
+  // Pago Transferencia (datos del comprobante)
+  const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
+  const [transferenciaData, setTransferenciaData] = useState<{
+    fecha: string;
+    titular: string;
+    cuil: string;
+    importe: string;
+    numero_operacion: string;
+    archivo: File | null;
+  } | null>(null);
+
   // Modal de búsqueda de productos
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
