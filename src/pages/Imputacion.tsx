@@ -923,6 +923,159 @@ export default function Imputacion() {
           onOpenChange={setImportarBancoOpen}
           onSuccess={fetchMovimientos}
         />
+
+        {/* Detalle Transferencia Dialog */}
+        <Dialog open={detalleTransfOpen} onOpenChange={setDetalleTransfOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detalle de la Transferencia</DialogTitle>
+            </DialogHeader>
+            {detalleTransfMov && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 text-sm bg-muted p-4 rounded-md">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Cliente</div>
+                    <div className="font-medium">{detalleTransfMov.cliente_nombre}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Importe</div>
+                    <div className="font-medium">{formatCurrency(detalleTransfMov.monto)}</div>
+                  </div>
+                  {detalleTransfMov.venta_numero && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Nº Venta</div>
+                      <div className="font-medium">#{detalleTransfMov.venta_numero}</div>
+                    </div>
+                  )}
+                  {detalleTransfMov.transferencia_origen && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Origen</div>
+                      <div className="font-medium capitalize">{detalleTransfMov.transferencia_origen}</div>
+                    </div>
+                  )}
+                  {detalleTransfMov.titular_nombre && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Titular</div>
+                      <div className="font-medium">{detalleTransfMov.titular_nombre}</div>
+                    </div>
+                  )}
+                  {detalleTransfMov.titular_cuil && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">CUIL/CUIT</div>
+                      <div className="font-mono">{detalleTransfMov.titular_cuil}</div>
+                    </div>
+                  )}
+                  {detalleTransfMov.numero_operacion && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Nº Operación</div>
+                      <div className="font-mono">{detalleTransfMov.numero_operacion}</div>
+                    </div>
+                  )}
+                  {detalleTransfMov.fecha_transferencia && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Fecha de transferencia</div>
+                      <div className="font-medium">
+                        {format(new Date(detalleTransfMov.fecha_transferencia), 'dd/MM/yyyy', { locale: es })}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-muted-foreground">Estado</div>
+                    <Badge
+                      variant={
+                        detalleTransfMov.estado_imputacion === 'confirmado' ? 'default' :
+                        detalleTransfMov.estado_imputacion === 'rechazado' ? 'destructive' : 'secondary'
+                      }
+                    >
+                      {detalleTransfMov.estado_imputacion}
+                    </Badge>
+                  </div>
+                  {detalleTransfMov.concepto && (
+                    <div className="col-span-2">
+                      <div className="text-xs text-muted-foreground">Concepto</div>
+                      <div>{detalleTransfMov.concepto}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Comprobante</Label>
+                  {loadingComprobante ? (
+                    <div className="flex items-center justify-center h-40 border rounded-md">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  ) : detalleTransfMov.foto_comprobante_path && comprobanteUrl ? (
+                    <div className="border rounded-md overflow-hidden bg-muted/30">
+                      {/\.pdf$/i.test(detalleTransfMov.foto_comprobante_path) ? (
+                        <iframe
+                          src={comprobanteUrl}
+                          className="w-full h-[400px]"
+                          title="Comprobante PDF"
+                        />
+                      ) : (
+                        <img
+                          src={comprobanteUrl}
+                          alt="Comprobante de transferencia"
+                          className="w-full max-h-[400px] object-contain"
+                        />
+                      )}
+                      <div className="p-2 flex items-center justify-between border-t bg-background">
+                        <span className="text-xs text-muted-foreground truncate">
+                          {detalleTransfMov.foto_comprobante_nombre || 'comprobante'}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => window.open(comprobanteUrl, '_blank', 'noopener,noreferrer')}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> Abrir en nueva pestaña
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-32 border rounded-md text-sm text-muted-foreground italic">
+                      Sin comprobante adjunto
+                    </div>
+                  )}
+                  <label className="inline-flex">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      disabled={uploadingTransfId === detalleTransfMov.transferencia_id}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleUploadComprobante(detalleTransfMov, f);
+                        e.target.value = '';
+                      }}
+                    />
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      disabled={uploadingTransfId === detalleTransfMov.transferencia_id}
+                    >
+                      <span>
+                        {detalleTransfMov.foto_comprobante_path ? (
+                          <><Upload className="h-4 w-4 mr-1" /> Cambiar comprobante</>
+                        ) : (
+                          <><Paperclip className="h-4 w-4 mr-1" /> Adjuntar comprobante</>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetalleTransfOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
