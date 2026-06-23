@@ -171,10 +171,26 @@ export default function Ventas() {
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
-    fetchVentas();
     fetchUsuarios();
     fetchVendedores();
   }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to first page when filters or search change
+  useEffect(() => {
+    setPage(1);
+  }, [filtroUsuario, filtroVendedor, filtroOrigen, filtroEstado, fechaDesde, fechaHasta, searchDebounced, pageSize]);
+
+  // Fetch the paginated server-side list whenever filters/page change
+  useEffect(() => {
+    fetchVentas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroUsuario, filtroVendedor, filtroOrigen, filtroEstado, fechaDesde, fechaHasta, searchDebounced, page, pageSize]);
 
   // Fetch payment breakdown via RPC whenever filters change
   useEffect(() => {
