@@ -70,6 +70,8 @@ interface MovimientoPendiente {
   titular_cuil?: string | null;
   fecha_transferencia?: string | null;
   transferencia_origen?: string | null;
+  observacion_rechazo?: string | null;
+  rechazado_at?: string | null;
 }
 
 interface VentaPendiente {
