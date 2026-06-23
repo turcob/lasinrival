@@ -789,6 +789,50 @@ export default function POS() {
     setFacturaDialogOpen(true);
   };
 
+  // Detecta si hay un pago con Transferencia entre los pagos del carrito
+  const getPagoTransferencia = () => {
+    const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+    if (!fpTransf) return null;
+    const pago = pagos.find(p => p.forma_pago_id === fpTransf.id);
+    return pago ? { pago, formaPagoId: fpTransf.id } : null;
+  };
+
+  // Handler del botón "Continuar" del diálogo de pago.
+  // Si hay un pago con Transferencia y aún no se cargaron sus datos,
+  // abre el modal para capturarlos antes de seguir.
+  const handleContinuarPago = () => {
+    const t = getPagoTransferencia();
+    if (t && !transferenciaData) {
+      setTransferenciaData({
+        fecha: new Date().toISOString().slice(0, 10),
+        titular: '',
+        cuil: '',
+        importe: t.pago.monto.toFixed(2),
+        numero_operacion: '',
+        archivo: null,
+      });
+      setTransferenciaDialogOpen(true);
+      return;
+    }
+    handleOpenFacturaDialog();
+  };
+
+  const handleConfirmarTransferencia = () => {
+    if (!transferenciaData) return;
+    if (!transferenciaData.fecha) return toast.error('Ingrese la fecha del comprobante');
+    if (!transferenciaData.titular.trim()) return toast.error('Ingrese el titular de la cuenta');
+    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
+    if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
+    const importeNum = parseFloat(transferenciaData.importe.replace(',', '.'));
+    if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
+    if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
+
+    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
+    setTransferenciaDialogOpen(false);
+    // continuar al diálogo de facturación
+    handleOpenFacturaDialog();
+  };
+
   // Agregar pago con tarjeta
   const handleAddPagoTarjeta = () => {
     if (!selectedTarjeta || !selectedFormaPago) return;
