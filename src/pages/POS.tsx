@@ -1035,6 +1035,29 @@ export default function POS() {
       return;
     }
 
+    // Si es Cheque, abrir diálogo con datos del cheque
+    if (fpNombre.includes('cheque')) {
+      if (pagos.some(p => p.forma_pago_id === formaPagoId)) {
+        toast.error('Ya hay un pago con Cheque agregado');
+        return;
+      }
+      setChequeFormaPagoId(formaPagoId);
+      setChequeData({
+        tipo: 'terceros',
+        numero_cheque: '',
+        banco: '',
+        sucursal_banco: '',
+        emisor: selectedCliente?.nombre || '',
+        cuit_emisor: selectedCliente?.dni_cuit || '',
+        monto: pendiente.toFixed(2),
+        fecha_emision: new Date().toISOString().slice(0, 10),
+        fecha_vencimiento: '',
+        observaciones: '',
+      });
+      setChequeDialogOpen(true);
+      return;
+    }
+
     // Resto de métodos de pago: pedir importe en un diálogo genérico
     setMontoGenericoData({
       formaPagoId,
