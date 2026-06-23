@@ -61,6 +61,9 @@ interface MovimientoPendiente {
     cuit_emisor: string | null;
     observaciones: string | null;
   } | null;
+  source?: 'movimiento' | 'transferencia';
+  transferencia_id?: string;
+  venta_numero?: number | null;
 }
 
 interface VentaPendiente {
