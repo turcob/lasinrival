@@ -1561,7 +1561,7 @@ export default function POS() {
           numero_operacion: transferenciaData.numero_operacion.trim(),
           importe: parseFloat(transferenciaData.importe),
           estado: 'pendiente',
-          origen: 'venta_pos',
+          origen: 'venta',
           venta_id: venta.id,
           creado_por: user.id,
           foto_comprobante_path: fotoPath,
