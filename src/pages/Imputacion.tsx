@@ -1002,6 +1002,22 @@ export default function Imputacion() {
                   )}
                 </div>
 
+                {detalleTransfMov.estado_imputacion === 'rechazado' && detalleTransfMov.observacion_rechazo && (
+                  <div className="border border-destructive/40 bg-destructive/5 p-3 rounded-md space-y-1">
+                    <div className="text-xs font-medium text-destructive uppercase tracking-wide">
+                      Motivo de rechazo
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap">
+                      {detalleTransfMov.observacion_rechazo}
+                    </div>
+                    {detalleTransfMov.rechazado_at && (
+                      <div className="text-xs text-muted-foreground">
+                        Rechazada el {format(new Date(detalleTransfMov.rechazado_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Comprobante</Label>
                   {loadingComprobante ? (
