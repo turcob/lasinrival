@@ -222,6 +222,8 @@ export default function Imputacion() {
           titular_cuil: t.titular_cuil || null,
           fecha_transferencia: t.fecha_transferencia || null,
           transferencia_origen: t.origen || null,
+          observacion_rechazo: t.observacion_rechazo || null,
+          rechazado_at: t.rechazado_at || null,
         };
       });
 
