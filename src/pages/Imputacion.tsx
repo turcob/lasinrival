@@ -507,6 +507,24 @@ export default function Imputacion() {
         return;
       }
 
+      if (selectedMovimiento.source === 'cheque' && selectedMovimiento.cheque_id) {
+        const { error } = await supabase
+          .from('cheques')
+          .update({
+            estado: 'rechazado' as any,
+            motivo_rechazo: motivoRechazo.trim(),
+            fecha_rechazo: new Date().toISOString().slice(0, 10),
+          })
+          .eq('id', selectedMovimiento.cheque_id);
+        if (error) throw error;
+        toast.success('Cheque rechazado');
+        setRejectDialogOpen(false);
+        setSelectedMovimiento(null);
+        setMotivoRechazo('');
+        fetchMovimientos();
+        return;
+      }
+
       const { error } = await supabase
         .from('cliente_movimientos')
         .update({
