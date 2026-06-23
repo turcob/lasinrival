@@ -430,6 +430,23 @@ export default function Imputacion() {
         return;
       }
 
+      // Caso cheque POS → actualiza la tabla cheques (pendiente_validacion -> en_cartera)
+      if (selectedMovimiento.source === 'cheque' && selectedMovimiento.cheque_id) {
+        const { error } = await supabase
+          .from('cheques')
+          .update({ estado: 'en_cartera' as any })
+          .eq('id', selectedMovimiento.cheque_id);
+        if (error) throw error;
+        toast.success('Cheque validado correctamente');
+        setConfirmDialogOpen(false);
+        setSelectedMovimiento(null);
+        setSelectedVentas([]);
+        setConceptoImputacion('');
+        setVentasPendientes([]);
+        fetchMovimientos();
+        return;
+      }
+
       // Construir concepto con las facturas seleccionadas
       let conceptoFinal = selectedMovimiento.concepto || '';
       if (selectedVentas.length > 0) {
