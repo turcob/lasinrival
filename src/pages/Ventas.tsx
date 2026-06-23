@@ -759,13 +759,96 @@ export default function Ventas() {
         </CardContent>
       </Card>
 
-      <DataTable
-        data={ventasFiltradas}
-        columns={columns}
-        searchPlaceholder="Buscar por Nº comprobante..."
-        searchKeys={['numero_comprobante']}
-        loading={loading}
-      />
+      {/* Server-paginated table */}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por Nº comprobante..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Mostrar</span>
+            <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">registros</span>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                {columns.map((c) => (
+                  <TableHead key={c.key} className="font-semibold">{c.header}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-32 text-center">
+                    <div className="flex items-center justify-center">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : ventasFiltradas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
+                    No se encontraron registros
+                  </TableCell>
+                </TableRow>
+              ) : (
+                ventasFiltradas.map((item) => (
+                  <TableRow key={item.id} className="table-row-hover">
+                    {columns.map((c) => (
+                      <TableCell key={c.key}>{c.render(item)}</TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {totalCount === 0 ? 0 : (page - 1) * pageSize + 1} a{' '}
+            {Math.min(page * pageSize, totalCount)} de {totalCount} registros
+          </p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => setPage(1)} disabled={page === 1 || loading}>
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-4 text-sm">
+              Página {page} de {Math.max(1, Math.ceil(totalCount / pageSize))}
+            </span>
+            <Button variant="outline" size="icon" onClick={() => setPage((p) => p + 1)} disabled={page * pageSize >= totalCount || loading}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setPage(Math.max(1, Math.ceil(totalCount / pageSize)))} disabled={page * pageSize >= totalCount || loading}>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* Detalle Dialog */}
       <Dialog open={detalleDialogOpen} onOpenChange={setDetalleDialogOpen}>
