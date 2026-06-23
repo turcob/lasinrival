@@ -2005,24 +2005,7 @@ export default function POS() {
         toast.success('Pedido actualizado correctamente');
         setEditingPedidoId(null);
       } else {
-        const { data: pedido, error: pedidoError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
-            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'pedido',
-          }])
-          .select()
-          .single();
-
-        if (pedidoError) throw pedidoError;
-
-        const detalles = cart.map((item) => ({
-          venta_id: pedido.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -2032,14 +2015,21 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
-
-        toast.success(`Pedido #${pedido.numero_comprobante} guardado correctamente`);
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'pedido',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        toast.success(`Pedido #${created.numero_comprobante} guardado correctamente`);
       }
 
       setCart([]);
