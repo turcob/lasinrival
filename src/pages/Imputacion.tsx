@@ -652,54 +652,59 @@ export default function Imputacion() {
                               <div><span className="text-muted-foreground">Emisor:</span> {mov.cheque.emisor}</div>
                               <div><span className="text-muted-foreground">Vto:</span> {format(new Date(mov.cheque.fecha_vencimiento), 'dd/MM/yyyy')}</div>
                             </div>
+                          ) : mov.source === 'transferencia' ? (
+                            <div className="text-xs space-y-0.5">
+                              {mov.numero_operacion && (
+                                <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
+                              )}
+                              {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
+                              <div className="flex items-center gap-1 pt-1 flex-wrap">
+                                {mov.foto_comprobante_path ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => handleVerComprobante(mov.foto_comprobante_path!)}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" /> Ver comprobante
+                                  </Button>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Sin comprobante</span>
+                                )}
+                                <label className="inline-flex">
+                                  <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    className="hidden"
+                                    disabled={uploadingTransfId === mov.transferencia_id}
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) handleUploadComprobante(mov, f);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs cursor-pointer"
+                                    disabled={uploadingTransfId === mov.transferencia_id}
+                                  >
+                                    <span>
+                                      {mov.foto_comprobante_path ? (
+                                        <><Upload className="h-3 w-3 mr-1" /> Cambiar</>
+                                      ) : (
+                                        <><Paperclip className="h-3 w-3 mr-1" /> Adjuntar</>
+                                      )}
+                                    </span>
+                                  </Button>
+                                </label>
+                              </div>
+                            </div>
                           ) : mov.numero_operacion ? (
                             <div className="text-xs space-y-0.5">
                               <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
                               {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
-                              {mov.source === 'transferencia' && (
-                                <div className="flex items-center gap-1 pt-1">
-                                  {mov.foto_comprobante_path ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-6 px-2 text-xs"
-                                      onClick={() => handleVerComprobante(mov.foto_comprobante_path!)}
-                                    >
-                                      <Eye className="h-3 w-3 mr-1" /> Ver
-                                    </Button>
-                                  ) : (
-                                    <span className="text-muted-foreground italic">Sin comprobante</span>
-                                  )}
-                                  <label className="inline-flex">
-                                    <input
-                                      type="file"
-                                      accept="image/*,application/pdf"
-                                      className="hidden"
-                                      disabled={uploadingTransfId === mov.transferencia_id}
-                                      onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) handleUploadComprobante(mov, f);
-                                        e.target.value = '';
-                                      }}
-                                    />
-                                    <Button
-                                      asChild
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 px-2 text-xs cursor-pointer"
-                                      disabled={uploadingTransfId === mov.transferencia_id}
-                                    >
-                                      <span>
-                                        {mov.foto_comprobante_path ? (
-                                          <><Upload className="h-3 w-3 mr-1" /> Cambiar</>
-                                        ) : (
-                                          <><Paperclip className="h-3 w-3 mr-1" /> Adjuntar</>
-                                        )}
-                                      </span>
-                                    </Button>
-                                  </label>
-                                </div>
-                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">{mov.concepto || '-'}</span>
