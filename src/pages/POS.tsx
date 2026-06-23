@@ -3074,7 +3074,7 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleOpenFacturaDialog} disabled={totalPagado < total}>
+              <Button onClick={handleContinuarPago} disabled={totalPagado < total}>
                 Continuar
               </Button>
             </div>
