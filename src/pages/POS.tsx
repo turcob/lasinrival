@@ -1230,26 +1230,7 @@ export default function POS() {
         if (detallesError) throw detallesError;
       } else {
         // Crear nueva venta
-        const { data: newVenta, error: ventaError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: null,
-            empleado_id: selectedEmpleado.id,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          }])
-          .select()
-          .single();
-
-        if (ventaError) throw ventaError;
-        venta = newVenta;
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -1259,12 +1240,23 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            empleado_id: selectedEmpleado.id,
+            caja_id: caja.id,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'confirmada',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        const { data: newVenta } = await supabase
+          .from('ventas').select('*').eq('id', created.id).single();
+        venta = newVenta;
       }
 
       // NO crear venta_pagos - no hay pago
@@ -1435,26 +1427,7 @@ export default function POS() {
         if (detallesError) throw detallesError;
       } else {
         // Crear nueva venta
-        const { data: newVenta, error: ventaError } = await supabase
-          .from('ventas')
-          .insert([{
-            usuario_id: user.id,
-            cliente_id: selectedCliente.id,
-            empleado_id: null,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          }])
-          .select()
-          .single();
-
-        if (ventaError) throw ventaError;
-        venta = newVenta;
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
+        const detallesPayload = cart.map((item) => ({
           producto_id: item.producto?.id || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio,
@@ -1464,12 +1437,23 @@ export default function POS() {
           producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
           producto_temporal_precio: item.es_temporal ? item.precio : null,
         }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user.id,
+            cliente_id: selectedCliente.id,
+            caja_id: caja.id,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'confirmada',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        const created: any = rpcRes;
+        const { data: newVenta } = await supabase
+          .from('ventas').select('*').eq('id', created.id).single();
+        venta = newVenta;
       }
 
       // NO crear venta_pagos - no hay pago
