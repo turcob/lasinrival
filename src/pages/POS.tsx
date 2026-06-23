@@ -3224,7 +3224,13 @@ export default function POS() {
       {/* Transferencia: datos del comprobante */}
       <Dialog open={transferenciaDialogOpen} onOpenChange={(open) => {
         setTransferenciaDialogOpen(open);
-        if (!open) setTransferenciaData(null);
+        // Si se cierra sin confirmar y aún no se agregó el pago de transferencia,
+        // limpiar los datos para no dejar estado huérfano.
+        if (!open) {
+          const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+          const tieneTransfPago = fpTransf ? pagos.some(p => p.forma_pago_id === fpTransf.id) : false;
+          if (!tieneTransfPago) setTransferenciaData(null);
+        }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
