@@ -66,6 +66,10 @@ interface MovimientoPendiente {
   venta_numero?: number | null;
   foto_comprobante_path?: string | null;
   foto_comprobante_nombre?: string | null;
+  titular_nombre?: string | null;
+  titular_cuil?: string | null;
+  fecha_transferencia?: string | null;
+  transferencia_origen?: string | null;
 }
 
 interface VentaPendiente {
@@ -212,6 +216,10 @@ export default function Imputacion() {
           venta_numero: ventaNro || null,
           foto_comprobante_path: t.foto_comprobante_path || null,
           foto_comprobante_nombre: t.foto_comprobante_nombre || null,
+          titular_nombre: t.titular_nombre || null,
+          titular_cuil: t.titular_cuil || null,
+          fecha_transferencia: t.fecha_transferencia || null,
+          transferencia_origen: t.origen || null,
         };
       });
 
@@ -654,8 +662,20 @@ export default function Imputacion() {
                             </div>
                           ) : mov.source === 'transferencia' ? (
                             <div className="text-xs space-y-0.5">
+                              {mov.titular_nombre && (
+                                <div><span className="text-muted-foreground">Titular:</span> {mov.titular_nombre}</div>
+                              )}
+                              {mov.titular_cuil && (
+                                <div><span className="text-muted-foreground">CUIL/CUIT:</span> <span className="font-mono">{mov.titular_cuil}</span></div>
+                              )}
                               {mov.numero_operacion && (
                                 <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
+                              )}
+                              {mov.fecha_transferencia && (
+                                <div><span className="text-muted-foreground">Fecha transf.:</span> {format(new Date(mov.fecha_transferencia), 'dd/MM/yyyy')}</div>
+                              )}
+                              {mov.transferencia_origen && (
+                                <div><span className="text-muted-foreground">Origen:</span> {mov.transferencia_origen}</div>
                               )}
                               {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
                               <div className="flex items-center gap-1 pt-1 flex-wrap">
