@@ -61,6 +61,9 @@ interface MovimientoPendiente {
     cuit_emisor: string | null;
     observaciones: string | null;
   } | null;
+  source?: 'movimiento' | 'transferencia';
+  transferencia_id?: string;
+  venta_numero?: number | null;
 }
 
 interface VentaPendiente {
@@ -141,9 +144,78 @@ export default function Imputacion() {
         usuario_registro_nombre: usuariosMap.get(m.usuario_registro_id) || null,
         numero_operacion: (m as any).numero_operacion || null,
         cheque: chequesMap.get(m.id) || null,
+        source: 'movimiento' as const,
       }));
 
-      setMovimientos(movimientosCompletos);
+      // Fetch standalone transferencias (origen='venta' o 'manual') que no estén
+      // ligadas a un cliente_movimiento — vienen del POS o de carga manual.
+      const { data: transfData, error: transfError } = await supabase
+        .from('transferencias')
+        .select('*')
+        .is('cliente_movimiento_id', null)
+        .in('estado', ['pendiente', 'validada', 'rechazada'])
+        .order('created_at', { ascending: false });
+
+      if (transfError) throw transfError;
+
+      const transfClienteIds = [...new Set((transfData || [])
+        .map(t => t.cliente_id)
+        .filter((id): id is string => !!id))];
+      const transfVentaIds = [...new Set((transfData || [])
+        .map(t => t.venta_id)
+        .filter((id): id is string => !!id))];
+
+      const [transfClientesRes, transfVentasRes] = await Promise.all([
+        transfClienteIds.length > 0
+          ? supabase.from('clientes').select('id, nombre').in('id', transfClienteIds)
+          : Promise.resolve({ data: [] as any[] }),
+        transfVentaIds.length > 0
+          ? supabase.from('ventas').select('id, numero_comprobante').in('id', transfVentaIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const transfClientesMap = new Map((transfClientesRes.data || []).map((c: any) => [c.id, c.nombre]));
+      const transfVentasMap = new Map((transfVentasRes.data || []).map((v: any) => [v.id, v.numero_comprobante]));
+
+      const estadoMap: Record<string, string> = {
+        pendiente: 'pendiente',
+        validada: 'confirmado',
+        rechazada: 'rechazado',
+      };
+
+      const transferenciasComoMov: MovimientoPendiente[] = (transfData || []).map((t: any) => {
+        const ventaNro = t.venta_id ? transfVentasMap.get(t.venta_id) : null;
+        const conceptoBase = t.origen === 'venta' && ventaNro
+          ? `Transferencia venta POS #${ventaNro}`
+          : `Transferencia · ${t.titular_nombre}`;
+        return {
+          id: `transf:${t.id}`,
+          cliente_id: t.cliente_id || '',
+          tipo: 'pago',
+          monto: Number(t.importe),
+          fecha: t.fecha_transferencia,
+          concepto: conceptoBase,
+          forma_pago_id: null,
+          estado_imputacion: estadoMap[t.estado] || 'pendiente',
+          created_at: t.created_at,
+          cliente_nombre: t.cliente_id
+            ? (transfClientesMap.get(t.cliente_id) || 'Cliente desconocido')
+            : 'Consumidor Final',
+          forma_pago_nombre: 'Transferencia',
+          usuario_registro_nombre: null,
+          numero_operacion: t.numero_operacion || null,
+          cheque: null,
+          source: 'transferencia' as const,
+          transferencia_id: t.id,
+          venta_numero: ventaNro || null,
+        };
+      });
+
+      const combinados = [...movimientosCompletos, ...transferenciasComoMov].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setMovimientos(combinados);
     } catch (error) {
       console.error('Error fetching movimientos:', error);
       toast.error('Error al cargar los movimientos');
@@ -253,6 +325,23 @@ export default function Imputacion() {
     
     setProcessing(true);
     try {
+      // Caso transferencia POS / standalone → actualiza la tabla transferencias
+      if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        const { error } = await supabase
+          .from('transferencias')
+          .update({ estado: 'validada' })
+          .eq('id', selectedMovimiento.transferencia_id);
+        if (error) throw error;
+        toast.success('Transferencia validada correctamente');
+        setConfirmDialogOpen(false);
+        setSelectedMovimiento(null);
+        setSelectedVentas([]);
+        setConceptoImputacion('');
+        setVentasPendientes([]);
+        fetchMovimientos();
+        return;
+      }
+
       // Construir concepto con las facturas seleccionadas
       let conceptoFinal = selectedMovimiento.concepto || '';
       if (selectedVentas.length > 0) {
@@ -299,6 +388,20 @@ export default function Imputacion() {
     
     setProcessing(true);
     try {
+      if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        const { error } = await supabase
+          .from('transferencias')
+          .update({ estado: 'rechazada', observacion_rechazo: motivoRechazo.trim() })
+          .eq('id', selectedMovimiento.transferencia_id);
+        if (error) throw error;
+        toast.success('Transferencia rechazada');
+        setRejectDialogOpen(false);
+        setSelectedMovimiento(null);
+        setMotivoRechazo('');
+        fetchMovimientos();
+        return;
+      }
+
       const { error } = await supabase
         .from('cliente_movimientos')
         .update({
@@ -329,7 +432,11 @@ export default function Imputacion() {
     setSelectedVentas([]);
     setConceptoImputacion('');
     setConfirmDialogOpen(true);
-    fetchVentasPendientes(mov.cliente_id);
+    if (mov.source !== 'transferencia' && mov.cliente_id) {
+      fetchVentasPendientes(mov.cliente_id);
+    } else {
+      setVentasPendientes([]);
+    }
   };
 
   const toggleVentaSelection = (ventaId: string) => {
