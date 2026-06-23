@@ -483,6 +483,30 @@ export default function Imputacion() {
   };
 
   const [uploadingTransfId, setUploadingTransfId] = useState<string | null>(null);
+  const [detalleTransfOpen, setDetalleTransfOpen] = useState(false);
+  const [detalleTransfMov, setDetalleTransfMov] = useState<MovimientoPendiente | null>(null);
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
+  const [loadingComprobante, setLoadingComprobante] = useState(false);
+
+  const openDetalleTransferencia = async (mov: MovimientoPendiente) => {
+    setDetalleTransfMov(mov);
+    setDetalleTransfOpen(true);
+    setComprobanteUrl(null);
+    if (mov.foto_comprobante_path) {
+      setLoadingComprobante(true);
+      try {
+        const { data, error } = await supabase.storage
+          .from('comprobantes-cobros')
+          .createSignedUrl(mov.foto_comprobante_path, 60 * 10);
+        if (error) throw error;
+        setComprobanteUrl(data?.signedUrl || null);
+      } catch (e) {
+        console.error('Error firmando URL:', e);
+      } finally {
+        setLoadingComprobante(false);
+      }
+    }
+  };
 
   const handleVerComprobante = async (path: string) => {
     try {
