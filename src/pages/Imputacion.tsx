@@ -216,6 +216,10 @@ export default function Imputacion() {
           venta_numero: ventaNro || null,
           foto_comprobante_path: t.foto_comprobante_path || null,
           foto_comprobante_nombre: t.foto_comprobante_nombre || null,
+          titular_nombre: t.titular_nombre || null,
+          titular_cuil: t.titular_cuil || null,
+          fecha_transferencia: t.fecha_transferencia || null,
+          transferencia_origen: t.origen || null,
         };
       });
 
