@@ -555,7 +555,7 @@ export default function Imputacion() {
     setSelectedVentas([]);
     setConceptoImputacion('');
     setConfirmDialogOpen(true);
-    if (mov.source !== 'transferencia' && mov.cliente_id) {
+    if (mov.source !== 'transferencia' && mov.source !== 'cheque' && mov.cliente_id) {
       fetchVentasPendientes(mov.cliente_id);
     } else {
       setVentasPendientes([]);
