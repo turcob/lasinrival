@@ -70,6 +70,8 @@ interface MovimientoPendiente {
   titular_cuil?: string | null;
   fecha_transferencia?: string | null;
   transferencia_origen?: string | null;
+  observacion_rechazo?: string | null;
+  rechazado_at?: string | null;
 }
 
 interface VentaPendiente {
@@ -220,6 +222,8 @@ export default function Imputacion() {
           titular_cuil: t.titular_cuil || null,
           fecha_transferencia: t.fecha_transferencia || null,
           transferencia_origen: t.origen || null,
+          observacion_rechazo: t.observacion_rechazo || null,
+          rechazado_at: t.rechazado_at || null,
         };
       });
 
@@ -997,6 +1001,22 @@ export default function Imputacion() {
                     </div>
                   )}
                 </div>
+
+                {detalleTransfMov.estado_imputacion === 'rechazado' && detalleTransfMov.observacion_rechazo && (
+                  <div className="border border-destructive/40 bg-destructive/5 p-3 rounded-md space-y-1">
+                    <div className="text-xs font-medium text-destructive uppercase tracking-wide">
+                      Motivo de rechazo
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap">
+                      {detalleTransfMov.observacion_rechazo}
+                    </div>
+                    {detalleTransfMov.rechazado_at && (
+                      <div className="text-xs text-muted-foreground">
+                        Rechazada el {format(new Date(detalleTransfMov.rechazado_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Comprobante</Label>
