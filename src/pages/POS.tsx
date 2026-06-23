@@ -3200,6 +3200,12 @@ export default function POS() {
                     <span>${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
+                {totalPagado > total + 0.009 && (
+                  <div className="flex justify-between text-destructive">
+                    <span>Excedente:</span>
+                    <span>${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3207,7 +3213,7 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleContinuarPago} disabled={totalPagado < total}>
+              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - total) > 0.009}>
                 Continuar
               </Button>
             </div>
