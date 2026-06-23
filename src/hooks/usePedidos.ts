@@ -504,38 +504,30 @@ export function useRendirPedido() {
         return sum + (cantidadReal * precio);
       }, 0) || 0;
 
-      // Create venta
-      const { data: venta, error: ventaError } = await supabase
-        .from('ventas')
-        .insert({
+      // Create venta (atomically via RPC: assigns number only on success)
+      const detallesPayload = (detallesActualizados || [])
+        .filter(d => d.cantidad_entregada > 0)
+        .map(d => ({
+          producto_id: d.producto_id,
+          cantidad: d.cantidad_entregada,
+          precio_unitario: d.precio_unitario,
+          descuento_porcentaje: d.descuento_porcentaje,
+          descuento: d.precio_unitario * d.cantidad_entregada * ((d.descuento_porcentaje || 0) / 100),
+          subtotal: d.cantidad_entregada * d.precio_unitario * (1 - (d.descuento_porcentaje || 0) / 100),
+        }));
+      const { data: rpcRes, error: ventaError } = await supabase.rpc('crear_venta_completa', {
+        p_venta: {
           cliente_id: pedido.cliente_id,
           usuario_id: user.id,
           caja_id: cajaId || null,
           subtotal: totalFinal,
           total: totalFinal,
-          estado: 'confirmada'
-        })
-        .select()
-        .single();
-
+          estado: 'confirmada',
+        } as any,
+        p_detalles: detallesPayload as any,
+      });
       if (ventaError) throw ventaError;
-
-      // Create venta_detalles
-      const ventaDetalles = detallesActualizados
-        ?.filter(d => d.cantidad_entregada > 0)
-        .map(d => ({
-          venta_id: venta.id,
-          producto_id: d.producto_id,
-          cantidad: d.cantidad_entregada,
-          precio_unitario: d.precio_unitario,
-          descuento_porcentaje: d.descuento_porcentaje,
-          descuento: d.precio_unitario * d.cantidad_entregada * (d.descuento_porcentaje / 100),
-          subtotal: d.cantidad_entregada * d.precio_unitario * (1 - (d.descuento_porcentaje || 0) / 100)
-        })) || [];
-
-      if (ventaDetalles.length > 0) {
-        await supabase.from('venta_detalles').insert(ventaDetalles);
-      }
+      const venta: any = rpcRes;
 
       // Register payment in cliente_movimientos (cuenta corriente)
       await supabase.from('cliente_movimientos').insert({
