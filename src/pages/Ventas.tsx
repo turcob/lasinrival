@@ -135,6 +135,14 @@ export default function Ventas() {
   const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([]);
   const [origenPorVenta, setOrigenPorVenta] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  // Server-side pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
+
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
   const [anularDialogOpen, setAnularDialogOpen] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
