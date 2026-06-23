@@ -61,8 +61,9 @@ interface MovimientoPendiente {
     cuit_emisor: string | null;
     observaciones: string | null;
   } | null;
-  source?: 'movimiento' | 'transferencia';
+  source?: 'movimiento' | 'transferencia' | 'cheque';
   transferencia_id?: string;
+  cheque_id?: string;
   venta_numero?: number | null;
   foto_comprobante_path?: string | null;
   foto_comprobante_nombre?: string | null;
@@ -227,7 +228,78 @@ export default function Imputacion() {
         };
       });
 
-      const combinados = [...movimientosCompletos, ...transferenciasComoMov].sort(
+      // Fetch cheques registrados desde POS (estado 'pendiente_validacion',
+      // o ya procesados: 'en_cartera' = confirmado, 'rechazado' = rechazado),
+      // que tengan venta_id (vienen del POS).
+      const { data: chequesData, error: chequesError } = await supabase
+        .from('cheques')
+        .select('*')
+        .in('estado', ['pendiente_validacion', 'en_cartera', 'rechazado'] as any)
+        .not('venta_id', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (chequesError) throw chequesError;
+
+      const chequeClienteIds = [...new Set((chequesData || [])
+        .map((c: any) => c.cliente_id)
+        .filter((id): id is string => !!id))];
+      const chequeVentaIds = [...new Set((chequesData || [])
+        .map((c: any) => c.venta_id)
+        .filter((id): id is string => !!id))];
+
+      const [chequeClientesRes, chequeVentasRes] = await Promise.all([
+        chequeClienteIds.length > 0
+          ? supabase.from('clientes').select('id, nombre').in('id', chequeClienteIds)
+          : Promise.resolve({ data: [] as any[] }),
+        chequeVentaIds.length > 0
+          ? supabase.from('ventas').select('id, numero_comprobante').in('id', chequeVentaIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const chequeClientesMap = new Map((chequeClientesRes.data || []).map((c: any) => [c.id, c.nombre]));
+      const chequeVentasMap = new Map((chequeVentasRes.data || []).map((v: any) => [v.id, v.numero_comprobante]));
+
+      const chequeEstadoMap: Record<string, string> = {
+        pendiente_validacion: 'pendiente',
+        en_cartera: 'confirmado',
+        rechazado: 'rechazado',
+      };
+
+      const chequesComoMov: MovimientoPendiente[] = (chequesData || []).map((c: any) => {
+        const ventaNro = c.venta_id ? chequeVentasMap.get(c.venta_id) : null;
+        return {
+          id: `cheque:${c.id}`,
+          cliente_id: c.cliente_id || '',
+          tipo: 'pago',
+          monto: Number(c.monto),
+          fecha: c.fecha_emision,
+          concepto: ventaNro ? `Cheque venta POS #${ventaNro}` : `Cheque · ${c.emisor}`,
+          forma_pago_id: null,
+          estado_imputacion: chequeEstadoMap[c.estado] || 'pendiente',
+          created_at: c.created_at,
+          cliente_nombre: c.cliente_id
+            ? (chequeClientesMap.get(c.cliente_id) || 'Cliente desconocido')
+            : 'Consumidor Final',
+          forma_pago_nombre: 'Cheque',
+          usuario_registro_nombre: null,
+          numero_operacion: c.numero_cheque || null,
+          cheque: {
+            numero_cheque: c.numero_cheque,
+            banco: c.banco,
+            emisor: c.emisor,
+            fecha_emision: c.fecha_emision,
+            fecha_vencimiento: c.fecha_vencimiento,
+            cuit_emisor: c.cuit_emisor,
+            observaciones: c.observaciones,
+          },
+          source: 'cheque' as const,
+          cheque_id: c.id,
+          venta_numero: ventaNro || null,
+          observacion_rechazo: c.motivo_rechazo || null,
+        };
+      });
+
+      const combinados = [...movimientosCompletos, ...transferenciasComoMov, ...chequesComoMov].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
@@ -358,6 +430,23 @@ export default function Imputacion() {
         return;
       }
 
+      // Caso cheque POS → actualiza la tabla cheques (pendiente_validacion -> en_cartera)
+      if (selectedMovimiento.source === 'cheque' && selectedMovimiento.cheque_id) {
+        const { error } = await supabase
+          .from('cheques')
+          .update({ estado: 'en_cartera' as any })
+          .eq('id', selectedMovimiento.cheque_id);
+        if (error) throw error;
+        toast.success('Cheque validado correctamente');
+        setConfirmDialogOpen(false);
+        setSelectedMovimiento(null);
+        setSelectedVentas([]);
+        setConceptoImputacion('');
+        setVentasPendientes([]);
+        fetchMovimientos();
+        return;
+      }
+
       // Construir concepto con las facturas seleccionadas
       let conceptoFinal = selectedMovimiento.concepto || '';
       if (selectedVentas.length > 0) {
@@ -418,6 +507,24 @@ export default function Imputacion() {
         return;
       }
 
+      if (selectedMovimiento.source === 'cheque' && selectedMovimiento.cheque_id) {
+        const { error } = await supabase
+          .from('cheques')
+          .update({
+            estado: 'rechazado' as any,
+            motivo_rechazo: motivoRechazo.trim(),
+            fecha_rechazo: new Date().toISOString().slice(0, 10),
+          })
+          .eq('id', selectedMovimiento.cheque_id);
+        if (error) throw error;
+        toast.success('Cheque rechazado');
+        setRejectDialogOpen(false);
+        setSelectedMovimiento(null);
+        setMotivoRechazo('');
+        fetchMovimientos();
+        return;
+      }
+
       const { error } = await supabase
         .from('cliente_movimientos')
         .update({
@@ -448,7 +555,7 @@ export default function Imputacion() {
     setSelectedVentas([]);
     setConceptoImputacion('');
     setConfirmDialogOpen(true);
-    if (mov.source !== 'transferencia' && mov.cliente_id) {
+    if (mov.source !== 'transferencia' && mov.source !== 'cheque' && mov.cliente_id) {
       fetchVentasPendientes(mov.cliente_id);
     } else {
       setVentasPendientes([]);

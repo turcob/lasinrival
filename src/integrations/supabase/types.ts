@@ -368,6 +368,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["cheque_tipo"]
           updated_at: string
           usuario_registro_id: string
+          venta_id: string | null
         }
         Insert: {
           banco: string
@@ -396,6 +397,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["cheque_tipo"]
           updated_at?: string
           usuario_registro_id: string
+          venta_id?: string | null
         }
         Update: {
           banco?: string
@@ -424,6 +426,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["cheque_tipo"]
           updated_at?: string
           usuario_registro_id?: string
+          venta_id?: string | null
         }
         Relationships: [
           {
@@ -439,6 +442,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "cliente_movimientos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "ventas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "vw_sales_line"
+            referencedColumns: ["venta_id"]
           },
         ]
       }
@@ -4912,6 +4929,7 @@ export type Database = {
         | "endosado"
         | "vencido"
         | "anulado"
+        | "pendiente_validacion"
       cheque_tipo: "terceros" | "propio"
       orden_compra_estado:
         | "borrador"
@@ -5096,6 +5114,7 @@ export const Constants = {
         "endosado",
         "vencido",
         "anulado",
+        "pendiente_validacion",
       ],
       cheque_tipo: ["terceros", "propio"],
       orden_compra_estado: [

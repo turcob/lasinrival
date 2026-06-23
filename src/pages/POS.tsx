@@ -51,6 +51,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -280,6 +281,22 @@ export default function POS() {
     formaPagoId: string;
     formaPagoNombre: string;
     monto: string;
+  } | null>(null);
+
+  // Pago Cheque (datos del cheque a registrar como pendiente de validación)
+  const [chequeDialogOpen, setChequeDialogOpen] = useState(false);
+  const [chequeFormaPagoId, setChequeFormaPagoId] = useState<string | null>(null);
+  const [chequeData, setChequeData] = useState<{
+    tipo: 'propio' | 'terceros';
+    numero_cheque: string;
+    banco: string;
+    sucursal_banco: string;
+    emisor: string;
+    cuit_emisor: string;
+    monto: string;
+    fecha_emision: string;
+    fecha_vencimiento: string;
+    observaciones: string;
   } | null>(null);
 
   // Modal de búsqueda de productos
@@ -1018,6 +1035,29 @@ export default function POS() {
       return;
     }
 
+    // Si es Cheque, abrir diálogo con datos del cheque
+    if (fpNombre.includes('cheque')) {
+      if (pagos.some(p => p.forma_pago_id === formaPagoId)) {
+        toast.error('Ya hay un pago con Cheque agregado');
+        return;
+      }
+      setChequeFormaPagoId(formaPagoId);
+      setChequeData({
+        tipo: 'terceros',
+        numero_cheque: '',
+        banco: '',
+        sucursal_banco: '',
+        emisor: selectedCliente?.nombre || '',
+        cuit_emisor: selectedCliente?.dni_cuit || '',
+        monto: pendiente.toFixed(2),
+        fecha_emision: new Date().toISOString().slice(0, 10),
+        fecha_vencimiento: '',
+        observaciones: '',
+      });
+      setChequeDialogOpen(true);
+      return;
+    }
+
     // Resto de métodos de pago: pedir importe en un diálogo genérico
     setMontoGenericoData({
       formaPagoId,
@@ -1053,6 +1093,39 @@ export default function POS() {
     setMontoGenericoData(null);
   };
 
+  const handleAddPagoCheque = () => {
+    if (!chequeData || !chequeFormaPagoId) return;
+    if (!chequeData.numero_cheque.trim() || !chequeData.banco.trim() || !chequeData.emisor.trim()) {
+      toast.error('Completá número de cheque, banco y emisor');
+      return;
+    }
+    if (!chequeData.fecha_emision || !chequeData.fecha_vencimiento) {
+      toast.error('Completá las fechas de emisión y vencimiento');
+      return;
+    }
+    const monto = parseFloat(chequeData.monto.replace(',', '.'));
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('Ingrese un importe válido');
+      return;
+    }
+    const existing = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
+    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    if (monto > pendienteDisponible + 0.009) {
+      toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+      return;
+    }
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === chequeFormaPagoId);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto };
+        return next;
+      }
+      return [...prev, { forma_pago_id: chequeFormaPagoId, monto }];
+    });
+    setChequeDialogOpen(false);
+  };
+
   const removePago = (index: number) => {
     setPagos((prev) => {
       const removed = prev[index];
@@ -1060,6 +1133,11 @@ export default function POS() {
       const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
       if (removed && fpTransf && removed.forma_pago_id === fpTransf.id) {
         setTransferenciaData(null);
+      }
+      // Si se quita el cheque, limpiar los datos del cheque
+      if (removed && chequeFormaPagoId && removed.forma_pago_id === chequeFormaPagoId) {
+        setChequeData(null);
+        setChequeFormaPagoId(null);
       }
       return prev.filter((_, i) => i !== index);
     });
@@ -1656,6 +1734,36 @@ export default function POS() {
           toast.error('Error al registrar la transferencia: ' + transfError.message);
         } else {
           toast.success('Transferencia registrada correctamente. Quedó pendiente de validación.');
+        }
+      }
+
+      // Si en la venta hay un pago con Cheque, registrar el cheque
+      // en la tabla `cheques` con estado 'pendiente_validacion'.
+      if (chequeData && chequeFormaPagoId) {
+        const pagoCheque = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
+        const montoCheque = pagoCheque?.monto ?? parseFloat(chequeData.monto.replace(',', '.'));
+        const { error: chequeError } = await supabase.from('cheques').insert([{
+          tipo: chequeData.tipo,
+          estado: 'pendiente_validacion' as any,
+          numero_cheque: chequeData.numero_cheque.trim(),
+          banco: chequeData.banco.trim(),
+          sucursal_banco: chequeData.sucursal_banco.trim() || null,
+          emisor: chequeData.emisor.trim(),
+          cuit_emisor: chequeData.cuit_emisor.trim() || null,
+          cliente_id: selectedCliente?.id || null,
+          monto: montoCheque,
+          fecha_emision: chequeData.fecha_emision,
+          fecha_vencimiento: chequeData.fecha_vencimiento,
+          observaciones: chequeData.observaciones.trim() || null,
+          venta_id: venta.id,
+          usuario_registro_id: user.id,
+        } as any]);
+
+        if (chequeError) {
+          console.error('Error registrando cheque:', chequeError);
+          toast.error('Error al registrar el cheque: ' + chequeError.message);
+        } else {
+          toast.success('Cheque registrado. Quedó pendiente de validación.');
         }
       }
 
@@ -3337,6 +3445,128 @@ export default function POS() {
                 </Button>
                 <Button onClick={handleAddPagoGenerico}>
                   Agregar pago
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Pago con Cheque: datos del cheque */}
+      <Dialog open={chequeDialogOpen} onOpenChange={(open) => {
+        setChequeDialogOpen(open);
+        if (!open && !pagos.some(p => p.forma_pago_id === chequeFormaPagoId)) {
+          setChequeData(null);
+          setChequeFormaPagoId(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Cheque</DialogTitle>
+          </DialogHeader>
+          {chequeData && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Tipo *</Label>
+                  <Select
+                    value={chequeData.tipo}
+                    onValueChange={(v) => setChequeData({ ...chequeData, tipo: v as 'propio' | 'terceros' })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="terceros">De Terceros</SelectItem>
+                      <SelectItem value="propio">Propio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Nº Cheque *</Label>
+                  <Input
+                    value={chequeData.numero_cheque}
+                    onChange={(e) => setChequeData({ ...chequeData, numero_cheque: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Banco *</Label>
+                  <Input
+                    value={chequeData.banco}
+                    onChange={(e) => setChequeData({ ...chequeData, banco: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Sucursal Banco</Label>
+                  <Input
+                    value={chequeData.sucursal_banco}
+                    onChange={(e) => setChequeData({ ...chequeData, sucursal_banco: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Emisor *</Label>
+                  <Input
+                    value={chequeData.emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, emisor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>CUIT Emisor</Label>
+                  <Input
+                    value={chequeData.cuit_emisor}
+                    onChange={(e) => setChequeData({ ...chequeData, cuit_emisor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label>Cliente</Label>
+                  <Input value={selectedCliente?.nombre || 'Sin cliente'} disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Monto *</Label>
+                  <Input
+                    inputMode="decimal"
+                    value={chequeData.monto}
+                    onChange={(e) => setChequeData({ ...chequeData, monto: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pendiente: ${(total - totalPagado + (pagos.find(p => p.forma_pago_id === chequeFormaPagoId)?.monto || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Fecha Emisión *</Label>
+                  <Input
+                    type="date"
+                    value={chequeData.fecha_emision}
+                    onChange={(e) => setChequeData({ ...chequeData, fecha_emision: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Fecha Vencimiento *</Label>
+                  <Input
+                    type="date"
+                    value={chequeData.fecha_vencimiento}
+                    onChange={(e) => setChequeData({ ...chequeData, fecha_vencimiento: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Observaciones</Label>
+                <Textarea
+                  rows={2}
+                  value={chequeData.observaciones}
+                  onChange={(e) => setChequeData({ ...chequeData, observaciones: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => {
+                  setChequeDialogOpen(false);
+                  if (!pagos.some(p => p.forma_pago_id === chequeFormaPagoId)) {
+                    setChequeData(null);
+                    setChequeFormaPagoId(null);
+                  }
+                }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddPagoCheque}>
+                  Agregar cheque
                 </Button>
               </div>
             </div>
