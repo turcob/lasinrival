@@ -283,6 +283,22 @@ export default function POS() {
     monto: string;
   } | null>(null);
 
+  // Pago Cheque (datos del cheque a registrar como pendiente de validación)
+  const [chequeDialogOpen, setChequeDialogOpen] = useState(false);
+  const [chequeFormaPagoId, setChequeFormaPagoId] = useState<string | null>(null);
+  const [chequeData, setChequeData] = useState<{
+    tipo: 'propio' | 'terceros';
+    numero_cheque: string;
+    banco: string;
+    sucursal_banco: string;
+    emisor: string;
+    cuit_emisor: string;
+    monto: string;
+    fecha_emision: string;
+    fecha_vencimiento: string;
+    observaciones: string;
+  } | null>(null);
+
   // Modal de búsqueda de productos
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
   const [productQuantityModalOpen, setProductQuantityModalOpen] = useState(false);
