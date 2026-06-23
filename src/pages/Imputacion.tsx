@@ -557,6 +557,18 @@ export default function Imputacion() {
       if (updErr) throw updErr;
 
       toast.success(mov.foto_comprobante_path ? 'Comprobante reemplazado' : 'Comprobante adjuntado');
+      // Refrescar detalle abierto
+      if (detalleTransfMov?.transferencia_id === mov.transferencia_id) {
+        const { data: signed } = await supabase.storage
+          .from('comprobantes-cobros')
+          .createSignedUrl(fileName, 60 * 10);
+        setComprobanteUrl(signed?.signedUrl || null);
+        setDetalleTransfMov({
+          ...detalleTransfMov,
+          foto_comprobante_path: fileName,
+          foto_comprobante_nombre: file.name,
+        });
+      }
       fetchMovimientos();
     } catch (e: any) {
       console.error('Error subiendo comprobante:', e);
