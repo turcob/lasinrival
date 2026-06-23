@@ -210,6 +210,8 @@ export default function Imputacion() {
           source: 'transferencia' as const,
           transferencia_id: t.id,
           venta_numero: ventaNro || null,
+          foto_comprobante_path: t.foto_comprobante_path || null,
+          foto_comprobante_nombre: t.foto_comprobante_nombre || null,
         };
       });
 
