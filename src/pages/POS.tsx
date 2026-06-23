@@ -992,26 +992,77 @@ export default function POS() {
       setTarjetaDialogOpen(true);
       return;
     }
-    
-    // Otros métodos de pago
-    const pendiente = total - totalPagado;
-    if (pendiente <= 0) return;
 
-    setPagos((prev) => {
-      const existing = prev.find((p) => p.forma_pago_id === formaPagoId);
-      if (existing) {
-        return prev.map((p) =>
-          p.forma_pago_id === formaPagoId
-            ? { ...p, monto: p.monto + pendiente }
-            : p
-        );
+    const pendiente = total - totalPagado;
+    if (pendiente <= 0.009) {
+      toast.error('No hay saldo pendiente para asignar');
+      return;
+    }
+
+    // Si es Transferencia, abrir directamente el diálogo de datos (incluye importe)
+    if (fpNombre.includes('transfer')) {
+      // Si ya existe un pago de transferencia, no duplicar
+      if (pagos.some(p => p.forma_pago_id === formaPagoId)) {
+        toast.error('Ya hay un pago con Transferencia agregado');
+        return;
       }
-      return [...prev, { forma_pago_id: formaPagoId, monto: pendiente }];
+      setTransferenciaData({
+        fecha: new Date().toISOString().slice(0, 10),
+        titular: '',
+        cuil: '',
+        importe: pendiente.toFixed(2),
+        numero_operacion: '',
+        archivo: null,
+      });
+      setTransferenciaDialogOpen(true);
+      return;
+    }
+
+    // Resto de métodos de pago: pedir importe en un diálogo genérico
+    setMontoGenericoData({
+      formaPagoId,
+      formaPagoNombre: fp?.nombre || 'Pago',
+      monto: pendiente.toFixed(2),
     });
+    setMontoGenericoDialogOpen(true);
+  };
+
+  const handleAddPagoGenerico = () => {
+    if (!montoGenericoData) return;
+    const monto = parseFloat(montoGenericoData.monto.replace(',', '.'));
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('Ingrese un importe válido');
+      return;
+    }
+    const existing = pagos.find(p => p.forma_pago_id === montoGenericoData.formaPagoId);
+    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    if (monto > pendienteDisponible + 0.009) {
+      toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+      return;
+    }
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto };
+        return next;
+      }
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto }];
+    });
+    setMontoGenericoDialogOpen(false);
+    setMontoGenericoData(null);
   };
 
   const removePago = (index: number) => {
-    setPagos((prev) => prev.filter((_, i) => i !== index));
+    setPagos((prev) => {
+      const removed = prev[index];
+      // Si se quita la transferencia, limpiar los datos del comprobante
+      const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+      if (removed && fpTransf && removed.forma_pago_id === fpTransf.id) {
+        setTransferenciaData(null);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   // Nueva función para procesar venta a empleado directo a cuenta corriente
