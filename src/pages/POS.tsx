@@ -3132,6 +3132,81 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
+      {/* Transferencia: datos del comprobante */}
+      <Dialog open={transferenciaDialogOpen} onOpenChange={(open) => {
+        setTransferenciaDialogOpen(open);
+        if (!open) setTransferenciaData(null);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Datos de la Transferencia</DialogTitle>
+          </DialogHeader>
+          {transferenciaData && (
+            <div className="space-y-3">
+              <div>
+                <Label>Fecha del comprobante *</Label>
+                <Input
+                  type="date"
+                  value={transferenciaData.fecha}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, fecha: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Titular de la cuenta *</Label>
+                <Input
+                  value={transferenciaData.titular}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, titular: e.target.value })}
+                  placeholder="Nombre y apellido / Razón social"
+                  maxLength={150}
+                />
+              </div>
+              <div>
+                <Label>CUIL / CUIT *</Label>
+                <Input
+                  inputMode="numeric"
+                  value={transferenciaData.cuil}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, cuil: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                  placeholder="11 dígitos"
+                />
+              </div>
+              <div>
+                <Label>Importe *</Label>
+                <Input
+                  inputMode="decimal"
+                  value={transferenciaData.importe}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, importe: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Número de comprobante / operación *</Label>
+                <Input
+                  value={transferenciaData.numero_operacion}
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, numero_operacion: e.target.value })}
+                  maxLength={100}
+                />
+              </div>
+              <div>
+                <Label>Foto del comprobante (opcional)</Label>
+                <Input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,application/pdf"
+                  onChange={(e) => setTransferenciaData({ ...transferenciaData, archivo: e.target.files?.[0] || null })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG o PDF. Puede cargarse luego desde Transferencias.</p>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setTransferenciaDialogOpen(false); setTransferenciaData(null); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleConfirmarTransferencia}>
+                  Confirmar y continuar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Tarjeta Dialog */}
       <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
         <DialogContent>
