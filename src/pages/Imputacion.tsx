@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Search, Clock, CreditCard, Building2, FileUp } from 'lucide-react';
+import { Check, X, Search, Clock, CreditCard, Building2, FileUp, Paperclip, Eye, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -64,6 +64,8 @@ interface MovimientoPendiente {
   source?: 'movimiento' | 'transferencia';
   transferencia_id?: string;
   venta_numero?: number | null;
+  foto_comprobante_path?: string | null;
+  foto_comprobante_nombre?: string | null;
 }
 
 interface VentaPendiente {
@@ -208,6 +210,8 @@ export default function Imputacion() {
           source: 'transferencia' as const,
           transferencia_id: t.id,
           venta_numero: ventaNro || null,
+          foto_comprobante_path: t.foto_comprobante_path || null,
+          foto_comprobante_nombre: t.foto_comprobante_nombre || null,
         };
       });
 
@@ -470,6 +474,66 @@ export default function Imputacion() {
     return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
   };
 
+  const [uploadingTransfId, setUploadingTransfId] = useState<string | null>(null);
+
+  const handleVerComprobante = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('comprobantes-cobros')
+        .createSignedUrl(path, 60 * 10);
+      if (error || !data?.signedUrl) throw error || new Error('No se pudo generar URL');
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      console.error('Error abriendo comprobante:', e);
+      toast.error('No se pudo abrir el comprobante');
+    }
+  };
+
+  const handleUploadComprobante = async (
+    mov: MovimientoPendiente,
+    file: File
+  ) => {
+    if (!mov.transferencia_id) return;
+    setUploadingTransfId(mov.transferencia_id);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `transferencias/${mov.transferencia_id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('comprobantes-cobros')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || 'image/jpeg',
+        });
+      if (upErr) throw upErr;
+
+      // Eliminar el anterior si existía
+      if (mov.foto_comprobante_path) {
+        await supabase.storage
+          .from('comprobantes-cobros')
+          .remove([mov.foto_comprobante_path])
+          .catch(() => {});
+      }
+
+      const { error: updErr } = await supabase
+        .from('transferencias')
+        .update({
+          foto_comprobante_path: fileName,
+          foto_comprobante_nombre: file.name,
+        })
+        .eq('id', mov.transferencia_id);
+      if (updErr) throw updErr;
+
+      toast.success(mov.foto_comprobante_path ? 'Comprobante reemplazado' : 'Comprobante adjuntado');
+      fetchMovimientos();
+    } catch (e: any) {
+      console.error('Error subiendo comprobante:', e);
+      toast.error('Error al subir el comprobante: ' + (e?.message || ''));
+    } finally {
+      setUploadingTransfId(null);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -592,6 +656,50 @@ export default function Imputacion() {
                             <div className="text-xs space-y-0.5">
                               <div><span className="text-muted-foreground">Nro. Op.:</span> <span className="font-mono">{mov.numero_operacion}</span></div>
                               {mov.concepto && <div className="text-muted-foreground">{mov.concepto}</div>}
+                              {mov.source === 'transferencia' && (
+                                <div className="flex items-center gap-1 pt-1">
+                                  {mov.foto_comprobante_path ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => handleVerComprobante(mov.foto_comprobante_path!)}
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" /> Ver
+                                    </Button>
+                                  ) : (
+                                    <span className="text-muted-foreground italic">Sin comprobante</span>
+                                  )}
+                                  <label className="inline-flex">
+                                    <input
+                                      type="file"
+                                      accept="image/*,application/pdf"
+                                      className="hidden"
+                                      disabled={uploadingTransfId === mov.transferencia_id}
+                                      onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleUploadComprobante(mov, f);
+                                        e.target.value = '';
+                                      }}
+                                    />
+                                    <Button
+                                      asChild
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-xs cursor-pointer"
+                                      disabled={uploadingTransfId === mov.transferencia_id}
+                                    >
+                                      <span>
+                                        {mov.foto_comprobante_path ? (
+                                          <><Upload className="h-3 w-3 mr-1" /> Cambiar</>
+                                        ) : (
+                                          <><Paperclip className="h-3 w-3 mr-1" /> Adjuntar</>
+                                        )}
+                                      </span>
+                                    </Button>
+                                  </label>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">{mov.concepto || '-'}</span>
