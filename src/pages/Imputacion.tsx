@@ -432,7 +432,11 @@ export default function Imputacion() {
     setSelectedVentas([]);
     setConceptoImputacion('');
     setConfirmDialogOpen(true);
-    fetchVentasPendientes(mov.cliente_id);
+    if (mov.source !== 'transferencia' && mov.cliente_id) {
+      fetchVentasPendientes(mov.cliente_id);
+    } else {
+      setVentasPendientes([]);
+    }
   };
 
   const toggleVentaSelection = (ventaId: string) => {
