@@ -1738,6 +1738,7 @@ export default function POS() {
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
       setTicketDialogOpen(true);
+      setTransferenciaData(null);
       
       toast.success('Venta procesada correctamente');
       fetchData();
