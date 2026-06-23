@@ -3294,7 +3294,49 @@ export default function POS() {
                   Cancelar
                 </Button>
                 <Button onClick={handleConfirmarTransferencia}>
-                  Confirmar y continuar
+                  Confirmar y agregar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Importe genérico para otros medios de pago */}
+      <Dialog open={montoGenericoDialogOpen} onOpenChange={(open) => {
+        setMontoGenericoDialogOpen(open);
+        if (!open) setMontoGenericoData(null);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Importe — {montoGenericoData?.formaPagoNombre}</DialogTitle>
+          </DialogHeader>
+          {montoGenericoData && (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total venta:</span>
+                <span className="font-semibold">${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Pendiente:</span>
+                <span className="font-semibold">${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div>
+                <Label>Importe *</Label>
+                <Input
+                  autoFocus
+                  inputMode="decimal"
+                  value={montoGenericoData.monto}
+                  onChange={(e) => setMontoGenericoData({ ...montoGenericoData, monto: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddPagoGenerico(); }}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setMontoGenericoDialogOpen(false); setMontoGenericoData(null); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddPagoGenerico}>
+                  Agregar pago
                 </Button>
               </div>
             </div>
