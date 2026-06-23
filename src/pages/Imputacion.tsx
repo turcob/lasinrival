@@ -66,6 +66,10 @@ interface MovimientoPendiente {
   venta_numero?: number | null;
   foto_comprobante_path?: string | null;
   foto_comprobante_nombre?: string | null;
+  titular_nombre?: string | null;
+  titular_cuil?: string | null;
+  fecha_transferencia?: string | null;
+  transferencia_origen?: string | null;
 }
 
 interface VentaPendiente {
