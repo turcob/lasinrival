@@ -806,11 +806,15 @@ export default function POS() {
   };
 
   // Handler del botón "Continuar" del diálogo de pago.
-  // Si hay un pago con Transferencia y aún no se cargaron sus datos,
-  // abre el modal para capturarlos antes de seguir.
+  // Sólo se habilita cuando la suma de medios de pago coincide con el total.
   const handleContinuarPago = () => {
+    if (Math.abs(totalPagado - total) > 0.009) {
+      toast.error('La suma de los medios de pago debe ser igual al total de la venta');
+      return;
+    }
     const t = getPagoTransferencia();
     if (t && !transferenciaData) {
+      toast.error('Complete los datos de la transferencia');
       setTransferenciaData({
         fecha: new Date().toISOString().slice(0, 10),
         titular: '',
@@ -835,10 +839,30 @@ export default function POS() {
     if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
     if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
 
+    // Validar que el importe no exceda el pendiente
+    const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
+    if (!fpTransf) return toast.error('No se encontró la forma de pago Transferencia');
+
+    const existing = pagos.find(p => p.forma_pago_id === fpTransf.id);
+    const pendienteSinTransf = total - totalPagado + (existing?.monto || 0);
+    if (importeNum > pendienteSinTransf + 0.009) {
+      return toast.error(`El importe excede el pendiente ($${pendienteSinTransf.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
+    }
+
+    // Agregar o actualizar el pago de transferencia con el importe ingresado
+    setPagos(prev => {
+      const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], monto: importeNum };
+        return next;
+      }
+      return [...prev, { forma_pago_id: fpTransf.id, monto: importeNum }];
+    });
+
     setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
     setTransferenciaDialogOpen(false);
-    // continuar al diálogo de facturación
-    handleOpenFacturaDialog();
+    toast.success('Transferencia agregada');
   };
 
   // Agregar pago con tarjeta
