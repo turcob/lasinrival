@@ -3845,7 +3845,7 @@ export type Database = {
           rechazado_at: string | null
           rechazado_por: string | null
           titular_cuil: string | null
-          titular_nombre: string
+          titular_nombre: string | null
           updated_at: string
           validado_at: string | null
           validado_por: string | null
@@ -3869,7 +3869,7 @@ export type Database = {
           rechazado_at?: string | null
           rechazado_por?: string | null
           titular_cuil?: string | null
-          titular_nombre: string
+          titular_nombre?: string | null
           updated_at?: string
           validado_at?: string | null
           validado_por?: string | null
@@ -3893,7 +3893,7 @@ export type Database = {
           rechazado_at?: string | null
           rechazado_por?: string | null
           titular_cuil?: string | null
-          titular_nombre?: string
+          titular_nombre?: string | null
           updated_at?: string
           validado_at?: string | null
           validado_por?: string | null

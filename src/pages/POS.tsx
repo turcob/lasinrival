@@ -849,7 +849,6 @@ export default function POS() {
   const handleConfirmarTransferencia = () => {
     if (!transferenciaData) return;
     if (!transferenciaData.fecha) return toast.error('Ingrese la fecha del comprobante');
-    if (!transferenciaData.titular.trim()) return toast.error('Ingrese el titular de la cuenta');
     const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
     if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
     const importeNum = parseFloat(transferenciaData.importe.replace(',', '.'));
@@ -1705,7 +1704,7 @@ export default function POS() {
         const { error: transfError } = await supabase.from('transferencias').insert([{
           fecha_transferencia: transferenciaData.fecha,
           cliente_id: selectedCliente?.id || null,
-          titular_nombre: transferenciaData.titular.trim(),
+          titular_nombre: transferenciaData.titular.trim() || null,
           titular_cuil: transferenciaData.cuil,
           numero_operacion: transferenciaData.numero_operacion.trim(),
           importe: parseFloat(transferenciaData.importe),
@@ -3333,7 +3332,7 @@ export default function POS() {
                 />
               </div>
               <div>
-                <Label>Titular de la cuenta *</Label>
+                <Label>Titular de la cuenta</Label>
                 <Input
                   value={transferenciaData.titular}
                   onChange={(e) => setTransferenciaData({ ...transferenciaData, titular: e.target.value })}
