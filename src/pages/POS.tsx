@@ -4203,7 +4203,9 @@ export default function POS() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-mono font-medium">
-                              #{String(pedido.numero_comprobante).padStart(8, '0')}
+                              {pedido.numero_comprobante
+                                ? `#${String(pedido.numero_comprobante).padStart(8, '0')}`
+                                : 'Sin Nº (pendiente de cobro)'}
                             </span>
                             <Badge variant="secondary">Pedido</Badge>
                           </div>
