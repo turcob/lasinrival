@@ -411,6 +411,7 @@ async function autorizarComprobante(
   let ivaXml = "";
   let impNeto = factura.importe_neto;
   let impIva = factura.importe_iva;
+  let impTotal = factura.importe_total;
   
   if (esFacturaC) {
     // Factura C: Total = Neto (no IVA discrimination)
@@ -439,6 +440,7 @@ async function autorizarComprobante(
     // que coincidan con la suma de AlicIva (requerido por AFIP).
     impNeto = Math.round(ivaItems.reduce((s, i) => s + i.baseImp, 0) * 100) / 100;
     impIva = Math.round(ivaItems.reduce((s, i) => s + i.importe, 0) * 100) / 100;
+    impTotal = Math.round((impNeto + impIva) * 100) / 100;
 
     ivaXml = `<ar:Iva>${ivaItems.map(iva => `
       <ar:AlicIva>
@@ -473,7 +475,7 @@ async function autorizarComprobante(
             <ar:CbteDesde>${nroComprobante}</ar:CbteDesde>
             <ar:CbteHasta>${nroComprobante}</ar:CbteHasta>
             <ar:CbteFch>${fechaHoy}</ar:CbteFch>
-            <ar:ImpTotal>${factura.importe_total.toFixed(2)}</ar:ImpTotal>
+            <ar:ImpTotal>${impTotal.toFixed(2)}</ar:ImpTotal>
             <ar:ImpTotConc>0.00</ar:ImpTotConc>
             <ar:ImpNeto>${impNeto.toFixed(2)}</ar:ImpNeto>
             <ar:ImpOpEx>0.00</ar:ImpOpEx>
