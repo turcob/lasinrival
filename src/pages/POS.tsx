@@ -1093,10 +1093,10 @@ export default function POS() {
       const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto };
+        next[idx] = { ...next[idx], monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
         return next;
       }
-      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto }];
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
     });
     setMontoGenericoDialogOpen(false);
     setMontoGenericoData(null);
