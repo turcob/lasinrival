@@ -393,6 +393,9 @@ export default function Ventas() {
   const handleAnular = async () => {
     if (!selectedVenta || !user) return;
 
+    // placeholder anchor (no-op) — real handler continues below
+
+
     if (!motivoAnulacion.trim()) {
       toast.error('Debe ingresar un motivo de anulación');
       return;
