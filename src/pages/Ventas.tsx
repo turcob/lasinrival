@@ -645,6 +645,22 @@ export default function Ventas() {
       ),
     },
     {
+      key: 'numero_factura',
+      header: 'Nº Factura',
+      render: (item: Venta) => {
+        const cmp = item.comprobantes_afip?.[0];
+        if (!cmp) return <span className="text-muted-foreground text-xs">—</span>;
+        const letra = TIPOS_COMPROBANTE[cmp.tipo_comprobante] || '';
+        const pv = String(cmp.punto_venta).padStart(4, '0');
+        const nro = String(cmp.numero_comprobante).padStart(8, '0');
+        return (
+          <span className="font-mono font-medium">
+            {letra ? `${letra} ` : ''}{pv}-{nro}
+          </span>
+        );
+      },
+    },
+    {
       key: 'fecha',
       header: 'Fecha',
       render: (item: Venta) => format(new Date(item.fecha), 'dd/MM/yyyy HH:mm', { locale: es }),
