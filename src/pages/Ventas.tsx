@@ -393,6 +393,45 @@ export default function Ventas() {
     }
   };
 
+  const openFacturaDialog = async (venta: Venta) => {
+    setSelectedVenta(venta);
+    setSelectedFactura(venta.comprobantes_afip?.[0] || null);
+    setFacturaDetalles([]);
+    setFacturaEmpleado(null);
+    setFacturaDialogOpen(true);
+
+    try {
+      const [detRes, ventaRes] = await Promise.all([
+        supabase
+          .from('venta_detalles')
+          .select('cantidad, precio_unitario, descuento_porcentaje, subtotal, producto_temporal_nombre, productos(descripcion)')
+          .eq('venta_id', venta.id),
+        supabase
+          .from('ventas')
+          .select('empleado_id, empleados:empleado_id(nombre, dni)')
+          .eq('id', venta.id)
+          .maybeSingle(),
+      ]);
+
+      const detalles = (detRes.data || []).map((d: any) => ({
+        nombre: d.producto_temporal_nombre || d.productos?.descripcion || 'Producto',
+        cantidad: Number(d.cantidad) || 0,
+        precio: Number(d.precio_unitario) || 0,
+        subtotal: Number(d.subtotal) || 0,
+        descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
+      }));
+      setFacturaDetalles(detalles);
+
+      const emp = ventaRes.data?.empleados
+        ? { nombre: (ventaRes.data.empleados as any).nombre, dni: (ventaRes.data.empleados as any).dni }
+        : null;
+      setFacturaEmpleado(emp);
+    } catch (err) {
+      console.error('Error cargando factura:', err);
+      toast.error('Error al cargar el detalle de la factura');
+    }
+  };
+
   const handleAnular = async () => {
     if (!selectedVenta || !user) return;
 
