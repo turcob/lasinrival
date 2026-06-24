@@ -921,12 +921,16 @@ export default function POS() {
       tarjeta_id: selectedTarjeta,
       cuotas: cuotasUsadas,
       coeficiente,
+      terminal: terminalTarjeta.trim() || undefined,
+      lote: loteTarjeta.trim() || undefined,
     }]);
     
     setTarjetaDialogOpen(false);
     setSelectedTarjeta(null);
     setSelectedCuotas(1);
     setMontoTarjeta('');
+    setTerminalTarjeta('');
+    setLoteTarjeta('');
     
     if (coeficiente > 1) {
       toast.success(`Pago agregado con ${((coeficiente - 1) * 100).toFixed(1)}% de interés`);
