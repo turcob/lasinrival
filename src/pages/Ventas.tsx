@@ -684,6 +684,20 @@ export default function Ventas() {
               <Printer className="h-4 w-4 text-primary" />
             </Button>
           )}
+          {!item._es_pedido &&
+            !item.anulada &&
+            item.estado === 'confirmada' &&
+            (!item.comprobantes_afip || item.comprobantes_afip.length === 0) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleReintentarAfip(item)}
+                disabled={reintentandoAfipId === item.id}
+                title="Reintentar factura AFIP"
+              >
+                <RefreshCw className={`h-4 w-4 text-amber-600 ${reintentandoAfipId === item.id ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
           {!item._es_pedido && !item.anulada && canAnular && (
             <Button
               variant="ghost"
