@@ -647,7 +647,7 @@ export default function Ventas() {
           <div className="flex flex-wrap gap-1">
             {pagosVenta.map((p, idx) => (
               <Badge key={idx} variant="outline" className="text-xs font-normal">
-                {p.forma_pago_nombre || 'Otro'}
+                {p.formas_pago?.nombre || 'Otro'}
               </Badge>
             ))}
           </div>
