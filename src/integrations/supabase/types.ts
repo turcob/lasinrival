@@ -4238,7 +4238,7 @@ export type Database = {
           fecha_anulacion: string | null
           id: string
           motivo_anulacion: string | null
-          numero_comprobante: number
+          numero_comprobante: number | null
           subtotal: number
           total: number
           usuario_id: string
@@ -4256,7 +4256,7 @@ export type Database = {
           fecha_anulacion?: string | null
           id?: string
           motivo_anulacion?: string | null
-          numero_comprobante: number
+          numero_comprobante?: number | null
           subtotal?: number
           total?: number
           usuario_id: string
@@ -4274,7 +4274,7 @@ export type Database = {
           fecha_anulacion?: string | null
           id?: string
           motivo_anulacion?: string | null
-          numero_comprobante?: number
+          numero_comprobante?: number | null
           subtotal?: number
           total?: number
           usuario_id?: string
