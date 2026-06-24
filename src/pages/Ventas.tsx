@@ -168,6 +168,8 @@ export default function Ventas() {
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
   const [reintentandoAfipId, setReintentandoAfipId] = useState<string | null>(null);
+  const [facturaDetalles, setFacturaDetalles] = useState<Array<{ nombre: string; cantidad: number; precio: number; subtotal: number; descuento_porcentaje: number }>>([]);
+  const [facturaEmpleado, setFacturaEmpleado] = useState<{ nombre: string; dni?: string | null } | null>(null);
 
   const canAnular = hasPermission('ventas', 'anular');
   const isAdmin = hasRole('admin');
