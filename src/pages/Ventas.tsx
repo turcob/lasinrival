@@ -13,7 +13,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -166,6 +166,7 @@ export default function Ventas() {
 
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<ComprobanteAfip | null>(null);
+  const [reintentandoAfipId, setReintentandoAfipId] = useState<string | null>(null);
 
   const canAnular = hasPermission('ventas', 'anular');
   const isAdmin = hasRole('admin');
