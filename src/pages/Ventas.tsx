@@ -636,7 +636,7 @@ export default function Ventas() {
   const columns = [
     {
       key: 'numero_comprobante',
-      header: 'Nº Comprobante',
+      header: 'Nº Venta',
       render: (item: Venta) => (
         <span className="font-mono font-medium">
           {item._es_pedido ? 'P-' : '#'}
