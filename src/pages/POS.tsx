@@ -3639,7 +3639,7 @@ export default function POS() {
             })()}
 
             <div>
-              <Label>Monto</Label>
+              <Label>Importe</Label>
               <Input
                 type="text"
                 value={montoTarjeta}
@@ -3658,6 +3658,27 @@ export default function POS() {
                   })()}
                 </p>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Terminal</Label>
+                <Input
+                  type="text"
+                  value={terminalTarjeta}
+                  onChange={(e) => setTerminalTarjeta(e.target.value)}
+                  placeholder="N° terminal"
+                />
+              </div>
+              <div>
+                <Label>Lote</Label>
+                <Input
+                  type="text"
+                  value={loteTarjeta}
+                  onChange={(e) => setLoteTarjeta(e.target.value)}
+                  placeholder="N° lote"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3">
