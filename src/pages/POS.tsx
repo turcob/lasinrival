@@ -1644,6 +1644,8 @@ export default function POS() {
           coeficiente: p.coeficiente || null,
           efectivo_entregado: p.efectivo_entregado || null,
           vuelto: p.vuelto || null,
+          terminal: p.terminal || null,
+          lote: p.lote || null,
         }));
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
           p_venta: {
@@ -1678,6 +1680,8 @@ export default function POS() {
           coeficiente: p.coeficiente || null,
           efectivo_entregado: p.efectivo_entregado || null,
           vuelto: p.vuelto || null,
+          terminal: p.terminal || null,
+          lote: p.lote || null,
         }));
         const { error: pagosError } = await supabase
           .from('venta_pagos')
