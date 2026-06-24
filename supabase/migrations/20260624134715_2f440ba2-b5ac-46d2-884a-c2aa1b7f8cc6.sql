@@ -1,0 +1,1 @@
+ALTER TABLE public.transferencias ALTER COLUMN titular_nombre DROP NOT NULL;
