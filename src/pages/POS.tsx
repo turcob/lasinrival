@@ -152,6 +152,8 @@ interface Pago {
   coeficiente?: number;
   efectivo_entregado?: number;
   vuelto?: number;
+  terminal?: string;
+  lote?: string;
 }
 
 const TIPOS_COMPROBANTE = [
@@ -259,6 +261,8 @@ export default function POS() {
   const [selectedCuotas, setSelectedCuotas] = useState<number>(1);
   const [montoTarjeta, setMontoTarjeta] = useState('');
   const [tipoTarjetaFiltro, setTipoTarjetaFiltro] = useState<'credito' | 'debito' | null>(null);
+  const [terminalTarjeta, setTerminalTarjeta] = useState('');
+  const [loteTarjeta, setLoteTarjeta] = useState('');
   
   // Pago efectivo
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
@@ -281,6 +285,8 @@ export default function POS() {
     formaPagoId: string;
     formaPagoNombre: string;
     monto: string;
+    terminal?: string;
+    lote?: string;
   } | null>(null);
 
   // Pago Cheque (datos del cheque a registrar como pendiente de validación)
@@ -915,12 +921,16 @@ export default function POS() {
       tarjeta_id: selectedTarjeta,
       cuotas: cuotasUsadas,
       coeficiente,
+      terminal: terminalTarjeta.trim() || undefined,
+      lote: loteTarjeta.trim() || undefined,
     }]);
     
     setTarjetaDialogOpen(false);
     setSelectedTarjeta(null);
     setSelectedCuotas(1);
     setMontoTarjeta('');
+    setTerminalTarjeta('');
+    setLoteTarjeta('');
     
     if (coeficiente > 1) {
       toast.success(`Pago agregado con ${((coeficiente - 1) * 100).toFixed(1)}% de interés`);
@@ -1083,10 +1093,10 @@ export default function POS() {
       const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto };
+        next[idx] = { ...next[idx], monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
         return next;
       }
-      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto }];
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
     });
     setMontoGenericoDialogOpen(false);
     setMontoGenericoData(null);
@@ -1634,6 +1644,8 @@ export default function POS() {
           coeficiente: p.coeficiente || null,
           efectivo_entregado: p.efectivo_entregado || null,
           vuelto: p.vuelto || null,
+          terminal: p.terminal || null,
+          lote: p.lote || null,
         }));
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
           p_venta: {
@@ -1668,6 +1680,8 @@ export default function POS() {
           coeficiente: p.coeficiente || null,
           efectivo_entregado: p.efectivo_entregado || null,
           vuelto: p.vuelto || null,
+          terminal: p.terminal || null,
+          lote: p.lote || null,
         }));
         const { error: pagosError } = await supabase
           .from('venta_pagos')
@@ -3416,6 +3430,28 @@ export default function POS() {
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddPagoGenerico(); }}
                 />
               </div>
+              {montoGenericoData.formaPagoNombre.toLowerCase().includes('qr') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Terminal</Label>
+                    <Input
+                      type="text"
+                      value={montoGenericoData.terminal || ''}
+                      onChange={(e) => setMontoGenericoData({ ...montoGenericoData, terminal: e.target.value })}
+                      placeholder="N° terminal"
+                    />
+                  </div>
+                  <div>
+                    <Label>Lote</Label>
+                    <Input
+                      type="text"
+                      value={montoGenericoData.lote || ''}
+                      onChange={(e) => setMontoGenericoData({ ...montoGenericoData, lote: e.target.value })}
+                      placeholder="N° lote"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => { setMontoGenericoDialogOpen(false); setMontoGenericoData(null); }}>
                   Cancelar
@@ -3625,7 +3661,7 @@ export default function POS() {
             })()}
 
             <div>
-              <Label>Monto</Label>
+              <Label>Importe</Label>
               <Input
                 type="text"
                 value={montoTarjeta}
@@ -3644,6 +3680,27 @@ export default function POS() {
                   })()}
                 </p>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Terminal</Label>
+                <Input
+                  type="text"
+                  value={terminalTarjeta}
+                  onChange={(e) => setTerminalTarjeta(e.target.value)}
+                  placeholder="N° terminal"
+                />
+              </div>
+              <div>
+                <Label>Lote</Label>
+                <Input
+                  type="text"
+                  value={loteTarjeta}
+                  onChange={(e) => setLoteTarjeta(e.target.value)}
+                  placeholder="N° lote"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3">

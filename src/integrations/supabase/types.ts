@@ -4164,8 +4164,10 @@ export type Database = {
           efectivo_entregado: number | null
           forma_pago_id: string
           id: string
+          lote: string | null
           monto: number
           tarjeta_id: string | null
+          terminal: string | null
           venta_id: string
           vuelto: number | null
         }
@@ -4176,8 +4178,10 @@ export type Database = {
           efectivo_entregado?: number | null
           forma_pago_id: string
           id?: string
+          lote?: string | null
           monto: number
           tarjeta_id?: string | null
+          terminal?: string | null
           venta_id: string
           vuelto?: number | null
         }
@@ -4188,8 +4192,10 @@ export type Database = {
           efectivo_entregado?: number | null
           forma_pago_id?: string
           id?: string
+          lote?: string | null
           monto?: number
           tarjeta_id?: string | null
+          terminal?: string | null
           venta_id?: string
           vuelto?: number | null
         }
