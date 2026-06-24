@@ -637,6 +637,24 @@ export default function Ventas() {
       ),
     },
     {
+      key: 'metodo_pago',
+      header: 'Método de Pago',
+      render: (item: Venta) => {
+        if (item._es_pedido) return <span className="text-muted-foreground text-xs">—</span>;
+        const pagosVenta = pagosPorVenta[item.id] || [];
+        if (pagosVenta.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {pagosVenta.map((p, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs font-normal">
+                {p.formas_pago?.nombre || 'Otro'}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
       key: 'estado',
       header: 'Estado',
       render: (item: Venta) => (
