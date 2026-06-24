@@ -1270,136 +1270,58 @@ export default function Ventas() {
                 </div>
               </div>
 
-              <Button className="w-full mt-4" onClick={() => {
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) {
-                  toast.error('No se pudo abrir la ventana de impresión');
-                  return;
+              <Button className="w-full mt-4" onClick={async () => {
+                try {
+                  // Fetch detalle de productos
+                  const { data: detRows } = await supabase
+                    .from('venta_detalles')
+                    .select('cantidad, precio_unitario, descuento_porcentaje, subtotal, producto_temporal_nombre, productos(descripcion)')
+                    .eq('venta_id', selectedVenta.id);
+
+                  // Fetch empleado (si la venta tiene empleado_id)
+                  const { data: ventaRow } = await supabase
+                    .from('ventas')
+                    .select('empleado_id, empleados:empleado_id(nombre, dni)')
+                    .eq('id', selectedVenta.id)
+                    .maybeSingle();
+
+                  const empleado = ventaRow?.empleados
+                    ? { nombre: (ventaRow.empleados as any).nombre, dni: (ventaRow.empleados as any).dni }
+                    : null;
+
+                  const detalles = (detRows || []).map((d: any) => ({
+                    nombre: d.producto_temporal_nombre || d.productos?.descripcion || 'Producto',
+                    cantidad: Number(d.cantidad) || 0,
+                    precio: Number(d.precio_unitario) || 0,
+                    subtotal: Number(d.subtotal) || 0,
+                    descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
+                  }));
+
+                  imprimirTicketFactura({
+                    comercio: comercioConfig,
+                    fecha: selectedVenta.fecha,
+                    total: selectedVenta.total,
+                    descuento: selectedVenta.descuento,
+                    numero_comprobante: selectedVenta.numero_comprobante,
+                    detalles,
+                    cliente: selectedVenta.clientes,
+                    empleado,
+                    factura: {
+                      tipo_comprobante: selectedFactura.tipo_comprobante,
+                      punto_venta: selectedFactura.punto_venta,
+                      numero_comprobante: selectedFactura.numero_comprobante,
+                      cae: selectedFactura.cae,
+                      cae_vencimiento: selectedFactura.cae_vencimiento,
+                      importe_total: selectedFactura.importe_total,
+                      importe_neto: selectedFactura.importe_neto,
+                      importe_iva: selectedFactura.importe_iva,
+                      doc_nro: selectedFactura.doc_nro,
+                    },
+                  });
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Error al preparar la factura para imprimir');
                 }
-
-                const tipoComprobante = TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante] || '?';
-                const numeroFactura = `${String(selectedFactura.punto_venta).padStart(4, '0')}-${String(selectedFactura.numero_comprobante).padStart(8, '0')}`;
-                const fechaEmision = format(new Date(selectedFactura.fecha_emision), 'dd/MM/yyyy');
-                const clienteNombre = selectedVenta.clientes?.nombre || 'Consumidor Final';
-                const clienteDocumento = selectedFactura.doc_nro || 'S/D';
-                const condicionIva = CONDICIONES_IVA[selectedVenta.clientes?.condicion_iva || 5];
-
-                let html = `
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <title>Factura ${tipoComprobante} - ${numeroFactura}</title>
-                      <style>
-                        @page { size: A4; margin: 15mm; }
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        body { 
-                          font-family: Arial, sans-serif; 
-                          font-size: 16px; 
-                          line-height: 1.4;
-                          padding: 20px;
-                        }
-                        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 15px; }
-                        .empresa { flex: 1; }
-                        .empresa-nombre { font-size: 18px; font-weight: bold; }
-                        .empresa-razon { color: #666; }
-                        .empresa-datos { font-size: 10px; color: #666; margin-top: 5px; }
-                        .tipo-factura { text-align: right; }
-                        .tipo-letra { display: inline-block; border: 3px solid #000; padding: 10px 20px; font-size: 28px; font-weight: bold; margin-bottom: 10px; }
-                        .factura-titulo { font-weight: bold; font-size: 14px; }
-                        .factura-numero { font-family: monospace; font-size: 16px; }
-                        .factura-fecha { font-size: 10px; color: #666; margin-top: 5px; }
-                        .cliente { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ccc; margin-bottom: 15px; }
-                        .cliente-label { font-size: 10px; color: #666; }
-                        .cliente-valor { font-weight: 500; }
-                        .totales { display: flex; justify-content: flex-end; padding: 15px 0; border-bottom: 1px solid #ccc; }
-                        .totales-tabla { width: 250px; }
-                        .totales-fila { display: flex; justify-content: space-between; padding: 3px 0; }
-                        .totales-total { font-weight: bold; font-size: 16px; border-top: 1px solid #000; padding-top: 5px; margin-top: 5px; }
-                        .cae { background: #f5f5f5; padding: 15px; margin-top: 15px; border-radius: 5px; }
-                        .cae-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 10px; }
-                        .cae-numero { font-weight: bold; font-size: 12px; }
-                        .cae-afip { text-align: right; color: #666; }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="header">
-                        <div class="empresa">
-                          <div class="empresa-nombre">${comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</div>
-                          <div class="empresa-razon">${comercioConfig?.razon_social || 'Razón Social'}</div>
-                          <div class="empresa-datos">
-                            ${comercioConfig?.direccion || 'Dirección'}<br>
-                            CUIT: ${formatCuit(comercioConfig?.cuit || '')}<br>
-                            ${comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}
-                          </div>
-                        </div>
-                        <div class="tipo-factura">
-                          <div class="tipo-letra">${tipoComprobante}</div>
-                          <div class="factura-titulo">FACTURA ${tipoComprobante}</div>
-                          <div class="factura-numero">Nº ${numeroFactura}</div>
-                          <div class="factura-fecha">Fecha: ${fechaEmision}</div>
-                        </div>
-                      </div>
-
-                      <div class="cliente">
-                        <div>
-                          <div class="cliente-label">Cliente:</div>
-                          <div class="cliente-valor">${clienteNombre}</div>
-                        </div>
-                        <div>
-                          <div class="cliente-label">CUIT/DNI:</div>
-                          <div class="cliente-valor">${clienteDocumento}</div>
-                        </div>
-                        <div style="grid-column: span 2;">
-                          <div class="cliente-label">Condición IVA:</div>
-                          <div class="cliente-valor">${condicionIva}</div>
-                        </div>
-                      </div>
-
-                      <div class="totales">
-                        <div class="totales-tabla">
-                          <div class="totales-fila">
-                            <span>Subtotal Neto:</span>
-                            <span>$${selectedFactura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          ${selectedFactura.importe_iva > 0 ? `
-                          <div class="totales-fila">
-                            <span>IVA 21%:</span>
-                            <span>$${selectedFactura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          ` : ''}
-                          <div class="totales-fila totales-total">
-                            <span>TOTAL:</span>
-                            <span>$${selectedFactura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="cae">
-                        <div class="cae-grid">
-                          <div>
-                            <div class="cae-numero">CAE Nº: ${selectedFactura.cae}</div>
-                            <div>Fecha Vto. CAE: ${selectedFactura.cae_vencimiento}</div>
-                          </div>
-                          <div class="cae-afip">
-                            <div>Comprobante Autorizado</div>
-                            <div>AFIP - Factura Electrónica</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <script>
-                        window.onload = function() {
-                          window.print();
-                          window.onafterprint = function() { window.close(); };
-                          setTimeout(function() { window.close(); }, 2000);
-                        };
-                      </script>
-                    </body>
-                  </html>
-                `;
-
-                printWindow.document.write(html);
-                printWindow.document.close();
               }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir Factura
