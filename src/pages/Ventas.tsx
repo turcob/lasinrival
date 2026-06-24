@@ -695,11 +695,7 @@ export default function Ventas() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => {
-                setSelectedVenta(item);
-                setSelectedFactura(item.comprobantes_afip![0]);
-                setFacturaDialogOpen(true);
-              }}
+              onClick={() => openFacturaDialog(item)}
               title="Reimprimir factura"
             >
               <Printer className="h-4 w-4 text-primary" />
