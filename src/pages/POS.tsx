@@ -3332,7 +3332,7 @@ export default function POS() {
                 />
               </div>
               <div>
-                <Label>Titular de la cuenta</Label>
+                <Label>Titular de la cuenta (opcional)</Label>
                 <Input
                   value={transferenciaData.titular}
                   onChange={(e) => setTransferenciaData({ ...transferenciaData, titular: e.target.value })}
