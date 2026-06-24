@@ -3430,6 +3430,28 @@ export default function POS() {
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddPagoGenerico(); }}
                 />
               </div>
+              {montoGenericoData.formaPagoNombre.toLowerCase().includes('qr') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Terminal</Label>
+                    <Input
+                      type="text"
+                      value={montoGenericoData.terminal || ''}
+                      onChange={(e) => setMontoGenericoData({ ...montoGenericoData, terminal: e.target.value })}
+                      placeholder="N° terminal"
+                    />
+                  </div>
+                  <div>
+                    <Label>Lote</Label>
+                    <Input
+                      type="text"
+                      value={montoGenericoData.lote || ''}
+                      onChange={(e) => setMontoGenericoData({ ...montoGenericoData, lote: e.target.value })}
+                      placeholder="N° lote"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => { setMontoGenericoDialogOpen(false); setMontoGenericoData(null); }}>
                   Cancelar
