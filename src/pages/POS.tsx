@@ -810,7 +810,7 @@ export default function POS() {
         condicion_iva_receptor: 5,
       });
     }
-    setEmitirFactura(false);
+    setEmitirFactura(true);
     setFacturaDialogOpen(true);
   };
 
