@@ -152,6 +152,8 @@ interface Pago {
   coeficiente?: number;
   efectivo_entregado?: number;
   vuelto?: number;
+  terminal?: string;
+  lote?: string;
 }
 
 const TIPOS_COMPROBANTE = [
@@ -259,6 +261,8 @@ export default function POS() {
   const [selectedCuotas, setSelectedCuotas] = useState<number>(1);
   const [montoTarjeta, setMontoTarjeta] = useState('');
   const [tipoTarjetaFiltro, setTipoTarjetaFiltro] = useState<'credito' | 'debito' | null>(null);
+  const [terminalTarjeta, setTerminalTarjeta] = useState('');
+  const [loteTarjeta, setLoteTarjeta] = useState('');
   
   // Pago efectivo
   const [efectivoDialogOpen, setEfectivoDialogOpen] = useState(false);
@@ -281,6 +285,8 @@ export default function POS() {
     formaPagoId: string;
     formaPagoNombre: string;
     monto: string;
+    terminal?: string;
+    lote?: string;
   } | null>(null);
 
   // Pago Cheque (datos del cheque a registrar como pendiente de validación)
