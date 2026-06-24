@@ -484,6 +484,113 @@ export default function Ventas() {
     }
   };
 
+  const handleReintentarAfip = async (venta: Venta) => {
+    if (!user) return;
+    if (venta._es_pedido || venta.anulada || venta.estado !== 'confirmada') return;
+
+    setReintentandoAfipId(venta.id);
+    try {
+      // Cargar detalles de la venta
+      const { data: detallesData, error: detallesErr } = await supabase
+        .from('venta_detalles')
+        .select('cantidad, precio_unitario, descuento_porcentaje, producto_temporal_nombre, productos(descripcion)')
+        .eq('venta_id', venta.id);
+      if (detallesErr) throw detallesErr;
+      if (!detallesData || detallesData.length === 0) {
+        toast.error('La venta no tiene detalles para facturar');
+        return;
+      }
+
+      // Determinar tipo de comprobante y datos del receptor
+      const condIva = venta.clientes?.condicion_iva ?? 5;
+      const docNroRaw = (venta.clientes?.dni_cuit || '').replace(/\D/g, '');
+      const esRespInscripto = condIva === 1;
+      const tipoComprobante = esRespInscripto ? 1 : 6; // A o B
+      const docTipo = esRespInscripto ? 80 : (docNroRaw.length >= 11 ? 80 : docNroRaw.length === 8 ? 96 : 99);
+      const docNro = docNroRaw ? parseInt(docNroRaw) : 0;
+
+      const totalFacturar = venta.total;
+      const netoSinIva = totalFacturar / 1.21;
+      const ivaAmount = totalFacturar - netoSinIva;
+
+      const items = (detallesData as any[]).map((d) => {
+        const precioFinal = Number(d.precio_unitario) * (1 - (Number(d.descuento_porcentaje) || 0) / 100);
+        return {
+          descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Item',
+          cantidad: Number(d.cantidad),
+          precio_unitario: precioFinal / 1.21,
+          iva_id: 5,
+        };
+      });
+
+      const { data: facturaResult, error: facturaError } = await supabase.functions.invoke(
+        'afip-facturacion/emitir',
+        {
+          body: {
+            tipo_comprobante: tipoComprobante,
+            punto_venta: comercioConfig?.punto_venta || 1,
+            concepto: 1,
+            doc_tipo: docTipo,
+            doc_nro: docNro,
+            condicion_iva_receptor: condIva,
+            importe_total: totalFacturar,
+            importe_neto: parseFloat(netoSinIva.toFixed(2)),
+            importe_iva: parseFloat(ivaAmount.toFixed(2)),
+            items,
+            venta_id: venta.id,
+          },
+        }
+      );
+
+      if (facturaError) {
+        toast.error('Error al emitir factura AFIP: ' + facturaError.message);
+        return;
+      }
+      if ((facturaResult as any)?.error) {
+        toast.error('Error AFIP: ' + (facturaResult as any).error);
+        return;
+      }
+
+      const formatFechaAfip = (fecha: string): string => {
+        if (fecha && fecha.length === 8) {
+          return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
+        }
+        return fecha || new Date().toISOString().split('T')[0];
+      };
+
+      const { error: insertErr } = await supabase
+        .from('comprobantes_afip')
+        .insert({
+          tipo_comprobante: tipoComprobante,
+          punto_venta: (facturaResult as any).punto_venta,
+          numero_comprobante: (facturaResult as any).numero_comprobante,
+          cae: (facturaResult as any).cae,
+          cae_vencimiento: formatFechaAfip((facturaResult as any).cae_vencimiento),
+          cuit_emisor: comercioConfig?.cuit?.replace(/\D/g, '') || '',
+          doc_tipo: docTipo,
+          doc_nro: docNro,
+          importe_total: totalFacturar,
+          importe_neto: parseFloat(netoSinIva.toFixed(2)),
+          importe_iva: parseFloat(ivaAmount.toFixed(2)),
+          usuario_id: user.id,
+          venta_id: venta.id,
+        });
+
+      if (insertErr) {
+        toast.warning(`Factura emitida (CAE: ${(facturaResult as any).cae}) pero hubo error al guardar: ${insertErr.message}`);
+      } else {
+        toast.success(`Factura emitida - CAE: ${(facturaResult as any).cae}`);
+      }
+
+      fetchVentas();
+      setRefreshTotales((n) => n + 1);
+    } catch (err: any) {
+      toast.error('Error al reintentar factura AFIP: ' + (err?.message || 'desconocido'));
+    } finally {
+      setReintentandoAfipId(null);
+    }
+  };
+
   const columns = [
     {
       key: 'numero_comprobante',
