@@ -169,7 +169,7 @@ export function imprimirTicketFactura(args: ImprimirTicketArgs) {
           <p>www.afip.gob.ar/fe/qr/</p>
           <p style="margin-top: 8px;">¡Gracias por su compra!</p>
         </div>
-        <script>window.print(); window.close();</script>
+        <script>window.onload=function(){setTimeout(function(){window.print();window.onafterprint=function(){window.close();};},300);};</script>
       </body>
       </html>
     `;
@@ -229,7 +229,7 @@ export function imprimirTicketFactura(args: ImprimirTicketArgs) {
         <div class="footer">
           <p>¡Gracias por su compra!</p>
         </div>
-        <script>window.print(); window.close();</script>
+        <script>window.onload=function(){setTimeout(function(){window.print();window.onafterprint=function(){window.close();};},300);};</script>
       </body>
       </html>
     `;
