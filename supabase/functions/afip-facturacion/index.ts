@@ -411,6 +411,7 @@ async function autorizarComprobante(
   let ivaXml = "";
   let impNeto = factura.importe_neto;
   let impIva = factura.importe_iva;
+  let impTotal = factura.importe_total;
   
   if (esFacturaC) {
     // Factura C: Total = Neto (no IVA discrimination)
@@ -420,19 +421,26 @@ async function autorizarComprobante(
   } else {
     // Factura A or B: Include IVA breakdown
     const ivaItems = factura.items.reduce((acc, item) => {
-      const baseImp = item.cantidad * item.precio_unitario;
+      const baseImpRaw = item.cantidad * item.precio_unitario;
+      const baseImp = Math.round(baseImpRaw * 100) / 100;
       const alicuota = item.iva_id === 5 ? 21 : item.iva_id === 4 ? 10.5 : 0;
-      const importe = baseImp * (alicuota / 100);
+      const importe = Math.round(baseImp * alicuota) / 100;
       
       const existing = acc.find(i => i.id === item.iva_id);
       if (existing) {
-        existing.baseImp += baseImp;
-        existing.importe += importe;
+        existing.baseImp = Math.round((existing.baseImp + baseImp) * 100) / 100;
+        existing.importe = Math.round((existing.importe + importe) * 100) / 100;
       } else {
         acc.push({ id: item.iva_id, baseImp, importe });
       }
       return acc;
     }, [] as Array<{ id: number; baseImp: number; importe: number }>);
+
+    // Recalcular impNeto/impIva/impTotal desde el desglose para garantizar
+    // que coincidan con la suma de AlicIva (requerido por AFIP).
+    impNeto = Math.round(ivaItems.reduce((s, i) => s + i.baseImp, 0) * 100) / 100;
+    impIva = Math.round(ivaItems.reduce((s, i) => s + i.importe, 0) * 100) / 100;
+    impTotal = Math.round((impNeto + impIva) * 100) / 100;
 
     ivaXml = `<ar:Iva>${ivaItems.map(iva => `
       <ar:AlicIva>
@@ -467,7 +475,7 @@ async function autorizarComprobante(
             <ar:CbteDesde>${nroComprobante}</ar:CbteDesde>
             <ar:CbteHasta>${nroComprobante}</ar:CbteHasta>
             <ar:CbteFch>${fechaHoy}</ar:CbteFch>
-            <ar:ImpTotal>${factura.importe_total.toFixed(2)}</ar:ImpTotal>
+            <ar:ImpTotal>${impTotal.toFixed(2)}</ar:ImpTotal>
             <ar:ImpTotConc>0.00</ar:ImpTotConc>
             <ar:ImpNeto>${impNeto.toFixed(2)}</ar:ImpNeto>
             <ar:ImpOpEx>0.00</ar:ImpOpEx>
