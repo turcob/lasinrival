@@ -1216,133 +1216,106 @@ export default function Ventas() {
           
           {selectedVenta && selectedFactura && (
             <>
-              <div id="printable-invoice" className="border rounded-lg p-6 text-sm">
+              {/* Preview en formato Ticket Térmico 80mm */}
+              <div
+                id="printable-invoice"
+                className="mx-auto border rounded-lg bg-white text-black p-4 font-mono text-[13px] leading-tight"
+                style={{ width: '320px' }}
+              >
                 {/* Header */}
-                <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                  <div>
-                    <p className="font-bold text-lg">{comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}</p>
-                    <p className="text-muted-foreground">{comercioConfig?.razon_social || 'Razón Social'}</p>
-                    <p className="text-muted-foreground text-xs mt-1">{comercioConfig?.direccion || 'Dirección'}</p>
-                    <p className="text-xs text-muted-foreground">CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
-                    <p className="text-xs text-muted-foreground">{comercioConfig?.condicion_iva || 'IVA Responsable Inscripto'}</p>
+                <div className="text-center border-b border-dashed border-black pb-2 mb-2">
+                  <p className="font-bold text-base">
+                    {comercioConfig?.nombre_fantasia || comercioConfig?.razon_social || 'EMPRESA'}
+                  </p>
+                  {comercioConfig?.razon_social && <p>{comercioConfig.razon_social}</p>}
+                  {comercioConfig?.direccion && <p>{comercioConfig.direccion}</p>}
+                  {comercioConfig?.localidad && (
+                    <p>
+                      {comercioConfig.localidad}
+                      {comercioConfig.provincia ? `, ${comercioConfig.provincia}` : ''}
+                    </p>
+                  )}
+                  <p>CUIT: {formatCuit(comercioConfig?.cuit || '')}</p>
+                  <p>{comercioConfig?.condicion_iva || 'IVA Resp. Inscripto'}</p>
+                  <div className="inline-block border border-black px-3 py-1 my-1 font-bold text-lg">
+                    {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante] || '?'}
                   </div>
-                  <div className="text-right">
-                    <div className="inline-block border-2 border-foreground px-4 py-2 mb-2">
-                      <p className="font-bold text-2xl">
-                        {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante] || '?'}
-                      </p>
-                    </div>
-                    <p className="font-bold">
-                      FACTURA {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante]}
-                    </p>
-                    <p className="text-lg font-mono">
-                      Nº {String(selectedFactura.punto_venta).padStart(4, '0')}-
-                      {String(selectedFactura.numero_comprobante).padStart(8, '0')}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Fecha: {format(new Date(selectedFactura.fecha_emision), 'dd/MM/yyyy')}
-                    </p>
-                  </div>
+                  <p className="font-bold">FACTURA {TIPOS_COMPROBANTE[selectedFactura.tipo_comprobante]}</p>
+                  <p className="font-bold">
+                    Nº {String(selectedFactura.punto_venta).padStart(4, '0')}-
+                    {String(selectedFactura.numero_comprobante).padStart(8, '0')}
+                  </p>
+                  <p>Fecha: {new Date(selectedVenta.fecha).toLocaleString('es-AR')}</p>
                 </div>
 
-                {/* Customer Info */}
-                <div className="py-3 border-b">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Cliente:</p>
-                      <p className="font-medium">{selectedVenta.clientes?.nombre || 'Consumidor Final'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">CUIT/DNI:</p>
-                      <p>{selectedFactura.doc_nro || 'S/D'}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <p className="text-xs text-muted-foreground">Condición IVA:</p>
-                    <p>{CONDICIONES_IVA[selectedVenta.clientes?.condicion_iva || 5]}</p>
-                  </div>
+                {/* Cliente / Empleado */}
+                <div className="border-b border-dashed border-black pb-2 mb-2">
+                  {facturaEmpleado ? (
+                    <>
+                      <p><strong>Empleado:</strong> {facturaEmpleado.nombre}</p>
+                      {facturaEmpleado.dni && <p><strong>DNI:</strong> {facturaEmpleado.dni}</p>}
+                      <p className="text-[10px]">(Cuenta Corriente)</p>
+                    </>
+                  ) : (
+                    <>
+                      <p><strong>Cliente:</strong> {selectedVenta.clientes?.nombre || 'Consumidor Final'}</p>
+                      <p><strong>CUIT/DNI:</strong> {selectedVenta.clientes?.dni_cuit || selectedFactura.doc_nro || 'Sin identificar'}</p>
+                      <p><strong>IVA:</strong> {CONDICIONES_IVA[selectedVenta.clientes?.condicion_iva || 5]}</p>
+                    </>
+                  )}
+                  <p><strong>Cond. Venta:</strong> {facturaEmpleado ? 'Cuenta Corriente' : 'Contado'}</p>
                 </div>
 
-                {/* Items - Need to fetch from venta_detalles */}
-                <div className="py-3 border-b">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    (Ver detalle de productos en la venta)
+                {/* Detalle */}
+                <div className="border-b border-dashed border-black pb-2 mb-2">
+                  <p className="font-bold text-center mb-1">DETALLE</p>
+                  {facturaDetalles.length === 0 ? (
+                    <p className="text-center text-[11px]">Cargando productos…</p>
+                  ) : (
+                    facturaDetalles.map((it, i) => (
+                      <div key={i} className="mb-1">
+                        <p className="font-bold break-words">{it.nombre}</p>
+                        <div className="flex justify-between">
+                          <span>{it.cantidad} x ${it.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                          <span>${it.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {it.descuento_porcentaje > 0 && (
+                          <p className="text-right text-[11px]">Desc: {it.descuento_porcentaje}%</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Totales */}
+                <div className="text-right">
+                  <p>Neto Gravado: ${(selectedFactura.importe_neto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                  <p>IVA 21%: ${(selectedFactura.importe_iva || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-base border-t-2 border-black pt-1 mt-1">
+                    TOTAL: ${selectedFactura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
 
-                {/* Totals */}
-                <div className="py-3 border-b">
-                  <div className="flex justify-end">
-                    <div className="w-64 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Subtotal Neto:</span>
-                        <span>${selectedFactura.importe_neto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      {selectedFactura.importe_iva > 0 && (
-                        <div className="flex justify-between">
-                          <span>IVA 21%:</span>
-                          <span>${selectedFactura.importe_iva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-bold text-lg border-t pt-1">
-                        <span>TOTAL:</span>
-                        <span>${selectedFactura.importe_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CAE Info */}
-                <div className="pt-3 bg-muted/50 rounded p-3 mt-3">
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <p className="font-bold">CAE Nº: {selectedFactura.cae}</p>
-                      <p>Fecha Vto. CAE: {selectedFactura.cae_vencimiento}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted-foreground">Comprobante Autorizado</p>
-                      <p className="text-muted-foreground">AFIP - Factura Electrónica</p>
-                    </div>
-                  </div>
+                {/* CAE */}
+                <div className="text-center mt-2 text-[11px]">
+                  <p className="font-bold">CAE: {selectedFactura.cae}</p>
+                  <p>Vto. CAE: {selectedFactura.cae_vencimiento}</p>
+                  <p className="mt-1">Comprobante Autorizado - AFIP</p>
+                  <p>www.afip.gob.ar/fe/qr/</p>
+                  <p className="mt-2">¡Gracias por su compra!</p>
                 </div>
               </div>
 
-              <Button className="w-full mt-4" onClick={async () => {
-                try {
-                  // Fetch detalle de productos
-                  const { data: detRows } = await supabase
-                    .from('venta_detalles')
-                    .select('cantidad, precio_unitario, descuento_porcentaje, subtotal, producto_temporal_nombre, productos(descripcion)')
-                    .eq('venta_id', selectedVenta.id);
-
-                  // Fetch empleado (si la venta tiene empleado_id)
-                  const { data: ventaRow } = await supabase
-                    .from('ventas')
-                    .select('empleado_id, empleados:empleado_id(nombre, dni)')
-                    .eq('id', selectedVenta.id)
-                    .maybeSingle();
-
-                  const empleado = ventaRow?.empleados
-                    ? { nombre: (ventaRow.empleados as any).nombre, dni: (ventaRow.empleados as any).dni }
-                    : null;
-
-                  const detalles = (detRows || []).map((d: any) => ({
-                    nombre: d.producto_temporal_nombre || d.productos?.descripcion || 'Producto',
-                    cantidad: Number(d.cantidad) || 0,
-                    precio: Number(d.precio_unitario) || 0,
-                    subtotal: Number(d.subtotal) || 0,
-                    descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
-                  }));
-
-                  imprimirTicketFactura({
+              <Button className="w-full mt-4" onClick={() => {
+                imprimirTicketFactura({
                     comercio: comercioConfig,
                     fecha: selectedVenta.fecha,
                     total: selectedVenta.total,
                     descuento: selectedVenta.descuento,
                     numero_comprobante: selectedVenta.numero_comprobante,
-                    detalles,
+                    detalles: facturaDetalles,
                     cliente: selectedVenta.clientes,
-                    empleado,
+                    empleado: facturaEmpleado,
                     factura: {
                       tipo_comprobante: selectedFactura.tipo_comprobante,
                       punto_venta: selectedFactura.punto_venta,
@@ -1355,10 +1328,6 @@ export default function Ventas() {
                       doc_nro: selectedFactura.doc_nro,
                     },
                   });
-                } catch (err) {
-                  console.error(err);
-                  toast.error('Error al preparar la factura para imprimir');
-                }
               }}>
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir Factura
