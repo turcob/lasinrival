@@ -1056,6 +1056,13 @@ export default function ListasPrecios() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DetalleListaPrecioDialog
+        open={!!detalleLista}
+        onOpenChange={(v) => { if (!v) setDetalleLista(null); }}
+        listaId={detalleLista?.id || null}
+        listaNombre={detalleLista?.nombre || ''}
+      />
     </MainLayout>
   );
 }
