@@ -57,6 +57,7 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
   const [aplicarAjuste, setAplicarAjuste] = useState(false);
   const [empleadoId, setEmpleadoId] = useState<string>('');
   const [empleados, setEmpleados] = useState<{ id: string; nombre: string; user_id: string | null }[]>([]);
+  const [empleadoVinculadoFaltante, setEmpleadoVinculadoFaltante] = useState(false);
 
   useEffect(() => {
     if (open && caja) {
@@ -64,6 +65,7 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
       loadEmpleados();
       setAplicarAjuste(false);
       setEmpleadoId('');
+      setEmpleadoVinculadoFaltante(false);
     }
   }, [open, caja]);
 
@@ -71,13 +73,17 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
     const { data } = await supabase
       .from('empleados')
       .select('id, nombre, user_id')
-      .eq('activo', true)
       .order('nombre');
     const list = (data || []) as { id: string; nombre: string; user_id: string | null }[];
     setEmpleados(list);
     if (caja?.usuario_id) {
       const match = list.find((e) => e.user_id === caja.usuario_id);
-      if (match) setEmpleadoId(match.id);
+      if (match) {
+        setEmpleadoId(match.id);
+        setEmpleadoVinculadoFaltante(false);
+      } else {
+        setEmpleadoVinculadoFaltante(true);
+      }
     }
   };
 
@@ -342,6 +348,11 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
                       <p className="text-xs text-muted-foreground">
                         Monto: ${Math.abs(caja.diferencia || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                       </p>
+                      {empleadoVinculadoFaltante && (
+                        <p className="text-xs text-warning">
+                          El usuario de la caja no tiene un empleado vinculado. Seleccioná uno manualmente.
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
