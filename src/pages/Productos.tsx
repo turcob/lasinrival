@@ -83,7 +83,8 @@ interface Marca {
 }
 
 export default function Productos() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isVendedor = hasRole('vendedor') && !hasRole('admin') && !hasRole('encargado');
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
@@ -360,7 +361,7 @@ export default function Productos() {
   const productosActivos = productos.filter((p) => p.activo);
   const productosDesactivados = productos.filter((p) => !p.activo);
 
-  const columnsActivos = [
+  const columnsActivosFull = [
     { key: 'codigo_articulo', header: 'Código' },
     { key: 'descripcion', header: 'Descripción' },
     { key: 'unidad_medida', header: 'Unidad' },
@@ -419,6 +420,29 @@ export default function Productos() {
       ),
     },
   ];
+
+  const columnsActivosVendedor = [
+    { key: 'codigo_articulo', header: 'Código' },
+    { key: 'descripcion', header: 'Descripción' },
+    { key: 'unidad_medida', header: 'Unidad' },
+    {
+      key: 'categorias.nombre',
+      header: 'Categoría',
+      render: (item: Producto) => item.categorias?.nombre || '-',
+    },
+    {
+      key: 'subcategorias.nombre',
+      header: 'Subcategoría',
+      render: (item: Producto) => item.subcategorias?.nombre || '-',
+    },
+    {
+      key: 'activo',
+      header: 'Estado',
+      render: (item: Producto) => <StatusBadge status={item.activo} />,
+    },
+  ];
+
+  const columnsActivos = isVendedor ? columnsActivosVendedor : columnsActivosFull;
 
   const columnsDesactivados = [
     { key: 'codigo_articulo', header: 'Código' },
@@ -499,24 +523,31 @@ export default function Productos() {
   return (
     <MainLayout>
       <PageHeader title="Productos" description="Gestión del catálogo de productos">
-        <ExcelImporter />
-        <ExcelImporterDesactivados onImportComplete={fetchData} />
-        <Button variant="outline" onClick={exportarExcel}>
-          <Download className="mr-2 h-4 w-4" />
-          Exportar Excel
-        </Button>
+        {!isVendedor && <ExcelImporter />}
+        {!isVendedor && <ExcelImporterDesactivados onImportComplete={fetchData} />}
+        {!isVendedor && (
+          <Button variant="outline" onClick={exportarExcel}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar Excel
+          </Button>
+        )}
         <Button variant="outline" onClick={() => setImprimirPreciosOpen(true)}>
           <Printer className="mr-2 h-4 w-4" />
           Impresión de Precios
         </Button>
-        <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
-          <Snowflake className="mr-2 h-4 w-4" />
-          Importar Fríos
-        </Button>
-        <Button variant="outline" onClick={() => setActualizadorOpen(true)}>
-          <TrendingUp className="mr-2 h-4 w-4" />
-          Actualizar Precios
-        </Button>
+        {!isVendedor && (
+          <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
+            <Snowflake className="mr-2 h-4 w-4" />
+            Importar Fríos
+          </Button>
+        )}
+        {!isVendedor && (
+          <Button variant="outline" onClick={() => setActualizadorOpen(true)}>
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Actualizar Precios
+          </Button>
+        )}
+        {!isVendedor && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -713,6 +744,7 @@ export default function Productos() {
             </form>
           </DialogContent>
         </Dialog>
+        )}
       </PageHeader>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -720,9 +752,11 @@ export default function Productos() {
           <TabsTrigger value="activos">
             Activos ({productosActivos.length})
           </TabsTrigger>
-          <TabsTrigger value="desactivados">
-            Desactivados ({productosDesactivados.length})
-          </TabsTrigger>
+          {!isVendedor && (
+            <TabsTrigger value="desactivados">
+              Desactivados ({productosDesactivados.length})
+            </TabsTrigger>
+          )}
         </TabsList>
         
         <TabsContent value="activos">
