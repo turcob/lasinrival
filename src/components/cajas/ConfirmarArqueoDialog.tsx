@@ -9,6 +9,9 @@ import { toast } from 'sonner';
 import { CheckCircle, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ArqueoDetalle {
   denominacion: number;
@@ -46,16 +49,37 @@ interface ConfirmarArqueoDialogProps {
 }
 
 export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: ConfirmarArqueoDialogProps) {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const [loading, setLoading] = useState(false);
   const [arqueoDetalles, setArqueoDetalles] = useState<ArqueoDetalle[]>([]);
   const [arqueoOtrosMedios, setArqueoOtrosMedios] = useState<ArqueoOtroMedio[]>([]);
+  const [aplicarAjuste, setAplicarAjuste] = useState(false);
+  const [empleadoId, setEmpleadoId] = useState<string>('');
+  const [empleados, setEmpleados] = useState<{ id: string; nombre: string; user_id: string | null }[]>([]);
 
   useEffect(() => {
     if (open && caja) {
       loadArqueoData();
+      loadEmpleados();
+      setAplicarAjuste(false);
+      setEmpleadoId('');
     }
   }, [open, caja]);
+
+  const loadEmpleados = async () => {
+    const { data } = await supabase
+      .from('empleados')
+      .select('id, nombre, user_id')
+      .eq('activo', true)
+      .order('nombre');
+    const list = (data || []) as { id: string; nombre: string; user_id: string | null }[];
+    setEmpleados(list);
+    if (caja?.usuario_id) {
+      const match = list.find((e) => e.user_id === caja.usuario_id);
+      if (match) setEmpleadoId(match.id);
+    }
+  };
 
   const loadArqueoData = async () => {
     if (!caja) return;
@@ -89,26 +113,28 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
 
   const handleConfirmar = async () => {
     if (!caja || !user) return;
+    if (aplicarAjuste && !empleadoId) {
+      toast.error('Seleccioná el empleado para imputar el ajuste');
+      return;
+    }
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('cajas')
-        .update({
-          arqueo_confirmado: true,
-          arqueo_pendiente_revision: false,
-          confirmado_por: user.id,
-          fecha_confirmacion: new Date().toISOString(),
-        })
-        .eq('id', caja.id);
-
+      const { error } = await supabase.rpc('confirmar_arqueo_con_ajuste', {
+        p_caja_id: caja.id,
+        p_aplicar_ajuste: aplicarAjuste,
+        p_empleado_id: aplicarAjuste ? empleadoId : null,
+      });
       if (error) throw error;
-
-      toast.success('Arqueo confirmado correctamente');
+      toast.success(
+        aplicarAjuste
+          ? 'Arqueo confirmado e imputado a la cuenta corriente del empleado'
+          : 'Arqueo confirmado correctamente'
+      );
       onOpenChange(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error confirming arqueo:', error);
-      toast.error('Error al confirmar el arqueo');
+      toast.error(error?.message || 'Error al confirmar el arqueo');
     } finally {
       setLoading(false);
     }
@@ -283,6 +309,44 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
                 )}
               </CardContent>
             </Card>
+
+            {isAdmin && (caja.diferencia || 0) !== 0 && (
+              <Card className="border-warning/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Ajuste en cuenta corriente del empleado</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="aplicar-ajuste"
+                      checked={aplicarAjuste}
+                      onCheckedChange={(c) => setAplicarAjuste(c === true)}
+                    />
+                    <Label htmlFor="aplicar-ajuste" className="text-sm leading-tight cursor-pointer">
+                      Imputar {(caja.diferencia || 0) < 0 ? 'faltante (suma deuda)' : 'sobrante (resta deuda)'} a la cuenta corriente del empleado
+                    </Label>
+                  </div>
+                  {aplicarAjuste && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Empleado</Label>
+                      <Select value={empleadoId} onValueChange={setEmpleadoId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar empleado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {empleados.map((e) => (
+                            <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Monto: ${Math.abs(caja.diferencia || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
