@@ -197,13 +197,12 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       .map(
         c => `
       <div class="cartel">
+        <div class="logo"><img src="/logo-empresa.jpg" alt="Logo" /></div>
         <div class="nombre">${escapeHtml(c.nombre)}</div>
         <div class="precio-row">
           <span class="signo">$</span>
-          <span class="entero">${escapeHtml(c.precioEntero)}</span><span class="decimal">${escapeHtml(c.precioDecimal)}</span>
+          <span class="entero">${escapeHtml(formatMiles(c.precioEntero))}</span><sup class="decimal">${escapeHtml(c.precioDecimal)}</sup>
         </div>
-        ${c.unidad ? `<div class="unidad">${escapeHtml(c.unidad)}</div>` : ''}
-        <div class="marca">SIN RIVAL SRL</div>
       </div>`,
       )
       .join('');
@@ -215,13 +214,13 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         body { margin:0; font-family: Arial, Helvetica, sans-serif; }
         .sheet { display:grid; grid-template-columns: repeat(${layout.cols}, 1fr); grid-auto-rows: ${(277 / layout.rows).toFixed(2)}mm; gap: 3mm; }
         .cartel { border: 3px solid #4ade80; padding: 6mm; display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; overflow:hidden; page-break-inside:avoid; }
+        .logo { width:100%; display:flex; justify-content:center; }
+        .logo img { max-height: ${logoH(porHoja)}; max-width: 80%; object-fit:contain; }
         .nombre { font-weight: 800; font-size: ${nombreFs(porHoja)}; line-height:1.1; word-wrap:break-word; }
-        .precio-row { display:flex; align-items:flex-end; justify-content:center; line-height:1; margin: 2mm 0; }
+        .precio-row { display:flex; align-items:flex-start; justify-content:center; line-height:1; margin: 2mm 0; }
         .signo { font-weight:900; font-size: ${signoFs(porHoja)}; margin-right: 4mm; }
-        .entero { font-weight:900; font-size: ${enteroFs(porHoja)}; letter-spacing:-2px; }
-        .decimal { font-weight:900; font-size: ${decimalFs(porHoja)}; vertical-align:super; margin-left:2mm; }
-        .unidad { font-weight:700; font-size: ${unidadFs(porHoja)}; }
-        .marca { font-weight:700; font-size: 10pt; color:#444; align-self:flex-end; }
+        .entero { font-weight:900; font-size: ${enteroFs(porHoja)}; letter-spacing:-2px; line-height:1; }
+        .decimal { font-weight:900; font-size: ${decimalFs(porHoja)}; margin-left:3mm; line-height:1; align-self:flex-start; }
         .sheet { page-break-after: always; }
       </style></head><body>
       ${chunkPages(cells, porHoja)}
