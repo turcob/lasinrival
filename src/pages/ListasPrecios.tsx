@@ -3,7 +3,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays } from 'lucide-react';
+import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays, Eye } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DetalleListaPrecioDialog } from '@/components/listas-precios/DetalleListaPrecioDialog';
 
 interface Marca {
   id: string;
@@ -126,6 +127,7 @@ export default function ListasPrecios() {
   // Selected items
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [selectedExcepcion, setSelectedExcepcion] = useState<Excepcion | null>(null);
+  const [detalleLista, setDetalleLista] = useState<ListaPrecio | null>(null);
   
   // Form data
   const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true, destino: 'sin_rival' });
@@ -801,6 +803,9 @@ export default function ListasPrecios() {
                         ))}
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" title="Ver detalle de productos y precios" onClick={() => setDetalleLista(lista)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => openEditListaDialog(lista)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
@@ -1051,6 +1056,13 @@ export default function ListasPrecios() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DetalleListaPrecioDialog
+        open={!!detalleLista}
+        onOpenChange={(v) => { if (!v) setDetalleLista(null); }}
+        listaId={detalleLista?.id || null}
+        listaNombre={detalleLista?.nombre || ''}
+      />
     </MainLayout>
   );
 }
