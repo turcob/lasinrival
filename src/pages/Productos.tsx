@@ -5,12 +5,13 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
 import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPreciosDialog';
 import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
+import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
 import {
   Dialog,
   DialogContent,
@@ -92,6 +93,7 @@ export default function Productos() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actualizadorOpen, setActualizadorOpen] = useState(false);
   const [importarFriosOpen, setImportarFriosOpen] = useState(false);
+  const [imprimirPreciosOpen, setImprimirPreciosOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
   const [formData, setFormData] = useState({
@@ -502,6 +504,10 @@ export default function Productos() {
         <Button variant="outline" onClick={exportarExcel}>
           <Download className="mr-2 h-4 w-4" />
           Exportar Excel
+        </Button>
+        <Button variant="outline" onClick={() => setImprimirPreciosOpen(true)}>
+          <Printer className="mr-2 h-4 w-4" />
+          Impresión de Precios
         </Button>
         <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
           <Snowflake className="mr-2 h-4 w-4" />
