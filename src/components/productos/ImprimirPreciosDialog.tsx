@@ -383,3 +383,13 @@ function decimalFs(n: number) {
 function unidadFs(n: number) {
   return ({ 1: '40pt', 2: '28pt', 4: '20pt', 6: '16pt', 8: '12pt', 9: '12pt' } as Record<number, string>)[n] || '16pt';
 }
+function logoH(n: number) {
+  return ({ 1: '60mm', 2: '40mm', 4: '25mm', 6: '20mm', 8: '16mm', 9: '14mm' } as Record<number, string>)[n] || '20mm';
+}
+function formatMiles(s: string) {
+  const neg = s.startsWith('-');
+  const digits = s.replace(/[^0-9]/g, '');
+  if (!digits) return s;
+  const withSep = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return neg ? '-' + withSep : withSep;
+}
