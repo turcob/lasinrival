@@ -671,7 +671,7 @@ export default function Cajas() {
           return (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="outline" className="gap-1 border-success text-success">
                   <CheckCircle className="h-3 w-3" />
                   Confirmada
                 </Badge>
