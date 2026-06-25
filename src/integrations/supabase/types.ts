@@ -173,6 +173,9 @@ export type Database = {
       }
       cajas: {
         Row: {
+          ajuste_cc_aplicado: boolean
+          ajuste_cc_empleado_id: string | null
+          ajuste_cc_movimiento_id: string | null
           arqueo_confirmado: boolean | null
           arqueo_pendiente_revision: boolean | null
           confirmado_por: string | null
@@ -191,6 +194,9 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          ajuste_cc_aplicado?: boolean
+          ajuste_cc_empleado_id?: string | null
+          ajuste_cc_movimiento_id?: string | null
           arqueo_confirmado?: boolean | null
           arqueo_pendiente_revision?: boolean | null
           confirmado_por?: string | null
@@ -209,6 +215,9 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          ajuste_cc_aplicado?: boolean
+          ajuste_cc_empleado_id?: string | null
+          ajuste_cc_movimiento_id?: string | null
           arqueo_confirmado?: boolean | null
           arqueo_pendiente_revision?: boolean | null
           confirmado_por?: string | null
@@ -226,7 +235,15 @@ export type Database = {
           total_ventas?: number | null
           usuario_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cajas_ajuste_cc_empleado_id_fkey"
+            columns: ["ajuste_cc_empleado_id"]
+            isOneToOne: false
+            referencedRelation: "empleados"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categorias: {
         Row: {
@@ -4841,6 +4858,14 @@ export type Database = {
     }
     Functions: {
       auto_expire_solicitudes: { Args: never; Returns: number }
+      confirmar_arqueo_con_ajuste: {
+        Args: {
+          p_aplicar_ajuste?: boolean
+          p_caja_id: string
+          p_empleado_id?: string
+        }
+        Returns: Json
+      }
       crear_venta_completa: {
         Args: { p_detalles: Json; p_pagos?: Json; p_venta: Json }
         Returns: Json
