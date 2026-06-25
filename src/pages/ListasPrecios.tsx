@@ -739,7 +739,7 @@ export default function ListasPrecios() {
 
           {/* Matriz */}
           <Card>
-            <ScrollArea className="w-full">
+            <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
