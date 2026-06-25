@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -56,6 +56,11 @@ export function DataTable<T extends { id?: string }>({
   });
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [data.length, search, pageSize]);
+
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
 
