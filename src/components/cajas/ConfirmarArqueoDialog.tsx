@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -268,14 +268,21 @@ export function ConfirmarArqueoDialog({ open, onOpenChange, caja, onSuccess }: C
               </CardContent>
             </Card>
 
-            {caja.observaciones && (
-              <Card>
-                <CardContent className="pt-4">
-                  <p className="text-sm text-muted-foreground">Observaciones</p>
-                  <p className="text-sm">{caja.observaciones}</p>
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Observaciones del cajero
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {caja.observaciones && caja.observaciones.trim().length > 0 ? (
+                  <p className="text-sm whitespace-pre-wrap">{caja.observaciones}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Sin observaciones registradas</p>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
