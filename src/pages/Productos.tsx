@@ -775,6 +775,11 @@ export default function Productos() {
         onOpenChange={setImportarFriosOpen}
         onImportComplete={fetchData}
       />
+
+      <ImprimirPreciosDialog
+        open={imprimirPreciosOpen}
+        onOpenChange={setImprimirPreciosOpen}
+      />
     </MainLayout>
   );
 }
