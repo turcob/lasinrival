@@ -823,7 +823,7 @@ export default function ListasPrecios() {
                   )}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           </Card>
         </TabsContent>
 
