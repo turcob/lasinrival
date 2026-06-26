@@ -800,7 +800,7 @@ export default function Ventas() {
       render: (item: Venta) => (
         <span className="font-mono font-medium">
           {item._es_pedido ? 'P-' : '#'}
-          {item.numero_comprobante.toString().padStart(item._es_pedido ? 6 : 8, '0')}
+          {(item.numero_comprobante ?? 0).toString().padStart(item._es_pedido ? 6 : 8, '0')}
         </span>
       ),
     },
