@@ -772,6 +772,51 @@ export default function Productos() {
             </TabsTrigger>
           )}
         </TabsList>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end mb-4">
+          <div className="space-y-2 sm:flex-1">
+            <Label htmlFor="categoria-filter">Filtrar por Categoría</Label>
+            <Select
+              value={categoriaFilter}
+              onValueChange={(value) => {
+                setCategoriaFilter(value);
+                setSubcategoriaFilter('');
+              }}
+            >
+              <SelectTrigger id="categoria-filter">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las categorías</SelectItem>
+                {categorias.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2 sm:flex-1">
+            <Label htmlFor="subcategoria-filter">Filtrar por Subcategoría</Label>
+            <Select
+              value={subcategoriaFilter}
+              onValueChange={(value) => setSubcategoriaFilter(value)}
+              disabled={!categoriaFilter}
+            >
+              <SelectTrigger id="subcategoria-filter">
+                <SelectValue placeholder={categoriaFilter ? 'Todas las subcategorías' : 'Seleccione una categoría'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las subcategorías</SelectItem>
+                {filteredSubcategoriasForFilter.map((sub) => (
+                  <SelectItem key={sub.id} value={sub.id}>
+                    {sub.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         
         <TabsContent value="activos">
           <DataTable
