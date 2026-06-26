@@ -64,6 +64,7 @@ interface VentaInfo {
 
 type Motivo = "devolucion" | "bonificacion" | "error_facturacion" | "otro";
 type Modo = "items" | "bonificacion";
+type Alcance = "parcial" | "total";
 
 const NC_TIPO_MAP: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
 
@@ -87,6 +88,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [motivo, setMotivo] = useState<Motivo>("devolucion");
   const [observaciones, setObservaciones] = useState("");
   const [modo, setModo] = useState<Modo>("items");
+  const [alcance, setAlcance] = useState<Alcance>("parcial");
+  const [anularVenta, setAnularVenta] = useState<"si" | "no">("si");
 
   // items mode
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
@@ -102,6 +105,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setMotivo("devolucion");
     setObservaciones("");
     setModo("items");
+    setAlcance("parcial");
+    setAnularVenta("si");
     setCantidades({});
     setReingresarStock("si");
     setTipoBonif("importe");
@@ -146,6 +151,18 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     if (motivo === "devolucion") setModo("items");
     else if (motivo === "bonificacion") setModo("bonificacion");
   }, [motivo]);
+
+  // Al elegir "total", forzar modo items y precargar cantidades disponibles
+  useEffect(() => {
+    if (alcance === "total" && saldo) {
+      setModo("items");
+      const next: Record<string, number> = {};
+      saldo.items.forEach((it) => {
+        if (it.cantidad_disponible > 0) next[it.venta_detalle_id] = it.cantidad_disponible;
+      });
+      setCantidades(next);
+    }
+  }, [alcance, saldo]);
 
   const itemsSeleccionados = useMemo(() => {
     if (!saldo) return [] as Array<SaldoItem & { cantidad: number; importe: number }>;
@@ -382,7 +399,13 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
           monto_acreditado: nuevoMonto,
           acreditada_parcial: true,
         };
-        if (totalmenteAcreditada) {
+        // Solo anular la venta si:
+        // - es una NC total y el usuario optó por anular, o
+        // - se acreditó el total acumulado y no es alcance="total" con anularVenta="no"
+        const debeAnular =
+          (alcance === "total" && anularVenta === "si") ||
+          (alcance !== "total" && totalmenteAcreditada);
+        if (debeAnular) {
           update.anulada = true;
           update.motivo_anulacion = `NC total acumulada por ${motivoLabel}`;
           update.fecha_anulacion = new Date().toISOString();
