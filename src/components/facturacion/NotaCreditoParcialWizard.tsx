@@ -574,6 +574,14 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             {step === 2 && (
               <div className="space-y-4">
                 <div>
+                  <Label className="mb-2 block">Alcance de la Nota de Crédito</Label>
+                  <RadioGroup value={alcance} onValueChange={(v) => setAlcance(v as Alcance)}>
+                    <div className="flex items-center gap-2"><RadioGroupItem value="parcial" id="a1" /><Label htmlFor="a1">Parcial (seleccionar ítems o importe)</Label></div>
+                    <div className="flex items-center gap-2"><RadioGroupItem value="total" id="a2" /><Label htmlFor="a2">Por el total de la factura</Label></div>
+                  </RadioGroup>
+                </div>
+
+                <div>
                   <Label className="mb-2 block">Motivo de la Nota de Crédito</Label>
                   <RadioGroup value={motivo} onValueChange={(v) => setMotivo(v as Motivo)}>
                     <div className="flex items-center gap-2"><RadioGroupItem value="devolucion" id="m1" /><Label htmlFor="m1">Devolución de mercadería</Label></div>
@@ -583,13 +591,26 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
                   </RadioGroup>
                 </div>
 
-                {(motivo === "error_facturacion" || motivo === "otro") && (
+                {alcance === "parcial" && (motivo === "error_facturacion" || motivo === "otro") && (
                   <div>
                     <Label className="mb-2 block">Modalidad</Label>
                     <RadioGroup value={modo} onValueChange={(v) => setModo(v as Modo)}>
                       <div className="flex items-center gap-2"><RadioGroupItem value="items" id="md1" /><Label htmlFor="md1">Por ítems facturados</Label></div>
                       <div className="flex items-center gap-2"><RadioGroupItem value="bonificacion" id="md2" /><Label htmlFor="md2">Por importe / porcentaje</Label></div>
                     </RadioGroup>
+                  </div>
+                )}
+
+                {alcance === "total" && factura.venta_id && (
+                  <div className="border rounded p-3 bg-muted/30">
+                    <Label className="mb-2 block">¿Anular también la venta original?</Label>
+                    <RadioGroup value={anularVenta} onValueChange={(v) => setAnularVenta(v as "si" | "no")} className="flex gap-6">
+                      <div className="flex items-center gap-2"><RadioGroupItem value="si" id="an1" /><Label htmlFor="an1">Sí, anular la venta</Label></div>
+                      <div className="flex items-center gap-2"><RadioGroupItem value="no" id="an2" /><Label htmlFor="an2">No, solo emitir la NC</Label></div>
+                    </RadioGroup>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Si elegís "No", la venta original permanecerá vigente y solo se registrará la NC en AFIP y en la cuenta corriente del cliente.
+                    </p>
                   </div>
                 )}
 
@@ -690,7 +711,10 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
                   <div><span className="text-muted-foreground">Factura origen: </span><b>{String(factura.punto_venta).padStart(4, "0")}-{String(factura.numero_comprobante).padStart(8, "0")}</b></div>
                   <div><span className="text-muted-foreground">Cliente: </span><b>{venta?.cliente?.nombre || "Consumidor Final"}</b></div>
                   <div><span className="text-muted-foreground">Motivo: </span><b>{motivoLabel}</b></div>
-                  <div><span className="text-muted-foreground">Modalidad: </span><b>{modo === "items" ? "Por ítems" : "Bonificación"}</b></div>
+                  <div><span className="text-muted-foreground">Alcance: </span><b>{alcance === "total" ? "Total de la factura" : (modo === "items" ? "Parcial por ítems" : "Parcial por importe")}</b></div>
+                  {alcance === "total" && factura.venta_id && (
+                    <div><span className="text-muted-foreground">Anular venta: </span><b className={anularVenta === "si" ? "text-destructive" : ""}>{anularVenta === "si" ? "Sí" : "No"}</b></div>
+                  )}
                 </div>
                 {observaciones && (
                   <div><span className="text-muted-foreground">Observaciones: </span>{observaciones}</div>
