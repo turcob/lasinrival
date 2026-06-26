@@ -272,6 +272,15 @@ export default function Facturacion() {
     return fecha;
   };
 
+  // Parsea 'YYYY-MM-DD' como fecha local (evita desfase de zona horaria por UTC)
+  const parseFechaLocal = (fecha: string): Date => {
+    if (!fecha) return new Date();
+    const soloFecha = fecha.slice(0, 10);
+    const [y, m, d] = soloFecha.split("-").map(Number);
+    if (y && m && d) return new Date(y, m - 1, d);
+    return new Date(fecha);
+  };
+
   const resetForm = () => {
     setFormData({
       tipo_comprobante: 6,
@@ -458,10 +467,10 @@ export default function Facturacion() {
                         <TableCell>
                           {String(comp.punto_venta).padStart(4, "0")}-{String(comp.numero_comprobante).padStart(8, "0")}
                         </TableCell>
-                        <TableCell>{format(new Date(comp.fecha_emision), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{format(parseFechaLocal(comp.fecha_emision), "dd/MM/yyyy")}</TableCell>
                         <TableCell>${Number(comp.importe_total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell className="font-mono text-xs">{comp.cae}</TableCell>
-                        <TableCell>{format(new Date(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{format(parseFechaLocal(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant={comp.estado === "emitido" ? "default" : "destructive"}>{comp.estado}</Badge>
                         </TableCell>
