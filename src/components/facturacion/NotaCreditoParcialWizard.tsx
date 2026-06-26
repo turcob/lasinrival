@@ -556,6 +556,16 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             resolucion_por: user.id,
           } as any)
           .eq("id", ncEmitida.comprobante_id);
+        // Actualizar total_egresos de la caja para que el esperado refleje el egreso
+        const { data: cajaActual } = await supabase
+          .from("cajas")
+          .select("total_egresos")
+          .eq("id", cajaAbierta.id)
+          .single();
+        await supabase
+          .from("cajas")
+          .update({ total_egresos: Number(cajaActual?.total_egresos || 0) + Number(ncEmitida.total) })
+          .eq("id", cajaAbierta.id);
         toast.success("Egreso registrado en caja");
       } else {
         if (esConsumidorFinal || !venta?.cliente?.id) {
