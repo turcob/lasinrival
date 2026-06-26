@@ -1304,7 +1304,23 @@ export default function Ventas() {
               y devolverá el stock de los productos.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
+          {selectedVenta?.comprobantes_afip && selectedVenta.comprobantes_afip.length > 0 && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-semibold mb-1">Se emitirá una Nota de Crédito electrónica</p>
+              <p>
+                Al anular esta venta, el sistema emitirá automáticamente una Nota de Crédito en AFIP
+                referenciando la factura original{' '}
+                <span className="font-mono font-semibold">
+                  {TIPOS_COMPROBANTE[selectedVenta.comprobantes_afip[0].tipo_comprobante] || ''}{' '}
+                  {String(selectedVenta.comprobantes_afip[0].punto_venta).padStart(4, '0')}-
+                  {String(selectedVenta.comprobantes_afip[0].numero_comprobante).padStart(8, '0')}
+                </span>
+                {' '}por el mismo importe.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="motivo">Motivo de anulación *</Label>
             <Textarea
