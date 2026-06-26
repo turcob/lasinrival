@@ -89,7 +89,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [observaciones, setObservaciones] = useState("");
   const [modo, setModo] = useState<Modo>("items");
   const [alcance, setAlcance] = useState<Alcance>("parcial");
-  const [anularVenta, setAnularVenta] = useState<"si" | "no">("si");
+  const [anularVenta, setAnularVenta] = useState<"si" | "no">("no");
 
   // items mode
   const [cantidades, setCantidades] = useState<Record<string, number>>({});
