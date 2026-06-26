@@ -946,14 +946,18 @@ export type Database = {
           doc_nro: number
           doc_tipo: number
           estado: string
+          factura_origen_id: string | null
           fecha_emision: string
           id: string
           importe_iva: number
           importe_neto: number
           importe_total: number
+          motivo_nc: string | null
           numero_comprobante: number
+          observaciones: string | null
           punto_venta: number
           tipo_comprobante: number
+          tipo_nc: string | null
           usuario_id: string
           venta_id: string | null
         }
@@ -966,14 +970,18 @@ export type Database = {
           doc_nro: number
           doc_tipo: number
           estado?: string
+          factura_origen_id?: string | null
           fecha_emision?: string
           id?: string
           importe_iva: number
           importe_neto: number
           importe_total: number
+          motivo_nc?: string | null
           numero_comprobante: number
+          observaciones?: string | null
           punto_venta: number
           tipo_comprobante: number
+          tipo_nc?: string | null
           usuario_id: string
           venta_id?: string | null
         }
@@ -986,18 +994,29 @@ export type Database = {
           doc_nro?: number
           doc_tipo?: number
           estado?: string
+          factura_origen_id?: string | null
           fecha_emision?: string
           id?: string
           importe_iva?: number
           importe_neto?: number
           importe_total?: number
+          motivo_nc?: string | null
           numero_comprobante?: number
+          observaciones?: string | null
           punto_venta?: number
           tipo_comprobante?: number
+          tipo_nc?: string | null
           usuario_id?: string
           venta_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "comprobantes_afip_factura_origen_id_fkey"
+            columns: ["factura_origen_id"]
+            isOneToOne: false
+            referencedRelation: "comprobantes_afip"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comprobantes_afip_venta_id_fkey"
             columns: ["venta_id"]
@@ -2406,6 +2425,98 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_sales_line"
             referencedColumns: ["venta_id"]
+          },
+        ]
+      }
+      nota_credito_items: {
+        Row: {
+          cantidad: number
+          comprobante_factura_id: string
+          comprobante_nc_id: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          importe: number
+          precio_unitario: number
+          producto_id: string | null
+          reingresado_stock: boolean
+          venta_detalle_id: string | null
+        }
+        Insert: {
+          cantidad?: number
+          comprobante_factura_id: string
+          comprobante_nc_id: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          importe?: number
+          precio_unitario?: number
+          producto_id?: string | null
+          reingresado_stock?: boolean
+          venta_detalle_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          comprobante_factura_id?: string
+          comprobante_nc_id?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          importe?: number
+          precio_unitario?: number
+          producto_id?: string | null
+          reingresado_stock?: boolean
+          venta_detalle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nota_credito_items_comprobante_factura_id_fkey"
+            columns: ["comprobante_factura_id"]
+            isOneToOne: false
+            referencedRelation: "comprobantes_afip"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_comprobante_nc_id_fkey"
+            columns: ["comprobante_nc_id"]
+            isOneToOne: false
+            referencedRelation: "comprobantes_afip"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "nota_credito_items_venta_detalle_id_fkey"
+            columns: ["venta_detalle_id"]
+            isOneToOne: false
+            referencedRelation: "venta_detalles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4249,6 +4360,7 @@ export type Database = {
       }
       ventas: {
         Row: {
+          acreditada_parcial: boolean
           anulada: boolean | null
           anulada_por: string | null
           caja_id: string | null
@@ -4260,6 +4372,7 @@ export type Database = {
           fecha: string | null
           fecha_anulacion: string | null
           id: string
+          monto_acreditado: number
           motivo_anulacion: string | null
           numero_comprobante: number | null
           subtotal: number
@@ -4267,6 +4380,7 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          acreditada_parcial?: boolean
           anulada?: boolean | null
           anulada_por?: string | null
           caja_id?: string | null
@@ -4278,6 +4392,7 @@ export type Database = {
           fecha?: string | null
           fecha_anulacion?: string | null
           id?: string
+          monto_acreditado?: number
           motivo_anulacion?: string | null
           numero_comprobante?: number | null
           subtotal?: number
@@ -4285,6 +4400,7 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          acreditada_parcial?: boolean
           anulada?: boolean | null
           anulada_por?: string | null
           caja_id?: string | null
@@ -4296,6 +4412,7 @@ export type Database = {
           fecha?: string | null
           fecha_anulacion?: string | null
           id?: string
+          monto_acreditado?: number
           motivo_anulacion?: string | null
           numero_comprobante?: number | null
           subtotal?: number
@@ -4871,6 +4988,10 @@ export type Database = {
         Returns: Json
       }
       get_empleado_id: { Args: never; Returns: string }
+      get_factura_saldo_disponible: {
+        Args: { p_factura_id: string }
+        Returns: Json
+      }
       get_ventas_lista: {
         Args: {
           p_estado?: string
