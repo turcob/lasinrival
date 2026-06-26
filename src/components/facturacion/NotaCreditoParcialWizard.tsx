@@ -65,6 +65,15 @@ interface VentaInfo {
 type Motivo = "devolucion" | "bonificacion" | "error_facturacion" | "otro";
 type Modo = "items" | "bonificacion";
 type Alcance = "parcial" | "total";
+type ResolucionOpcion = "caja" | "cuenta_corriente";
+
+interface NcEmitidaState {
+  comprobante_id: string;
+  punto_venta: number;
+  numero_comprobante: number;
+  tipo_comprobante: number;
+  total: number;
+}
 
 const NC_TIPO_MAP: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
 
@@ -99,6 +108,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [tipoBonif, setTipoBonif] = useState<"importe" | "porcentaje">("importe");
   const [valorBonif, setValorBonif] = useState<number>(0);
 
+  // Resolución financiera (post-emisión, obligatoria)
+  const [ncEmitida, setNcEmitida] = useState<NcEmitidaState | null>(null);
+  const [resolucionOpcion, setResolucionOpcion] = useState<ResolucionOpcion | null>(null);
+  const [cajaAbierta, setCajaAbierta] = useState<{ id: string; fecha_apertura: string | null } | null>(null);
+  const [resolviendo, setResolviendo] = useState(false);
+
   useEffect(() => {
     if (!open || !factura) return;
     setStep(1);
@@ -111,6 +126,9 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setReingresarStock("si");
     setTipoBonif("importe");
     setValorBonif(0);
+    setNcEmitida(null);
+    setResolucionOpcion(null);
+    setCajaAbierta(null);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
