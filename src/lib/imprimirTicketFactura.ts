@@ -36,7 +36,7 @@ export interface TicketDetalleItem {
 }
 
 export interface TicketFacturaData {
-  tipo_comprobante: number; // 1 A, 6 B, 11 C
+  tipo_comprobante: number; // 1 A, 6 B, 11 C, 3 NC A, 8 NC B, 13 NC C
   punto_venta: number;
   numero_comprobante: number;
   cae: string;
@@ -45,6 +45,11 @@ export interface TicketFacturaData {
   importe_neto: number;
   importe_iva: number;
   doc_nro?: string | number | null;
+  comprobante_asociado?: {
+    tipo_comprobante: number;
+    punto_venta: number;
+    numero_comprobante: number;
+  } | null;
 }
 
 export interface TicketCliente {
@@ -96,12 +101,22 @@ export function imprimirTicketFactura(args: ImprimirTicketArgs) {
   let html = '';
 
   if (factura) {
-    const tipoLetra = factura.tipo_comprobante === 1 ? 'A' : factura.tipo_comprobante === 6 ? 'B' : 'C';
+    const NC_TIPOS = [3, 8, 13];
+    const esNC = NC_TIPOS.includes(factura.tipo_comprobante);
+    const tipoLetra =
+      factura.tipo_comprobante === 1 || factura.tipo_comprobante === 3 ? 'A'
+      : factura.tipo_comprobante === 6 || factura.tipo_comprobante === 8 ? 'B'
+      : 'C';
+    const docTitulo = esNC ? 'NOTA DE CRÉDITO' : 'FACTURA';
+    const asociadoLetra = factura.comprobante_asociado
+      ? (factura.comprobante_asociado.tipo_comprobante === 1 ? 'A'
+        : factura.comprobante_asociado.tipo_comprobante === 6 ? 'B' : 'C')
+      : '';
     html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Factura ${tipoLetra} ${String(factura.punto_venta).padStart(4, '0')}-${String(factura.numero_comprobante).padStart(8, '0')}</title>
+        <title>${docTitulo} ${tipoLetra} ${String(factura.punto_venta).padStart(4, '0')}-${String(factura.numero_comprobante).padStart(8, '0')}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
           body {
@@ -137,9 +152,10 @@ export function imprimirTicketFactura(args: ImprimirTicketArgs) {
           <p>CUIT: ${formatCuit(comercio?.cuit || '')}</p>
           <p>${comercio?.condicion_iva || 'IVA Resp. Inscripto'}</p>
           <div class="tipo-box">${tipoLetra}</div>
-          <p style="font-weight: bold; font-size: 11px;">FACTURA ${tipoLetra}</p>
+          <p style="font-weight: bold; font-size: 11px;">${docTitulo} ${tipoLetra}</p>
           <p style="font-weight: bold;">Nº ${String(factura.punto_venta).padStart(4, '0')}-${String(factura.numero_comprobante).padStart(8, '0')}</p>
           <p>Fecha: ${new Date(fecha).toLocaleString('es-AR')}</p>
+          ${factura.comprobante_asociado ? `<p style="font-size: 12px;">Comp. asociado: ${asociadoLetra} ${String(factura.comprobante_asociado.punto_venta).padStart(4,'0')}-${String(factura.comprobante_asociado.numero_comprobante).padStart(8,'0')}</p>` : ''}
         </div>
         <div class="section">
           ${empleado ? `
@@ -167,7 +183,7 @@ export function imprimirTicketFactura(args: ImprimirTicketArgs) {
           <p>Vto. CAE: ${factura.cae_vencimiento}</p>
           <p style="margin-top: 4px;">Comprobante Autorizado - AFIP</p>
           <p>www.afip.gob.ar/fe/qr/</p>
-          <p style="margin-top: 8px;">¡Gracias por su compra!</p>
+          <p style="margin-top: 8px;">${esNC ? 'Nota de Crédito emitida por anulación' : '¡Gracias por su compra!'}</p>
         </div>
         <script>window.onload=function(){setTimeout(function(){window.print();window.onafterprint=function(){window.close();};},300);};</script>
       </body>
