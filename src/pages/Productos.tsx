@@ -97,6 +97,9 @@ export default function Productos() {
   const [imprimirPreciosOpen, setImprimirPreciosOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
+  const [categoriaFilter, setCategoriaFilter] = useState('');
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState('');
+
   const [formData, setFormData] = useState({
     codigo_articulo: '',
     descripcion: '',
