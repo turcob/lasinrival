@@ -760,6 +760,29 @@ export default function Facturacion() {
                 </div>
               </div>
 
+              {selectedComp && NC_TIPOS.includes(selectedComp.tipo_comprobante) && selectedComp.factura_origen_id && (
+                (() => {
+                  const facturaOrigen = comprobantes.find(c => c.id === selectedComp.factura_origen_id);
+                  return facturaOrigen ? (
+                    <div className="border rounded-lg p-3 bg-amber-50/50 border-amber-200">
+                      <p className="text-sm font-semibold text-amber-800 mb-1">Factura de Origen</p>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-amber-900">
+                          {getTipoComprobanteLabel(facturaOrigen.tipo_comprobante)} {String(facturaOrigen.punto_venta).padStart(4, '0')}-{String(facturaOrigen.numero_comprobante).padStart(8, '0')}
+                          <span className="text-muted-foreground ml-2">{format(new Date(facturaOrigen.fecha_emision), 'dd/MM/yyyy')}</span>
+                        </span>
+                        <span className="font-medium text-amber-900">${Number(facturaOrigen.importe_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg p-3 bg-amber-50/50 border-amber-200">
+                      <p className="text-sm font-semibold text-amber-800 mb-1">Factura de Origen</p>
+                      <p className="text-sm text-amber-900">Factura ID: {selectedComp.factura_origen_id}</p>
+                    </div>
+                  );
+                })()
+              )}
+
               <div className="border rounded-lg">
                 <Table>
                   <TableHeader>
