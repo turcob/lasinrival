@@ -65,6 +65,15 @@ interface VentaInfo {
 type Motivo = "devolucion" | "bonificacion" | "error_facturacion" | "otro";
 type Modo = "items" | "bonificacion";
 type Alcance = "parcial" | "total";
+type ResolucionOpcion = "caja" | "cuenta_corriente";
+
+interface NcEmitidaState {
+  comprobante_id: string;
+  punto_venta: number;
+  numero_comprobante: number;
+  tipo_comprobante: number;
+  total: number;
+}
 
 const NC_TIPO_MAP: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
 
@@ -99,6 +108,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [tipoBonif, setTipoBonif] = useState<"importe" | "porcentaje">("importe");
   const [valorBonif, setValorBonif] = useState<number>(0);
 
+  // Resolución financiera (post-emisión, obligatoria)
+  const [ncEmitida, setNcEmitida] = useState<NcEmitidaState | null>(null);
+  const [resolucionOpcion, setResolucionOpcion] = useState<ResolucionOpcion | null>(null);
+  const [cajaAbierta, setCajaAbierta] = useState<{ id: string; fecha_apertura: string | null } | null>(null);
+  const [resolviendo, setResolviendo] = useState(false);
+
   useEffect(() => {
     if (!open || !factura) return;
     setStep(1);
@@ -111,6 +126,9 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setReingresarStock("si");
     setTipoBonif("importe");
     setValorBonif(0);
+    setNcEmitida(null);
+    setResolucionOpcion(null);
+    setCajaAbierta(null);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
@@ -380,17 +398,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         }
       }
 
-      // Registrar NCR en CC del cliente
-      if (venta?.cliente?.id) {
-        await supabase.from("cliente_movimientos").insert({
-          cliente_id: venta.cliente.id,
-          tipo: "NCR",
-          monto: Number(totalNc.toFixed(2)),
-          concepto: `NC ${String((ncResult as any).punto_venta).padStart(4, "0")}-${String((ncResult as any).numero_comprobante).padStart(8, "0")} sobre Factura ${String(factura.punto_venta).padStart(4, "0")}-${String(factura.numero_comprobante).padStart(8, "0")} - ${motivoLabel}`,
-          usuario_registro_id: user.id,
-        } as any);
-      }
-
       // Actualizar venta: monto_acreditado y flag
       if (factura.venta_id) {
         const nuevoMonto = Number((saldo.total_acreditado + totalNc).toFixed(2));
@@ -476,25 +483,174 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         console.error("Error imprimiendo ticket NC:", e);
       }
 
-      onEmitida();
-      onOpenChange(false);
+      // Bloquear el wizard hasta resolver financieramente la NC
+      if (compNc?.id) {
+        setNcEmitida({
+          comprobante_id: compNc.id,
+          punto_venta: (ncResult as any).punto_venta,
+          numero_comprobante: (ncResult as any).numero_comprobante,
+          tipo_comprobante: ncTipo,
+          total: Number(totalNc.toFixed(2)),
+        });
+        // Buscar caja abierta del usuario actual
+        const { data: caja } = await supabase
+          .from("cajas")
+          .select("id, fecha_apertura")
+          .eq("usuario_id", user.id)
+          .eq("estado", "abierta")
+          .order("fecha_apertura", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (caja) setCajaAbierta(caja as any);
+        onEmitida();
+      } else {
+        // Sin id de comprobante guardado, no podemos vincular la resolución
+        onEmitida();
+        onOpenChange(false);
+      }
     } catch (e: any) {
       toast.error("Error al emitir NC: " + (e?.message || e));
     }
     setEmitiendo(false);
   };
 
+  const esConsumidorFinal = !venta?.cliente?.id || venta?.cliente?.condicion_iva === 5;
+
+  const ncLabel = ncEmitida
+    ? `NC ${ncEmitida.tipo_comprobante === 3 ? "A" : ncEmitida.tipo_comprobante === 8 ? "B" : "C"} ${String(ncEmitida.punto_venta).padStart(4, "0")}-${String(ncEmitida.numero_comprobante).padStart(8, "0")}`
+    : "";
+  const facturaLabel = factura
+    ? `Factura ${factura.tipo_comprobante === 1 ? "A" : factura.tipo_comprobante === 6 ? "B" : "C"} ${String(factura.punto_venta).padStart(4, "0")}-${String(factura.numero_comprobante).padStart(8, "0")}`
+    : "";
+
+  const confirmarResolucion = async () => {
+    if (!ncEmitida || !user || !factura || !resolucionOpcion) return;
+    setResolviendo(true);
+    try {
+      if (resolucionOpcion === "caja") {
+        if (!cajaAbierta) {
+          toast.error("No hay una caja abierta para registrar el egreso");
+          setResolviendo(false);
+          return;
+        }
+        const concepto = `Egreso por ${ncLabel} correspondiente a ${facturaLabel}`;
+        const { data: mov, error: movErr } = await supabase
+          .from("movimientos_caja")
+          .insert({
+            caja_id: cajaAbierta.id,
+            tipo: "egreso",
+            monto: ncEmitida.total,
+            concepto,
+            usuario_id: user.id,
+            venta_id: factura.venta_id,
+          })
+          .select("id")
+          .single();
+        if (movErr) throw movErr;
+        await supabase
+          .from("comprobantes_afip")
+          .update({
+            resolucion_financiera: "caja",
+            caja_movimiento_id: mov.id,
+            resolucion_at: new Date().toISOString(),
+            resolucion_por: user.id,
+          } as any)
+          .eq("id", ncEmitida.comprobante_id);
+        toast.success("Egreso registrado en caja");
+      } else {
+        if (esConsumidorFinal || !venta?.cliente?.id) {
+          toast.error("No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final.");
+          setResolviendo(false);
+          return;
+        }
+        const concepto = `${ncLabel} sobre ${facturaLabel} - ${motivoLabel}`;
+        const { data: mov, error: movErr } = await supabase
+          .from("cliente_movimientos")
+          .insert({
+            cliente_id: venta.cliente.id,
+            tipo: "NCR",
+            monto: ncEmitida.total,
+            concepto,
+            usuario_registro_id: user.id,
+          } as any)
+          .select("id")
+          .single();
+        if (movErr) throw movErr;
+        await supabase
+          .from("comprobantes_afip")
+          .update({
+            resolucion_financiera: "cuenta_corriente",
+            resolucion_cliente_movimiento_id: mov.id,
+            resolucion_at: new Date().toISOString(),
+            resolucion_por: user.id,
+          } as any)
+          .eq("id", ncEmitida.comprobante_id);
+        toast.success("Crédito registrado en la cuenta corriente del cliente");
+      }
+      onEmitida();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("Error al registrar la resolución: " + (e?.message || e));
+    }
+    setResolviendo(false);
+  };
+
   if (!factura) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !emitiendo && onOpenChange(o)}>
+    <Dialog open={open} onOpenChange={(o) => !emitiendo && !ncEmitida && !resolviendo && onOpenChange(o)}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Generar Nota de Crédito — Factura {String(factura.punto_venta).padStart(4, "0")}-{String(factura.numero_comprobante).padStart(8, "0")}
+            {ncEmitida
+              ? `Resolución financiera — ${ncLabel}`
+              : `Generar Nota de Crédito — Factura ${String(factura.punto_venta).padStart(4, "0")}-${String(factura.numero_comprobante).padStart(8, "0")}`}
           </DialogTitle>
         </DialogHeader>
 
+        {ncEmitida ? (
+          <div className="space-y-4 mt-2">
+            <div className="rounded border bg-muted/30 p-3 text-sm space-y-1">
+              <p><b>{ncLabel}</b> emitida correctamente sobre <b>{facturaLabel}</b>.</p>
+              <p>Importe total: <b>${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></p>
+              <p>Cliente: <b>{venta?.cliente?.nombre || "Consumidor Final"}</b></p>
+            </div>
+            <p className="text-base font-medium">¿Cómo desea resolver financieramente esta Nota de Crédito?</p>
+            <RadioGroup value={resolucionOpcion ?? ""} onValueChange={(v) => setResolucionOpcion(v as ResolucionOpcion)}>
+              <div className="border rounded p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="caja" id="rf-caja" disabled={!cajaAbierta} />
+                  <Label htmlFor="rf-caja" className="font-medium">Registrar egreso en Caja</Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  {cajaAbierta
+                    ? `Se generará un egreso por $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} en la caja abierta actual.`
+                    : "No tenés una caja abierta. Abrí una caja para usar esta opción."}
+                </p>
+              </div>
+              <div className="border rounded p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="cuenta_corriente" id="rf-cc" disabled={esConsumidorFinal} />
+                  <Label htmlFor="rf-cc" className="font-medium">Registrar crédito en Cuenta Corriente del cliente</Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  {esConsumidorFinal
+                    ? "No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final."
+                    : `Se sumará $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} como saldo a favor de ${venta?.cliente?.nombre}.`}
+                </p>
+              </div>
+            </RadioGroup>
+            <p className="text-xs text-destructive">
+              Esta resolución es obligatoria. La NC no se considerará finalizada hasta que se registre la resolución financiera.
+            </p>
+            <DialogFooter>
+              <Button onClick={confirmarResolucion} disabled={!resolucionOpcion || resolviendo}>
+                {resolviendo ? "Registrando..." : "Confirmar resolución"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+        <>
         <div className="flex items-center gap-2 text-xs">
           {[1, 2, 3, 4].map((n) => (
             <Badge key={n} variant={step === n ? "default" : step > n ? "secondary" : "outline"}>
@@ -779,6 +935,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             </>
           )}
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

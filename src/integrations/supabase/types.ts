@@ -940,6 +940,7 @@ export type Database = {
         Row: {
           cae: string
           cae_vencimiento: string
+          caja_movimiento_id: string | null
           created_at: string
           cuit_emisor: string
           cuit_receptor: string | null
@@ -956,6 +957,10 @@ export type Database = {
           numero_comprobante: number
           observaciones: string | null
           punto_venta: number
+          resolucion_at: string | null
+          resolucion_cliente_movimiento_id: string | null
+          resolucion_financiera: string | null
+          resolucion_por: string | null
           tipo_comprobante: number
           tipo_nc: string | null
           usuario_id: string
@@ -964,6 +969,7 @@ export type Database = {
         Insert: {
           cae: string
           cae_vencimiento: string
+          caja_movimiento_id?: string | null
           created_at?: string
           cuit_emisor: string
           cuit_receptor?: string | null
@@ -980,6 +986,10 @@ export type Database = {
           numero_comprobante: number
           observaciones?: string | null
           punto_venta: number
+          resolucion_at?: string | null
+          resolucion_cliente_movimiento_id?: string | null
+          resolucion_financiera?: string | null
+          resolucion_por?: string | null
           tipo_comprobante: number
           tipo_nc?: string | null
           usuario_id: string
@@ -988,6 +998,7 @@ export type Database = {
         Update: {
           cae?: string
           cae_vencimiento?: string
+          caja_movimiento_id?: string | null
           created_at?: string
           cuit_emisor?: string
           cuit_receptor?: string | null
@@ -1004,6 +1015,10 @@ export type Database = {
           numero_comprobante?: number
           observaciones?: string | null
           punto_venta?: number
+          resolucion_at?: string | null
+          resolucion_cliente_movimiento_id?: string | null
+          resolucion_financiera?: string | null
+          resolucion_por?: string | null
           tipo_comprobante?: number
           tipo_nc?: string | null
           usuario_id?: string
@@ -1011,10 +1026,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "comprobantes_afip_caja_movimiento_id_fkey"
+            columns: ["caja_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos_caja"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "comprobantes_afip_factura_origen_id_fkey"
             columns: ["factura_origen_id"]
             isOneToOne: false
             referencedRelation: "comprobantes_afip"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comprobantes_afip_resolucion_cliente_movimiento_id_fkey"
+            columns: ["resolucion_cliente_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_movimientos"
             referencedColumns: ["id"]
           },
           {
