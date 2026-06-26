@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfiguracionComercio } from "@/hooks/useConfiguracionComercio";
-import { FileText, Plus, TestTube } from "lucide-react";
+import { FileText, Plus, TestTube, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
+import { imprimirTicketFactura, TicketDetalleItem } from "@/lib/imprimirTicketFactura";
 import {
   Table,
   TableBody,
@@ -31,9 +32,12 @@ interface Comprobante {
   cae: string;
   cae_vencimiento: string;
   importe_total: number;
+  importe_neto: number;
+  importe_iva: number;
   doc_nro: number;
   fecha_emision: string;
   estado: string;
+  venta_id?: string | null;
 }
 
 interface Cliente {
@@ -79,6 +83,12 @@ export default function Facturacion() {
   const [emitiendo, setEmitiendo] = useState(false);
   
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [detalleLoading, setDetalleLoading] = useState(false);
+  const [selectedComp, setSelectedComp] = useState<Comprobante | null>(null);
+  const [detalleVenta, setDetalleVenta] = useState<any>(null);
+  const [detalleItems, setDetalleItems] = useState<TicketDetalleItem[]>([]);
+  const [detalleCliente, setDetalleCliente] = useState<any>(null);
   const [formData, setFormData] = useState({
     tipo_comprobante: 6, // Factura B por defecto
     punto_venta: 1, // Se actualiza con useEffect cuando carga comercioConfig
@@ -278,6 +288,69 @@ export default function Facturacion() {
     return TIPOS_COMPROBANTE.find((t) => t.value === tipo)?.label || tipo.toString();
   };
 
+  const verDetalle = async (comp: Comprobante) => {
+    setSelectedComp(comp);
+    setDetalleOpen(true);
+    setDetalleLoading(true);
+    setDetalleVenta(null);
+    setDetalleItems([]);
+    setDetalleCliente(null);
+    try {
+      if (!comp.venta_id) {
+        setDetalleLoading(false);
+        return;
+      }
+      const { data: venta } = await supabase
+        .from('ventas')
+        .select('id, fecha, total, descuento, numero_comprobante, cliente_id, clientes(nombre, dni_cuit, condicion_iva)')
+        .eq('id', comp.venta_id)
+        .maybeSingle();
+      const { data: detalles } = await supabase
+        .from('venta_detalles')
+        .select('cantidad, precio_unitario, subtotal, descuento_porcentaje, producto_temporal_nombre, productos(nombre)')
+        .eq('venta_id', comp.venta_id);
+      setDetalleVenta(venta);
+      setDetalleCliente((venta as any)?.clientes || null);
+      setDetalleItems(
+        (detalles || []).map((d: any) => ({
+          nombre: d.productos?.nombre || d.producto_temporal_nombre || 'Producto',
+          cantidad: Number(d.cantidad) || 0,
+          precio: Number(d.precio_unitario) || 0,
+          subtotal: Number(d.subtotal) || 0,
+          descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al cargar el detalle');
+    }
+    setDetalleLoading(false);
+  };
+
+  const reimprimir = () => {
+    if (!selectedComp) return;
+    imprimirTicketFactura({
+      comercio: comercioConfig,
+      fecha: detalleVenta?.fecha || selectedComp.fecha_emision,
+      total: Number(detalleVenta?.total ?? selectedComp.importe_total),
+      descuento: Number(detalleVenta?.descuento || 0),
+      numero_comprobante: detalleVenta?.numero_comprobante,
+      detalles: detalleItems,
+      cliente: detalleCliente,
+      factura: {
+        tipo_comprobante: selectedComp.tipo_comprobante,
+        punto_venta: selectedComp.punto_venta,
+        numero_comprobante: selectedComp.numero_comprobante,
+        cae: selectedComp.cae,
+        cae_vencimiento: selectedComp.cae_vencimiento,
+        importe_total: Number(selectedComp.importe_total),
+        importe_neto: Number(selectedComp.importe_neto),
+        importe_iva: Number(selectedComp.importe_iva),
+        doc_nro: selectedComp.doc_nro,
+      },
+    });
+  };
+
   const totales = calcularTotales();
 
   return (
@@ -318,12 +391,13 @@ export default function Facturacion() {
                     <TableHead>CAE</TableHead>
                     <TableHead>Vto. CAE</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {comprobantes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                         No hay comprobantes emitidos
                       </TableCell>
                     </TableRow>
@@ -343,6 +417,11 @@ export default function Facturacion() {
                         <TableCell>{format(new Date(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant={comp.estado === "emitido" ? "default" : "destructive"}>{comp.estado}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => verDetalle(comp)} title="Ver detalle">
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
