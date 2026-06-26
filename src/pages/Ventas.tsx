@@ -544,6 +544,59 @@ export default function Ventas() {
           numero: (ncResult as any).numero_comprobante,
           cae: (ncResult as any).cae,
         };
+
+        // Imprimir ticket de la Nota de Crédito
+        try {
+          const detallesTicket = (detNc as any[] | null || []).map((d) => {
+            const precioFinal = Number(d.precio_unitario) * (1 - (Number(d.descuento_porcentaje) || 0) / 100);
+            const cant = Number(d.cantidad);
+            return {
+              nombre: d.productos?.descripcion || d.producto_temporal_nombre || 'Item',
+              cantidad: cant,
+              precio: precioFinal,
+              subtotal: precioFinal * cant,
+              descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
+            };
+          });
+          imprimirTicketFactura({
+            comercio: comercioConfig ? {
+              nombre_fantasia: comercioConfig.nombre_fantasia,
+              razon_social: comercioConfig.razon_social,
+              direccion: comercioConfig.direccion,
+              localidad: comercioConfig.localidad,
+              provincia: comercioConfig.provincia,
+              cuit: comercioConfig.cuit,
+              condicion_iva: 'IVA Resp. Inscripto',
+              telefono: (comercioConfig as any).telefono,
+            } : null,
+            fecha: new Date(),
+            total: totalNc,
+            detalles: detallesTicket,
+            cliente: selectedVenta.clientes ? {
+              nombre: selectedVenta.clientes.nombre,
+              dni_cuit: selectedVenta.clientes.dni_cuit,
+              condicion_iva: selectedVenta.clientes.condicion_iva,
+            } : null,
+            factura: {
+              tipo_comprobante: ncTipo,
+              punto_venta: (ncResult as any).punto_venta,
+              numero_comprobante: (ncResult as any).numero_comprobante,
+              cae: (ncResult as any).cae,
+              cae_vencimiento: formatFechaAfip((ncResult as any).cae_vencimiento),
+              importe_total: totalNc,
+              importe_neto: parseFloat(netoNc.toFixed(2)),
+              importe_iva: parseFloat(ivaNc.toFixed(2)),
+              doc_nro: compOriginal.doc_nro,
+              comprobante_asociado: {
+                tipo_comprobante: compOriginal.tipo_comprobante,
+                punto_venta: compOriginal.punto_venta,
+                numero_comprobante: compOriginal.numero_comprobante,
+              },
+            },
+          });
+        } catch (printErr) {
+          console.error('Error al imprimir ticket NC:', printErr);
+        }
       }
 
       const { error } = await supabase
