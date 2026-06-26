@@ -361,8 +361,19 @@ export default function Productos() {
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
   );
 
-  const productosActivos = productos.filter((p) => p.activo);
-  const productosDesactivados = productos.filter((p) => !p.activo);
+  const filteredSubcategoriasForFilter = subcategorias.filter(
+    (sub) => !categoriaFilter || sub.categoria_id === categoriaFilter
+  );
+
+  const productosFiltrados = productos.filter((p) => {
+    if (categoriaFilter && p.categoria_id !== categoriaFilter) return false;
+    if (subcategoriaFilter && p.subcategoria_id !== subcategoriaFilter) return false;
+    return true;
+  });
+
+  const productosActivos = productosFiltrados.filter((p) => p.activo);
+  const productosDesactivados = productosFiltrados.filter((p) => !p.activo);
+
 
   const columnsActivosFull = [
     { key: 'codigo_articulo', header: 'Código' },
