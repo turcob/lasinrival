@@ -551,7 +551,30 @@ export default function Productos() {
     { key: 'descripcion', header: 'Descripción' },
     {
       key: 'categorias.nombre',
-      header: 'Categoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Categoría</span>
+          <Select
+            value={categoriaFilter}
+            onValueChange={(value) => {
+              setCategoriaFilter(value);
+              setSubcategoriaFilter('all');
+            }}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.categorias?.nombre || '-',
     },
     {
