@@ -5097,6 +5097,21 @@ export type Database = {
       is_route_owner: { Args: { route_id: string }; Returns: boolean }
       is_route_responsable: { Args: { route_id: string }; Returns: boolean }
       is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
+      pos_registrar_venta: {
+        Args: {
+          p_caja_movimiento?: Json
+          p_cheque?: Json
+          p_cliente_movimiento?: Json
+          p_detalles: Json
+          p_editing_pedido_id?: string
+          p_empleado_movimiento?: Json
+          p_motivo_inventario?: string
+          p_pagos?: Json
+          p_transferencia?: Json
+          p_venta: Json
+        }
+        Returns: Json
+      }
       refacturar_hoja_ruta_producto: {
         Args: {
           p_hoja_ruta_id: string

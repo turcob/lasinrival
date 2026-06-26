@@ -1187,127 +1187,46 @@ export default function POS() {
         return;
       }
 
-      let venta: any;
+      const detallesPayload = cart.map((item) => ({
+        producto_id: item.producto?.id || null,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio,
+        descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+        descuento_porcentaje: item.descuento_porcentaje,
+        subtotal: item.subtotal,
+        producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+        producto_temporal_precio: item.es_temporal ? item.precio : null,
+        es_temporal: !!item.es_temporal,
+      }));
 
-      if (editingPedidoId) {
-        // Actualizar pedido existente
-        const { error: updateError } = await supabase
-          .from('ventas')
-          .update({
-            cliente_id: null,
-            empleado_id: selectedEmpleado.id,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          })
-          .eq('id', editingPedidoId);
-
-        if (updateError) throw updateError;
-        
-        const { data: updatedVenta, error: fetchError } = await supabase
-          .from('ventas')
-          .select('*')
-          .eq('id', editingPedidoId)
-          .single();
-          
-        if (fetchError) throw fetchError;
-        venta = updatedVenta;
-
-        await supabase
-          .from('venta_detalles')
-          .delete()
-          .eq('venta_id', editingPedidoId);
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
-      } else {
-        // Crear nueva venta
-        const detallesPayload = cart.map((item) => ({
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
-          p_venta: {
-            usuario_id: user.id,
-            empleado_id: selectedEmpleado.id,
-            caja_id: caja.id,
-            subtotal,
-            descuento: totalDescuentos,
-            total,
-            estado: 'confirmada',
-          } as any,
-          p_detalles: detallesPayload as any,
-        });
-        if (rpcErr) throw rpcErr;
-        const created: any = rpcRes;
-        const { data: newVenta } = await supabase
-          .from('ventas').select('*').eq('id', created.id).single();
-        venta = newVenta;
-      }
-
-      // NO crear venta_pagos - no hay pago
-
-      // Actualizar stock (solo para productos reales)
-      for (const item of cart) {
-        if (item.producto && !item.es_temporal) {
-          await supabase
-            .from('productos')
-            .update({ stock_actual: item.producto.stock_actual - item.cantidad })
-            .eq('id', item.producto.id);
-
-          await supabase.from('movimientos_inventario').insert([{
-            producto_id: item.producto.id,
-            tipo: 'salida',
-            cantidad: item.cantidad,
-            stock_anterior: item.producto.stock_actual,
-            stock_nuevo: item.producto.stock_actual - item.cantidad,
-            motivo: 'Venta a Empleado',
-            usuario_id: user.id,
-            venta_id: venta.id,
-          }]);
-        }
-      }
-
-      // Registrar movimiento en cuenta corriente del empleado
-      const { error: movimientoError } = await supabase.from('empleado_movimientos').insert([{
-        empleado_id: selectedEmpleado.id,
-        tipo: 'compra',
-        monto: total,
-        concepto: `Compra - Venta #${venta.numero_comprobante}`,
-        venta_id: venta.id,
-        usuario_registro_id: user.id,
-      }]);
-
-      if (movimientoError) {
-        console.error('Error registrando movimiento en cuenta corriente:', movimientoError);
-        toast.error('Error al registrar en cuenta corriente del empleado');
-        throw movimientoError;
-      }
-
-      // NO registrar movimiento de caja - no entra dinero
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('pos_registrar_venta', {
+        p_venta: {
+          usuario_id: user.id,
+          empleado_id: selectedEmpleado.id,
+          caja_id: caja.id,
+          subtotal,
+          descuento: totalDescuentos,
+          total,
+          estado: 'confirmada',
+        } as any,
+        p_detalles: detallesPayload as any,
+        p_pagos: [] as any,
+        p_caja_movimiento: null as any,
+        p_cliente_movimiento: null as any,
+        p_empleado_movimiento: {
+          empleado_id: selectedEmpleado.id,
+          tipo: 'compra',
+          monto: total,
+        } as any,
+        p_transferencia: null as any,
+        p_cheque: null as any,
+        p_motivo_inventario: 'Venta a Empleado',
+        p_editing_pedido_id: editingPedidoId,
+      });
+      if (rpcErr) throw rpcErr;
+      const created: any = rpcRes;
+      const { data: venta } = await supabase
+        .from('ventas').select('*').eq('id', created.id).single();
 
       // Guardar venta para el ticket
       setLastVenta({
@@ -1384,121 +1303,46 @@ export default function POS() {
         return;
       }
 
-      let venta: any;
+      const detallesPayload = cart.map((item) => ({
+        producto_id: item.producto?.id || null,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio,
+        descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+        descuento_porcentaje: item.descuento_porcentaje,
+        subtotal: item.subtotal,
+        producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+        producto_temporal_precio: item.es_temporal ? item.precio : null,
+        es_temporal: !!item.es_temporal,
+      }));
 
-      if (editingPedidoId) {
-        // Actualizar pedido existente
-        const { error: updateError } = await supabase
-          .from('ventas')
-          .update({
-            cliente_id: selectedCliente.id,
-            empleado_id: null,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: total,
-            estado: 'confirmada',
-          })
-          .eq('id', editingPedidoId);
-
-        if (updateError) throw updateError;
-        
-        const { data: updatedVenta, error: fetchError } = await supabase
-          .from('ventas')
-          .select('*')
-          .eq('id', editingPedidoId)
-          .single();
-          
-        if (fetchError) throw fetchError;
-        venta = updatedVenta;
-
-        await supabase
-          .from('venta_detalles')
-          .delete()
-          .eq('venta_id', editingPedidoId);
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
-      } else {
-        // Crear nueva venta
-        const detallesPayload = cart.map((item) => ({
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
-          p_venta: {
-            usuario_id: user.id,
-            cliente_id: selectedCliente.id,
-            caja_id: caja.id,
-            subtotal,
-            descuento: totalDescuentos,
-            total,
-            estado: 'confirmada',
-          } as any,
-          p_detalles: detallesPayload as any,
-        });
-        if (rpcErr) throw rpcErr;
-        const created: any = rpcRes;
-        const { data: newVenta } = await supabase
-          .from('ventas').select('*').eq('id', created.id).single();
-        venta = newVenta;
-      }
-
-      // NO crear venta_pagos - no hay pago
-
-      // Actualizar stock (solo para productos reales)
-      for (const item of cart) {
-        if (item.producto && !item.es_temporal) {
-          await supabase
-            .from('productos')
-            .update({ stock_actual: item.producto.stock_actual - item.cantidad })
-            .eq('id', item.producto.id);
-
-          await supabase.from('movimientos_inventario').insert([{
-            producto_id: item.producto.id,
-            tipo: 'salida',
-            cantidad: item.cantidad,
-            stock_anterior: item.producto.stock_actual,
-            stock_nuevo: item.producto.stock_actual - item.cantidad,
-            motivo: 'Venta a Cliente (CC)',
-            usuario_id: user.id,
-            venta_id: venta.id,
-          }]);
-        }
-      }
-
-      // Registrar movimiento en cuenta corriente del cliente
-      await supabase.from('cliente_movimientos').insert([{
-        cliente_id: selectedCliente.id,
-        tipo: 'compra',
-        monto: total,
-        concepto: `Compra - Venta #${venta.numero_comprobante}`,
-        venta_id: venta.id,
-        usuario_registro_id: user.id,
-      }]);
-
-      // NO registrar movimiento de caja - no entra dinero
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('pos_registrar_venta', {
+        p_venta: {
+          usuario_id: user.id,
+          cliente_id: selectedCliente.id,
+          caja_id: caja.id,
+          subtotal,
+          descuento: totalDescuentos,
+          total,
+          estado: 'confirmada',
+        } as any,
+        p_detalles: detallesPayload as any,
+        p_pagos: [] as any,
+        p_caja_movimiento: null as any,
+        p_cliente_movimiento: {
+          cliente_id: selectedCliente.id,
+          tipo: 'compra',
+          monto: total,
+        } as any,
+        p_empleado_movimiento: null as any,
+        p_transferencia: null as any,
+        p_cheque: null as any,
+        p_motivo_inventario: 'Venta a Cliente (CC)',
+        p_editing_pedido_id: editingPedidoId,
+      });
+      if (rpcErr) throw rpcErr;
+      const created: any = rpcRes;
+      const { data: venta } = await supabase
+        .from('ventas').select('*').eq('id', created.id).single();
 
       // Guardar venta para el ticket
       setLastVenta({
@@ -1576,129 +1420,15 @@ export default function POS() {
         return;
       }
 
-      let venta: any;
-
-      if (editingPedidoId) {
-        const { error: updateError } = await supabase
-          .from('ventas')
-          .update({
-            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
-            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
-            caja_id: caja.id,
-            subtotal: subtotal,
-            descuento: totalDescuentos,
-            total: totalFacturar,
-            estado: 'confirmada',
-          })
-          .eq('id', editingPedidoId);
-
-        if (updateError) throw updateError;
-        
-        const { data: updatedVenta, error: fetchError } = await supabase
-          .from('ventas')
-          .select('*')
-          .eq('id', editingPedidoId)
-          .single();
-          
-        if (fetchError) throw fetchError;
-        venta = updatedVenta;
-
-        await supabase
-          .from('venta_detalles')
-          .delete()
-          .eq('venta_id', editingPedidoId);
-
-        const detalles = cart.map((item) => ({
-          venta_id: venta.id,
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-
-        const { error: detallesError } = await supabase
-          .from('venta_detalles')
-          .insert(detalles);
-
-        if (detallesError) throw detallesError;
-      } else {
-        const detallesPayload = cart.map((item) => ({
-          producto_id: item.producto?.id || null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
-          descuento_porcentaje: item.descuento_porcentaje,
-          subtotal: item.subtotal,
-          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
-          producto_temporal_precio: item.es_temporal ? item.precio : null,
-        }));
-        const pagosPayload = pagos.map((p) => ({
-          forma_pago_id: p.forma_pago_id,
-          monto: p.monto,
-          tarjeta_id: p.tarjeta_id || null,
-          cuotas: p.cuotas || null,
-          coeficiente: p.coeficiente || null,
-          efectivo_entregado: p.efectivo_entregado || null,
-          vuelto: p.vuelto || null,
-          terminal: p.terminal || null,
-          lote: p.lote || null,
-        }));
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
-          p_venta: {
-            usuario_id: user.id,
-            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
-            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
-            caja_id: caja.id,
-            subtotal,
-            descuento: totalDescuentos,
-            total: totalFacturar,
-            estado: 'confirmada',
-          } as any,
-          p_detalles: detallesPayload as any,
-          p_pagos: pagosPayload as any,
-        });
-        if (rpcErr) throw rpcErr;
-        const created: any = rpcRes;
-        const { data: newVenta } = await supabase
-          .from('ventas').select('*').eq('id', created.id).single();
-        venta = newVenta;
-      }
-
-      // venta_pagos: cuando es venta nueva, ya fueron insertados por la RPC.
-      // Para el caso de edición de pedido existente, registramos aquí los pagos.
-      if (editingPedidoId) {
-        const ventaPagos = pagos.map((p) => ({
-          venta_id: venta.id,
-          forma_pago_id: p.forma_pago_id,
-          monto: p.monto,
-          tarjeta_id: p.tarjeta_id || null,
-          cuotas: p.cuotas || null,
-          coeficiente: p.coeficiente || null,
-          efectivo_entregado: p.efectivo_entregado || null,
-          vuelto: p.vuelto || null,
-          terminal: p.terminal || null,
-          lote: p.lote || null,
-        }));
-        const { error: pagosError } = await supabase
-          .from('venta_pagos')
-          .insert(ventaPagos);
-        if (pagosError) throw pagosError;
-      }
-
-      // Si en la venta hay un pago con Transferencia, registrar el comprobante
-      // en la tabla `transferencias` con estado 'pendiente'.
+      // ============ Subir foto de transferencia ANTES de la transacción ============
+      let transferPayload: any = null;
       if (transferenciaData) {
         let fotoPath: string | null = null;
         let fotoNombre: string | null = null;
-
         if (transferenciaData.archivo) {
           try {
             const ext = transferenciaData.archivo.name.split('.').pop()?.toLowerCase() || 'jpg';
-            const fileName = `transferencias/${venta.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+            const fileName = `transferencias/pendientes/${Date.now()}-${crypto.randomUUID()}.${ext}`;
             const { error: upErr } = await supabase.storage
               .from('comprobantes-cobros')
               .upload(fileName, transferenciaData.archivo, {
@@ -1714,38 +1444,25 @@ export default function POS() {
             toast.warning('No se pudo adjuntar el comprobante. Podés cargarlo luego desde Transferencias.');
           }
         }
-
-        const { error: transfError } = await supabase.from('transferencias').insert([{
+        transferPayload = {
           fecha_transferencia: transferenciaData.fecha,
           cliente_id: selectedCliente?.id || null,
           titular_nombre: transferenciaData.titular.trim() || null,
           titular_cuil: transferenciaData.cuil,
           numero_operacion: transferenciaData.numero_operacion.trim(),
           importe: parseFloat(transferenciaData.importe),
-          estado: 'pendiente',
-          origen: 'venta',
-          venta_id: venta.id,
-          creado_por: user.id,
           foto_comprobante_path: fotoPath,
           foto_comprobante_nombre: fotoNombre,
-        }]);
-
-        if (transfError) {
-          console.error('Error registrando transferencia:', transfError);
-          toast.error('Error al registrar la transferencia: ' + transfError.message);
-        } else {
-          toast.success('Transferencia registrada correctamente. Quedó pendiente de validación.');
-        }
+        };
       }
 
-      // Si en la venta hay un pago con Cheque, registrar el cheque
-      // en la tabla `cheques` con estado 'pendiente_validacion'.
+      // ============ Cheque payload ============
+      let chequePayload: any = null;
       if (chequeData && chequeFormaPagoId) {
         const pagoCheque = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
         const montoCheque = pagoCheque?.monto ?? parseFloat(chequeData.monto.replace(',', '.'));
-        const { error: chequeError } = await supabase.from('cheques').insert([{
+        chequePayload = {
           tipo: chequeData.tipo,
-          estado: 'pendiente_validacion' as any,
           numero_cheque: chequeData.numero_cheque.trim(),
           banco: chequeData.banco.trim(),
           sucursal_banco: chequeData.sucursal_banco.trim() || null,
@@ -1756,77 +1473,65 @@ export default function POS() {
           fecha_emision: chequeData.fecha_emision,
           fecha_vencimiento: chequeData.fecha_vencimiento,
           observaciones: chequeData.observaciones.trim() || null,
-          venta_id: venta.id,
-          usuario_registro_id: user.id,
-        } as any]);
-
-        if (chequeError) {
-          console.error('Error registrando cheque:', chequeError);
-          toast.error('Error al registrar el cheque: ' + chequeError.message);
-        } else {
-          toast.success('Cheque registrado. Quedó pendiente de validación.');
-        }
+        };
       }
 
-      // Update stock (only for real products)
-      for (const item of cart) {
-        if (item.producto && !item.es_temporal) {
-          await supabase
-            .from('productos')
-            .update({ stock_actual: item.producto.stock_actual - item.cantidad })
-            .eq('id', item.producto.id);
+      const detallesPayload = cart.map((item) => ({
+        producto_id: item.producto?.id || null,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio,
+        descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+        descuento_porcentaje: item.descuento_porcentaje,
+        subtotal: item.subtotal,
+        producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+        producto_temporal_precio: item.es_temporal ? item.precio : null,
+        es_temporal: !!item.es_temporal,
+      }));
+      const pagosPayload = pagos.map((p) => ({
+        forma_pago_id: p.forma_pago_id,
+        monto: p.monto,
+        tarjeta_id: p.tarjeta_id || null,
+        cuotas: p.cuotas || null,
+        coeficiente: p.coeficiente || null,
+        efectivo_entregado: p.efectivo_entregado || null,
+        vuelto: p.vuelto || null,
+        terminal: p.terminal || null,
+        lote: p.lote || null,
+      }));
 
-          await supabase.from('movimientos_inventario').insert([{
-            producto_id: item.producto.id,
-            tipo: 'salida',
-            cantidad: item.cantidad,
-            stock_anterior: item.producto.stock_actual,
-            stock_nuevo: item.producto.stock_actual - item.cantidad,
-            motivo: 'Venta',
-            usuario_id: user.id,
-            venta_id: venta.id,
-          }]);
-        }
-      }
-
-      // If this is an employee sale with cuenta corriente, register the movement in their account
-      // For pago_directo, we do NOT create a debt movement
-      if (isVentaEmpleado && selectedEmpleado && empleadoModalidadPago === 'cuenta_corriente') {
-        const { error: movimientoEmpleadoError } = await supabase.from('empleado_movimientos').insert([{
-          empleado_id: selectedEmpleado.id,
-          tipo: 'compra',
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('pos_registrar_venta', {
+        p_venta: {
+          usuario_id: user.id,
+          cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+          empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+          caja_id: caja.id,
+          subtotal,
+          descuento: totalDescuentos,
+          total: totalFacturar,
+          estado: 'confirmada',
+        } as any,
+        p_detalles: detallesPayload as any,
+        p_pagos: pagosPayload as any,
+        p_caja_movimiento: {
+          caja_id: caja.id,
           monto: totalFacturar,
-          concepto: `Compra - Venta #${venta.numero_comprobante}`,
-          venta_id: venta.id,
-          usuario_registro_id: user.id,
-        }]);
+        } as any,
+        p_cliente_movimiento: null as any,
+        p_empleado_movimiento: (isVentaEmpleado && selectedEmpleado && empleadoModalidadPago === 'cuenta_corriente')
+          ? { empleado_id: selectedEmpleado.id, tipo: 'compra', monto: totalFacturar } as any
+          : null as any,
+        p_transferencia: transferPayload as any,
+        p_cheque: chequePayload as any,
+        p_motivo_inventario: 'Venta',
+        p_editing_pedido_id: editingPedidoId,
+      });
+      if (rpcErr) throw rpcErr;
+      const created: any = rpcRes;
+      const { data: venta } = await supabase
+        .from('ventas').select('*').eq('id', created.id).single();
 
-        if (movimientoEmpleadoError) {
-          console.error('Error registrando movimiento en cuenta corriente:', movimientoEmpleadoError);
-          toast.error('Error al registrar en cuenta corriente del empleado');
-          throw movimientoEmpleadoError;
-        }
-      }
-
-      await supabase.from('movimientos_caja').insert([{
-        caja_id: caja.id,
-        usuario_id: user.id,
-        tipo: 'ingreso',
-        concepto: `Venta #${venta.numero_comprobante}`,
-        monto: totalFacturar,
-        venta_id: venta.id,
-      }]);
-
-      const { data: cajaData } = await supabase
-        .from('cajas')
-        .select('total_ventas')
-        .eq('id', caja.id)
-        .maybeSingle();
-
-      await supabase
-        .from('cajas')
-        .update({ total_ventas: (cajaData?.total_ventas || 0) + totalFacturar })
-        .eq('id', caja.id);
+      if (transferPayload) toast.success('Transferencia registrada. Quedó pendiente de validación.');
+      if (chequePayload) toast.success('Cheque registrado. Quedó pendiente de validación.');
 
       let facturaInfo = null;
       if (emitirFactura) {

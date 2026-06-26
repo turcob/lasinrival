@@ -1,103 +1,102 @@
+
+# Refactor del POS — Venta atómica sin huérfanas
+
+## Problema actual
+
+Hoy el flujo del POS hace ~6 a 10 operaciones independientes contra la base, una tras otra, sin transacción global:
+
+```text
+1. RPC crear_venta_completa  → INSERT ventas + venta_detalles + venta_pagos
+2. INSERT transferencias     (si hay transferencia)
+3. INSERT cheques            (si hay cheque)
+4. UPDATE productos.stock + INSERT movimientos_inventario (por item)
+5. INSERT empleado_movimientos (si CC empleado)
+6. INSERT movimientos_caja
+7. INSERT cliente_movimientos (si CC cliente)
+8. UPDATE cajas.total_ingresos
+9. (luego) INSERT comprobantes_afip si factura
+```
+
+La RPC `crear_venta_completa` **sí** es atómica para venta+detalles+pagos, pero **solo** se usa en la rama de "venta nueva". En la rama de "editar pedido" (`editingPedidoId`), los pagos se insertan **después** del UPDATE de venta, sin transacción → si falla cualquier paso intermedio queda la venta sin pagos.
+
+Además, ni siquiera la RPC abarca `movimientos_caja`, `transferencias`, `cheques`, `cliente_movimientos`, `empleado_movimientos`, `movimientos_inventario` ni la actualización del total de caja. Cualquier corte de red o error de validación entre paso 1 y paso 6 deja la venta confirmada **sin método de pago registrado** — exactamente lo que pasó con la venta #6047.
+
 ## Objetivo
 
-Emitir Notas de Crédito **parciales** (devolución o bonificación) sobre facturas ya autorizadas en ARCA desde **Facturación Electrónica**, sin anular la venta original, permitiendo múltiples NC por factura con trazabilidad completa.
+Que la venta sea **todo o nada**: si falla cualquier paso financiero (pagos, caja, transferencia, cheque, CC), no queda registro de venta en la base. Si todo OK, la venta queda completa y consistente.
 
-## Base de datos
+## Estrategia
 
-**Nueva tabla `nota_credito_items`** — vincula una NC (registro en `comprobantes_afip` con tipo 3/8/13) a los `venta_detalles` afectados:
+Expandir la RPC existente `crear_venta_completa` a una nueva `pos_registrar_venta` que reciba el payload completo y haga todo en una sola transacción Postgres (que es atómica por defecto).
 
+### Lo que entra en la RPC (transaccional)
+
+- `INSERT ventas` + asignación de número
+- `INSERT venta_detalles`
+- `INSERT venta_pagos` (siempre, incluso en edición de pedido)
+- `INSERT movimientos_caja` (ingreso por el total)
+- `UPDATE cajas.total_ingresos`
+- `UPDATE productos.stock_actual` + `INSERT movimientos_inventario` por item
+- `INSERT transferencias` (si aplica, estado `pendiente`) — sin la foto, esa va aparte
+- `INSERT cheques` (si aplica)
+- `INSERT cliente_movimientos` (si CC cliente)
+- `INSERT empleado_movimientos` (si CC empleado)
+- Si es edición de pedido: `UPDATE ventas` + `DELETE venta_detalles` + reinsertar
+
+Si **cualquier** insert falla, Postgres revierte todo y la venta no existe.
+
+### Lo que queda fuera de la RPC (no transaccional, post-commit)
+
+- Upload de la foto del comprobante de transferencia a Storage (no se puede hacer dentro de SQL). Se sube **antes** de llamar a la RPC y se pasa el `path` resultante como parámetro. Si la subida falla, se aborta la venta antes de tocar la base.
+- Emisión AFIP (CAE) y `INSERT comprobantes_afip`: se mantiene **después** del commit, porque depende de un servicio externo y no debe bloquear la venta. Si AFIP falla, la venta queda registrada y se puede reintentar (ya existe `handleReintentarAfip`).
+- Impresión del ticket (post-commit).
+
+## Cambios concretos
+
+### 1. Migración: nueva RPC `pos_registrar_venta`
+
+Una sola función `SECURITY DEFINER` que recibe:
+
+```text
+p_venta            jsonb   -- datos de la venta
+p_detalles         jsonb   -- array de items
+p_pagos            jsonb   -- array de pagos
+p_movimientos_inv  jsonb   -- array de movimientos de inventario a registrar
+p_transferencia    jsonb   -- null o datos de transferencia
+p_cheque           jsonb   -- null o datos de cheque
+p_cliente_mov      jsonb   -- null o movimiento CC cliente
+p_empleado_mov     jsonb   -- null o movimiento CC empleado
+p_editing_pedido_id uuid   -- null o id de pedido a actualizar
 ```
-- comprobante_nc_id      uuid  → comprobantes_afip(id)  (la NC)
-- comprobante_factura_id uuid  → comprobantes_afip(id)  (la factura origen)
-- venta_detalle_id       uuid  → venta_detalles(id)     (null si bonificación)
-- producto_id            uuid
-- cantidad               numeric
-- precio_unitario        numeric
-- importe                numeric
-- reingresado_stock      boolean
-- created_at             timestamptz
-```
 
-**Ampliación `comprobantes_afip`**:
-- `motivo_nc text` (`devolucion`, `bonificacion`, `error_facturacion`, `otro`)
-- `observaciones text`
-- `tipo_nc text` (`total`, `parcial_items`, `parcial_bonificacion`)
-- `factura_origen_id uuid → comprobantes_afip(id)` (para listar el árbol Factura → NCs)
+Devuelve `{ id, numero_comprobante }`. Toda la lógica corre en la misma transacción implícita de la función.
 
-**Ampliación `ventas`**:
-- `monto_acreditado numeric default 0`
-- `acreditada_parcial boolean default false`
+### 2. `src/pages/POS.tsx`
 
-Grants/policies: lectura `facturacion.ver`, escritura `facturacion.crear`.
+- Reemplazar las llamadas separadas (RPC + transferencias + cheques + cliente_movimientos + empleado_movimientos + movimientos_caja + UPDATE cajas + movimientos_inventario + UPDATE productos) por **una sola** llamada a `pos_registrar_venta`.
+- Subir la foto de transferencia **antes** de invocar la RPC y pasar el `path` como parámetro.
+- Mantener fuera del RPC: emisión AFIP, impresión, refresco de caja en el cliente.
+- Las tres ramas actuales (venta empleado / venta cliente CC / venta normal) consolidan su lógica en armar el payload y llamar a la misma RPC.
 
-**RPC `get_factura_saldo_disponible(comprobante_factura_id)`** — devuelve, por cada `venta_detalle`, `cantidad_facturada`, `cantidad_acreditada`, `cantidad_disponible` y `monto_disponible` total. Usado por el wizard para validar.
+### 3. Sin cambios funcionales visibles
 
-## Edge function `afip-facturacion`
+El usuario no nota ninguna diferencia en la UI. El único efecto observable es que **dejan de aparecer ventas sin método de pago**: o se registra completa o no se registra.
 
-Ya soporta `cbtes_asoc`. Agregar acción nueva `emitir_nc_parcial` que reciba:
-- `factura_origen_id` (comprobante AFIP origen)
-- `tipo_nc` (`parcial_items` | `parcial_bonificacion`)
-- `motivo` + `observaciones`
-- `items[]` (cuando es por ítems): `venta_detalle_id`, `cantidad`, `precio_unitario`, `iva_id`
-- `importe_bonificacion` (cuando es por bonificación)
-- `reingresar_stock` (bool)
+## Limpieza del histórico
 
-Flujo del backend:
-1. Carga factura origen, valida estado autorizado y no anulada.
-2. Re-valida con RPC que cantidades/importe no superan lo disponible (anti race).
-3. Determina tipo NC: factura A→3, B→8, C→13.
-4. Construye items para AFIP y llama `autorizarComprobante` con `cbtes_asoc = [{ tipo, pv, nro, fecha }]`.
-5. Inserta en `comprobantes_afip` con `factura_origen_id`, `motivo_nc`, `tipo_nc`, `observaciones`.
-6. Inserta filas en `nota_credito_items`.
-7. Si `reingresar_stock`: por cada item suma stock y crea `movimientos_inventario` (entrada).
-8. Crea movimiento `NCR` en `cliente_movimientos` por el total.
-9. Actualiza `ventas.monto_acreditado` y `acreditada_parcial = true`. Si saldo = 0 → marca también `anulada=true` con motivo "NC total acumulada".
+Aparte del refactor, se puede:
+- Anular la venta #6047 actual (queda con `anulada=true`, motivo "venta huérfana sin pago").
+- Opcional: query de auditoría para listar otras posibles huérfanas históricas (ventas confirmadas no anuladas sin filas en `venta_pagos`).
 
-## UI — `src/pages/Facturacion.tsx`
+## Riesgos
 
-Por cada fila de comprobante:
-- Ojito (ya existe).
-- **Nuevo botón "Generar NC"** con icono `FileMinus`, visible solo si: tipo factura (1/6/11), `estado='autorizado'`, venta no anulada, y `saldo_disponible > 0`.
-- Badge "NC parcial" / "NC total" cuando aplique.
+- La RPC se vuelve más grande y centraliza mucha lógica de negocio. Mitigación: mantenerla acotada a inserts/updates, sin reglas de pricing ni descuentos (eso sigue en el cliente).
+- Stock: el `UPDATE productos.stock_actual` dentro de la RPC debe leer el stock con `FOR UPDATE` para evitar condiciones de carrera entre ventas concurrentes del mismo producto.
+- Permisos: la RPC corre como `SECURITY DEFINER`, así que valida `auth.uid()` al inicio y respeta los permisos de caja/venta del usuario.
 
-En el modal de detalle del comprobante (ya existente), agregar sección **"Comprobantes asociados"**: lista de NCs emitidas contra esta factura (número, fecha, monto, motivo) con botón "Ver" y "Reimprimir ticket" para cada una.
+## Pasos de implementación
 
-## UI — Wizard `NotaCreditoParcialWizard.tsx` (componente nuevo)
-
-Dialog con stepper de 4 pasos:
-
-**Paso 1 — Información factura origen** (solo lectura):
-Número, fecha, cliente, total, productos facturados con cantidades disponibles.
-
-**Paso 2 — Motivo**:
-RadioGroup obligatorio: Devolución de mercadería / Bonificación comercial / Error de facturación / Otro. Si "Otro" → textarea obligatorio. Determina automáticamente el tipo:
-- Devolución de mercadería → modo **ítems**.
-- Bonificación comercial → modo **bonificación**.
-- Error de facturación / Otro → permite elegir modo ítems o monto.
-
-**Paso 3 — Detalle**:
-- *Modo ítems*: tabla con productos de la factura (cantidad facturada, ya acreditada, disponible, **cantidad a devolver** editable, precio, descuento, importe a acreditar calculado). Total NC dinámico abajo. Toggle "¿La mercadería vuelve al stock? Sí/No".
-- *Modo bonificación*: radio Importe fijo / Porcentaje + input. Si porcentaje, calcular sobre el total disponible de la factura. Validar que no exceda saldo disponible.
-
-**Paso 4 — Resumen y confirmación**:
-Factura origen, productos/bonificación, motivo, observaciones, subtotal neto, IVA, total NC. Botón "Emitir Nota de Crédito" que llama la edge function. Mientras procesa, muestra loader.
-
-Al terminar: toast de éxito + impresión automática del ticket NC reutilizando `imprimirTicketFactura` (ya soporta NC con comprobante asociado) + invalidación de queries de facturación.
-
-## Validaciones (cliente y servidor)
-
-- No permitir cantidad > disponible por línea.
-- No permitir total NC > saldo disponible de la factura.
-- Considerar NCs previas (vía RPC) para los saldos.
-- Sólo facturas autorizadas y no anuladas.
-- Permiso `facturacion.crear` requerido.
-
-## Reimpresión y visualización
-
-Las NC quedan automáticamente en el listado de `Facturacion.tsx` (son comprobantes AFIP). El ojito ya muestra el detalle. Para NCs se mostrará además el bloque "Comprobante asociado" (ya soportado por `imprimirTicketFactura`).
-
-## Fuera de alcance (según pedido)
-
-- No se implementa flujo de cambio de productos: se documenta operativamente (emitir NC + nueva venta).
-- No se modifica la pantalla de Ventas: la acción vive sólo en Facturación Electrónica.
-- La anulación total automática existente se conserva sin cambios.
+1. Migración SQL con la nueva función `pos_registrar_venta` (y mantener la vieja `crear_venta_completa` por compatibilidad hasta confirmar).
+2. Refactor de `src/pages/POS.tsx` en las tres ramas de venta.
+3. Anular venta #6047 huérfana.
+4. Verificación: hacer una venta efectivo, una con transferencia, una a CC cliente, una a CC empleado, y forzar un error intermedio para confirmar el rollback.
