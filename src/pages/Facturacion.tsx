@@ -307,13 +307,13 @@ export default function Facturacion() {
         .maybeSingle();
       const { data: detalles } = await supabase
         .from('venta_detalles')
-        .select('cantidad, precio_unitario, subtotal, descuento_porcentaje, producto_temporal_nombre, productos(nombre)')
+        .select('cantidad, precio_unitario, subtotal, descuento_porcentaje, producto_temporal_nombre, productos(descripcion)')
         .eq('venta_id', comp.venta_id);
       setDetalleVenta(venta);
       setDetalleCliente((venta as any)?.clientes || null);
       setDetalleItems(
         (detalles || []).map((d: any) => ({
-          nombre: d.productos?.nombre || d.producto_temporal_nombre || 'Producto',
+          nombre: d.productos?.descripcion || d.producto_temporal_nombre || 'Producto',
           cantidad: Number(d.cantidad) || 0,
           precio: Number(d.precio_unitario) || 0,
           subtotal: Number(d.subtotal) || 0,
