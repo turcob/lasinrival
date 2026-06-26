@@ -458,10 +458,10 @@ export default function Facturacion() {
                         <TableCell>
                           {String(comp.punto_venta).padStart(4, "0")}-{String(comp.numero_comprobante).padStart(8, "0")}
                         </TableCell>
-                        <TableCell>{format(new Date(comp.fecha_emision), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{format(parseFechaLocal(comp.fecha_emision), "dd/MM/yyyy")}</TableCell>
                         <TableCell>${Number(comp.importe_total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell className="font-mono text-xs">{comp.cae}</TableCell>
-                        <TableCell>{format(new Date(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{format(parseFechaLocal(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant={comp.estado === "emitido" ? "default" : "destructive"}>{comp.estado}</Badge>
                         </TableCell>
