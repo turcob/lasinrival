@@ -362,12 +362,12 @@ export default function Productos() {
   );
 
   const filteredSubcategoriasForFilter = subcategorias.filter(
-    (sub) => !categoriaFilter || sub.categoria_id === categoriaFilter
+    (sub) => !categoriaFilter || categoriaFilter === 'all' || sub.categoria_id === categoriaFilter
   );
 
   const productosFiltrados = productos.filter((p) => {
-    if (categoriaFilter && p.categoria_id !== categoriaFilter) return false;
-    if (subcategoriaFilter && p.subcategoria_id !== subcategoriaFilter) return false;
+    if (categoriaFilter && categoriaFilter !== 'all' && p.categoria_id !== categoriaFilter) return false;
+    if (subcategoriaFilter && subcategoriaFilter !== 'all' && p.subcategoria_id !== subcategoriaFilter) return false;
     return true;
   });
 
@@ -780,14 +780,14 @@ export default function Productos() {
               value={categoriaFilter}
               onValueChange={(value) => {
                 setCategoriaFilter(value);
-                setSubcategoriaFilter('');
+                setSubcategoriaFilter('all');
               }}
             >
               <SelectTrigger id="categoria-filter">
                 <SelectValue placeholder="Todas las categorías" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las categorías</SelectItem>
+                <SelectItem value="all">Todas las categorías</SelectItem>
                 {categorias.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.nombre}
@@ -801,13 +801,13 @@ export default function Productos() {
             <Select
               value={subcategoriaFilter}
               onValueChange={(value) => setSubcategoriaFilter(value)}
-              disabled={!categoriaFilter}
+              disabled={!categoriaFilter || categoriaFilter === 'all'}
             >
               <SelectTrigger id="subcategoria-filter">
-                <SelectValue placeholder={categoriaFilter ? 'Todas las subcategorías' : 'Seleccione una categoría'} />
+                <SelectValue placeholder={categoriaFilter && categoriaFilter !== 'all' ? 'Todas las subcategorías' : 'Seleccione una categoría'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las subcategorías</SelectItem>
+                <SelectItem value="all">Todas las subcategorías</SelectItem>
                 {filteredSubcategoriasForFilter.map((sub) => (
                   <SelectItem key={sub.id} value={sub.id}>
                     {sub.nombre}
