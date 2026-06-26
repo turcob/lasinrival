@@ -435,7 +435,6 @@ export default function Facturacion() {
                     <TableHead>Tipo</TableHead>
                     <TableHead>Número</TableHead>
                     <TableHead>Fecha</TableHead>
-                    <TableHead>Documento</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>CAE</TableHead>
                     <TableHead>Vto. CAE</TableHead>
@@ -446,7 +445,7 @@ export default function Facturacion() {
                 <TableBody>
                   {comprobantes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                         No hay comprobantes emitidos
                       </TableCell>
                     </TableRow>
@@ -460,7 +459,6 @@ export default function Facturacion() {
                           {String(comp.punto_venta).padStart(4, "0")}-{String(comp.numero_comprobante).padStart(8, "0")}
                         </TableCell>
                         <TableCell>{format(new Date(comp.fecha_emision), "dd/MM/yyyy")}</TableCell>
-                        <TableCell>{comp.doc_nro}</TableCell>
                         <TableCell>${Number(comp.importe_total).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell className="font-mono text-xs">{comp.cae}</TableCell>
                         <TableCell>{format(new Date(comp.cae_vencimiento), "dd/MM/yyyy")}</TableCell>
