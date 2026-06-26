@@ -97,6 +97,9 @@ export default function Productos() {
   const [imprimirPreciosOpen, setImprimirPreciosOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
+  const [categoriaFilter, setCategoriaFilter] = useState('');
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState('');
+
   const [formData, setFormData] = useState({
     codigo_articulo: '',
     descripcion: '',
@@ -358,8 +361,19 @@ export default function Productos() {
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
   );
 
-  const productosActivos = productos.filter((p) => p.activo);
-  const productosDesactivados = productos.filter((p) => !p.activo);
+  const filteredSubcategoriasForFilter = subcategorias.filter(
+    (sub) => !categoriaFilter || sub.categoria_id === categoriaFilter
+  );
+
+  const productosFiltrados = productos.filter((p) => {
+    if (categoriaFilter && p.categoria_id !== categoriaFilter) return false;
+    if (subcategoriaFilter && p.subcategoria_id !== subcategoriaFilter) return false;
+    return true;
+  });
+
+  const productosActivos = productosFiltrados.filter((p) => p.activo);
+  const productosDesactivados = productosFiltrados.filter((p) => !p.activo);
+
 
   const columnsActivosFull = [
     { key: 'codigo_articulo', header: 'Código' },
@@ -758,6 +772,51 @@ export default function Productos() {
             </TabsTrigger>
           )}
         </TabsList>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end mb-4">
+          <div className="space-y-2 sm:flex-1">
+            <Label htmlFor="categoria-filter">Filtrar por Categoría</Label>
+            <Select
+              value={categoriaFilter}
+              onValueChange={(value) => {
+                setCategoriaFilter(value);
+                setSubcategoriaFilter('');
+              }}
+            >
+              <SelectTrigger id="categoria-filter">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las categorías</SelectItem>
+                {categorias.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2 sm:flex-1">
+            <Label htmlFor="subcategoria-filter">Filtrar por Subcategoría</Label>
+            <Select
+              value={subcategoriaFilter}
+              onValueChange={(value) => setSubcategoriaFilter(value)}
+              disabled={!categoriaFilter}
+            >
+              <SelectTrigger id="subcategoria-filter">
+                <SelectValue placeholder={categoriaFilter ? 'Todas las subcategorías' : 'Seleccione una categoría'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las subcategorías</SelectItem>
+                {filteredSubcategoriasForFilter.map((sub) => (
+                  <SelectItem key={sub.id} value={sub.id}>
+                    {sub.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         
         <TabsContent value="activos">
           <DataTable
