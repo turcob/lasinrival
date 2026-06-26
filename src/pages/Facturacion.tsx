@@ -272,6 +272,15 @@ export default function Facturacion() {
     return fecha;
   };
 
+  // Parsea 'YYYY-MM-DD' como fecha local (evita desfase de zona horaria por UTC)
+  const parseFechaLocal = (fecha: string): Date => {
+    if (!fecha) return new Date();
+    const soloFecha = fecha.slice(0, 10);
+    const [y, m, d] = soloFecha.split("-").map(Number);
+    if (y && m && d) return new Date(y, m - 1, d);
+    return new Date(fecha);
+  };
+
   const resetForm = () => {
     setFormData({
       tipo_comprobante: 6,
