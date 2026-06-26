@@ -798,6 +798,24 @@ export default function Facturacion() {
                 <p>IVA: <span className="font-medium">${Number(selectedComp.importe_iva || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></p>
                 <p className="text-lg font-bold">TOTAL: ${Number(selectedComp.importe_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
               </div>
+
+              {ncsAsociadas.length > 0 && (
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <p className="font-semibold mb-2 text-sm">Notas de Crédito asociadas</p>
+                  <div className="space-y-1 text-sm">
+                    {ncsAsociadas.map((nc) => (
+                      <div key={nc.id} className="flex justify-between items-center">
+                        <span>
+                          {getTipoComprobanteLabel(nc.tipo_comprobante)} {String(nc.punto_venta).padStart(4, '0')}-{String(nc.numero_comprobante).padStart(8, '0')}
+                          {nc.motivo_nc && <span className="text-muted-foreground ml-2">({MOTIVO_LABEL[nc.motivo_nc] || nc.motivo_nc})</span>}
+                          <span className="text-muted-foreground ml-2">{format(new Date(nc.fecha_emision), 'dd/MM/yyyy')}</span>
+                        </span>
+                        <span className="font-medium">${Number(nc.importe_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -810,6 +828,13 @@ export default function Facturacion() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NotaCreditoParcialWizard
+        open={ncDialogOpen}
+        onOpenChange={setNcDialogOpen}
+        factura={facturaParaNc as any}
+        onEmitida={() => { fetchData(); }}
+      />
     </MainLayout>
   );
 }
