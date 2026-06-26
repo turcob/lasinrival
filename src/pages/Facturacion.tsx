@@ -15,6 +15,8 @@ import { useConfiguracionComercio } from "@/hooks/useConfiguracionComercio";
 import { FileText, Plus, TestTube, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { imprimirTicketFactura, TicketDetalleItem } from "@/lib/imprimirTicketFactura";
+import { FileMinus } from "lucide-react";
+import { NotaCreditoParcialWizard } from "@/components/facturacion/NotaCreditoParcialWizard";
 import {
   Table,
   TableBody,
@@ -38,6 +40,12 @@ interface Comprobante {
   fecha_emision: string;
   estado: string;
   venta_id?: string | null;
+  doc_tipo?: number;
+  cuit_emisor?: string;
+  factura_origen_id?: string | null;
+  tipo_nc?: string | null;
+  motivo_nc?: string | null;
+  observaciones?: string | null;
 }
 
 interface Cliente {
@@ -52,6 +60,16 @@ const TIPOS_COMPROBANTE = [
   { value: 3, label: "Nota de Crédito A" },
   { value: 8, label: "Nota de Crédito B" },
 ];
+
+const FACTURA_TIPOS = [1, 6, 11];
+const NC_TIPOS = [3, 8, 13];
+
+const MOTIVO_LABEL: Record<string, string> = {
+  devolucion: "Devolución",
+  bonificacion: "Bonificación",
+  error_facturacion: "Error de facturación",
+  otro: "Otro",
+};
 
 const TIPOS_DOCUMENTO = [
   { value: 80, label: "CUIT" },
@@ -89,6 +107,10 @@ export default function Facturacion() {
   const [detalleVenta, setDetalleVenta] = useState<any>(null);
   const [detalleItems, setDetalleItems] = useState<TicketDetalleItem[]>([]);
   const [detalleCliente, setDetalleCliente] = useState<any>(null);
+  const [ncsAsociadas, setNcsAsociadas] = useState<Comprobante[]>([]);
+  const [ncDialogOpen, setNcDialogOpen] = useState(false);
+  const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
+  const [saldosFacturas, setSaldosFacturas] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     tipo_comprobante: 6, // Factura B por defecto
     punto_venta: 1, // Se actualiza con useEffect cuando carga comercioConfig
@@ -127,6 +149,17 @@ export default function Facturacion() {
 
       if (comprobantesRes.data) setComprobantes(comprobantesRes.data);
       if (clientesRes.data) setClientes(clientesRes.data);
+
+      // Pre-cargar saldo disponible de facturas para mostrar el botón "Generar NC"
+      const facturas = (comprobantesRes.data || []).filter((c: any) => FACTURA_TIPOS.includes(c.tipo_comprobante));
+      const saldos: Record<string, number> = {};
+      await Promise.all(facturas.map(async (f: any) => {
+        const acreditado = (comprobantesRes.data || [])
+          .filter((x: any) => x.factura_origen_id === f.id && NC_TIPOS.includes(x.tipo_comprobante))
+          .reduce((s: number, x: any) => s + Number(x.importe_total || 0), 0);
+        saldos[f.id] = Math.max(0, Number(f.importe_total) - acreditado);
+      }));
+      setSaldosFacturas(saldos);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Error al cargar datos");
@@ -295,6 +328,7 @@ export default function Facturacion() {
     setDetalleVenta(null);
     setDetalleItems([]);
     setDetalleCliente(null);
+    setNcsAsociadas([]);
     try {
       if (!comp.venta_id) {
         setDetalleLoading(false);
@@ -320,6 +354,16 @@ export default function Facturacion() {
           descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
         }))
       );
+
+      // Cargar comprobantes asociados (NCs sobre esta factura)
+      if (FACTURA_TIPOS.includes(comp.tipo_comprobante)) {
+        const { data: ncs } = await supabase
+          .from('comprobantes_afip')
+          .select('*')
+          .eq('factura_origen_id', comp.id)
+          .order('created_at', { ascending: true });
+        setNcsAsociadas((ncs as any[] | null) || []);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Error al cargar el detalle');
@@ -352,6 +396,11 @@ export default function Facturacion() {
   };
 
   const totales = calcularTotales();
+
+  const abrirNcDialog = (comp: Comprobante) => {
+    setFacturaParaNc(comp);
+    setNcDialogOpen(true);
+  };
 
   return (
     <MainLayout>
@@ -419,9 +468,18 @@ export default function Facturacion() {
                           <Badge variant={comp.estado === "emitido" ? "default" : "destructive"}>{comp.estado}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => verDetalle(comp)} title="Ver detalle">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => verDetalle(comp)} title="Ver detalle">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {FACTURA_TIPOS.includes(comp.tipo_comprobante)
+                              && comp.estado === 'emitido'
+                              && (saldosFacturas[comp.id] ?? 0) > 0 && (
+                              <Button variant="ghost" size="icon" onClick={() => abrirNcDialog(comp)} title="Generar Nota de Crédito">
+                                <FileMinus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
