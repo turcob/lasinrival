@@ -106,7 +106,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setObservaciones("");
     setModo("items");
     setAlcance("parcial");
-    setAnularVenta("si");
+    setAnularVenta("no");
     setCantidades({});
     setReingresarStock("si");
     setTipoBonif("importe");
