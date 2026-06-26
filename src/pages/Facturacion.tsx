@@ -653,6 +653,105 @@ export default function Facturacion() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={detalleOpen} onOpenChange={setDetalleOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Detalle del Comprobante
+              {selectedComp && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {getTipoComprobanteLabel(selectedComp.tipo_comprobante)} {String(selectedComp.punto_venta).padStart(4, '0')}-{String(selectedComp.numero_comprobante).padStart(8, '0')}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {detalleLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : selectedComp ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Fecha</p>
+                  <p className="font-medium">{format(new Date(detalleVenta?.fecha || selectedComp.fecha_emision), 'dd/MM/yyyy HH:mm')}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Nº Venta</p>
+                  <p className="font-medium">
+                    {detalleVenta?.numero_comprobante
+                      ? `#${String(detalleVenta.numero_comprobante).padStart(8, '0')}`
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cliente</p>
+                  <p className="font-medium">{detalleCliente?.nombre || 'Consumidor Final'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">CUIT/DNI</p>
+                  <p className="font-medium">{detalleCliente?.dni_cuit || selectedComp.doc_nro || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">CAE</p>
+                  <p className="font-mono text-xs">{selectedComp.cae}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Vto. CAE</p>
+                  <p className="font-medium">{format(new Date(selectedComp.cae_vencimiento), 'dd/MM/yyyy')}</p>
+                </div>
+              </div>
+
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">P. Unit.</TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detalleItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground text-sm">
+                          {selectedComp.venta_id ? 'Sin items' : 'Este comprobante no está asociado a una venta'}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      detalleItems.map((it, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{it.nombre}</TableCell>
+                          <TableCell className="text-right">{it.cantidad}</TableCell>
+                          <TableCell className="text-right">${it.precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">${it.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="border-t pt-3 text-right space-y-1 text-sm">
+                <p>Neto Gravado: <span className="font-medium">${Number(selectedComp.importe_neto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></p>
+                <p>IVA: <span className="font-medium">${Number(selectedComp.importe_iva || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span></p>
+                <p className="text-lg font-bold">TOTAL: ${Number(selectedComp.importe_total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetalleOpen(false)}>Cerrar</Button>
+            <Button onClick={reimprimir} disabled={!selectedComp}>
+              <Printer className="mr-2 h-4 w-4" />
+              Reimprimir Ticket
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
