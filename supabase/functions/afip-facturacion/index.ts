@@ -56,6 +56,13 @@ interface FacturaRequest {
     precio_unitario: number;
     iva_id: number;
   }>;
+  cbtes_asoc?: Array<{
+    tipo: number;
+    punto_venta: number;
+    numero: number;
+    cuit?: string;
+    fecha?: string; // YYYYMMDD
+  }>;
 }
 
 // Generate LoginTicketRequest (TRA)
@@ -484,6 +491,15 @@ async function autorizarComprobante(
             <ar:MonId>PES</ar:MonId>
             <ar:MonCotiz>1</ar:MonCotiz>
             <ar:CondicionIVAReceptorId>${factura.condicion_iva_receptor}</ar:CondicionIVAReceptorId>
+            ${factura.cbtes_asoc && factura.cbtes_asoc.length > 0 ? `<ar:CbtesAsoc>${factura.cbtes_asoc.map(ca => `
+              <ar:CbteAsoc>
+                <ar:Tipo>${ca.tipo}</ar:Tipo>
+                <ar:PtoVta>${ca.punto_venta}</ar:PtoVta>
+                <ar:Nro>${ca.numero}</ar:Nro>
+                ${ca.cuit ? `<ar:Cuit>${ca.cuit}</ar:Cuit>` : ''}
+                ${ca.fecha ? `<ar:CbteFch>${ca.fecha}</ar:CbteFch>` : ''}
+              </ar:CbteAsoc>
+            `).join('')}</ar:CbtesAsoc>` : ''}
             ${ivaXml}
           </ar:FECAEDetRequest>
         </ar:FeDetReq>
