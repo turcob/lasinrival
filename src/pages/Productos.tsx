@@ -381,12 +381,56 @@ export default function Productos() {
     { key: 'unidad_medida', header: 'Unidad' },
     {
       key: 'categorias.nombre',
-      header: 'Categoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Categoría</span>
+          <Select
+            value={categoriaFilter}
+            onValueChange={(value) => {
+              setCategoriaFilter(value);
+              setSubcategoriaFilter('all');
+            }}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.categorias?.nombre || '-',
     },
     {
       key: 'subcategorias.nombre',
-      header: 'Subcategoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Subcategoría</span>
+          <Select
+            value={subcategoriaFilter}
+            onValueChange={(value) => setSubcategoriaFilter(value)}
+            disabled={!categoriaFilter || categoriaFilter === 'all'}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {filteredSubcategoriasForFilter.map((sub) => (
+                <SelectItem key={sub.id} value={sub.id}>
+                  {sub.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.subcategorias?.nombre || '-',
     },
     {
@@ -441,12 +485,56 @@ export default function Productos() {
     { key: 'unidad_medida', header: 'Unidad' },
     {
       key: 'categorias.nombre',
-      header: 'Categoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Categoría</span>
+          <Select
+            value={categoriaFilter}
+            onValueChange={(value) => {
+              setCategoriaFilter(value);
+              setSubcategoriaFilter('all');
+            }}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.categorias?.nombre || '-',
     },
     {
       key: 'subcategorias.nombre',
-      header: 'Subcategoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Subcategoría</span>
+          <Select
+            value={subcategoriaFilter}
+            onValueChange={(value) => setSubcategoriaFilter(value)}
+            disabled={!categoriaFilter || categoriaFilter === 'all'}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {filteredSubcategoriasForFilter.map((sub) => (
+                <SelectItem key={sub.id} value={sub.id}>
+                  {sub.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.subcategorias?.nombre || '-',
     },
     {
@@ -463,7 +551,30 @@ export default function Productos() {
     { key: 'descripcion', header: 'Descripción' },
     {
       key: 'categorias.nombre',
-      header: 'Categoría',
+      header: (
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-muted-foreground">Categoría</span>
+          <Select
+            value={categoriaFilter}
+            onValueChange={(value) => {
+              setCategoriaFilter(value);
+              setSubcategoriaFilter('all');
+            }}
+          >
+            <SelectTrigger className="h-7 w-full min-w-[140px] text-xs">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ),
       render: (item: Producto) => item.categorias?.nombre || '-',
     },
     {
@@ -773,50 +884,6 @@ export default function Productos() {
           )}
         </TabsList>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end mb-4">
-          <div className="space-y-2 sm:flex-1">
-            <Label htmlFor="categoria-filter">Filtrar por Categoría</Label>
-            <Select
-              value={categoriaFilter}
-              onValueChange={(value) => {
-                setCategoriaFilter(value);
-                setSubcategoriaFilter('all');
-              }}
-            >
-              <SelectTrigger id="categoria-filter">
-                <SelectValue placeholder="Todas las categorías" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {categorias.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2 sm:flex-1">
-            <Label htmlFor="subcategoria-filter">Filtrar por Subcategoría</Label>
-            <Select
-              value={subcategoriaFilter}
-              onValueChange={(value) => setSubcategoriaFilter(value)}
-              disabled={!categoriaFilter || categoriaFilter === 'all'}
-            >
-              <SelectTrigger id="subcategoria-filter">
-                <SelectValue placeholder={categoriaFilter && categoriaFilter !== 'all' ? 'Todas las subcategorías' : 'Seleccione una categoría'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las subcategorías</SelectItem>
-                {filteredSubcategoriasForFilter.map((sub) => (
-                  <SelectItem key={sub.id} value={sub.id}>
-                    {sub.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
         
         <TabsContent value="activos">
           <DataTable

@@ -20,7 +20,7 @@ import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from '
 
 interface Column<T> {
   key: keyof T | string;
-  header: string;
+  header: string | React.ReactNode;
   render?: (item: T) => React.ReactNode;
   sortable?: boolean;
 }
