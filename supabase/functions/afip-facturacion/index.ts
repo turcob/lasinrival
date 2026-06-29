@@ -410,6 +410,11 @@ async function autorizarComprobante(
   
   const nroComprobante = ultimoNro + 1;
   const fechaHoy = new Date().toISOString().split("T")[0].replace(/-/g, "");
+
+  // AFIP: si DocTipo = 99 (Consumidor Final sin identificar), DocNro debe ser 0
+  if (factura.doc_tipo === 99) {
+    factura.doc_nro = 0;
+  }
   
   // Check if it's a Factura C (tipo 11) - Monotributistas don't discriminate IVA
   const esFacturaC = factura.tipo_comprobante === 11;
