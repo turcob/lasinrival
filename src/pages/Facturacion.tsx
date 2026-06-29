@@ -825,6 +825,12 @@ export default function Facturacion() {
                   <p className="font-medium">{detalleCliente?.dni_cuit || selectedComp.doc_nro || '—'}</p>
                 </div>
                 <div>
+                  <p className="text-muted-foreground">Usuario que registró</p>
+                  <p className="font-medium">
+                    {detalleUsuario?.nombre || detalleUsuario?.email || '—'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-muted-foreground">CAE</p>
                   <p className="font-mono text-xs">{selectedComp.cae}</p>
                 </div>
