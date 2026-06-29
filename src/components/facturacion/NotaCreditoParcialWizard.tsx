@@ -65,7 +65,14 @@ interface VentaInfo {
 type Motivo = "devolucion" | "bonificacion" | "error_facturacion" | "otro";
 type Modo = "items" | "bonificacion";
 type Alcance = "parcial" | "total";
-type ResolucionOpcion = "caja" | "cuenta_corriente";
+type ResolucionTipo = "caja" | "cuenta_corriente";
+
+interface CajaAbierta {
+  id: string;
+  fecha_apertura: string | null;
+  usuario_id: string;
+  usuario_nombre?: string | null;
+}
 
 interface NcEmitidaState {
   comprobante_id: string;
@@ -86,6 +93,7 @@ interface Props {
 
 export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitida }: Props) {
   const { user } = useAuth();
+  const { hasRole } = useAuth();
   const { config: comercioConfig } = useConfiguracionComercio();
 
   const [step, setStep] = useState(1);
@@ -110,8 +118,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
 
   // Resolución financiera (post-emisión, obligatoria)
   const [ncEmitida, setNcEmitida] = useState<NcEmitidaState | null>(null);
-  const [resolucionOpcion, setResolucionOpcion] = useState<ResolucionOpcion | null>(null);
-  const [cajaAbierta, setCajaAbierta] = useState<{ id: string; fecha_apertura: string | null } | null>(null);
+  const [tipoResolucionAuto, setTipoResolucionAuto] = useState<ResolucionTipo | null>(null);
+  const [motivoResolucion, setMotivoResolucion] = useState<string>("");
+  const [cajaPropia, setCajaPropia] = useState<CajaAbierta | null>(null);
+  const [cajasAbiertas, setCajasAbiertas] = useState<CajaAbierta[]>([]);
+  const [cajaSeleccionadaId, setCajaSeleccionadaId] = useState<string | null>(null);
+  const [ventaEnCC, setVentaEnCC] = useState<boolean>(false);
   const [resolviendo, setResolviendo] = useState(false);
 
   useEffect(() => {
@@ -127,8 +139,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setTipoBonif("importe");
     setValorBonif(0);
     setNcEmitida(null);
-    setResolucionOpcion(null);
-    setCajaAbierta(null);
+    setTipoResolucionAuto(null);
+    setMotivoResolucion("");
+    setCajaPropia(null);
+    setCajasAbiertas([]);
+    setCajaSeleccionadaId(null);
+    setVentaEnCC(false);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
