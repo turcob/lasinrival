@@ -417,6 +417,25 @@ export default function Facturacion() {
     setNcDialogOpen(true);
   };
 
+  const comprobantesFiltrados = useMemo(() => {
+    return comprobantes.filter((c) => {
+      if (filtroTipo !== "all" && String(c.tipo_comprobante) !== filtroTipo) return false;
+      if (filtroNumero.trim()) {
+        const q = filtroNumero.replace(/\D/g, "");
+        const num = String(c.numero_comprobante);
+        const full = `${String(c.punto_venta).padStart(4, "0")}${String(c.numero_comprobante).padStart(8, "0")}`;
+        if (q && !num.includes(q) && !full.includes(q)) return false;
+      }
+      if (filtroFechaDesde) {
+        if ((c.fecha_emision || "").slice(0, 10) < filtroFechaDesde) return false;
+      }
+      if (filtroFechaHasta) {
+        if ((c.fecha_emision || "").slice(0, 10) > filtroFechaHasta) return false;
+      }
+      return true;
+    });
+  }, [comprobantes, filtroTipo, filtroNumero, filtroFechaDesde, filtroFechaHasta]);
+
   return (
     <MainLayout>
       <PageHeader
