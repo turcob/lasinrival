@@ -47,6 +47,8 @@ interface Comprobante {
   tipo_nc?: string | null;
   motivo_nc?: string | null;
   observaciones?: string | null;
+  usuario_id?: string | null;
+  resolucion_por?: string | null;
 }
 
 interface Cliente {
@@ -108,6 +110,7 @@ export default function Facturacion() {
   const [detalleVenta, setDetalleVenta] = useState<any>(null);
   const [detalleItems, setDetalleItems] = useState<TicketDetalleItem[]>([]);
   const [detalleCliente, setDetalleCliente] = useState<any>(null);
+  const [detalleUsuario, setDetalleUsuario] = useState<any>(null);
   const [ncsAsociadas, setNcsAsociadas] = useState<Comprobante[]>([]);
   const [ncDialogOpen, setNcDialogOpen] = useState(false);
   const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
@@ -343,8 +346,19 @@ export default function Facturacion() {
     setDetalleVenta(null);
     setDetalleItems([]);
     setDetalleCliente(null);
+    setDetalleUsuario(null);
     setNcsAsociadas([]);
     try {
+      // Cargar usuario que registró el comprobante
+      if (comp.usuario_id) {
+        const { data: perfil } = await supabase
+          .from('profiles')
+          .select('id, nombre, email')
+          .eq('id', comp.usuario_id)
+          .maybeSingle();
+        setDetalleUsuario(perfil || null);
+      }
+
       if (!comp.venta_id) {
         setDetalleLoading(false);
         return;
@@ -809,6 +823,12 @@ export default function Facturacion() {
                 <div>
                   <p className="text-muted-foreground">CUIT/DNI</p>
                   <p className="font-medium">{detalleCliente?.dni_cuit || selectedComp.doc_nro || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Usuario que registró</p>
+                  <p className="font-medium">
+                    {detalleUsuario?.nombre || detalleUsuario?.email || '—'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">CAE</p>
