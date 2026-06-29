@@ -578,7 +578,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
               .from("cliente_movimientos")
               .insert({
                 cliente_id: venta.cliente.id,
-                tipo: "NCR",
+                tipo: "nota_credito",
                 monto: totalNcFinal,
                 concepto,
                 usuario_registro_id: user.id,
@@ -711,7 +711,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
           .from("cliente_movimientos")
           .insert({
             cliente_id: venta.cliente.id,
-            tipo: "NCR",
+            tipo: "nota_credito",
             monto: ncEmitida.total,
             concepto,
             usuario_registro_id: user.id,
