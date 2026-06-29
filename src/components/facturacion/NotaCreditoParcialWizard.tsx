@@ -150,7 +150,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   }, [open, factura?.id]);
 
   const cargarDatos = async () => {
-    if (!factura) return;
+    if (!factura || !user) return;
     setLoading(true);
     try {
       const { data: saldoData, error: saldoErr } = await supabase
@@ -158,6 +158,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
       if (saldoErr) throw saldoErr;
       setSaldo(saldoData as unknown as Saldo);
 
+      let clienteIdLocal: string | null = null;
+      let condicionIvaLocal: number | null = null;
       if (factura.venta_id) {
         const { data: v } = await supabase
           .from("ventas")
@@ -170,9 +172,76 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             fecha: v.fecha,
             cliente: (v as any).clientes || null,
           });
+          clienteIdLocal = (v as any).clientes?.id ?? null;
+          condicionIvaLocal = (v as any).clientes?.condicion_iva ?? null;
         }
       } else {
         setVenta(null);
+      }
+
+      // Determinar resolución automática
+      let tipo: ResolucionTipo = "caja";
+      let motivoRes = "";
+      const esCFinal = !clienteIdLocal || condicionIvaLocal === 5;
+      if (esCFinal) {
+        tipo = "caja";
+        motivoRes = "Cliente Consumidor Final: el monto se descuenta de la caja.";
+      } else if (factura.venta_id) {
+        // Detectar si la venta fue a Cuenta Corriente (existe movimiento 'compra' del cliente)
+        const { data: ccMov } = await supabase
+          .from("cliente_movimientos")
+          .select("id")
+          .eq("venta_id", factura.venta_id)
+          .eq("tipo", "compra")
+          .limit(1)
+          .maybeSingle();
+        if (ccMov) {
+          tipo = "cuenta_corriente";
+          motivoRes = "Venta original cobrada en Cuenta Corriente: el crédito se imputa a la CC del cliente.";
+        } else {
+          tipo = "caja";
+          motivoRes = "Venta original con pago directo: el monto se descuenta de la caja.";
+        }
+      } else {
+        tipo = "caja";
+        motivoRes = "Comprobante sin venta vinculada: el monto se descuenta de la caja.";
+      }
+      setTipoResolucionAuto(tipo);
+      setMotivoResolucion(motivoRes);
+
+      if (tipo === "caja") {
+        // Caja propia del usuario actual
+        const { data: propia } = await supabase
+          .from("cajas")
+          .select("id, fecha_apertura, usuario_id")
+          .eq("usuario_id", user.id)
+          .eq("estado", "abierta")
+          .order("fecha_apertura", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const propiaC = propia ? { ...(propia as any) } as CajaAbierta : null;
+        setCajaPropia(propiaC);
+        setCajaSeleccionadaId(propiaC?.id ?? null);
+
+        if (hasRole("admin")) {
+          const { data: todas } = await supabase
+            .from("cajas")
+            .select("id, fecha_apertura, usuario_id")
+            .eq("estado", "abierta")
+            .order("fecha_apertura", { ascending: false });
+          const ids = (todas || []).map((c: any) => c.usuario_id);
+          let nombres: Record<string, string> = {};
+          if (ids.length) {
+            const { data: profs } = await supabase
+              .from("profiles").select("id, nombre").in("id", ids);
+            (profs || []).forEach((p: any) => { nombres[p.id] = p.nombre; });
+          }
+          const lista: CajaAbierta[] = (todas || []).map((c: any) => ({
+            id: c.id, fecha_apertura: c.fecha_apertura, usuario_id: c.usuario_id,
+            usuario_nombre: nombres[c.usuario_id] || "Sin nombre",
+          }));
+          setCajasAbiertas(lista);
+        }
       }
     } catch (e: any) {
       toast.error("Error al cargar datos de la factura: " + e.message);
