@@ -123,7 +123,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [cajaPropia, setCajaPropia] = useState<CajaAbierta | null>(null);
   const [cajasAbiertas, setCajasAbiertas] = useState<CajaAbierta[]>([]);
   const [cajaSeleccionadaId, setCajaSeleccionadaId] = useState<string | null>(null);
-  const [ventaEnCC, setVentaEnCC] = useState<boolean>(false);
   const [resolviendo, setResolviendo] = useState(false);
 
   useEffect(() => {
@@ -144,7 +143,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setCajaPropia(null);
     setCajasAbiertas([]);
     setCajaSeleccionadaId(null);
-    setVentaEnCC(false);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
@@ -588,8 +586,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     }
     setEmitiendo(false);
   };
-
-  const esConsumidorFinal = !venta?.cliente?.id || venta?.cliente?.condicion_iva === 5;
 
   const ncLabel = ncEmitida
     ? `NC ${ncEmitida.tipo_comprobante === 3 ? "A" : ncEmitida.tipo_comprobante === 8 ? "B" : "C"} ${String(ncEmitida.punto_venta).padStart(4, "0")}-${String(ncEmitida.numero_comprobante).padStart(8, "0")}`
