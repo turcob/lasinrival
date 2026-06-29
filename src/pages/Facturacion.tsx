@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { imprimirTicketFactura, TicketDetalleItem } from "@/lib/imprimirTicketFactura";
 import { FileMinus } from "lucide-react";
 import { NotaCreditoParcialWizard } from "@/components/facturacion/NotaCreditoParcialWizard";
+import { ResolverNcPendienteDialog } from "@/components/facturacion/ResolverNcPendienteDialog";
 import {
   Table,
   TableBody,
@@ -49,6 +50,7 @@ interface Comprobante {
   observaciones?: string | null;
   usuario_id?: string | null;
   resolucion_por?: string | null;
+  resolucion_financiera?: string | null;
 }
 
 interface Cliente {
@@ -114,6 +116,8 @@ export default function Facturacion() {
   const [ncsAsociadas, setNcsAsociadas] = useState<Comprobante[]>([]);
   const [ncDialogOpen, setNcDialogOpen] = useState(false);
   const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
+  const [resolverNcOpen, setResolverNcOpen] = useState(false);
+  const [ncParaResolver, setNcParaResolver] = useState<Comprobante | null>(null);
   const [saldosFacturas, setSaldosFacturas] = useState<Record<string, number>>({});
   // Filtros
   const [filtroFechaDesde, setFiltroFechaDesde] = useState("");
@@ -551,6 +555,18 @@ export default function Facturacion() {
                                 <FileMinus className="h-4 w-4" />
                               </Button>
                             )}
+                            {NC_TIPOS.includes(comp.tipo_comprobante)
+                              && comp.estado === 'emitido'
+                              && !comp.resolucion_financiera && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { setNcParaResolver(comp); setResolverNcOpen(true); }}
+                                title="Resolver financieramente"
+                              >
+                                Resolver
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -935,6 +951,13 @@ export default function Facturacion() {
         onOpenChange={setNcDialogOpen}
         factura={facturaParaNc as any}
         onEmitida={() => { fetchData(); }}
+      />
+
+      <ResolverNcPendienteDialog
+        open={resolverNcOpen}
+        onOpenChange={setResolverNcOpen}
+        nc={ncParaResolver as any}
+        onResuelto={() => { fetchData(); }}
       />
     </MainLayout>
   );
