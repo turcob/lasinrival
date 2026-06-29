@@ -42,6 +42,7 @@ import DetalleEntregas from "./pages/DetalleEntregas";
 import Encargado from "./pages/Encargado";
 import EncargadoHojaDetalle from "./pages/EncargadoHojaDetalle";
 import PendientesChofer from "./pages/PendientesChofer";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 const queryClient = new QueryClient();
 
@@ -120,6 +121,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
+          <UpdateBanner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

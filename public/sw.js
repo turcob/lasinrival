@@ -1,73 +1,40 @@
-const CACHE_NAME = 'descuentos-pwa-v6';
-const urlsToCache = [
-  '/admin-descuentos',
-  '/auth',
-  '/manifest.json'
-];
+const CACHE_NAME = 'descuentos-pwa-v7';
 
-// Install event - cache essential files
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker v6');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-      .catch((error) => {
-        console.log('[SW] Cache install error:', error);
-      })
-  );
+// Install: no precache. Solo activar inmediatamente.
+self.addEventListener('install', () => {
+  console.log('[SW] Installing v7 (no app-shell cache)');
   self.skipWaiting();
 });
 
-// Activate event - clean old caches
+// Activate: borrar TODAS las cachés viejas del SW anterior y forzar recarga
+// de los clientes para que descarten el index.html cacheado.
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker v6');
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+  console.log('[SW] Activating v7 - limpiando cachés viejas');
+  event.waitUntil((async () => {
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.allSettled(
+        cacheNames
+          .filter((name) => name.startsWith('descuentos-pwa-') || name === 'solicitudes-data')
+          .map((name) => caches.delete(name))
+      );
+      await self.clients.claim();
+      const windowClients = await self.clients.matchAll({ type: 'window' });
+      await Promise.allSettled(
+        windowClients.map((client) => {
+          try { return client.navigate(client.url); } catch { return Promise.resolve(); }
         })
       );
-    })
-  );
-  self.clients.claim();
+    } catch (e) {
+      console.error('[SW] Activate error:', e);
+    }
+  })());
 });
 
-// Fetch event - network first, fallback to cache
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  if (event.request.url.includes('/functions/') || 
-      event.request.url.includes('supabase') ||
-      event.request.url.includes('/rest/')) {
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
-  );
-});
+// NOTA: se eliminó intencionalmente el handler `fetch`. El SW ya no intercepta
+// peticiones de navegación ni de assets. El navegador y los headers de hosting
+// gestionan el caché correctamente, garantizando que cada deploy se sirva
+// inmediatamente sin necesidad de Ctrl+F5.
 
 // Push event - iOS Safari compatible handler
 self.addEventListener('push', (event) => {
