@@ -65,7 +65,14 @@ interface VentaInfo {
 type Motivo = "devolucion" | "bonificacion" | "error_facturacion" | "otro";
 type Modo = "items" | "bonificacion";
 type Alcance = "parcial" | "total";
-type ResolucionOpcion = "caja" | "cuenta_corriente";
+type ResolucionTipo = "caja" | "cuenta_corriente";
+
+interface CajaAbierta {
+  id: string;
+  fecha_apertura: string | null;
+  usuario_id: string;
+  usuario_nombre?: string | null;
+}
 
 interface NcEmitidaState {
   comprobante_id: string;
@@ -86,6 +93,7 @@ interface Props {
 
 export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitida }: Props) {
   const { user } = useAuth();
+  const { hasRole } = useAuth();
   const { config: comercioConfig } = useConfiguracionComercio();
 
   const [step, setStep] = useState(1);
@@ -110,8 +118,11 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
 
   // Resolución financiera (post-emisión, obligatoria)
   const [ncEmitida, setNcEmitida] = useState<NcEmitidaState | null>(null);
-  const [resolucionOpcion, setResolucionOpcion] = useState<ResolucionOpcion | null>(null);
-  const [cajaAbierta, setCajaAbierta] = useState<{ id: string; fecha_apertura: string | null } | null>(null);
+  const [tipoResolucionAuto, setTipoResolucionAuto] = useState<ResolucionTipo | null>(null);
+  const [motivoResolucion, setMotivoResolucion] = useState<string>("");
+  const [cajaPropia, setCajaPropia] = useState<CajaAbierta | null>(null);
+  const [cajasAbiertas, setCajasAbiertas] = useState<CajaAbierta[]>([]);
+  const [cajaSeleccionadaId, setCajaSeleccionadaId] = useState<string | null>(null);
   const [resolviendo, setResolviendo] = useState(false);
 
   useEffect(() => {
@@ -127,14 +138,17 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setTipoBonif("importe");
     setValorBonif(0);
     setNcEmitida(null);
-    setResolucionOpcion(null);
-    setCajaAbierta(null);
+    setTipoResolucionAuto(null);
+    setMotivoResolucion("");
+    setCajaPropia(null);
+    setCajasAbiertas([]);
+    setCajaSeleccionadaId(null);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
 
   const cargarDatos = async () => {
-    if (!factura) return;
+    if (!factura || !user) return;
     setLoading(true);
     try {
       const { data: saldoData, error: saldoErr } = await supabase
@@ -142,6 +156,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
       if (saldoErr) throw saldoErr;
       setSaldo(saldoData as unknown as Saldo);
 
+      let clienteIdLocal: string | null = null;
+      let condicionIvaLocal: number | null = null;
       if (factura.venta_id) {
         const { data: v } = await supabase
           .from("ventas")
@@ -154,9 +170,76 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             fecha: v.fecha,
             cliente: (v as any).clientes || null,
           });
+          clienteIdLocal = (v as any).clientes?.id ?? null;
+          condicionIvaLocal = (v as any).clientes?.condicion_iva ?? null;
         }
       } else {
         setVenta(null);
+      }
+
+      // Determinar resolución automática
+      let tipo: ResolucionTipo = "caja";
+      let motivoRes = "";
+      const esCFinal = !clienteIdLocal || condicionIvaLocal === 5;
+      if (esCFinal) {
+        tipo = "caja";
+        motivoRes = "Cliente Consumidor Final: el monto se descuenta de la caja.";
+      } else if (factura.venta_id) {
+        // Detectar si la venta fue a Cuenta Corriente (existe movimiento 'compra' del cliente)
+        const { data: ccMov } = await supabase
+          .from("cliente_movimientos")
+          .select("id")
+          .eq("venta_id", factura.venta_id)
+          .eq("tipo", "compra")
+          .limit(1)
+          .maybeSingle();
+        if (ccMov) {
+          tipo = "cuenta_corriente";
+          motivoRes = "Venta original cobrada en Cuenta Corriente: el crédito se imputa a la CC del cliente.";
+        } else {
+          tipo = "caja";
+          motivoRes = "Venta original con pago directo: el monto se descuenta de la caja.";
+        }
+      } else {
+        tipo = "caja";
+        motivoRes = "Comprobante sin venta vinculada: el monto se descuenta de la caja.";
+      }
+      setTipoResolucionAuto(tipo);
+      setMotivoResolucion(motivoRes);
+
+      if (tipo === "caja") {
+        // Caja propia del usuario actual
+        const { data: propia } = await supabase
+          .from("cajas")
+          .select("id, fecha_apertura, usuario_id")
+          .eq("usuario_id", user.id)
+          .eq("estado", "abierta")
+          .order("fecha_apertura", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const propiaC = propia ? { ...(propia as any) } as CajaAbierta : null;
+        setCajaPropia(propiaC);
+        setCajaSeleccionadaId(propiaC?.id ?? null);
+
+        if (hasRole("admin")) {
+          const { data: todas } = await supabase
+            .from("cajas")
+            .select("id, fecha_apertura, usuario_id")
+            .eq("estado", "abierta")
+            .order("fecha_apertura", { ascending: false });
+          const ids = (todas || []).map((c: any) => c.usuario_id);
+          let nombres: Record<string, string> = {};
+          if (ids.length) {
+            const { data: profs } = await supabase
+              .from("profiles").select("id, nombre").in("id", ids);
+            (profs || []).forEach((p: any) => { nombres[p.id] = p.nombre; });
+          }
+          const lista: CajaAbierta[] = (todas || []).map((c: any) => ({
+            id: c.id, fecha_apertura: c.fecha_apertura, usuario_id: c.usuario_id,
+            usuario_nombre: nombres[c.usuario_id] || "Sin nombre",
+          }));
+          setCajasAbiertas(lista);
+        }
       }
     } catch (e: any) {
       toast.error("Error al cargar datos de la factura: " + e.message);
@@ -492,16 +575,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
           tipo_comprobante: ncTipo,
           total: Number(totalNc.toFixed(2)),
         });
-        // Buscar caja abierta del usuario actual
-        const { data: caja } = await supabase
-          .from("cajas")
-          .select("id, fecha_apertura")
-          .eq("usuario_id", user.id)
-          .eq("estado", "abierta")
-          .order("fecha_apertura", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (caja) setCajaAbierta(caja as any);
         onEmitida();
       } else {
         // Sin id de comprobante guardado, no podemos vincular la resolución
@@ -514,8 +587,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setEmitiendo(false);
   };
 
-  const esConsumidorFinal = !venta?.cliente?.id || venta?.cliente?.condicion_iva === 5;
-
   const ncLabel = ncEmitida
     ? `NC ${ncEmitida.tipo_comprobante === 3 ? "A" : ncEmitida.tipo_comprobante === 8 ? "B" : "C"} ${String(ncEmitida.punto_venta).padStart(4, "0")}-${String(ncEmitida.numero_comprobante).padStart(8, "0")}`
     : "";
@@ -524,11 +595,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     : "";
 
   const confirmarResolucion = async () => {
-    if (!ncEmitida || !user || !factura || !resolucionOpcion) return;
+    if (!ncEmitida || !user || !factura || !tipoResolucionAuto) return;
     setResolviendo(true);
     try {
-      if (resolucionOpcion === "caja") {
-        if (!cajaAbierta) {
+      if (tipoResolucionAuto === "caja") {
+        const cajaId = cajaSeleccionadaId;
+        if (!cajaId) {
           toast.error("No hay una caja abierta para registrar el egreso");
           setResolviendo(false);
           return;
@@ -537,7 +609,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         const { data: mov, error: movErr } = await supabase
           .from("movimientos_caja")
           .insert({
-            caja_id: cajaAbierta.id,
+            caja_id: cajaId,
             tipo: "egreso",
             monto: ncEmitida.total,
             concepto,
@@ -560,15 +632,15 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         const { data: cajaActual } = await supabase
           .from("cajas")
           .select("total_egresos")
-          .eq("id", cajaAbierta.id)
+          .eq("id", cajaId)
           .single();
         await supabase
           .from("cajas")
           .update({ total_egresos: Number(cajaActual?.total_egresos || 0) + Number(ncEmitida.total) })
-          .eq("id", cajaAbierta.id);
+          .eq("id", cajaId);
         toast.success("Egreso registrado en caja");
       } else {
-        if (esConsumidorFinal || !venta?.cliente?.id) {
+        if (!venta?.cliente?.id) {
           toast.error("No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final.");
           setResolviendo(false);
           return;
@@ -625,37 +697,59 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
               <p>Importe total: <b>${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></p>
               <p>Cliente: <b>{venta?.cliente?.nombre || "Consumidor Final"}</b></p>
             </div>
-            <p className="text-base font-medium">¿Cómo desea resolver financieramente esta Nota de Crédito?</p>
-            <RadioGroup value={resolucionOpcion ?? ""} onValueChange={(v) => setResolucionOpcion(v as ResolucionOpcion)}>
-              <div className="border rounded p-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="caja" id="rf-caja" disabled={!cajaAbierta} />
-                  <Label htmlFor="rf-caja" className="font-medium">Registrar egreso en Caja</Label>
+            <div className="border rounded p-3 space-y-2 bg-primary/5">
+              <p className="text-sm font-medium">Resolución financiera automática</p>
+              <p className="text-xs text-muted-foreground">{motivoResolucion}</p>
+              {tipoResolucionAuto === "caja" ? (
+                <div className="space-y-2">
+                  <p className="text-sm">
+                    Se registrará un <b>egreso de ${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b>
+                    {" "}en la caja{hasRole("admin") ? " seleccionada" : " del usuario"}.
+                  </p>
+                  {hasRole("admin") ? (
+                    <div>
+                      <Label className="text-xs">Caja</Label>
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm bg-background"
+                        value={cajaSeleccionadaId ?? ""}
+                        onChange={(e) => setCajaSeleccionadaId(e.target.value || null)}
+                      >
+                        <option value="" disabled>Seleccionar caja abierta...</option>
+                        {cajasAbiertas.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.usuario_nombre}{c.id === cajaPropia?.id ? " (propia)" : ""}
+                            {c.fecha_apertura ? ` — abierta ${format(new Date(c.fecha_apertura), "dd/MM HH:mm")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {cajasAbiertas.length === 0 && (
+                        <p className="text-xs text-destructive mt-1">No hay cajas abiertas. Abrí una caja para continuar.</p>
+                      )}
+                    </div>
+                  ) : (
+                    cajaPropia ? (
+                      <p className="text-xs text-muted-foreground">
+                        Caja propia abierta el {cajaPropia.fecha_apertura ? format(new Date(cajaPropia.fecha_apertura), "dd/MM/yyyy HH:mm") : "—"}.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-destructive">
+                        No tenés una caja abierta. Pedile a un administrador que registre la resolución o abrí tu caja.
+                      </p>
+                    )
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground pl-6">
-                  {cajaAbierta
-                    ? `Se generará un egreso por $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} en la caja abierta actual.`
-                    : "No tenés una caja abierta. Abrí una caja para usar esta opción."}
+              ) : (
+                <p className="text-sm">
+                  Se sumarán <b>${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b> como crédito a la cuenta corriente de <b>{venta?.cliente?.nombre}</b>.
                 </p>
-              </div>
-              <div className="border rounded p-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="cuenta_corriente" id="rf-cc" disabled={esConsumidorFinal} />
-                  <Label htmlFor="rf-cc" className="font-medium">Registrar crédito en Cuenta Corriente del cliente</Label>
-                </div>
-                <p className="text-xs text-muted-foreground pl-6">
-                  {esConsumidorFinal
-                    ? "No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final."
-                    : `Se sumará $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} como saldo a favor de ${venta?.cliente?.nombre}.`}
-                </p>
-              </div>
-            </RadioGroup>
-            <p className="text-xs text-destructive">
-              Esta resolución es obligatoria. La NC no se considerará finalizada hasta que se registre la resolución financiera.
-            </p>
+              )}
+            </div>
             <DialogFooter>
-              <Button onClick={confirmarResolucion} disabled={!resolucionOpcion || resolviendo}>
-                {resolviendo ? "Registrando..." : "Confirmar resolución"}
+              <Button
+                onClick={confirmarResolucion}
+                disabled={resolviendo || (tipoResolucionAuto === "caja" && !cajaSeleccionadaId)}
+              >
+                {resolviendo ? "Registrando..." : hasRole("admin") && tipoResolucionAuto === "caja" ? "Confirmar" : "Aceptar"}
               </Button>
             </DialogFooter>
           </div>
