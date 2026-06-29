@@ -701,37 +701,59 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
               <p>Importe total: <b>${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></p>
               <p>Cliente: <b>{venta?.cliente?.nombre || "Consumidor Final"}</b></p>
             </div>
-            <p className="text-base font-medium">¿Cómo desea resolver financieramente esta Nota de Crédito?</p>
-            <RadioGroup value={resolucionOpcion ?? ""} onValueChange={(v) => setResolucionOpcion(v as ResolucionOpcion)}>
-              <div className="border rounded p-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="caja" id="rf-caja" disabled={!cajaAbierta} />
-                  <Label htmlFor="rf-caja" className="font-medium">Registrar egreso en Caja</Label>
+            <div className="border rounded p-3 space-y-2 bg-primary/5">
+              <p className="text-sm font-medium">Resolución financiera automática</p>
+              <p className="text-xs text-muted-foreground">{motivoResolucion}</p>
+              {tipoResolucionAuto === "caja" ? (
+                <div className="space-y-2">
+                  <p className="text-sm">
+                    Se registrará un <b>egreso de ${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b>
+                    {" "}en la caja{hasRole("admin") ? " seleccionada" : " del usuario"}.
+                  </p>
+                  {hasRole("admin") ? (
+                    <div>
+                      <Label className="text-xs">Caja</Label>
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm bg-background"
+                        value={cajaSeleccionadaId ?? ""}
+                        onChange={(e) => setCajaSeleccionadaId(e.target.value || null)}
+                      >
+                        <option value="" disabled>Seleccionar caja abierta...</option>
+                        {cajasAbiertas.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.usuario_nombre}{c.id === cajaPropia?.id ? " (propia)" : ""}
+                            {c.fecha_apertura ? ` — abierta ${format(new Date(c.fecha_apertura), "dd/MM HH:mm")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {cajasAbiertas.length === 0 && (
+                        <p className="text-xs text-destructive mt-1">No hay cajas abiertas. Abrí una caja para continuar.</p>
+                      )}
+                    </div>
+                  ) : (
+                    cajaPropia ? (
+                      <p className="text-xs text-muted-foreground">
+                        Caja propia abierta el {cajaPropia.fecha_apertura ? format(new Date(cajaPropia.fecha_apertura), "dd/MM/yyyy HH:mm") : "—"}.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-destructive">
+                        No tenés una caja abierta. Pedile a un administrador que registre la resolución o abrí tu caja.
+                      </p>
+                    )
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground pl-6">
-                  {cajaAbierta
-                    ? `Se generará un egreso por $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} en la caja abierta actual.`
-                    : "No tenés una caja abierta. Abrí una caja para usar esta opción."}
+              ) : (
+                <p className="text-sm">
+                  Se sumarán <b>${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b> como crédito a la cuenta corriente de <b>{venta?.cliente?.nombre}</b>.
                 </p>
-              </div>
-              <div className="border rounded p-3 space-y-1">
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="cuenta_corriente" id="rf-cc" disabled={esConsumidorFinal} />
-                  <Label htmlFor="rf-cc" className="font-medium">Registrar crédito en Cuenta Corriente del cliente</Label>
-                </div>
-                <p className="text-xs text-muted-foreground pl-6">
-                  {esConsumidorFinal
-                    ? "No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final."
-                    : `Se sumará $${ncEmitida.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })} como saldo a favor de ${venta?.cliente?.nombre}.`}
-                </p>
-              </div>
-            </RadioGroup>
-            <p className="text-xs text-destructive">
-              Esta resolución es obligatoria. La NC no se considerará finalizada hasta que se registre la resolución financiera.
-            </p>
+              )}
+            </div>
             <DialogFooter>
-              <Button onClick={confirmarResolucion} disabled={!resolucionOpcion || resolviendo}>
-                {resolviendo ? "Registrando..." : "Confirmar resolución"}
+              <Button
+                onClick={confirmarResolucion}
+                disabled={resolviendo || (tipoResolucionAuto === "caja" && !cajaSeleccionadaId)}
+              >
+                {resolviendo ? "Registrando..." : hasRole("admin") && tipoResolucionAuto === "caja" ? "Confirmar" : "Aceptar"}
               </Button>
             </DialogFooter>
           </div>
