@@ -266,16 +266,29 @@ export function ResolverNcPendienteDialog({ open, onOpenChange, nc, onResuelto }
             </div>
             <div>
               <Label className="mb-2 block">Tipo de resolución</Label>
-              <RadioGroup value={tipo} onValueChange={(v) => setTipo(v as Tipo)}>
+              <RadioGroup
+                value={tipo}
+                onValueChange={(v) => {
+                  if (v === "cuenta_corriente" && !clienteId) return;
+                  setTipo(v as Tipo);
+                }}
+              >
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="caja" id="r-caja" />
                   <Label htmlFor="r-caja">Egreso en caja</Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="cuenta_corriente" id="r-cc" disabled={!clienteId} />
-                  <Label htmlFor="r-cc">Crédito en CC del cliente{!clienteId ? " (requiere cliente)" : ""}</Label>
-                </div>
+                {clienteId && (
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="cuenta_corriente" id="r-cc" />
+                    <Label htmlFor="r-cc">Crédito en CC del cliente</Label>
+                  </div>
+                )}
               </RadioGroup>
+              {!clienteId && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  La NC corresponde a Consumidor Final, sólo puede resolverse por caja.
+                </p>
+              )}
             </div>
             {tipo === "caja" && (
               <div>
@@ -307,7 +320,15 @@ export function ResolverNcPendienteDialog({ open, onOpenChange, nc, onResuelto }
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={confirmar} disabled={saving || loading || (tipo === "caja" && !cajaSeleccionadaId)}>
+          <Button
+            onClick={confirmar}
+            disabled={
+              saving ||
+              loading ||
+              (tipo === "caja" && !cajaSeleccionadaId) ||
+              (tipo === "cuenta_corriente" && !clienteId)
+            }
+          >
             {saving ? "Registrando..." : "Confirmar"}
           </Button>
         </DialogFooter>
