@@ -216,6 +216,7 @@ export default function POS() {
   // Facturación
   const [facturaDialogOpen, setFacturaDialogOpen] = useState(false);
   const [emitirFactura, setEmitirFactura] = useState(true);
+  const [modoVentaCC, setModoVentaCC] = useState<null | 'cliente' | 'empleado'>(null);
   const [facturaData, setFacturaData] = useState({
     tipo_comprobante: 6,
     doc_tipo: 99,
