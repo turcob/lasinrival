@@ -577,16 +577,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
           tipo_comprobante: ncTipo,
           total: Number(totalNc.toFixed(2)),
         });
-        // Buscar caja abierta del usuario actual
-        const { data: caja } = await supabase
-          .from("cajas")
-          .select("id, fecha_apertura")
-          .eq("usuario_id", user.id)
-          .eq("estado", "abierta")
-          .order("fecha_apertura", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (caja) setCajaAbierta(caja as any);
         onEmitida();
       } else {
         // Sin id de comprobante guardado, no podemos vincular la resolución
@@ -609,11 +599,12 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     : "";
 
   const confirmarResolucion = async () => {
-    if (!ncEmitida || !user || !factura || !resolucionOpcion) return;
+    if (!ncEmitida || !user || !factura || !tipoResolucionAuto) return;
     setResolviendo(true);
     try {
-      if (resolucionOpcion === "caja") {
-        if (!cajaAbierta) {
+      if (tipoResolucionAuto === "caja") {
+        const cajaId = cajaSeleccionadaId;
+        if (!cajaId) {
           toast.error("No hay una caja abierta para registrar el egreso");
           setResolviendo(false);
           return;
@@ -622,7 +613,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         const { data: mov, error: movErr } = await supabase
           .from("movimientos_caja")
           .insert({
-            caja_id: cajaAbierta.id,
+            caja_id: cajaId,
             tipo: "egreso",
             monto: ncEmitida.total,
             concepto,
@@ -645,15 +636,15 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         const { data: cajaActual } = await supabase
           .from("cajas")
           .select("total_egresos")
-          .eq("id", cajaAbierta.id)
+          .eq("id", cajaId)
           .single();
         await supabase
           .from("cajas")
           .update({ total_egresos: Number(cajaActual?.total_egresos || 0) + Number(ncEmitida.total) })
-          .eq("id", cajaAbierta.id);
+          .eq("id", cajaId);
         toast.success("Egreso registrado en caja");
       } else {
-        if (esConsumidorFinal || !venta?.cliente?.id) {
+        if (!venta?.cliente?.id) {
           toast.error("No es posible registrar un crédito en Cuenta Corriente porque el comprobante corresponde a un cliente Consumidor Final.");
           setResolviendo(false);
           return;
