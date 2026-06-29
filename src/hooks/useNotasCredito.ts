@@ -107,7 +107,7 @@ export function useAprobarNC() {
           .from('cliente_movimientos')
           .insert({
             cliente_id: nc.cliente_id,
-            tipo: 'NCR',
+            tipo: 'nota_credito',
             monto: Number(nc.importe_total),
             concepto,
             usuario_registro_id: user.id,
