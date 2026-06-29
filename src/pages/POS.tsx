@@ -1345,6 +1345,87 @@ export default function POS() {
       const { data: venta } = await supabase
         .from('ventas').select('*').eq('id', created.id).single();
 
+      // ============ Emisión AFIP opcional ============
+      let facturaInfo: any = null;
+      if (emitirFactura) {
+        try {
+          const netoSinIva = total / 1.21;
+          const ivaAmount = total - netoSinIva;
+
+          const { data: facturaResult, error: facturaError } = await supabase.functions.invoke(
+            'afip-facturacion/emitir',
+            {
+              body: {
+                tipo_comprobante: facturaData.tipo_comprobante,
+                punto_venta: comercioConfig?.punto_venta || 1,
+                concepto: 1,
+                doc_tipo: facturaData.doc_tipo,
+                doc_nro: parseInt(facturaData.doc_nro) || 0,
+                condicion_iva_receptor: facturaData.condicion_iva_receptor,
+                importe_total: total,
+                importe_neto: parseFloat(netoSinIva.toFixed(2)),
+                importe_iva: parseFloat(ivaAmount.toFixed(2)),
+                items: cart.map(item => ({
+                  descripcion: item.es_temporal ? item.nombre_temporal : item.producto?.descripcion,
+                  cantidad: item.cantidad,
+                  precio_unitario: item.precio / 1.21,
+                  iva_id: 5,
+                })),
+                venta_id: venta.id,
+              },
+            }
+          );
+
+          if (facturaError) {
+            toast.error('Error al emitir factura AFIP: ' + facturaError.message);
+          } else if (facturaResult?.error) {
+            toast.error('Error AFIP: ' + facturaResult.error);
+          } else {
+            const formatFechaAfip = (fecha: string): string => {
+              if (fecha && fecha.length === 8) {
+                return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
+              }
+              return fecha || new Date().toISOString().split('T')[0];
+            };
+
+            facturaInfo = {
+              ...facturaResult,
+              cae_vencimiento: formatFechaAfip(facturaResult.cae_vencimiento),
+              importe_total: total,
+              importe_neto: parseFloat(netoSinIva.toFixed(2)),
+              importe_iva: parseFloat(ivaAmount.toFixed(2)),
+            };
+
+            const { error: insertCompError } = await supabase
+              .from('comprobantes_afip')
+              .insert({
+                tipo_comprobante: facturaData.tipo_comprobante,
+                punto_venta: facturaInfo.punto_venta,
+                numero_comprobante: facturaInfo.numero_comprobante,
+                cae: facturaInfo.cae,
+                cae_vencimiento: facturaInfo.cae_vencimiento,
+                cuit_emisor: comercioConfig?.cuit?.replace(/\D/g, '') || '',
+                doc_tipo: facturaData.doc_tipo,
+                doc_nro: parseInt(facturaData.doc_nro) || 0,
+                importe_total: facturaInfo.importe_total,
+                importe_neto: facturaInfo.importe_neto,
+                importe_iva: facturaInfo.importe_iva,
+                usuario_id: user.id,
+                venta_id: venta.id,
+              });
+
+            if (insertCompError) {
+              console.error('Error guardando comprobante en DB:', insertCompError);
+              toast.warning(`Factura emitida (CAE: ${facturaResult.cae}) pero hubo error al guardar: ${insertCompError.message}`);
+            } else {
+              toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
+            }
+          }
+        } catch (facturaErr: any) {
+          toast.error('Error al emitir factura: ' + facturaErr.message);
+        }
+      }
+
       // Guardar venta para el ticket
       setLastVenta({
         ...venta,
@@ -1362,6 +1443,7 @@ export default function POS() {
         clienteCuentaCorriente: true,
         empleado: null,
         descuento_global: descuentoGlobal,
+        factura: facturaInfo,
       });
 
       toast.success(`Venta #${venta.numero_comprobante} cargada a cuenta corriente de ${selectedCliente.nombre}`);
@@ -1374,6 +1456,8 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
       setEditingPedidoId(null);
+      setFacturaDialogOpen(false);
+      setModoVentaCC(null);
       
       // Mostrar ticket
       setTicketDialogOpen(true);
