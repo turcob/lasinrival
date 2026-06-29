@@ -4011,10 +4011,10 @@ export default function POS() {
             </div>
 
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setFacturaDialogOpen(false)}>
+              <Button variant="outline" onClick={() => { setFacturaDialogOpen(false); setModoVentaCC(null); }}>
                 Cancelar
               </Button>
-              <Button onClick={handleProcesarVenta} disabled={emitiendo}>
+              <Button onClick={() => modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta()} disabled={emitiendo}>
                 {emitiendo ? 'Procesando...' : emitirFactura ? 'Confirmar y Facturar' : 'Confirmar Venta'}
               </Button>
             </div>
