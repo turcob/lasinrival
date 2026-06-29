@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,6 +112,11 @@ export default function Facturacion() {
   const [ncDialogOpen, setNcDialogOpen] = useState(false);
   const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
   const [saldosFacturas, setSaldosFacturas] = useState<Record<string, number>>({});
+  // Filtros
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState("");
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<string>("all");
+  const [filtroNumero, setFiltroNumero] = useState("");
   const [formData, setFormData] = useState({
     tipo_comprobante: 6, // Factura B por defecto
     punto_venta: 1, // Se actualiza con useEffect cuando carga comercioConfig
@@ -411,6 +417,25 @@ export default function Facturacion() {
     setNcDialogOpen(true);
   };
 
+  const comprobantesFiltrados = useMemo(() => {
+    return comprobantes.filter((c) => {
+      if (filtroTipo !== "all" && String(c.tipo_comprobante) !== filtroTipo) return false;
+      if (filtroNumero.trim()) {
+        const q = filtroNumero.replace(/\D/g, "");
+        const num = String(c.numero_comprobante);
+        const full = `${String(c.punto_venta).padStart(4, "0")}${String(c.numero_comprobante).padStart(8, "0")}`;
+        if (q && !num.includes(q) && !full.includes(q)) return false;
+      }
+      if (filtroFechaDesde) {
+        if ((c.fecha_emision || "").slice(0, 10) < filtroFechaDesde) return false;
+      }
+      if (filtroFechaHasta) {
+        if ((c.fecha_emision || "").slice(0, 10) > filtroFechaHasta) return false;
+      }
+      return true;
+    });
+  }, [comprobantes, filtroTipo, filtroNumero, filtroFechaDesde, filtroFechaHasta]);
+
   return (
     <MainLayout>
       <PageHeader
@@ -432,6 +457,32 @@ export default function Facturacion() {
           <CardTitle>Comprobantes Emitidos</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+            <div>
+              <Label className="text-xs">Desde</Label>
+              <Input type="date" value={filtroFechaDesde} onChange={(e) => setFiltroFechaDesde(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Hasta</Label>
+              <Input type="date" value={filtroFechaHasta} onChange={(e) => setFiltroFechaHasta(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Tipo</Label>
+              <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {TIPOS_COMPROBANTE.map((t) => (
+                    <SelectItem key={t.value} value={String(t.value)}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
+              <Label className="text-xs">Buscar N° comprobante</Label>
+              <Input placeholder="Ej: 5840 o 00010000005840" value={filtroNumero} onChange={(e) => setFiltroNumero(e.target.value)} />
+            </div>
+          </div>
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -452,14 +503,14 @@ export default function Facturacion() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {comprobantes.length === 0 ? (
+                  {comprobantesFiltrados.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                         No hay comprobantes emitidos
                       </TableCell>
                     </TableRow>
                   ) : (
-                    comprobantes.map((comp) => (
+                    comprobantesFiltrados.map((comp) => (
                       <TableRow key={comp.id}>
                         <TableCell>
                           <Badge variant="outline">{getTipoComprobanteLabel(comp.tipo_comprobante)}</Badge>
