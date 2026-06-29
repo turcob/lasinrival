@@ -2756,8 +2756,9 @@ export default function POS() {
                     setPagoDialogOpen(true);
                   }
                 } else if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
-                  // Cliente con cuenta corriente
-                  handleProcesarVentaClienteCC();
+                  // Cliente con cuenta corriente: ofrecer facturación AFIP
+                  setModoVentaCC('cliente');
+                  handleOpenFacturaDialog();
                 } else {
                   // Flujo normal de pago
                   setPagos([]);
