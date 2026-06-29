@@ -1,54 +1,65 @@
-## Objetivo
+## Diagnóstico — Causa del problema
 
-Eliminar la elección manual de resolución financiera en el wizard de Nota de Crédito. La resolución se determina automáticamente según el cliente y el método de pago original de la venta, y el popup pasa a ser solo informativo (salvo selección de caja para admin).
+La aplicación tiene un **Service Worker (`public/sw.js`) registrado para todos los usuarios en todas las rutas** (no solo en `/admin-descuentos` como sugiere el manifest). Ese SW tiene un handler `fetch` que aplica estrategia **"network-first con fallback a caché"** sobre **todos los GET** del sitio, incluyendo:
 
-## Reglas de resolución automática
+- `index.html`
+- los bundles JS/CSS con hash de Vite
+- imágenes y assets
 
-| Caso | Detección | Acción automática |
-|---|---|---|
-| 1. Cliente final (consumidor final / sin cliente_id) | `venta.cliente_id IS NULL` o cliente Consumidor Final | **Egreso en caja** |
-| 2. Cliente con pago directo | Existe `cliente_id` y NO hay `venta_pagos` con forma de pago "Cuenta Corriente" | **Egreso en caja** |
-| 3. Cliente con pago en Cuenta Corriente | `venta_pagos` con forma de pago "Cuenta Corriente" | **Crédito en CC del cliente** (movimiento NCR) |
+Cada respuesta exitosa se guarda en `caches.open('descuentos-pwa-v6')`. Cuando hay un fallo momentáneo de red, una respuesta intermedia o el navegador prioriza la caché del SW, se sirve el `index.html` viejo que apunta a chunks JS con hashes que ya no existen en el deploy nuevo → pantalla rota o versión vieja persistente, incluso después de Ctrl+F5 (porque Ctrl+F5 no desregistra al SW; el SW intercepta igual).
 
-## Reglas de selección de caja (cuando la resolución es egreso en caja)
+Además:
+- El SW vive en scope `/` aunque solo se necesita para push notifications de descuentos.
+- No hay ningún mecanismo en la app para detectar que se publicó una versión nueva.
+- Los headers de hosting de Lovable ya revalidan `index.html` correctamente, pero el SW los anula.
 
-| Rol del usuario | Comportamiento |
-|---|---|
-| **Vendedor** (o cualquier rol no admin) | Egreso se registra **automáticamente en SU caja abierta**. Sin selector. Si no tiene caja abierta → error y abortar resolución. |
-| **Administrador** | Por defecto se selecciona **su propia caja abierta**, pero el popup informativo muestra un selector con **todas las cajas abiertas** del día para que pueda cambiarla antes de confirmar. |
+## Cambios a implementar
 
-## UI — `src/components/facturacion/NotaCreditoParcialWizard.tsx`
+### 1) `public/sw.js` — neutralizar el caché de app-shell, conservar push
 
-1. Quitar el paso manual de elegir "Egreso en Caja" vs "Crédito en CC".
-2. Calcular la resolución apenas se carga la factura/venta origen (helper `determinarResolucionAutomatica`).
-3. Tras emitir ARCA con éxito, mostrar **popup informativo** con:
-   - Tipo de resolución (Caja X / Crédito en CC cliente Y) y motivo de la regla aplicada.
-   - Monto.
-   - **Si es egreso y el usuario es admin**: selector de caja (default = caja propia abierta). Botón "Confirmar resolución".
-   - **Si es egreso y el usuario es vendedor**: solo lectura con la caja propia. Botón "Aceptar" que confirma.
-   - **Si es CC**: solo lectura. Botón "Aceptar".
-4. Si vendedor no tiene caja abierta → toast de error y bloquear emisión antes de tocar ARCA (validación previa).
-5. Si admin no tiene caja propia abierta pero existen otras → mostrar selector sin default y exigir elección.
+Mantener intactos los handlers `push`, `notificationclick`, `sync`, `periodicsync`, `message` (los necesita el PWA de descuentos). Cambios:
 
-## Backend
+- Subir `CACHE_NAME` a `descuentos-pwa-v7`.
+- **Eliminar por completo el handler `fetch`** (causa raíz). Sin `fetch`, el SW deja de interceptar navegación y assets; el navegador y los headers de Lovable manejan el caché correctamente.
+- En `install`: no precachear nada (`urlsToCache = []`) + `skipWaiting()`.
+- En `activate`: borrar **todas** las cachés cuyo nombre empiece con `descuentos-pwa-` o sea `solicitudes-data`, luego `clients.claim()` y forzar `client.navigate(client.url)` en todos los clientes abiertos para que descarten el HTML viejo.
 
-Sin migraciones de esquema. Reusar campos existentes en `comprobantes_afip` (`resolucion_financiera`, `caja_movimiento_id`, `resolucion_cliente_movimiento_id`, `resolucion_at`, `resolucion_por`).
+Esto actúa como kill-switch del caché actual sin perder push notifications.
 
-Consultas adicionales en el cliente:
-- `venta_pagos` + `formas_pago` para detectar pago CC.
-- `cajas` filtrado por `estado = 'abierta'` y fecha de hoy para listar opciones (admin) y resolver caja propia (vendedor/admin) vía `usuario_apertura_id = user.id`.
+### 2) Detector de nueva versión
 
-## Detalles técnicos
+a) **Generar versión en cada build.** Editar `vite.config.ts` para inyectar `__APP_VERSION__` con `Date.now()` vía `define`, y agregar un pequeño plugin que escriba `dist/version.json` con `{ "version": "<timestamp>" }` al terminar el build.
 
-- **Cliente final**: `cliente_id IS NULL` o `clientes.condicion_iva` = Consumidor Final (verificar campo en tabla).
-- **Pago CC**: `formas_pago.nombre ILIKE '%cuenta corriente%'`.
-- **Caja propia**: registro en `cajas` con `usuario_apertura_id = auth.uid()` y sin cierre.
-- **Movimiento caja**: tipo `egreso`, concepto `NC <numero> - Factura <numero_origen>`, actualiza `cajas.total_egresos`.
-- **Movimiento CC**: tipo `NCR`, asociado al `cliente_id`.
-- Rol se obtiene desde `useAuth().hasRole('admin')`.
+b) **Hook `useVersionCheck`** en `src/hooks/useVersionCheck.ts`:
+- Al montar y en cada `visibilitychange` cuando la pestaña vuelve a estar visible (y cada 5 min via `setInterval`), hacer `fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })`.
+- Comparar con `__APP_VERSION__` embebido en el bundle actual.
+- Si difieren, exponer `nuevaVersionDisponible = true`.
 
-## Fuera de alcance
+c) **UI no intrusiva** en `src/components/UpdateBanner.tsx` y montarla en `src/App.tsx`:
+- Toast persistente (sonner) o banner fijo abajo con texto: **"Hay una nueva versión del sistema disponible."** y botón **"Actualizar"**.
+- Acción del botón:
+  1. `navigator.serviceWorker.getRegistrations()` → `unregister()` de cada uno.
+  2. `caches.keys()` → `caches.delete()` de todos.
+  3. `location.reload()` (recarga limpia; los hashes nuevos de Vite garantizan que se baje todo de nuevo).
 
-- No cambia lógica de emisión ARCA ni items de la NC.
-- No se toca flujo de anulación total automática desde Ventas.
-- No se modifican permisos ni RLS.
+### 3) Verificación
+
+- Build y deploy.
+- Confirmar en DevTools › Application que el SW activo ya no tiene handler `fetch` y que las cachés viejas `descuentos-pwa-v6` y `solicitudes-data` se eliminan.
+- Publicar un cambio menor; verificar que aparece el banner "Actualizar" en pestañas abiertas al volver el foco.
+
+## Notas técnicas
+
+- No se introduce `vite-plugin-pwa` ni Workbox: el SW se mantiene a mano porque su rol real es push, no offline.
+- `start_url` y `scope` del manifest siguen apuntando a `/admin-descuentos` (PWA instalada de descuentos); el SW deja de interferir con el resto del sistema.
+- Usuarios con la versión actual rota recibirán el SW nuevo (mismo path `/sw.js`), su `activate` borrará sus cachés y navegará la pestaña → quedan en la versión nueva sin tocar nada.
+- No se modifican headers de hosting (Lovable ya sirve `index.html` con revalidación) ni el manifest ni las edge functions.
+
+## Archivos afectados
+
+- `public/sw.js` — reescribir según punto 1.
+- `vite.config.ts` — `define` + plugin para `version.json`.
+- `src/hooks/useVersionCheck.ts` — nuevo.
+- `src/components/UpdateBanner.tsx` — nuevo.
+- `src/App.tsx` — montar `<UpdateBanner />`.
+- `src/vite-env.d.ts` — declarar `__APP_VERSION__`.
