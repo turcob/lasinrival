@@ -1,65 +1,29 @@
-## Diagnóstico — Causa del problema
+## Objetivo
+Incorporar facturación AFIP al flujo de venta en cuenta corriente del POS, equiparándolo al flujo de pago directo.
 
-La aplicación tiene un **Service Worker (`public/sw.js`) registrado para todos los usuarios en todas las rutas** (no solo en `/admin-descuentos` como sugiere el manifest). Ese SW tiene un handler `fetch` que aplica estrategia **"network-first con fallback a caché"** sobre **todos los GET** del sitio, incluyendo:
+## Situación actual
+- `handleProcesarVentaCC` (src/pages/POS.tsx ~L1280) registra la venta + movimiento en CC y muestra el ticket, pero nunca abre el diálogo de facturación ni invoca `afip-facturacion`.
+- `handleProcesarVenta` (pago directo) sí ejecuta `handleOpenFacturaDialog()` → diálogo con tildado de "Emitir factura" + selección de tipo/condición IVA → invoca `supabase.functions.invoke('afip-facturacion/emitir')` → guarda en `comprobantes_afip` → incluye datos AFIP en el ticket impreso.
 
-- `index.html`
-- los bundles JS/CSS con hash de Vite
-- imágenes y assets
+## Cambios
 
-Cada respuesta exitosa se guarda en `caches.open('descuentos-pwa-v6')`. Cuando hay un fallo momentáneo de red, una respuesta intermedia o el navegador prioriza la caché del SW, se sirve el `index.html` viejo que apunta a chunks JS con hashes que ya no existen en el deploy nuevo → pantalla rota o versión vieja persistente, incluso después de Ctrl+F5 (porque Ctrl+F5 no desregistra al SW; el SW intercepta igual).
+### src/pages/POS.tsx
+1. **Botón "Confirmar venta CC"**: en lugar de llamar directo a `handleProcesarVentaCC`, llamar a `handleOpenFacturaDialog()` (igual que pago directo). Marcar un flag `modoVentaCC = true` para que el confirm del diálogo dispare la rama correcta.
+2. **Diálogo de facturación**: precargar `tipo_comprobante`, `doc_tipo`, `doc_nro` y `condicion_iva_receptor` desde `selectedCliente` (ya existe esa lógica en `handleOpenFacturaDialog` para clientes con CUIT). "Emitir factura" tildado por defecto.
+3. **Confirm del diálogo**: cuando `modoVentaCC === true`, ejecutar la lógica actual de `handleProcesarVentaCC` (RPC `pos_registrar_venta` con `p_cliente_movimiento`, sin pagos ni movimiento de caja) y, si `emitirFactura` está tildado, ejecutar el mismo bloque AFIP que ya existe en `handleProcesarVenta`:
+   - `supabase.functions.invoke('afip-facturacion/emitir', ...)` con `venta_id` de la venta recién creada.
+   - Insertar registro en `comprobantes_afip` con `usuario_id`, `venta_id`, CAE, importes, etc.
+   - Adjuntar `facturaInfo` a `lastVenta` para que el ticket impreso muestre los datos AFIP (ya soportado en el bloque de impresión de factura ~L1969).
+4. **Manejo de errores AFIP**: si falla la emisión, la venta y el movimiento de CC quedan confirmados (igual que hoy en pago directo), solo se muestra `toast.error` con el mensaje AFIP. Esto preserva la consistencia: la deuda en CC ya está registrada y la factura puede reemitirse luego desde Facturación.
+5. **Reset post-venta**: limpiar `clienteModalidadPago`, `facturaDialogOpen`, `emitirFactura` y `modoVentaCC` junto con el resto del estado.
 
-Además:
-- El SW vive en scope `/` aunque solo se necesita para push notifications de descuentos.
-- No hay ningún mecanismo en la app para detectar que se publicó una versión nueva.
-- Los headers de hosting de Lovable ya revalidan `index.html` correctamente, pero el SW los anula.
+## Detalles técnicos
+- No requiere cambios en la edge function `afip-facturacion` ni en la RPC `pos_registrar_venta`.
+- La tabla `comprobantes_afip` ya acepta el `venta_id` correspondiente; el flujo de NC posterior (que lee `cliente_movimientos` y la factura para definir resolución financiera) seguirá funcionando porque la NC sobre una factura cuyo origen fue CC automáticamente cae en la rama "crédito en CC" según la regla ya implementada.
+- El ticket térmico ya tiene rama para imprimir formato Factura (con CAE/QR) cuando `lastVenta.factura` existe; al haber CC sin pagos, se imprimirá la factura con leyenda "Cuenta Corriente" (agregar línea informativa "Forma de pago: Cuenta Corriente" en el bloque de factura).
 
-## Cambios a implementar
-
-### 1) `public/sw.js` — neutralizar el caché de app-shell, conservar push
-
-Mantener intactos los handlers `push`, `notificationclick`, `sync`, `periodicsync`, `message` (los necesita el PWA de descuentos). Cambios:
-
-- Subir `CACHE_NAME` a `descuentos-pwa-v7`.
-- **Eliminar por completo el handler `fetch`** (causa raíz). Sin `fetch`, el SW deja de interceptar navegación y assets; el navegador y los headers de Lovable manejan el caché correctamente.
-- En `install`: no precachear nada (`urlsToCache = []`) + `skipWaiting()`.
-- En `activate`: borrar **todas** las cachés cuyo nombre empiece con `descuentos-pwa-` o sea `solicitudes-data`, luego `clients.claim()` y forzar `client.navigate(client.url)` en todos los clientes abiertos para que descarten el HTML viejo.
-
-Esto actúa como kill-switch del caché actual sin perder push notifications.
-
-### 2) Detector de nueva versión
-
-a) **Generar versión en cada build.** Editar `vite.config.ts` para inyectar `__APP_VERSION__` con `Date.now()` vía `define`, y agregar un pequeño plugin que escriba `dist/version.json` con `{ "version": "<timestamp>" }` al terminar el build.
-
-b) **Hook `useVersionCheck`** en `src/hooks/useVersionCheck.ts`:
-- Al montar y en cada `visibilitychange` cuando la pestaña vuelve a estar visible (y cada 5 min via `setInterval`), hacer `fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })`.
-- Comparar con `__APP_VERSION__` embebido en el bundle actual.
-- Si difieren, exponer `nuevaVersionDisponible = true`.
-
-c) **UI no intrusiva** en `src/components/UpdateBanner.tsx` y montarla en `src/App.tsx`:
-- Toast persistente (sonner) o banner fijo abajo con texto: **"Hay una nueva versión del sistema disponible."** y botón **"Actualizar"**.
-- Acción del botón:
-  1. `navigator.serviceWorker.getRegistrations()` → `unregister()` de cada uno.
-  2. `caches.keys()` → `caches.delete()` de todos.
-  3. `location.reload()` (recarga limpia; los hashes nuevos de Vite garantizan que se baje todo de nuevo).
-
-### 3) Verificación
-
-- Build y deploy.
-- Confirmar en DevTools › Application que el SW activo ya no tiene handler `fetch` y que las cachés viejas `descuentos-pwa-v6` y `solicitudes-data` se eliminan.
-- Publicar un cambio menor; verificar que aparece el banner "Actualizar" en pestañas abiertas al volver el foco.
-
-## Notas técnicas
-
-- No se introduce `vite-plugin-pwa` ni Workbox: el SW se mantiene a mano porque su rol real es push, no offline.
-- `start_url` y `scope` del manifest siguen apuntando a `/admin-descuentos` (PWA instalada de descuentos); el SW deja de interferir con el resto del sistema.
-- Usuarios con la versión actual rota recibirán el SW nuevo (mismo path `/sw.js`), su `activate` borrará sus cachés y navegará la pestaña → quedan en la versión nueva sin tocar nada.
-- No se modifican headers de hosting (Lovable ya sirve `index.html` con revalidación) ni el manifest ni las edge functions.
-
-## Archivos afectados
-
-- `public/sw.js` — reescribir según punto 1.
-- `vite.config.ts` — `define` + plugin para `version.json`.
-- `src/hooks/useVersionCheck.ts` — nuevo.
-- `src/components/UpdateBanner.tsx` — nuevo.
-- `src/App.tsx` — montar `<UpdateBanner />`.
-- `src/vite-env.d.ts` — declarar `__APP_VERSION__`.
+## Validación
+- Venta CC con cliente Cons. Final → Factura B emitida, CAE recibido, deuda en CC creada, ticket impreso con datos AFIP.
+- Venta CC con cliente Resp. Inscripto (CUIT) → Factura A precargada, CAE recibido.
+- Venta CC con "Emitir factura" destildado → comportamiento actual (solo deuda en CC, sin AFIP).
+- Falla AFIP → venta queda confirmada en CC, toast de error, usuario puede reintentar emisión desde Facturación.
