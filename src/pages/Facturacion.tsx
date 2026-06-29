@@ -47,6 +47,8 @@ interface Comprobante {
   tipo_nc?: string | null;
   motivo_nc?: string | null;
   observaciones?: string | null;
+  usuario_id?: string | null;
+  resolucion_por?: string | null;
 }
 
 interface Cliente {
@@ -108,6 +110,7 @@ export default function Facturacion() {
   const [detalleVenta, setDetalleVenta] = useState<any>(null);
   const [detalleItems, setDetalleItems] = useState<TicketDetalleItem[]>([]);
   const [detalleCliente, setDetalleCliente] = useState<any>(null);
+  const [detalleUsuario, setDetalleUsuario] = useState<any>(null);
   const [ncsAsociadas, setNcsAsociadas] = useState<Comprobante[]>([]);
   const [ncDialogOpen, setNcDialogOpen] = useState(false);
   const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
@@ -343,6 +346,7 @@ export default function Facturacion() {
     setDetalleVenta(null);
     setDetalleItems([]);
     setDetalleCliente(null);
+    setDetalleUsuario(null);
     setNcsAsociadas([]);
     try {
       if (!comp.venta_id) {
