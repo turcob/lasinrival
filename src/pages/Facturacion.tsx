@@ -349,6 +349,16 @@ export default function Facturacion() {
     setDetalleUsuario(null);
     setNcsAsociadas([]);
     try {
+      // Cargar usuario que registró el comprobante
+      if (comp.usuario_id) {
+        const { data: perfil } = await supabase
+          .from('profiles')
+          .select('id, nombre, email')
+          .eq('id', comp.usuario_id)
+          .maybeSingle();
+        setDetalleUsuario(perfil || null);
+      }
+
       if (!comp.venta_id) {
         setDetalleLoading(false);
         return;
