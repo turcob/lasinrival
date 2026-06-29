@@ -112,6 +112,11 @@ export default function Facturacion() {
   const [ncDialogOpen, setNcDialogOpen] = useState(false);
   const [facturaParaNc, setFacturaParaNc] = useState<Comprobante | null>(null);
   const [saldosFacturas, setSaldosFacturas] = useState<Record<string, number>>({});
+  // Filtros
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState("");
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<string>("all");
+  const [filtroNumero, setFiltroNumero] = useState("");
   const [formData, setFormData] = useState({
     tipo_comprobante: 6, // Factura B por defecto
     punto_venta: 1, // Se actualiza con useEffect cuando carga comercioConfig
