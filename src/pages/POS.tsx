@@ -2108,7 +2108,7 @@ export default function POS() {
               <p><strong>CUIT/DNI:</strong> ${lastVenta.cliente?.dni_cuit || lastVenta.factura?.doc_nro || 'Sin identificar'}</p>
               <p><strong>IVA:</strong> ${lastVenta.cliente ? (CONDICIONES_IVA_MAP[lastVenta.cliente.condicion_iva] || 'Cons. Final') : 'Cons. Final'}</p>
             `}
-            <p><strong>Cond. Venta:</strong> ${lastVenta.empleado ? 'Cuenta Corriente' : 'Contado'}</p>
+            <p><strong>Cond. Venta:</strong> ${(lastVenta.empleado && !lastVenta.empleadoPagoDirecto) || lastVenta.clienteCuentaCorriente ? 'Cuenta Corriente' : 'Contado'}</p>
           </div>
           <div class="section">
             <p style="font-weight: bold; text-align: center;">DETALLE</p>
@@ -3741,7 +3741,7 @@ export default function POS() {
                           {lastVenta.cliente?.direccion && <p><strong>Dom.:</strong> {lastVenta.cliente.direccion}</p>}
                         </>
                       )}
-                      <p><strong>Cond. Venta:</strong> {lastVenta.empleado ? (lastVenta.empleadoPagoDirecto ? 'Contado' : 'Cuenta Corriente') : 'Contado'}</p>
+                      <p><strong>Cond. Venta:</strong> {lastVenta.empleado ? (lastVenta.empleadoPagoDirecto ? 'Contado' : 'Cuenta Corriente') : (lastVenta.clienteCuentaCorriente ? 'Cuenta Corriente' : 'Contado')}</p>
                     </div>
 
                     <div className="thermal-section border-b border-dashed border-black pb-2 mb-2">
