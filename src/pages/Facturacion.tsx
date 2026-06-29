@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { imprimirTicketFactura, TicketDetalleItem } from "@/lib/imprimirTicketFactura";
 import { FileMinus } from "lucide-react";
 import { NotaCreditoParcialWizard } from "@/components/facturacion/NotaCreditoParcialWizard";
+import { ResolucionesPendientes } from "@/components/facturacion/ResolucionesPendientes";
 import {
   Table,
   TableBody,
@@ -465,6 +466,8 @@ export default function Facturacion() {
           Nuevo Comprobante
         </Button>
       </PageHeader>
+
+      <ResolucionesPendientes refreshKey={comprobantes.length} onResolved={fetchData} />
 
       <Card>
         <CardHeader>

@@ -566,21 +566,82 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
         console.error("Error imprimiendo ticket NC:", e);
       }
 
-      // Bloquear el wizard hasta resolver financieramente la NC
+      // Resolución financiera automática (sin paso manual)
       if (compNc?.id) {
-        setNcEmitida({
-          comprobante_id: compNc.id,
-          punto_venta: (ncResult as any).punto_venta,
-          numero_comprobante: (ncResult as any).numero_comprobante,
-          tipo_comprobante: ncTipo,
-          total: Number(totalNc.toFixed(2)),
-        });
-        onEmitida();
-      } else {
-        // Sin id de comprobante guardado, no podemos vincular la resolución
-        onEmitida();
-        onOpenChange(false);
+        const totalNcFinal = Number(totalNc.toFixed(2));
+        const ncLabelLocal = `NC ${ncTipo === 3 ? "A" : ncTipo === 8 ? "B" : "C"} ${String((ncResult as any).punto_venta).padStart(4, "0")}-${String((ncResult as any).numero_comprobante).padStart(8, "0")}`;
+        const facturaLabelLocal = `Factura ${factura.tipo_comprobante === 1 ? "A" : factura.tipo_comprobante === 6 ? "B" : "C"} ${String(factura.punto_venta).padStart(4, "0")}-${String(factura.numero_comprobante).padStart(8, "0")}`;
+        try {
+          if (tipoResolucionAuto === "cuenta_corriente" && venta?.cliente?.id) {
+            const concepto = `${ncLabelLocal} sobre ${facturaLabelLocal} - ${motivoLabel}`;
+            const { data: mov, error: movErr } = await supabase
+              .from("cliente_movimientos")
+              .insert({
+                cliente_id: venta.cliente.id,
+                tipo: "NCR",
+                monto: totalNcFinal,
+                concepto,
+                usuario_registro_id: user.id,
+              } as any)
+              .select("id")
+              .single();
+            if (movErr) throw movErr;
+            await supabase
+              .from("comprobantes_afip")
+              .update({
+                resolucion_financiera: "cuenta_corriente",
+                resolucion_cliente_movimiento_id: mov.id,
+                resolucion_at: new Date().toISOString(),
+                resolucion_por: user.id,
+              } as any)
+              .eq("id", compNc.id);
+            toast.success("Crédito imputado a la cuenta corriente del cliente");
+          } else {
+            // caja → usar la caja propia del usuario por defecto
+            if (cajaPropia?.id) {
+              const concepto = `Egreso por ${ncLabelLocal} correspondiente a ${facturaLabelLocal}`;
+              const { data: mov, error: movErr } = await supabase
+                .from("movimientos_caja")
+                .insert({
+                  caja_id: cajaPropia.id,
+                  tipo: "egreso",
+                  monto: totalNcFinal,
+                  concepto,
+                  usuario_id: user.id,
+                  venta_id: factura.venta_id,
+                })
+                .select("id")
+                .single();
+              if (movErr) throw movErr;
+              await supabase
+                .from("comprobantes_afip")
+                .update({
+                  resolucion_financiera: "caja",
+                  caja_movimiento_id: mov.id,
+                  resolucion_at: new Date().toISOString(),
+                  resolucion_por: user.id,
+                } as any)
+                .eq("id", compNc.id);
+              const { data: cajaActual } = await supabase
+                .from("cajas")
+                .select("total_egresos")
+                .eq("id", cajaPropia.id)
+                .single();
+              await supabase
+                .from("cajas")
+                .update({ total_egresos: Number(cajaActual?.total_egresos || 0) + totalNcFinal })
+                .eq("id", cajaPropia.id);
+              toast.success("Egreso registrado automáticamente en caja");
+            } else {
+              toast.warning("NC emitida. No hay caja abierta: la resolución quedó pendiente de regularizar.");
+            }
+          }
+        } catch (resErr: any) {
+          toast.warning("NC emitida pero la resolución financiera quedó pendiente: " + (resErr?.message || resErr));
+        }
       }
+      onEmitida();
+      onOpenChange(false);
     } catch (e: any) {
       toast.error("Error al emitir NC: " + (e?.message || e));
     }
