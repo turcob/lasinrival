@@ -797,6 +797,14 @@ export default function POS() {
   const totalDescuentos = useMemo(() => totalDescuentosProductos + montoDescuentoGlobal, [totalDescuentosProductos, montoDescuentoGlobal]);
   const total = useMemo(() => subtotalConDescuentosProductos - montoDescuentoGlobal, [subtotalConDescuentosProductos, montoDescuentoGlobal]);
   const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
+  // Recargo por cuotas: se traslada al cliente. Suma de (monto - monto/coef) de pagos con tarjeta con coeficiente > 1.
+  const recargoTarjeta = useMemo(() => pagos.reduce((sum, p) => {
+    if (p.tarjeta_id && p.coeficiente && p.coeficiente > 1) {
+      return sum + (p.monto - p.monto / p.coeficiente);
+    }
+    return sum;
+  }, 0), [pagos]);
+  const totalConRecargo = useMemo(() => total + recargoTarjeta, [total, recargoTarjeta]);
   // Total a facturar: si hay pagos con intereses, usar totalPagado; sino usar total de productos
   const totalFacturar = useMemo(() => totalPagado > 0 ? totalPagado : total, [totalPagado, total]);
 
