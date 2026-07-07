@@ -840,7 +840,7 @@ export default function POS() {
   // Handler del botón "Continuar" del diálogo de pago.
   // Sólo se habilita cuando la suma de medios de pago coincide con el total.
   const handleContinuarPago = () => {
-    if (Math.abs(totalPagado - total) > 0.009) {
+    if (Math.abs(totalPagado - totalConRecargo) > 0.009) {
       toast.error('La suma de los medios de pago debe ser igual al total de la venta');
       return;
     }
@@ -875,7 +875,7 @@ export default function POS() {
     if (!fpTransf) return toast.error('No se encontró la forma de pago Transferencia');
 
     const existing = pagos.find(p => p.forma_pago_id === fpTransf.id);
-    const pendienteSinTransf = total - totalPagado + (existing?.monto || 0);
+    const pendienteSinTransf = totalConRecargo - totalPagado + (existing?.monto || 0);
     if (importeNum > pendienteSinTransf + 0.009) {
       return toast.error(`El importe excede el pendiente ($${pendienteSinTransf.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
     }
@@ -951,7 +951,7 @@ export default function POS() {
   // Agregar pago en efectivo
   const handleAddPagoEfectivo = () => {
     const entregado = parseFloat(efectivoEntregado.replace(',', '.'));
-    const pendiente = total - totalPagado;
+    const pendiente = totalConRecargo - totalPagado;
     
     if (isNaN(entregado) || entregado <= 0) {
       toast.error('Ingrese un monto válido');
@@ -998,7 +998,7 @@ export default function POS() {
       setTipoTarjetaFiltro('debito');
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
-      const pendiente = total - totalPagado;
+      const pendiente = totalConRecargo - totalPagado;
       setMontoTarjeta(pendiente.toString());
       setTarjetaDialogOpen(true);
       return;
@@ -1010,7 +1010,7 @@ export default function POS() {
       setTipoTarjetaFiltro('credito');
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
-      const pendiente = total - totalPagado;
+      const pendiente = totalConRecargo - totalPagado;
       setMontoTarjeta(pendiente.toString());
       setTarjetaDialogOpen(true);
       return;
@@ -1022,13 +1022,13 @@ export default function POS() {
       setTipoTarjetaFiltro(null);
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
-      const pendiente = total - totalPagado;
+      const pendiente = totalConRecargo - totalPagado;
       setMontoTarjeta(pendiente.toString());
       setTarjetaDialogOpen(true);
       return;
     }
 
-    const pendiente = total - totalPagado;
+    const pendiente = totalConRecargo - totalPagado;
     if (pendiente <= 0.009) {
       toast.error('No hay saldo pendiente para asignar');
       return;
@@ -1093,7 +1093,7 @@ export default function POS() {
       return;
     }
     const existing = pagos.find(p => p.forma_pago_id === montoGenericoData.formaPagoId);
-    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    const pendienteDisponible = totalConRecargo - totalPagado + (existing?.monto || 0);
     if (monto > pendienteDisponible + 0.009) {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
@@ -1127,7 +1127,7 @@ export default function POS() {
       return;
     }
     const existing = pagos.find(p => p.forma_pago_id === chequeFormaPagoId);
-    const pendienteDisponible = total - totalPagado + (existing?.monto || 0);
+    const pendienteDisponible = totalConRecargo - totalPagado + (existing?.monto || 0);
     if (monto > pendienteDisponible + 0.009) {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
@@ -1492,7 +1492,7 @@ export default function POS() {
       return;
     }
 
-    if (totalPagado < total) {
+    if (totalPagado < totalConRecargo) {
       toast.error('El monto pagado es insuficiente');
       return;
     }
@@ -3041,7 +3041,7 @@ export default function POS() {
                   key={fp.id}
                   variant="outline"
                   onClick={() => addPago(fp.id)}
-                  disabled={totalPagado >= total}
+                  disabled={totalPagado >= totalConRecargo}
                 >
                   {fp.nombre}
                 </Button>
@@ -3092,16 +3092,16 @@ export default function POS() {
                   <span>Total pagado:</span>
                   <span>${totalPagado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                {totalPagado < total && (
+                {totalPagado < totalConRecargo && (
                   <div className="flex justify-between text-destructive">
                     <span>Pendiente:</span>
-                    <span>${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    <span>${(totalConRecargo - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
-                {totalPagado > total + 0.009 && (
+                {totalPagado > totalConRecargo + 0.009 && (
                   <div className="flex justify-between text-destructive">
                     <span>Excedente:</span>
-                    <span>${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    <span>${(totalPagado - totalConRecargo).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -3111,7 +3111,7 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - total) > 0.009}>
+              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - totalConRecargo) > 0.009}>
                 Continuar
               </Button>
             </div>
@@ -3217,7 +3217,7 @@ export default function POS() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Pendiente:</span>
-                <span className="font-semibold">${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">${(totalConRecargo - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
               </div>
               <div>
                 <Label>Importe *</Label>
@@ -3339,7 +3339,7 @@ export default function POS() {
                     onChange={(e) => setChequeData({ ...chequeData, monto: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Pendiente: ${(total - totalPagado + (pagos.find(p => p.forma_pago_id === chequeFormaPagoId)?.monto || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    Pendiente: ${(totalConRecargo - totalPagado + (pagos.find(p => p.forma_pago_id === chequeFormaPagoId)?.monto || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -3524,7 +3524,7 @@ export default function POS() {
             <div className="p-3 bg-muted rounded-lg">
               <div className="flex justify-between">
                 <span>Pendiente de cobro:</span>
-                <span className="font-bold">${(total - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                <span className="font-bold">${(totalConRecargo - totalPagado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
 
@@ -3543,7 +3543,7 @@ export default function POS() {
               <div className="p-3 bg-muted rounded-lg">
                 {(() => {
                   const entregado = parseFloat(efectivoEntregado.replace(',', '.')) || 0;
-                  const pendiente = total - totalPagado;
+                  const pendiente = totalConRecargo - totalPagado;
                   const vuelto = entregado > pendiente ? entregado - pendiente : 0;
                   return (
                     <>
@@ -4000,7 +4000,7 @@ export default function POS() {
             <Separator />
 
             {/* Mostrar desglose si hay intereses */}
-            {totalPagado > total && (
+            {totalPagado > totalConRecargo && (
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal productos:</span>
@@ -4008,7 +4008,7 @@ export default function POS() {
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Intereses tarjeta:</span>
-                  <span>+${(totalPagado - total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span>+${(totalPagado - totalConRecargo).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             )}
