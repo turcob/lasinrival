@@ -1,6 +1,6 @@
 # Guía del sistema — Onboarding paso a paso
 
-Este documento es una explicación (no genera código). Si querés, después lo guardo como `docs/ONBOARDING.md` en el repo para consulta futura.
+Documento de referencia para nuevas personas en el proyecto.
 
 ---
 
@@ -62,7 +62,7 @@ Selección productos → Carrito → Elegir cliente (opcional)
 ```
 
 ### 3.b Venta en Cuenta Corriente (cliente)
-Igual al 3.a pero sin `venta_pagos` ni movimiento de caja; se agrega `cliente_movimientos` tipo `compra`. La facturación AFIP se ofrece igual que en pago directo (memory rule). El ticket muestra "Cond. Venta: Cuenta Corriente".
+Igual al 3.a pero sin `venta_pagos` ni movimiento de caja; se agrega `cliente_movimientos` tipo `compra`. La facturación AFIP se ofrece igual que en pago directo. El ticket muestra "Cond. Venta: Cuenta Corriente".
 
 ### 3.c Pedido → Entrega → Cobro (circuito reparto)
 ```text
@@ -91,7 +91,7 @@ Pedidos.NuevoPedido  → pedidos + pedido_detalles (estado 'pendiente')
 
 ### 4.a Cajas
 - Apertura con saldo inicial → registra movimientos (`ingreso`, `egreso`, ventas automáticas).
-- **Vendedor NO puede** hacer Ingreso/Egreso manuales (memory rule).
+- **Vendedor NO puede** hacer Ingreso/Egreso manuales.
 - Cierre: se calcula `diferencia = arqueo - esperado`. Confirmación en 2 pasos vía `confirmar_arqueo_con_ajuste`. Si el admin decide imputar la diferencia, se crea `empleado_movimientos` (ajuste faltante o devolución sobrante).
 
 ### 4.b Cuenta Corriente
@@ -134,12 +134,7 @@ Se valida `numero_operacion` para evitar duplicados. Extractor con AI Gemini Vis
 
 ## 7. Cómo seguir explorando
 
-- Ver `src/pages/POS.tsx` → circuito venta end-to-end (referencia de patrones).
+- Ver `src/pages/POS.tsx` → circuito venta end-to-end.
 - Ver `supabase/functions/afip-facturacion/index.ts` → integración WSFE.
-- Ver RPCs `pos_registrar_venta`, `refacturar_hoja_ruta_producto`, `get_ventas_lista`, `confirmar_arqueo_con_ajuste` → toda la lógica transaccional.
+- Ver RPCs `pos_registrar_venta`, `refacturar_hoja_ruta_producto`, `get_ventas_lista`, `confirmar_arqueo_con_ajuste` → lógica transaccional.
 - Ver `src/components/facturacion/NotaCreditoParcialWizard.tsx` → wizard NC.
-- Ver memorias del proyecto (`mem://index.md`) para reglas de negocio detalladas por feature.
-
----
-
-**Próximo paso sugerido**: ¿querés que guarde esta guía como `docs/ONBOARDING.md` en el repo, o que profundicemos en un módulo puntual (por ejemplo, "circuito Pedidos→Logística" o "AFIP paso a paso")?
