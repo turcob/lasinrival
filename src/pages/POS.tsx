@@ -3032,8 +3032,14 @@ export default function POS() {
           <div className="space-y-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total a cobrar:</span>
-              <span>${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              <span>${totalConRecargo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
+            {recargoTarjeta > 0 && (
+              <div className="flex justify-between text-sm text-muted-foreground -mt-2">
+                <span>Incluye recargo por cuotas:</span>
+                <span>+${recargoTarjeta.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               {formasPago.map((fp) => (
