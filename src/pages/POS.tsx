@@ -1183,6 +1183,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1276,6 +1278,7 @@ export default function POS() {
       console.error('Error al procesar venta a empleado:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
@@ -1299,6 +1302,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1478,6 +1483,7 @@ export default function POS() {
       console.error('Error al procesar venta a cliente CC:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
@@ -1500,6 +1506,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1740,6 +1748,7 @@ export default function POS() {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
