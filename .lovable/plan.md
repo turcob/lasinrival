@@ -1,87 +1,71 @@
-# Plan: Prompt mayorista autocontenido para Antigravity
+# Diagnóstico: Duplicación de pago en venta #00006404
 
-Generar un único archivo `docs/PROMPT_MAYORISTA.md` (~800–1200 líneas) redactado como brief de producto + especificación funcional, **agnóstico de stack** (sin nombrar React/Vite/Supabase/Lovable; se habla de "frontend web", "app móvil", "base de datos relacional", "funciones serverless", "gateway AFIP"). Sirve para pegar en Antigravity y arrancar desarrollo desde cero.
+## Qué pasó
 
-## Alcance incluido (todo B2B)
+Consultando la base:
 
-1. **Clientes mayoristas** — alta, datos fiscales, zona, vendedor asignado, lista de precios, condición IVA, bloqueo por deuda (umbral facturas impagas + monto), importadores Excel (clientes, deudas granulares, historial legacy con `origen=historico` excluido de balances).
-2. **Cuenta Corriente cliente** — movimientos (compra, pago, nota_credito, ajuste), pagos multi-método y parciales, **imputación FIFO** de REC/NC contra FAC más antiguas, imputación diferida para cheque/transferencia (recién al validarse).
-3. **Pedidos** — tipos web/reparto/mostrador, estados `pendiente → preparado → despachado → rechazado`, preparación con ajuste real (kg decimales, excedentes), precio/descuento manual por ítem, alerta de duplicados diarios, bloqueo por 30 días de deuda, sugerencias de productos.
-4. **Consolidado de pedidos** — agrupación Pesables / Frescos / No Pesables, impresión por zona.
-5. **Logística / Reparto** — vehículos, hojas de ruta (`planificada → en_carga → carga_confirmada → en_reparto → cerrada`), paradas, cobros en calle (efectivo/transf/cheque), devoluciones, rechazados, rendición del chofer, refacturación por producto, transición automática a `despachado` (solo desde Logística), agregación de datos legacy.
-6. **App móvil encargado/chofer** — tabs Carga / Paradas / Cobros / Devoluciones / Rendición / Stock rechazado; mismo backend con RLS; login vía linkage `empleados.user_id`.
-7. **Facturación AFIP** — WSFE producción, tipos A/B/C según condición IVA, ticket térmico 80 mm con QR, factura A5, NC total (anula + compensa CC), **NC parcial wizard** (elige ítems/cantidades), resoluciones pendientes (contado → dinero/cheque/transf; CC → crédito CC).
-8. **Cheques** — 7 estados (`pendiente_validacion, cartera, depositado, acreditado, rechazado, endosado, entregado_a_proveedor`) con historial de auditoría.
-9. **Transferencias** — validación de `numero_operacion` contra duplicados, extractor AI Vision de comprobantes.
-10. **Proveedores** — alta, CC proveedor, órdenes de compra con detalle, pagos con 4 medios (efectivo, transferencia, cheque terceros, cheque propio), importadores.
-11. **Listas de precios** — múltiples listas, asignación por cliente, actualizador masivo.
-12. **Zonas / Vendedores** — territorios, horarios de zona, objetivos por vendedor/zona, agenda de visitas, productos foco, incidencias.
-13. **Productos** (mínimo para B2B) — SKU, categorías/subcategorías/marcas/tipos, flag `es_frio`, unidad de medida (pesable/unidad), stock, movimientos de inventario.
-14. **Roles y permisos** — tabla `roles` dinámica (no enum), `role_permissions(role, modulo, permiso)`, función `has_role` SECURITY DEFINER, RLS obligatoria en cada tabla + GRANTs.
-15. **Impresión** — remito ORO (layout fijo, duplicado), factura A5 (10 filas fijas), ticket térmico 80 mm, recibo liquidación, consolidado por zona.
+- **Venta única** `20b16f5f…` #6404, `total=218.775,89`, `subtotal=218.775,92`, creada **11:18:02** (nació como pedido).
+- **Dos filas idénticas** en `venta_pagos` (Efectivo, $218.775,89) creadas a las **11:48:31** y **11:48:32** (1 segundo de diferencia).
+- **Dos filas idénticas** en `movimientos_caja` (ingreso $218.775,89) a las mismas timestamps.
 
-## Alcance EXCLUIDO explícitamente
+Es decir: la venta empezó como *pedido* a las 11:18, y a las 11:48 al cobrarla el RPC `pos_registrar_venta` se ejecutó **dos veces** en 1 segundo (doble click / doble emisión desde el diálogo de cobro). Por eso ves duplicado el "Efectivo" en el comprobante y esa diferencia de $0,03 entre subtotal y total es sólo el redondeo original — el "error visible" es la duplicación de la forma de pago.
 
-- POS mostrador de contado (venta directa retail).
-- Descuentos PWA con token rotativo.
-- Terminal Clover.
-- Empleados / liquidaciones / sueldos.
-- Cajas (arqueo, apertura/cierre) — es retail.
-- Dashboard, sugerencias/chat asistente.
+## Por qué el RPC no lo evitó
 
-## Estructura del archivo `docs/PROMPT_MAYORISTA.md`
+En `pos_registrar_venta`, cuando viene `p_editing_pedido_id` (cobrar un pedido existente):
 
-```text
-1. Contexto y objetivo del sistema (distribuidora mayorista de alimentos)
-2. Usuarios y roles (admin, encargado, vendedor, chofer, depósito)
-3. Glosario (hoja de ruta, parada, rendición, NC parcial, imputación FIFO, etc.)
-4. Arquitectura sugerida (agnóstica): frontend web + app móvil + BD relacional + funciones serverless + gateway AFIP
-5. Modelo de dominio (entidades + relaciones, sin DDL específico de motor)
-     Clientes, Zonas, Vendedores, ListasPrecios, Productos,
-     Pedidos+Detalles, HojasRuta+Paradas+Cobros+Devoluciones+Rendiciones,
-     Ventas+Detalles+Pagos, ComprobantesAFIP, NotasCredito+Items,
-     ClienteMovimientos+Imputaciones, Cheques+Historial, Transferencias,
-     Proveedores+Movimientos+OrdenesCompra, Roles+Permisos, Empleados (mínimo link móvil)
-6. Módulos funcionales (14 secciones, cada una con):
-     · Qué hace
-     · Pantallas / vistas
-     · Flujo paso a paso
-     · Reglas de negocio
-     · Datos que toca
-     · Permisos por rol
-7. Circuitos end-to-end:
-     · Toma de pedido → preparación → hoja de ruta → reparto → cobro → rendición → venta → factura AFIP → CC
-     · NC parcial post-entrega con resolución financiera
-     · Pago cliente multi-método con imputación FIFO
-     · Pago a proveedor con cheque propio
-8. Reglas invariantes (críticas, no negociables):
-     · `despachado` sólo desde Logística
-     · `origen=historico` excluido de balances
-     · Roles en tabla aparte, nunca en profile (evita escalación)
-     · Imputación diferida para valores no confirmados
-     · Layout de remito ORO congelado
-     · Duplicados de transferencia bloqueados por numero_operacion
-9. Integraciones externas:
-     · AFIP WSFE (certificado prod, ambientes)
-     · AI Vision para extraer numero_operacion de comprobantes
-     · Impresión térmica 80mm y A5
-10. Seguridad y multi-tenant:
-     · RLS por tabla, GRANTs explícitos
-     · Función has_role SECURITY DEFINER
-     · Linkage usuario-empleado para app móvil
-11. Importadores Excel (formato de columnas + reglas de auto-provisión)
-12. Checklist plano de features (para trackear progreso en Antigravity)
-13. Sugerencias de orden de implementación (fase 1: clientes+productos+pedidos; fase 2: logística+encargado APK; fase 3: AFIP+NC; fase 4: cheques+transferencias+proveedores)
+```
+UPDATE ventas …
+DELETE FROM venta_detalles WHERE venta_id = v_venta_id;   -- ✅ limpia detalles
+-- ❌ NO borra venta_pagos previos
+-- ❌ NO borra movimientos_caja previos
+INSERT INTO venta_pagos …                                 -- agrega otra tanda
+INSERT INTO movimientos_caja …                            -- agrega otra tanda
 ```
 
-## Fuentes que se van a consolidar
+Cualquier reintento sobre un pedido en edición **acumula** pagos y movimientos de caja en vez de reemplazarlos. Sumado a que el guard `emitiendo` del cliente es un `useState` (asíncrono) y no bloquea un segundo click disparado antes del re-render.
 
-- `docs/ONBOARDING.md` — arquitectura y circuitos.
-- `docs/FUNCIONALIDADES.md` — inventario de 28 módulos (se filtran solo los B2B).
-- `mem://` — reglas invariantes ya memorizadas (imputación FIFO, orden despachado, remito ORO, cheques 7 estados, etc.).
+## Plan de fix
 
-## Entregable
+### 1. Hacer idempotente el RPC (`pos_registrar_venta`) — migración SQL
 
-- **Un archivo nuevo:** `docs/PROMPT_MAYORISTA.md`.
-- **Sin cambios de código de aplicación.**
-- Redactado en español, tono spec/brief, con diagramas ASCII y tablas markdown, sin nombres de librerías ni de la plataforma.
+En la rama `IF p_editing_pedido_id IS NOT NULL`, antes de re-insertar:
+
+```sql
+DELETE FROM venta_pagos      WHERE venta_id = v_venta_id;
+DELETE FROM movimientos_caja WHERE venta_id = v_venta_id;
+-- (venta_detalles ya se borra)
+```
+
+Así, reprocesar un pedido siempre deja el estado consistente aunque el cliente reintente.
+
+### 2. Guard duro anti doble-click en el cliente
+
+En `src/pages/POS.tsx`, reemplazar el guard basado sólo en `useState('emitiendo')` por un `useRef` (`emitiendoRef.current`) chequeado al inicio de:
+
+- `handleProcesarVenta`
+- `handleProcesarVentaClienteCC`
+- `handleProcesarVentaEmpleadoCC`
+
+El `useRef` se actualiza de forma síncrona y bloquea el segundo disparo aunque React no haya re-renderizado el `disabled` del botón.
+
+### 3. Corregir la venta #6404 ya existente — migración de datos
+
+Borrar la fila duplicada (la de las 11:48:32) tanto en `venta_pagos` como en `movimientos_caja`:
+
+```sql
+DELETE FROM venta_pagos      WHERE id = '11b6c710-c1b0-4d7a-a9a4-e5f32fb43a3c';
+DELETE FROM movimientos_caja WHERE id = 'f866746a-c71f-4e04-811c-7480415a187c';
+```
+
+El `total` de la venta ya es correcto ($218.775,89); no requiere recalcularse.
+
+### 4. Verificación
+
+- Re-abrir el comprobante #6404 → debe mostrar una sola línea "Efectivo $218.775,89".
+- Revisar rendición de la caja del 06/07 → el total baja $218.775,89 y coincide con lo real.
+- Simular doble-click al confirmar un pedido → sólo se registra una tanda de pagos/movimientos.
+
+## Nota sobre la diferencia $0,03 (218.775,92 vs 218.775,89)
+
+Es sólo redondeo del subtotal por líneas (31.093,00 + 13.840,93 + 7.580,32 = 218.514,25 no cierra con los precios unitarios porque hay bonificación/redondeo por línea). No es un bug de duplicación; el bug real es la doble forma de pago. Si querés que también unifique el criterio de redondeo, avisame y lo agrego como fix separado.
