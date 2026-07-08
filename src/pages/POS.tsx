@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -224,6 +224,9 @@ export default function POS() {
     condicion_iva_receptor: 5,
   });
   const [emitiendo, setEmitiendo] = useState(false);
+  // Guard síncrono: bloquea reentradas al confirmar venta aunque React todavía
+  // no haya re-renderizado el `disabled` del botón (evita duplicar pagos/movs).
+  const emitiendoRef = useRef(false);
   
   // Pedidos
   const [pedidosDialogOpen, setPedidosDialogOpen] = useState(false);
@@ -1180,6 +1183,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1273,6 +1278,7 @@ export default function POS() {
       console.error('Error al procesar venta a empleado:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
@@ -1296,6 +1302,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1475,6 +1483,7 @@ export default function POS() {
       console.error('Error al procesar venta a cliente CC:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
@@ -1497,6 +1506,8 @@ export default function POS() {
       return;
     }
 
+    if (emitiendoRef.current) return;
+    emitiendoRef.current = true;
     setEmitiendo(true);
 
     try {
@@ -1737,6 +1748,7 @@ export default function POS() {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
     } finally {
+      emitiendoRef.current = false;
       setEmitiendo(false);
     }
   };
