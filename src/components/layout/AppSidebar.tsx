@@ -28,7 +28,8 @@ import {
   Building2,
   PackageX,
   Route as RouteIcon,
-  Wallet
+  Wallet,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -89,6 +90,7 @@ const adminNavItems: NavItem[] = [
   { title: 'Roles y Permisos', href: '/roles', icon: Shield, module: 'roles' },
   { title: 'Sugerencias', href: '/sugerencias', icon: Lightbulb },
   { title: 'Configuración', href: '/configuracion', icon: Settings },
+  { title: 'Ayuda', href: '/ayuda', icon: HelpCircle },
 ];
 
 export function AppSidebar() {
