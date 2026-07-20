@@ -28,7 +28,8 @@ import {
   Building2,
   PackageX,
   Route as RouteIcon,
-  Wallet
+  Wallet,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -218,6 +219,7 @@ export function AppSidebar() {
           {(isAdmin || isEncargado) && (
             <NavSection title="Administración" items={adminNavItems} />
           )}
+          <NavSection title="Ayuda" items={[{ title: 'Manual de uso', href: '/ayuda', icon: HelpCircle }]} />
         </ScrollArea>
 
         {/* Footer */}
