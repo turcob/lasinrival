@@ -90,7 +90,6 @@ const adminNavItems: NavItem[] = [
   { title: 'Roles y Permisos', href: '/roles', icon: Shield, module: 'roles' },
   { title: 'Sugerencias', href: '/sugerencias', icon: Lightbulb },
   { title: 'Configuración', href: '/configuracion', icon: Settings },
-  { title: 'Ayuda', href: '/ayuda', icon: HelpCircle },
 ];
 
 export function AppSidebar() {
@@ -220,6 +219,7 @@ export function AppSidebar() {
           {(isAdmin || isEncargado) && (
             <NavSection title="Administración" items={adminNavItems} />
           )}
+          <NavSection title="Ayuda" items={[{ title: 'Manual de uso', href: '/ayuda', icon: HelpCircle }]} />
         </ScrollArea>
 
         {/* Footer */}
