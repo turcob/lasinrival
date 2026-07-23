@@ -578,6 +578,7 @@ export default function Facturacion() {
                             </Button>
                             {FACTURA_TIPOS.includes(comp.tipo_comprobante)
                               && comp.estado === 'emitido'
+                              && puedeAnular
                               && (saldosFacturas[comp.id] ?? 0) > 0 && (
                               <Button variant="ghost" size="icon" onClick={() => abrirNcDialog(comp)} title="Generar Nota de Crédito">
                                 <FileMinus className="h-4 w-4" />
