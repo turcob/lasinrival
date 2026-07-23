@@ -13,8 +13,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus } from 'lucide-react';
 import { imprimirTicketFactura } from '@/lib/imprimirTicketFactura';
+import { NotaCreditoParcialWizard } from '@/components/facturacion/NotaCreditoParcialWizard';
 import {
   Select,
   SelectContent,
@@ -28,16 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
   Card,
   CardContent,
@@ -146,11 +137,14 @@ export default function Ventas() {
   const [searchDebounced, setSearchDebounced] = useState('');
 
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
-  const [anularDialogOpen, setAnularDialogOpen] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
-  const [motivoAnulacion, setMotivoAnulacion] = useState('');
+
+  // NC wizard state
+  const [ncWizardOpen, setNcWizardOpen] = useState(false);
+  const [facturaParaNc, setFacturaParaNc] = useState<any>(null);
+  const [ncPreset, setNcPreset] = useState<{ alcance: 'parcial' | 'total'; anular: 'si' | 'no' }>({ alcance: 'parcial', anular: 'no' });
   
   // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
