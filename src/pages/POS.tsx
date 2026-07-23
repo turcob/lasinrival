@@ -1865,8 +1865,7 @@ export default function POS() {
           p_detalles: detallesPayload as any,
         });
         if (rpcErr) throw rpcErr;
-        const created: any = rpcRes;
-        toast.success(`Pedido #${created.numero_comprobante} guardado correctamente`);
+        toast.success('Pedido guardado correctamente');
       }
 
       setCart([]);
