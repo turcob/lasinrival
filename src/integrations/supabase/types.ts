@@ -5120,6 +5120,20 @@ export type Database = {
         }
         Returns: Json
       }
+      resolver_nota_credito: {
+        Args: {
+          p_caja_id: string
+          p_cliente_id: string
+          p_comprobante_nc_id: string
+          p_concepto_caja: string
+          p_concepto_cc: string
+          p_factura_compra_mov_id: string
+          p_monto_caja: number
+          p_monto_cc: number
+          p_venta_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_permission:

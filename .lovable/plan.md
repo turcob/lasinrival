@@ -1,77 +1,114 @@
-# Unificar NC en Ventas con el wizard existente
+## Objetivo
 
-Alcance: solo front. No se toca la edge `afip-facturacion` ni `get_factura_saldo_disponible`.
+Que toda NC quede resuelta financieramente **en el mismo acto de emisión**, contra la caja del usuario que la emite, salvo excepción de CC impaga. Precheck obligatorio antes de ir a AFIP, y vinculación atómica NC ↔ movimiento vía RPC.
 
-## Cambios
+## Cómo resuelvo la excepción de CC impaga (explícito, antes de aplicar)
 
-### 1) `src/components/facturacion/NotaCreditoParcialWizard.tsx` — props opcionales de preset
+Cuando la factura de origen tiene `venta_id`, calculo el saldo impago de esa venta puntual (no del cliente entero):
 
-Agregar dos props opcionales para que el llamador pueda abrir el wizard "preseteado":
+1. Ubico el movimiento "compra" que la venta generó:
+   ```sql
+   select id, monto from cliente_movimientos
+   where venta_id = :venta_id and tipo = 'compra'
+     and coalesce(origen,'sistema') <> 'historico'
+   order by created_at asc limit 1;
+   ```
+2. Calculo lo ya imputado a esa factura:
+   ```sql
+   select coalesce(sum(monto),0) from cliente_movimiento_imputaciones
+   where movimiento_factura_id = :compra_id;
+   ```
+3. `saldo_impago = max(0, compra.monto - imputado)`.
 
-```ts
-interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  factura: FacturaOrigen | null;
-  onEmitida: () => void;
-  presetAlcance?: Alcance;         // "parcial" | "total"
-  presetAnularVenta?: "si" | "no"; // default "no"
-}
+Con eso reparto el `total_nc`:
+
+- `monto_cc  = min(total_nc, saldo_impago)` → se imputa como NCR contra la deuda.
+- `monto_caja = total_nc - monto_cc` → egreso en la caja del emisor.
+
+Casos que quedan cubiertos:
+
+| Escenario | monto_cc | monto_caja | Requiere caja abierta |
+|---|---|---|---|
+| Venta contado (sin `compra` en CC) | 0 | total_nc | Sí |
+| Venta CC ya pagada | 0 | total_nc | Sí (le "devolvés" lo que ya cobraste) |
+| Venta CC totalmente impaga y NC ≤ saldo | total_nc | 0 | No |
+| Venta CC parcialmente pagada y NC > saldo | saldo_impago | resto | Sí, sólo por el resto |
+| NC sin `venta_id` (bonificación suelta) | 0 | total_nc | Sí |
+
+Consumidor Final entra siempre por caja porque no hay `cliente_movimientos` a imputar.
+
+## Precheck antes de AFIP
+
+Se corre **antes** de invocar la edge `afip-facturacion/emitir`. Si falla, no se emite:
+
+- Si `monto_caja > 0` y el usuario no tiene una caja en estado `abierta` (buscada por `usuario_id = auth.uid()`), se bloquea con mensaje:
+  > "No podés emitir esta Nota de Crédito: necesitás una caja abierta a tu nombre para registrar el egreso de $X. Abrí tu caja y volvé a intentar."
+
+Se elimina el selector de "elegir caja" para admin: siempre la caja propia del emisor. Menos superficie de error, más trazabilidad.
+
+## Registro atómico post-CAE
+
+Nueva RPC `public.resolver_nota_credito` (SECURITY DEFINER):
+
+```
+resolver_nota_credito(
+  p_comprobante_nc_id uuid,
+  p_caja_id uuid,            -- null si monto_caja = 0
+  p_cliente_id uuid,         -- null si monto_cc = 0
+  p_monto_caja numeric,
+  p_monto_cc numeric,
+  p_factura_compra_mov_id uuid, -- para imputación (opcional)
+  p_concepto_caja text,
+  p_concepto_cc text,
+  p_venta_id uuid
+) returns jsonb
 ```
 
-En el `useEffect` de reset (línea ~128) aplicar el preset si viene:
-- `setAlcance(presetAlcance ?? "parcial")`
-- `setAnularVenta(presetAnularVenta ?? "no")`
-- si `presetAlcance === "total"`: `setModo("bonificacion")` no aplica; el modo queda "items" por defecto, el usuario igual puede revisar. (El wizard ya soporta alcance total en modo items marcando todas las cantidades.)
+En una única transacción:
+1. Bloquea la fila de `comprobantes_afip` con `for update`.
+2. Rechaza si ya tiene `resolucion_financiera` (idempotencia).
+3. Si `p_monto_caja > 0`: inserta `movimientos_caja` (tipo `egreso`), actualiza `cajas.total_egresos`.
+4. Si `p_monto_cc > 0`: inserta `cliente_movimientos` (tipo `nota_credito`) y, si viene `p_factura_compra_mov_id`, inserta `cliente_movimiento_imputaciones` por `p_monto_cc`.
+5. `update comprobantes_afip set resolucion_financiera = case when caja>0 and cc>0 then 'mixta' when caja>0 then 'caja' else 'cuenta_corriente' end, caja_movimiento_id = ..., resolucion_cliente_movimiento_id = ..., resolucion_at = now(), resolucion_por = auth.uid()`.
+6. Todo en la misma transacción: si falla cualquier paso, `raise` y se revierte.
 
-No se cambia lógica interna de emisión, validaciones, resolución financiera ni marcado de `anulada`.
+Los UNIQUE parciales existentes (`comprobantes_afip_caja_mov_uniq`, `comprobantes_afip_cc_mov_uniq`) siguen previniendo doble uso.
 
-### 2) `src/pages/Ventas.tsx` — reemplazar `handleAnular` propio por el wizard
+Emisión ↔ resolución: como el CAE de AFIP no se puede rollbackear, la garantía viene por el precheck (nunca se llama a AFIP si la caja no está abierta) más la RPC atómica. Si algo excepcional fallara post-CAE (ej. la fila de la NC se guardó pero la RPC falla por race), la NC queda visible en `ResolucionesPendientes` — que sigue funcionando sin cambios.
 
-**a. Fetch de ventas:** ampliar el select de `comprobantes_afip` para incluir los campos que exige `FacturaOrigen` del wizard: agregar `cuit_emisor, venta_id` al select (ya trae el resto).
+## Cambios de código
 
-**b. Estado nuevo:**
-```ts
-const [ncWizardOpen, setNcWizardOpen] = useState(false);
-const [facturaParaNc, setFacturaParaNc] = useState<any>(null);
-const [ncPreset, setNcPreset] = useState<{ alcance: "parcial" | "total"; anular: "si" | "no" }>({ alcance: "parcial", anular: "no" });
-```
+### 1. `supabase/migration` — nueva RPC `resolver_nota_credito`
 
-**c. Handlers:**
-- `openNcWizard(item, preset)`: setea `facturaParaNc = item.comprobantes_afip[0]`, `ncPreset = preset`, abre el wizard. Si la venta no tiene comprobante AFIP, `toast.error("La venta no tiene factura electrónica; no se puede emitir NC")` y no abre.
-- `onEmitida`: `fetchVentas()` + `setRefreshTotales(n => n + 1)`.
+Contiene la lógica descrita arriba. También agrega `resolucion_financiera in ('caja','cuenta_corriente','mixta')` implícito por uso (no se agrega CHECK para no romper histórico).
 
-**d. Grilla — columna Acciones (línea ~902):**
-- Eliminar el actual botón "Anular venta" que abre `AnularDialog`.
-- Agregar dos botones cuando `!item._es_pedido && !item.anulada && canAnular && item.comprobantes_afip?.length`:
-  - `FileText` — "Nota de crédito" → `openNcWizard(item, { alcance: "parcial", anular: "no" })`
-  - `XCircle` (destructive) — "Anular venta" → `openNcWizard(item, { alcance: "total", anular: "si" })`
-- Si no hay factura AFIP, no se muestra ninguno (la anulación sin factura queda fuera de alcance de este paso).
+### 2. `src/components/facturacion/NotaCreditoParcialWizard.tsx`
 
-**e. Eliminar:**
-- Función `handleAnular` (líneas ~436-688).
-- Estado `anularDialogOpen`, `motivoAnulacion` y el `<AlertDialog>` de anulación (buscar `AnularDialog` / `setAnularDialogOpen`).
+- **Cargar caja propia y saldo de CC antes de emitir** (`cargarDatos`):
+  - Buscar caja abierta del `user.id`.
+  - Si `factura.venta_id`, cargar `compra_mov` y `saldo_impago` (dos selects).
+  - Calcular `montoCaja / montoCC` en un `useMemo` a partir del `totalNc`.
+- **Deshabilitar el botón "Emitir"** cuando `montoCaja > 0 && !cajaPropia`, con banner rojo indicando el motivo.
+- **En `handleEmitir`**, antes del `invoke("afip-facturacion/emitir", ...)`:
+  - Re-chequear caja abierta si `montoCaja > 0`. Si no hay → `toast.error` y return sin llamar a AFIP.
+- **Reemplazar** todo el bloque de "resolución financiera automática" (líneas 571–644) por una única llamada a `supabase.rpc("resolver_nota_credito", { ... })` con los parámetros calculados. Ya no hay tres inserts sueltos ni actualización manual de `total_egresos`.
+- **Eliminar** el modo "post-emisión con selector de caja del admin" (bloque `ncEmitida` en el render, líneas ~660–818, y estados `ncEmitida`, `cajaSeleccionadaId`, `cajasAbiertas`, `confirmarResolucion`, `resolviendo`). Ya no aplica: la resolución es sincrónica con la emisión y siempre en la caja propia.
+- Se conserva `tipoResolucionAuto` sólo como label informativo en el paso 4 ("Se descontará $X de tu caja y $Y de la CC del cliente").
 
-**f. Render del wizard** (antes del cierre de `MainLayout`):
-```tsx
-<NotaCreditoParcialWizard
-  open={ncWizardOpen}
-  onOpenChange={setNcWizardOpen}
-  factura={facturaParaNc}
-  presetAlcance={ncPreset.alcance}
-  presetAnularVenta={ncPreset.anular}
-  onEmitida={() => { fetchVentas(); setRefreshTotales(n => n + 1); }}
-/>
-```
+### 3. `src/components/facturacion/ResolucionesPendientes.tsx`
 
-## Cobertura de los dos gaps (confirmación pedida)
+**No se toca.** Sigue leyendo NCs con `resolucion_financiera is null` para las históricas. Puede llamar internamente a la nueva RPC en lugar de sus inserts sueltos (mejora opcional), pero fuera del alcance.
 
-1. **Validación contra NCs previas (doble acreditación):** cubierta. Toda emisión pasa ahora por `get_factura_saldo_disponible`, que descuenta NCs previas y expone `monto_disponible`. El wizard bloquea si `monto_disponible <= 0` (paso 1 del wizard). Antes, `handleAnular` no consultaba saldos y podía emitir una NC total incluso con NCs parciales previas.
-2. **Reposición de stock:** cubierta. El wizard, en modo items, reingresa stock cuando `reingresarStock === "si"` (default) y registra el movimiento de inventario. Cuando "Anular venta" abra el wizard con `alcance="total" + anular="si"`, el modo por defecto es items con reingreso activo, así que la anulación total queda con reingreso equivalente al comportamiento anterior. Además marca `anulada=true` con `motivo_anulacion` que incluye referencia a la NC total.
+## Fuera de alcance
 
-## Fuera de alcance (explícito)
+- Cambios en `afip-facturacion` (no se toca).
+- Cambio del comportamiento de `ResolucionesPendientes` (sigue igual).
+- CHECK constraint sobre `resolucion_financiera` (histórico puede tener otros valores).
+- POS / NC desde Ventas: usan el mismo wizard, así que quedan cubiertos por el cambio en `NotaCreditoParcialWizard.tsx`.
 
-- Edge `afip-facturacion`: `CbtesAsoc` ya está correcto en el wizard.
-- `get_factura_saldo_disponible`: no se toca.
-- Ventas sin factura AFIP: quedan sin acción de anulación en este paso (se puede tratar aparte).
-- Movimientos de caja por anulación: el wizard resuelve financieramente por caja o CC según su propia lógica; ya no se replica el `movimientos_caja` egreso que hacía `handleAnular`.
+## Orden de aplicación
+
+1. Migración con la RPC `resolver_nota_credito`.
+2. Cambios en `NotaCreditoParcialWizard.tsx`.
+
+Antes de aplicar te muestro el diff concreto de cada archivo.
