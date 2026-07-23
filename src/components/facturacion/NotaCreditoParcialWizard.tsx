@@ -316,6 +316,14 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
       return;
     }
 
+    // Precheck: si va a caja, tiene que haber una caja abierta del emisor
+    if (montoCaja > 0 && !cajaPropia) {
+      toast.error(
+        `No podés emitir esta NC: necesitás una caja abierta a tu nombre para registrar el egreso de $${montoCaja.toLocaleString("es-AR", { minimumFractionDigits: 2 })}. Abrí tu caja y volvé a intentar.`
+      );
+      return;
+    }
+
     setEmitiendo(true);
     try {
       // Armar items AFIP
