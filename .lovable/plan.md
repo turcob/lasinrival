@@ -1,73 +1,115 @@
-
-## Objetivo
-
-Crear una página estática `/ayuda` accesible desde el menú lateral, orientada a que un usuario nuevo entienda los **circuitos comerciales** del negocio (no solo pantallas sueltas). Contenido en español (AR), responsive, con índice lateral fijo y flujos visuales tipo stepper.
+# Restringir visibilidad de ventas por usuario
 
 ## Alcance
+Solo la pantalla **Ventas** (via `get_ventas_lista`). RLS de `ventas` y otros módulos (POS, Facturación, NC, Imputación, Liquidación, Dashboard) no se tocan.
 
-- Sin cambios de backend, sin tablas nuevas, sin RLS.
-- Todo el contenido vive en componentes React (`src/pages/Ayuda.tsx` + subcomponentes en `src/components/ayuda/`).
-- Accesible a todos los roles autenticados (sin restricción por permisos de módulo).
+## Regla
+- No admin/encargado/administracion → ve solo `usuario_id = auth.uid()`.
+- Admin/encargado/administracion → ven todo, con select de usuario en la UI.
 
-## Estructura de la página
+---
 
-```text
-/ayuda
-├── Sidebar interno (sticky en desktop, tabs en mobile)
-│   ├─ Introducción
-│   ├─ Roles
-│   ├─ Flujos
-│   │   ├─ Venta mostrador (contado)
-│   │   ├─ Venta en cuenta corriente
-│   │   ├─ Pedido → Entrega → Cobro
-│   │   ├─ Facturación y NC
-│   │   └─ Ciclo financiero
-│   └─ Pantallas (referencia)
-└─ Contenido (scroll con anchors)
+## 1. Migración: `get_ventas_lista`
+
+Se agrega al inicio la detección de rol y se fuerza el filtro en las DOS ramas del UNION (ventas + pedidos). El `p_usuario_id` recibido se ignora salvo que el caller sea privilegiado.
+
+```diff
+ CREATE OR REPLACE FUNCTION public.get_ventas_lista(
+   p_estado text DEFAULT 'confirmada',
+   p_usuario_id uuid DEFAULT NULL,
+   ...
+ )
+ RETURNS TABLE(...)
+ LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+ AS $function$
++WITH ctx AS (
++  SELECT
++    auth.uid() AS uid,
++    (
++      public.has_role(auth.uid(), 'admin')
++      OR public.has_role(auth.uid(), 'encargado')
++      OR public.has_role(auth.uid(), 'administracion')
++    ) AS is_priv
++),
+-WITH base AS (
++base AS (
+   SELECT ..., v.usuario_id, ...
+   FROM public.ventas v
+   LEFT JOIN public.clientes c ON c.id = v.cliente_id
+   LEFT JOIN LATERAL (...) po ON true
++  WHERE
++    (SELECT is_priv FROM ctx)
++    OR v.usuario_id = (SELECT uid FROM ctx)
+
+   UNION ALL
+
+   SELECT ..., p.usuario_id, ...
+   FROM public.pedidos p
+   LEFT JOIN public.clientes c ON c.id = p.cliente_id
+   WHERE p.venta_id IS NULL AND p.tipo_pedido IN ('web','reparto')
++    AND (
++      (SELECT is_priv FROM ctx)
++      OR p.usuario_id = (SELECT uid FROM ctx)
++    )
+ ),
+ filtered AS (
+   SELECT * FROM base
+   WHERE (p_estado = 'todos' OR estado = p_estado)
+-    AND (p_usuario_id IS NULL OR usuario_id = p_usuario_id)
++    AND (
++      -- privilegiados: respetan el parámetro; no-privilegiados: ya filtrados en base
++      (SELECT is_priv FROM ctx) = false
++      OR p_usuario_id IS NULL
++      OR usuario_id = p_usuario_id
++    )
+     AND (...)
+ ),
+ ...
 ```
 
-### 1. Introducción
-Bloque corto: qué es el sistema (gestión integral mayorista + mostrador + reparto) y su propósito operativo.
+Todo lo demás de la RPC queda igual.
 
-### 2. Roles
-Grilla de tarjetas (una por rol): **admin, encargado, cajero, vendedor, depósito, chofer**. Cada tarjeta: ícono lucide + una línea de qué puede hacer.
+## 2. `src/pages/Ventas.tsx`
 
-### 3. Flujos principales (bloque dominante)
-Cada flujo se renderiza con un **Stepper vertical** (componente propio `<FlujoStepper />`) mostrando pasos numerados con ícono, título, descripción breve y un chip "Pantalla: [link a #pantalla-x]" que hace scroll al acordeón de la sección 4.
+Mostrar el select de usuario solo si el rol lo permite. Roles `encargado` y `administracion` se leen con `hasRole`.
 
-Flujos incluidos (mismos 5 que pide el usuario):
-1. **Venta en mostrador (contado)** — productos → carrito → cliente opcional → cobro multi-medio → factura AFIP → ticket térmico.
-2. **Venta en cuenta corriente** — igual, sin cobro, impacto en CC.
-3. **Pedido → Entrega → Cobro (reparto)** — toma pedido → preparación → hoja de ruta → carga → reparto (cobro/devolución/rechazo) → rendición chofer → despacho automático → venta + factura.
-4. **Facturación y Notas de Crédito** — emisión AFIP, NC total vs parcial, resolución financiera automática (Caja vs CC según origen del pago).
-5. **Ciclo financiero** — cobranzas → rendiciones → impacto en cajas → imputación de pagos; ramas para cheques y transferencias.
+```diff
+   const { user, hasRole } = useAuth();
++  const puedeVerTodas = hasRole('admin') || hasRole('encargado') || hasRole('administracion');
+...
+-        <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
+-          <SelectTrigger className="w-[180px]">
+-            <SelectValue placeholder="Usuario que cargó" />
+-          </SelectTrigger>
+-          <SelectContent>
+-            <SelectItem value="todos">Todos los usuarios</SelectItem>
+-            {usuarios.map((u) => (
+-              <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+-            ))}
+-          </SelectContent>
+-        </Select>
++        {puedeVerTodas && (
++          <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
++            <SelectTrigger className="w-[180px]">
++              <SelectValue placeholder="Usuario que cargó" />
++            </SelectTrigger>
++            <SelectContent>
++              <SelectItem value="todos">Todos los usuarios</SelectItem>
++              {usuarios.map((u) => (
++                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
++              ))}
++            </SelectContent>
++          </Select>
++        )}
+```
 
-### 4. Explicación de pantallas (referencia)
-Acordeón (`shadcn Accordion`) agrupado por módulo:
-- POS, Pedidos, Logística, Facturación, Cajas, Clientes, Empleados, Proveedores, Configuración.
+El backend igual fuerza `auth.uid()` para no-privilegiados, así que aunque un cliente manipule `p_usuario_id`, la RPC lo ignora. La UI solo esconde el control.
 
-Cada item: **qué es**, **para qué se usa**, **en qué flujo participa** (link ancla al flujo de la sección 3).
+## Lo que NO se toca
+- RLS de `ventas` (queda `USING true`).
+- POS (reimpresión, edición de pedido), Facturación, NotaCreditoParcialWizard, ResolucionesPendientes, Imputación, LiquidacionSection, RegistrarPagoClienteDialog, Dashboard.
 
-## Diseño
-
-- Layout: `grid` con `<aside>` sticky (índice) + `<main>` scrolleable. En mobile, el índice se colapsa a `Tabs` horizontales scrolleables.
-- Tokens semánticos de `src/index.css` (`bg-card`, `text-foreground`, `border-border`, `text-primary`, etc.). Cero colores hardcodeados.
-- Steppers: círculo numerado con `bg-primary text-primary-foreground`, líneas conectoras con `bg-border`, íconos lucide dentro de cada paso.
-- Tipografía existente (Inter). Títulos con `text-2xl font-bold tracking-tight`, subtítulos `text-lg font-semibold`.
-- Responsive: breakpoint `md` para pasar de sidebar a tabs.
-
-## Cambios técnicos
-
-1. **`src/pages/Ayuda.tsx`** — página nueva envuelta en `<MainLayout>` con `<PageHeader title="Ayuda / Manual de uso" />` y layout de dos columnas.
-2. **`src/components/ayuda/FlujoStepper.tsx`** — componente reutilizable (props: `titulo`, `descripcion`, `pasos[]`).
-3. **`src/components/ayuda/RolCard.tsx`** — tarjeta de rol.
-4. **`src/components/ayuda/PantallaAccordion.tsx`** — acordeón agrupado por módulo.
-5. **`src/components/ayuda/ayudaContent.ts`** — data estática (roles, flujos, pantallas) para mantener el JSX limpio.
-6. **`src/App.tsx`** — nueva ruta `<Route path="/ayuda" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />`.
-7. **`src/components/layout/AppSidebar.tsx`** — nuevo item en `adminNavItems` (o en un grupo "Ayuda" al pie) con ícono `HelpCircle`, sin `module` para que sea visible a todos los roles.
-
-## Fuera de alcance
-
-- Sin edición de contenido desde la UI (no CMS).
-- Sin búsqueda full-text (puede sumarse después).
-- Sin cambios en `index.css` ni `tailwind.config.ts`.
+## Verificación posterior
+- Login con vendedor no-admin → lista solo sus ventas + sus pedidos web/reparto; select de usuario oculto.
+- Login admin/encargado → ve todo y puede filtrar por usuario.
+- Confirmar que totales, paginación y el resto de filtros siguen respondiendo (la RPC mantiene su firma y semántica para privilegiados).
