@@ -1287,6 +1287,80 @@ export default function Imputacion() {
                   </div>
                 )}
 
+                {detalleTransfMov.estado_imputacion === 'pendiente' && editableCampos && (
+                  <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-medium">Datos de la transferencia</Label>
+                        <div className="text-xs text-muted-foreground">
+                          Podés completar o corregir los campos. Usá "Autocompletar con IA" para leer el comprobante.
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!detalleTransfMov.foto_comprobante_path || autocompletandoIA}
+                          onClick={handleAutocompletarIA}
+                        >
+                          <Sparkles className="h-4 w-4 mr-1" />
+                          {autocompletandoIA ? 'Analizando...' : 'Autocompletar con IA'}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleGuardarCampos}
+                          disabled={savingCampos}
+                        >
+                          <Save className="h-4 w-4 mr-1" />
+                          {savingCampos ? 'Guardando...' : 'Guardar cambios'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const renderCampo = (
+                        key: keyof EditableCampos,
+                        label: string,
+                        opts: { mono?: boolean; type?: string; placeholder?: string } = {}
+                      ) => {
+                        const meta = camposMeta[key];
+                        const isAI = meta?.source === 'ai';
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Label className="text-xs">{label}</Label>
+                              {isAI && (
+                                <Badge variant="secondary" className="h-4 text-[10px] gap-1 px-1.5">
+                                  <Sparkles className="h-2.5 w-2.5" />
+                                  IA{meta?.confianza ? ` · ${meta.confianza}` : ''}
+                                </Badge>
+                              )}
+                            </div>
+                            <Input
+                              type={opts.type || 'text'}
+                              value={editableCampos[key]}
+                              onChange={(e) => setCampo(key, e.target.value)}
+                              placeholder={opts.placeholder}
+                              className={`${opts.mono ? 'font-mono' : ''} ${isAI ? 'border-primary/60 bg-primary/5' : ''}`}
+                            />
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="grid grid-cols-2 gap-3">
+                          {renderCampo('numero_operacion', 'Nº Operación', { mono: true })}
+                          {renderCampo('fecha_transferencia', 'Fecha', { type: 'date' })}
+                          {renderCampo('titular_nombre', 'Titular')}
+                          {renderCampo('titular_cuil', 'CUIL/CUIT', { mono: true, placeholder: '11 dígitos' })}
+                          {renderCampo('banco', 'Banco (referencia)')}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Comprobante</Label>
                   {loadingComprobante ? (
