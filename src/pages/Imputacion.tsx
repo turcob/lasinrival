@@ -415,6 +415,27 @@ export default function Imputacion() {
     try {
       // Caso transferencia POS / standalone → actualiza la tabla transferencias
       if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        // Revalidación de duplicados global: si otro registro validado ya usa
+        // el mismo numero_operacion (incluso de otro cliente), avisamos.
+        const numOp = selectedMovimiento.numero_operacion?.trim();
+        if (numOp) {
+          const { data: dupes } = await supabase
+            .from('transferencias')
+            .select('id, cliente_id, importe, fecha_transferencia')
+            .eq('numero_operacion', numOp)
+            .eq('estado', 'validada')
+            .neq('id', selectedMovimiento.transferencia_id);
+          if (dupes && dupes.length > 0) {
+            const otroCliente = dupes.some(d => d.cliente_id !== selectedMovimiento.cliente_id);
+            const msg = otroCliente
+              ? `Ya existe una transferencia validada con el mismo Nº de operación (${numOp}) en OTRO cliente. ¿Confirmar de todas formas?`
+              : `Ya existe una transferencia validada con el mismo Nº de operación (${numOp}). ¿Confirmar de todas formas?`;
+            if (!window.confirm(msg)) {
+              setProcessing(false);
+              return;
+            }
+          }
+        }
         const { error } = await supabase
           .from('transferencias')
           .update({ estado: 'validada' })
