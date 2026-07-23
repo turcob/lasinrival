@@ -96,7 +96,9 @@ const ALICUOTAS_IVA = [
 ];
 
 export default function Facturacion() {
-  const { user } = useAuth();
+  const { user, hasRole, hasPermission } = useAuth();
+  const isPriv = hasRole("admin") || hasRole("encargado") || hasRole("administracion");
+  const [puedeAnular, setPuedeAnular] = useState(false);
   const { config: comercioConfig } = useConfiguracionComercio();
   const [comprobantes, setComprobantes] = useState<Comprobante[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -143,14 +145,37 @@ export default function Facturacion() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ok = await hasPermission("facturacion", "anular");
+        if (!cancelled) setPuedeAnular(!!ok);
+      } catch {
+        if (!cancelled) setPuedeAnular(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Privilegiado: ve todo, incluidos comprobantes con venta_id NULL.
+      // No privilegiado: inner join a ventas filtrando por usuario_id.
+      const comprobantesPromise = isPriv
+        ? supabase
+            .from("comprobantes_afip")
+            .select("*")
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("comprobantes_afip")
+            .select("*, ventas!inner(usuario_id)")
+            .eq("ventas.usuario_id", user!.id)
+            .order("created_at", { ascending: false });
+
       const [comprobantesRes, clientesRes] = await Promise.all([
-        supabase
-          .from("comprobantes_afip")
-          .select("*")
-          .order("created_at", { ascending: false }),
+        comprobantesPromise,
         supabase
           .from("clientes")
           .select("id, nombre, dni_cuit")
@@ -428,6 +453,10 @@ export default function Facturacion() {
   const totales = calcularTotales();
 
   const abrirNcDialog = (comp: Comprobante) => {
+    if (!puedeAnular) {
+      toast.error("No tenés permiso para emitir notas de crédito");
+      return;
+    }
     setFacturaParaNc(comp);
     setNcDialogOpen(true);
   };
@@ -549,6 +578,7 @@ export default function Facturacion() {
                             </Button>
                             {FACTURA_TIPOS.includes(comp.tipo_comprobante)
                               && comp.estado === 'emitido'
+                              && puedeAnular
                               && (saldosFacturas[comp.id] ?? 0) > 0 && (
                               <Button variant="ghost" size="icon" onClick={() => abrirNcDialog(comp)} title="Generar Nota de Crédito">
                                 <FileMinus className="h-4 w-4" />
