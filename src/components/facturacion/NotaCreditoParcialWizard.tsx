@@ -256,6 +256,18 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const netoNc = totalNc / 1.21;
   const ivaNc = totalNc - netoNc;
 
+  // Reparto entre CC (saldo impago de la factura original) y caja del emisor.
+  const montoCC = useMemo(() => {
+    if (!venta?.cliente?.id || saldoImpago <= 0) return 0;
+    return Math.min(totalNc, saldoImpago);
+  }, [venta, saldoImpago, totalNc]);
+  const montoCaja = useMemo(
+    () => Math.max(0, Number((totalNc - montoCC).toFixed(2))),
+    [totalNc, montoCC]
+  );
+  const requiereCaja = montoCaja > 0;
+  const cajaOK = !requiereCaja || !!cajaPropia;
+
   const motivoLabel = {
     devolucion: "Devolución de mercadería",
     bonificacion: "Bonificación comercial",
