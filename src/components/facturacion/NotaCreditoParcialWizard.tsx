@@ -858,6 +858,31 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
                   <p>IVA 21%: <b>${ivaNc.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b></p>
                   <p className="text-xl font-bold text-primary">TOTAL NC: ${totalNc.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
                 </div>
+                <div className={`rounded border p-3 text-sm space-y-1 ${cajaOK ? "bg-primary/5" : "bg-destructive/10 border-destructive/40"}`}>
+                  <p className="font-medium">Resolución financiera</p>
+                  {montoCC > 0 && (
+                    <p>
+                      Crédito a cuenta corriente de <b>{venta?.cliente?.nombre}</b>: <b>${montoCC.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b>
+                      {compraMovId ? " (imputado a la factura original)" : ""}
+                    </p>
+                  )}
+                  {montoCaja > 0 && (
+                    <p>
+                      Egreso en tu caja: <b>${montoCaja.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</b>
+                      {cajaPropia?.fecha_apertura ? ` (abierta ${format(new Date(cajaPropia.fecha_apertura), "dd/MM HH:mm")})` : ""}
+                    </p>
+                  )}
+                  {!cajaOK && (
+                    <p className="text-destructive font-medium">
+                      No podés emitir la NC: no tenés una caja abierta a tu nombre. Abrí tu caja y volvé a intentar.
+                    </p>
+                  )}
+                  {saldoImpago > 0 && venta?.cliente && (
+                    <p className="text-xs text-muted-foreground">
+                      Saldo impago de la factura original: ${saldoImpago.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -882,7 +907,7 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
           {step === 4 && (
             <>
               <Button variant="outline" onClick={() => setStep(3)} disabled={emitiendo}>Atrás</Button>
-              <Button onClick={handleEmitir} disabled={emitiendo}>
+              <Button onClick={handleEmitir} disabled={emitiendo || !cajaOK}>
                 {emitiendo ? "Emitiendo..." : "Emitir Nota de Crédito"}
               </Button>
             </>
