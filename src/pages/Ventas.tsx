@@ -429,7 +429,6 @@ export default function Ventas() {
 
 
   const handleReintentarAfip = async (venta: Venta) => {
-    // placeholder to keep boundary
     if (!user) return;
     if (venta._es_pedido || venta.anulada || venta.estado !== 'confirmada') return;
 
