@@ -130,6 +130,7 @@ const TIPOS_COMPROBANTE: Record<number, string> = {
 export default function Ventas() {
   const { user, hasPermission, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
+  const puedeVerTodas = hasRole('admin') || hasRole('encargado') || hasRole('administracion');
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [pagosPorVenta, setPagosPorVenta] = useState<Record<string, VentaPago[]>>({});
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
@@ -961,17 +962,19 @@ export default function Ventas() {
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Usuario que cargó" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los usuarios</SelectItem>
-              {usuarios.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {puedeVerTodas && (
+            <Select value={filtroUsuario} onValueChange={setFiltroUsuario}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Usuario que cargó" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los usuarios</SelectItem>
+                {usuarios.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
