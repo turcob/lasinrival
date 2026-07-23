@@ -867,11 +867,25 @@ export default function POS() {
   const handleConfirmarTransferencia = () => {
     if (!transferenciaData) return;
     if (!transferenciaData.fecha) return toast.error('Ingrese la fecha del comprobante');
-    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
-    if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
     const importeNum = parseFloat(transferenciaData.importe.replace(',', '.'));
     if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
-    if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
+
+    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
+    const numOpTrim = transferenciaData.numero_operacion.trim();
+    const tieneComprobante = !!transferenciaData.archivo;
+
+    if (tieneComprobante) {
+      // Modo flexible: se pueden dejar CUIL / titular / nro operación vacíos
+      // para completarlos luego desde Imputación (con ayuda de IA).
+      // Pero si el usuario cargó CUIL parcial, lo rechazamos: no aceptamos basura.
+      if (cuilLimpio.length > 0 && cuilLimpio.length !== 11) {
+        return toast.error('El CUIL/CUIT debe tener 11 dígitos, o dejarse vacío');
+      }
+    } else {
+      // Sin comprobante adjunto: obligamos los campos como siempre.
+      if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
+      if (!numOpTrim) return toast.error('Ingrese el número de comprobante / operación, o adjunte el comprobante');
+    }
 
     // Validar que el importe no exceda el pendiente
     const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
