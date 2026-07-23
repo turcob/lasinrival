@@ -13,8 +13,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus } from 'lucide-react';
 import { imprimirTicketFactura } from '@/lib/imprimirTicketFactura';
+import { NotaCreditoParcialWizard } from '@/components/facturacion/NotaCreditoParcialWizard';
 import {
   Select,
   SelectContent,
@@ -28,16 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
   Card,
   CardContent,
@@ -146,11 +137,14 @@ export default function Ventas() {
   const [searchDebounced, setSearchDebounced] = useState('');
 
   const [detalleDialogOpen, setDetalleDialogOpen] = useState(false);
-  const [anularDialogOpen, setAnularDialogOpen] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
-  const [motivoAnulacion, setMotivoAnulacion] = useState('');
+
+  // NC wizard state
+  const [ncWizardOpen, setNcWizardOpen] = useState(false);
+  const [facturaParaNc, setFacturaParaNc] = useState<any>(null);
+  const [ncPreset, setNcPreset] = useState<{ alcance: 'parcial' | 'total'; anular: 'si' | 'no' }>({ alcance: 'parcial', anular: 'no' });
   
   // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('todos');
@@ -433,258 +427,15 @@ export default function Ventas() {
     }
   };
 
-  const handleAnular = async () => {
-    if (!selectedVenta || !user) return;
-
-    if (!motivoAnulacion.trim()) {
-      toast.error('Debe ingresar un motivo de anulación');
+  const openNcWizard = (item: Venta, preset: { alcance: 'parcial' | 'total'; anular: 'si' | 'no' }) => {
+    const comp = item.comprobantes_afip?.[0];
+    if (!comp) {
+      toast.error('La venta no tiene factura electrónica; no se puede emitir NC');
       return;
     }
-
-    try {
-      // Si existe una factura electrónica AFIP, emitir Nota de Crédito asociada
-      const compOriginal = selectedVenta.comprobantes_afip?.[0];
-      let ncEmitida: { tipo: number; punto_venta: number; numero: number; cae: string } | null = null;
-      if (compOriginal) {
-        // Mapear tipo de NC según la factura original
-        const ncTipoMap: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
-        const ncTipo = ncTipoMap[compOriginal.tipo_comprobante];
-        if (!ncTipo) {
-          toast.error('Tipo de comprobante original no soportado para NC automática');
-          return;
-        }
-
-        // Cargar detalles para armar los items de la NC
-        const { data: detNc } = await supabase
-          .from('venta_detalles')
-          .select('cantidad, precio_unitario, descuento_porcentaje, producto_temporal_nombre, productos(descripcion)')
-          .eq('venta_id', selectedVenta.id);
-
-        const itemsNc = (detNc as any[] | null || []).map((d) => {
-          const precioFinal = Number(d.precio_unitario) * (1 - (Number(d.descuento_porcentaje) || 0) / 100);
-          return {
-            descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Item',
-            cantidad: Number(d.cantidad),
-            precio_unitario: precioFinal / 1.21,
-            iva_id: 5,
-          };
-        });
-
-        const totalNc = Number(selectedVenta.total);
-        const netoNc = totalNc / 1.21;
-        const ivaNc = totalNc - netoNc;
-
-        const fechaAsoc = (compOriginal as any).fecha_emision
-          ? String((compOriginal as any).fecha_emision).replace(/-/g, '').slice(0, 8)
-          : undefined;
-
-        const { data: ncResult, error: ncErr } = await supabase.functions.invoke(
-          'afip-facturacion/emitir',
-          {
-            body: {
-              tipo_comprobante: ncTipo,
-              punto_venta: comercioConfig?.punto_venta || compOriginal.punto_venta || 1,
-              concepto: 1,
-              doc_tipo: compOriginal.doc_tipo,
-              doc_nro: Number(compOriginal.doc_nro) || 0,
-              condicion_iva_receptor: selectedVenta.clientes?.condicion_iva ?? 5,
-              importe_total: totalNc,
-              importe_neto: parseFloat(netoNc.toFixed(2)),
-              importe_iva: parseFloat(ivaNc.toFixed(2)),
-              items: itemsNc,
-              venta_id: selectedVenta.id,
-              cbtes_asoc: [{
-                tipo: compOriginal.tipo_comprobante,
-                punto_venta: compOriginal.punto_venta,
-                numero: compOriginal.numero_comprobante,
-                cuit: (compOriginal as any).cuit_emisor,
-                fecha: fechaAsoc,
-              }],
-            },
-          }
-        );
-
-        if (ncErr || (ncResult as any)?.error) {
-          const msg = ncErr?.message || (ncResult as any)?.error || 'Error desconocido';
-          toast.error('No se pudo emitir la Nota de Crédito en AFIP: ' + msg);
-          return;
-        }
-
-        const formatFechaAfip = (fecha: string): string => {
-          if (fecha && fecha.length === 8) return `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6, 8)}`;
-          return fecha || new Date().toISOString().split('T')[0];
-        };
-
-        const { error: insertNcErr } = await supabase
-          .from('comprobantes_afip')
-          .insert({
-            tipo_comprobante: ncTipo,
-            punto_venta: (ncResult as any).punto_venta,
-            numero_comprobante: (ncResult as any).numero_comprobante,
-            cae: (ncResult as any).cae,
-            cae_vencimiento: formatFechaAfip((ncResult as any).cae_vencimiento),
-            cuit_emisor: comercioConfig?.cuit?.replace(/\D/g, '') || (compOriginal as any).cuit_emisor || '',
-            doc_tipo: compOriginal.doc_tipo,
-            doc_nro: Number(compOriginal.doc_nro) || 0,
-            importe_total: totalNc,
-            importe_neto: parseFloat(netoNc.toFixed(2)),
-            importe_iva: parseFloat(ivaNc.toFixed(2)),
-            usuario_id: user.id,
-            venta_id: selectedVenta.id,
-          });
-
-        if (insertNcErr) {
-          toast.warning(`NC emitida (CAE: ${(ncResult as any).cae}) pero hubo error al guardar: ${insertNcErr.message}`);
-        } else {
-          toast.success(`Nota de Crédito emitida - CAE: ${(ncResult as any).cae}`);
-        }
-
-        ncEmitida = {
-          tipo: ncTipo,
-          punto_venta: (ncResult as any).punto_venta,
-          numero: (ncResult as any).numero_comprobante,
-          cae: (ncResult as any).cae,
-        };
-
-        // Imprimir ticket de la Nota de Crédito
-        try {
-          const detallesTicket = (detNc as any[] | null || []).map((d) => {
-            const precioFinal = Number(d.precio_unitario) * (1 - (Number(d.descuento_porcentaje) || 0) / 100);
-            const cant = Number(d.cantidad);
-            return {
-              nombre: d.productos?.descripcion || d.producto_temporal_nombre || 'Item',
-              cantidad: cant,
-              precio: precioFinal,
-              subtotal: precioFinal * cant,
-              descuento_porcentaje: Number(d.descuento_porcentaje) || 0,
-            };
-          });
-          imprimirTicketFactura({
-            comercio: comercioConfig ? {
-              nombre_fantasia: comercioConfig.nombre_fantasia,
-              razon_social: comercioConfig.razon_social,
-              direccion: comercioConfig.direccion,
-              localidad: comercioConfig.localidad,
-              provincia: comercioConfig.provincia,
-              cuit: comercioConfig.cuit,
-              condicion_iva: 'IVA Resp. Inscripto',
-              telefono: (comercioConfig as any).telefono,
-            } : null,
-            fecha: new Date(),
-            total: totalNc,
-            detalles: detallesTicket,
-            cliente: selectedVenta.clientes ? {
-              nombre: selectedVenta.clientes.nombre,
-              dni_cuit: selectedVenta.clientes.dni_cuit,
-              condicion_iva: selectedVenta.clientes.condicion_iva,
-            } : null,
-            factura: {
-              tipo_comprobante: ncTipo,
-              punto_venta: (ncResult as any).punto_venta,
-              numero_comprobante: (ncResult as any).numero_comprobante,
-              cae: (ncResult as any).cae,
-              cae_vencimiento: formatFechaAfip((ncResult as any).cae_vencimiento),
-              importe_total: totalNc,
-              importe_neto: parseFloat(netoNc.toFixed(2)),
-              importe_iva: parseFloat(ivaNc.toFixed(2)),
-              doc_nro: compOriginal.doc_nro,
-              comprobante_asociado: {
-                tipo_comprobante: compOriginal.tipo_comprobante,
-                punto_venta: compOriginal.punto_venta,
-                numero_comprobante: compOriginal.numero_comprobante,
-              },
-            },
-          });
-        } catch (printErr) {
-          console.error('Error al imprimir ticket NC:', printErr);
-        }
-      }
-
-      const { error } = await supabase
-        .from('ventas')
-        .update({
-          anulada: true,
-          motivo_anulacion: ncEmitida
-            ? `${motivoAnulacion} [NC ${ncEmitida.punto_venta.toString().padStart(4,'0')}-${ncEmitida.numero.toString().padStart(8,'0')} CAE ${ncEmitida.cae}]`
-            : motivoAnulacion,
-          fecha_anulacion: new Date().toISOString(),
-          anulada_por: user.id,
-        })
-        .eq('id', selectedVenta.id);
-
-      if (error) throw error;
-
-      // Restore stock for each product
-      const { data: detallesData } = await supabase
-        .from('venta_detalles')
-        .select('producto_id, cantidad')
-        .eq('venta_id', selectedVenta.id);
-
-      if (detallesData) {
-        for (const detalle of detallesData) {
-          const { data: producto } = await supabase
-            .from('productos')
-            .select('stock_actual')
-            .eq('id', detalle.producto_id)
-            .single();
-
-          if (producto) {
-            await supabase
-              .from('productos')
-              .update({ stock_actual: producto.stock_actual + detalle.cantidad })
-              .eq('id', detalle.producto_id);
-
-            // Register inventory movement
-            await supabase.from('movimientos_inventario').insert([{
-              producto_id: detalle.producto_id,
-              tipo: 'entrada',
-              cantidad: detalle.cantidad,
-              stock_anterior: producto.stock_actual,
-              stock_nuevo: producto.stock_actual + detalle.cantidad,
-              motivo: `Anulación venta #${selectedVenta.numero_comprobante}`,
-              usuario_id: user.id,
-              venta_id: selectedVenta.id,
-            }]);
-          }
-        }
-      }
-
-      // Register cash movement (negative)
-      if (selectedVenta.caja_id) {
-        await supabase.from('movimientos_caja').insert([{
-          caja_id: selectedVenta.caja_id,
-          usuario_id: user.id,
-          tipo: 'egreso',
-          concepto: `Anulación venta #${selectedVenta.numero_comprobante}`,
-          monto: selectedVenta.total,
-          venta_id: selectedVenta.id,
-        }]);
-
-        // Update caja totals
-        const { data: caja } = await supabase
-          .from('cajas')
-          .select('total_egresos')
-          .eq('id', selectedVenta.caja_id)
-          .single();
-
-        if (caja) {
-          await supabase
-            .from('cajas')
-            .update({ total_egresos: (caja.total_egresos || 0) + selectedVenta.total })
-            .eq('id', selectedVenta.caja_id);
-        }
-      }
-
-      toast.success('Venta anulada correctamente');
-      setAnularDialogOpen(false);
-      setMotivoAnulacion('');
-      setSelectedVenta(null);
-      fetchVentas();
-      setRefreshTotales(prev => prev + 1);
-    } catch (error) {
-      console.error('Error anulando venta:', error);
-      toast.error('Error al anular la venta');
-    }
+    setFacturaParaNc(comp);
+    setNcPreset(preset);
+    setNcWizardOpen(true);
   };
 
   const handleReintentarAfip = async (venta: Venta) => {
@@ -931,18 +682,25 @@ export default function Ventas() {
                 <RefreshCw className={`h-4 w-4 text-amber-600 ${reintentandoAfipId === item.id ? 'animate-spin' : ''}`} />
               </Button>
             )}
-          {!item._es_pedido && !item.anulada && canAnular && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setSelectedVenta(item);
-                setAnularDialogOpen(true);
-              }}
-              title="Anular venta"
-            >
-              <XCircle className="h-4 w-4 text-destructive" />
-            </Button>
+          {!item._es_pedido && !item.anulada && canAnular && item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openNcWizard(item, { alcance: 'parcial', anular: 'no' })}
+                title="Emitir Nota de Crédito"
+              >
+                <FileMinus className="h-4 w-4 text-amber-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openNcWizard(item, { alcance: 'total', anular: 'si' })}
+                title="Anular venta (NC total)"
+              >
+                <XCircle className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
           )}
         </div>
       ),
@@ -1350,54 +1108,18 @@ export default function Ventas() {
         </DialogContent>
       </Dialog>
 
-      {/* Anular Dialog */}
-      <AlertDialog open={anularDialogOpen} onOpenChange={setAnularDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Anular venta?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción anulará el comprobante #{selectedVenta?.numero_comprobante.toString().padStart(8, '0')} 
-              y devolverá el stock de los productos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {selectedVenta?.comprobantes_afip && selectedVenta.comprobantes_afip.length > 0 && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              <p className="font-semibold mb-1">Se emitirá una Nota de Crédito electrónica</p>
-              <p>
-                Al anular esta venta, el sistema emitirá automáticamente una Nota de Crédito en AFIP
-                referenciando la factura original{' '}
-                <span className="font-mono font-semibold">
-                  {TIPOS_COMPROBANTE[selectedVenta.comprobantes_afip[0].tipo_comprobante] || ''}{' '}
-                  {String(selectedVenta.comprobantes_afip[0].punto_venta).padStart(4, '0')}-
-                  {String(selectedVenta.comprobantes_afip[0].numero_comprobante).padStart(8, '0')}
-                </span>
-                {' '}por el mismo importe.
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="motivo">Motivo de anulación *</Label>
-            <Textarea
-              id="motivo"
-              value={motivoAnulacion}
-              onChange={(e) => setMotivoAnulacion(e.target.value)}
-              placeholder="Ingrese el motivo de la anulación..."
-            />
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setMotivoAnulacion('')}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleAnular} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Anular Venta
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* NC Wizard (parcial o total) */}
+      <NotaCreditoParcialWizard
+        open={ncWizardOpen}
+        onOpenChange={setNcWizardOpen}
+        factura={facturaParaNc}
+        presetAlcance={ncPreset.alcance}
+        presetAnularVenta={ncPreset.anular}
+        onEmitida={() => {
+          fetchVentas();
+          setRefreshTotales((n) => n + 1);
+        }}
+      />
 
       {/* Factura Dialog for Reprint */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>

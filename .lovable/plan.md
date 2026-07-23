@@ -1,102 +1,77 @@
+# Unificar NC en Ventas con el wizard existente
 
-## Alcance
-Cambios acotados en 2 archivos frontend: `src/pages/POS.tsx` y `src/pages/Imputacion.tsx`. No se toca la edge function (ya extendida en el turno anterior), ni el flujo FIFO, ni el trigger `transferencias_validar_transicion`, ni migraciones. Una transferencia sigue sin impactar cuenta corriente mientras esté `pendiente`.
+Alcance: solo front. No se toca la edge `afip-facturacion` ni `get_factura_saldo_disponible`.
 
-## 1) POS.tsx — validación relajada de `handleConfirmarTransferencia` (~L867-874)
+## Cambios
 
-Regla nueva:
-- `fecha` y `importe` → siempre obligatorios.
-- Si **NO** hay archivo adjunto (`transferenciaData.archivo`) → seguir exigiendo `cuil` (11 dígitos válidos) y `numero_operacion` como hoy.
-- Si **hay** archivo adjunto → permitir guardar con `cuil`, `titular` y `numero_operacion` vacíos. En ese caso:
-  - Si el usuario cargó CUIL pero es inválido (largo distinto de 11 y no vacío), seguir bloqueando: no aceptamos basura, sólo vacío.
-  - Se pasa `numero_operacion` como `null` a la RPC cuando está vacío (hoy se hace `.trim()` — se ajusta para permitir `null`). El `unique index` actual sobre `(cliente_id, numero_operacion)` no se dispara cuando el valor es NULL en Postgres.
+### 1) `src/components/facturacion/NotaCreditoParcialWizard.tsx` — props opcionales de preset
 
-Diálogo (líneas 3156-3206):
-- Cambiar los labels de "CUIL/CUIT *", "Número de comprobante *" a sin asterisco cuando hay archivo. Simplificación: mantenerlos con `*` pero agregar un **Alert** amarillo dentro del diálogo:
-  > "Podés adjuntar el comprobante y dejar los campos vacíos. Quedarán pendientes de completar desde Imputación con ayuda de IA."
-  Este alert se muestra siempre; el usuario elige.
-- En `POS.tsx` L1556, ya se pasa `numero_operacion: transferenciaData.numero_operacion.trim()` — cambiar a `numero_operacion.trim() || null` para no guardar string vacío.
-- Idem `titular_cuil` y `titular_nombre` → normalizar a `null` cuando vacíos.
-
-## 2) Imputacion.tsx — botón "Autocompletar con IA" + edición previa a validar
-
-Estado nuevo dentro del modal de detalle:
-```ts
-type FieldSource = 'manual' | 'ai' | null;
-type FieldMeta = { source: FieldSource; confianza?: 'alta' | 'media' | 'baja' };
-
-const [editableCampos, setEditableCampos] = useState<{
-  numero_operacion: string;
-  titular_nombre: string;
-  titular_cuil: string;
-  fecha_transferencia: string;
-  banco: string; // solo display, hoy no hay columna
-} | null>(null);
-
-const [camposMeta, setCamposMeta] = useState<Record<string, FieldMeta>>({});
-const [autocompletandoIA, setAutocompletandoIA] = useState(false);
-```
-
-Cuando se abre el detalle de una transferencia **pendiente** con al menos un campo faltante (`!numero_operacion || !titular_cuil || !titular_nombre`), en lugar de mostrar los campos como texto readonly, se muestran como `<Input>` editables inicializados con el valor actual (o vacío). Si están todos completos, se sigue mostrando el modo actual readonly (para no romper la UX cuando ya está todo cargado).
-
-Botón "Autocompletar con IA":
-- Ubicación: en la sección de comprobante, junto al botón "Cambiar comprobante".
-- `disabled` cuando: `!detalleTransfMov.foto_comprobante_path` || no está pendiente || `autocompletandoIA`.
-- Al clickear:
-  1. Descargar el archivo del bucket `comprobantes-cobros` con `supabase.storage.from('comprobantes-cobros').download(path)`.
-  2. Rechazar PDFs por ahora → toast "Solo imágenes JPG/PNG por IA. PDFs se completan manualmente." (la edge sólo acepta imágenes vía `image_url`).
-  3. Convertir Blob a base64 (`FileReader.readAsDataURL`, sacar prefix).
-  4. `supabase.functions.invoke('extraer-numero-operacion', { body: { imageBase64, mimeType } })`.
-  5. Rellenar sólo los campos que hoy están vacíos en `editableCampos` (no pisar lo que el usuario ya editó). Si el resultado del campo es `null`, dejarlo vacío. Nunca inventar.
-  6. Guardar en `camposMeta[campo] = { source: 'ai', confianza: r.confianza_campos[campo] || r.confianza }`.
-- Los `Input` de campos con `camposMeta[x].source === 'ai'` se distinguen visualmente con un borde azul (`border-blue-400`) y un pequeño badge con ícono ✨ + texto "IA · alta/media/baja" al lado del label. Cuando el usuario edita manualmente ese input (`onChange`), su `source` pasa a `'manual'` y el estilo vuelve a la normalidad.
-- Nada se guarda automáticamente. Junto a "Cerrar", cuando hay `editableCampos` modificados, aparece botón "Guardar cambios" que hace `UPDATE transferencias SET numero_operacion, titular_nombre, titular_cuil, fecha_transferencia WHERE id = transferencia_id` y refresca.
-
-Ícono/estilos: usar `Sparkles` de `lucide-react` para el botón IA; badge con `bg-blue-100 text-blue-700 border-blue-300`. Sin colores hardcodeados fuera del componente — se usan clases Tailwind ya presentes en el proyecto.
-
-Toasts:
-- `"Comprobante analizado con IA. Revisá los datos antes de validar."`
-- Errores 429/402 mapeados a mensajes en español ya usados en el proyecto.
-
-## 3) Revalidación de duplicado en `handleConfirmar` (L411-431)
-
-Antes del `UPDATE ... SET estado = 'validada'` sobre transferencias:
+Agregar dos props opcionales para que el llamador pueda abrir el wizard "preseteado":
 
 ```ts
-// Obtener numero_operacion actual (por si fue editado sin guardar aún, exigir guardar primero)
-const numOp = selectedMovimiento.numero_operacion?.trim();
-if (!numOp) {
-  toast.error('La transferencia no tiene número de operación. Completalo antes de validar.');
-  return;
-}
-const { data: dup } = await supabase
-  .from('transferencias')
-  .select('id, cliente_id')
-  .eq('numero_operacion', numOp)
-  .eq('estado', 'validada')
-  .neq('id', selectedMovimiento.transferencia_id)
-  .limit(1);
-
-if (dup && dup.length > 0) {
-  const mismoCliente = dup[0].cliente_id === selectedMovimiento.cliente_id;
-  const msg = mismoCliente
-    ? 'Ya existe otra transferencia validada del mismo cliente con este número de operación. ¿Confirmar de todos modos?'
-    : 'Ya existe una transferencia validada de OTRO cliente con este mismo número de operación. ¿Confirmar de todos modos?';
-  if (!window.confirm(msg)) { setProcessing(false); return; }
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  factura: FacturaOrigen | null;
+  onEmitida: () => void;
+  presetAlcance?: Alcance;         // "parcial" | "total"
+  presetAnularVenta?: "si" | "no"; // default "no"
 }
 ```
 
-- El unique index actual protege el clash `(cliente_id, numero_operacion)`. Esta revalidación añade cobertura cross-cliente (soft warning con `window.confirm`, no bloqueo duro).
-- Además exige que el número de operación esté cargado al momento de validar (regla natural: podés guardar la transferencia vacía, pero no validarla sin número).
+En el `useEffect` de reset (línea ~128) aplicar el preset si viene:
+- `setAlcance(presetAlcance ?? "parcial")`
+- `setAnularVenta(presetAnularVenta ?? "no")`
+- si `presetAlcance === "total"`: `setModo("bonificacion")` no aplica; el modo queda "items" por defecto, el usuario igual puede revisar. (El wizard ya soporta alcance total en modo items marcando todas las cantidades.)
 
-## 4) Post-condiciones / lo que NO se toca
+No se cambia lógica interna de emisión, validaciones, resolución financiera ni marcado de `anulada`.
 
-- Trigger `transferencias_validar_transicion` → no se modifica.
-- Índice único → no se modifica (la revalidación cross-cliente es sólo warning, no constraint).
-- Imputación FIFO / creación de `cliente_movimientos` al validar → sin cambios.
-- Edge function `extraer-numero-operacion` → ya extendida en el turno anterior (fecha, cuil_titular, titular, banco + confianza por campo).
-- La columna `banco` no existe hoy en `transferencias`. El campo devuelto por IA se muestra en pantalla como referencia informativa pero **no** se persiste. Si más adelante querés persistirlo, hace falta migración (fuera de alcance).
+### 2) `src/pages/Ventas.tsx` — reemplazar `handleAnular` propio por el wizard
 
-## Riesgos
-- Guardar transferencias con `numero_operacion = null` habilita casos donde el unique index no protege duplicados. Se compensa con la revalidación en validar (paso 3) y con el hecho de que sólo puede validarse una transferencia que ya tiene número cargado.
-- OCR por IA sobre PDFs no está soportado en esta iteración (edge sólo acepta `image_url`); se avisa al usuario.
+**a. Fetch de ventas:** ampliar el select de `comprobantes_afip` para incluir los campos que exige `FacturaOrigen` del wizard: agregar `cuit_emisor, venta_id` al select (ya trae el resto).
+
+**b. Estado nuevo:**
+```ts
+const [ncWizardOpen, setNcWizardOpen] = useState(false);
+const [facturaParaNc, setFacturaParaNc] = useState<any>(null);
+const [ncPreset, setNcPreset] = useState<{ alcance: "parcial" | "total"; anular: "si" | "no" }>({ alcance: "parcial", anular: "no" });
+```
+
+**c. Handlers:**
+- `openNcWizard(item, preset)`: setea `facturaParaNc = item.comprobantes_afip[0]`, `ncPreset = preset`, abre el wizard. Si la venta no tiene comprobante AFIP, `toast.error("La venta no tiene factura electrónica; no se puede emitir NC")` y no abre.
+- `onEmitida`: `fetchVentas()` + `setRefreshTotales(n => n + 1)`.
+
+**d. Grilla — columna Acciones (línea ~902):**
+- Eliminar el actual botón "Anular venta" que abre `AnularDialog`.
+- Agregar dos botones cuando `!item._es_pedido && !item.anulada && canAnular && item.comprobantes_afip?.length`:
+  - `FileText` — "Nota de crédito" → `openNcWizard(item, { alcance: "parcial", anular: "no" })`
+  - `XCircle` (destructive) — "Anular venta" → `openNcWizard(item, { alcance: "total", anular: "si" })`
+- Si no hay factura AFIP, no se muestra ninguno (la anulación sin factura queda fuera de alcance de este paso).
+
+**e. Eliminar:**
+- Función `handleAnular` (líneas ~436-688).
+- Estado `anularDialogOpen`, `motivoAnulacion` y el `<AlertDialog>` de anulación (buscar `AnularDialog` / `setAnularDialogOpen`).
+
+**f. Render del wizard** (antes del cierre de `MainLayout`):
+```tsx
+<NotaCreditoParcialWizard
+  open={ncWizardOpen}
+  onOpenChange={setNcWizardOpen}
+  factura={facturaParaNc}
+  presetAlcance={ncPreset.alcance}
+  presetAnularVenta={ncPreset.anular}
+  onEmitida={() => { fetchVentas(); setRefreshTotales(n => n + 1); }}
+/>
+```
+
+## Cobertura de los dos gaps (confirmación pedida)
+
+1. **Validación contra NCs previas (doble acreditación):** cubierta. Toda emisión pasa ahora por `get_factura_saldo_disponible`, que descuenta NCs previas y expone `monto_disponible`. El wizard bloquea si `monto_disponible <= 0` (paso 1 del wizard). Antes, `handleAnular` no consultaba saldos y podía emitir una NC total incluso con NCs parciales previas.
+2. **Reposición de stock:** cubierta. El wizard, en modo items, reingresa stock cuando `reingresarStock === "si"` (default) y registra el movimiento de inventario. Cuando "Anular venta" abra el wizard con `alcance="total" + anular="si"`, el modo por defecto es items con reingreso activo, así que la anulación total queda con reingreso equivalente al comportamiento anterior. Además marca `anulada=true` con `motivo_anulacion` que incluye referencia a la NC total.
+
+## Fuera de alcance (explícito)
+
+- Edge `afip-facturacion`: `CbtesAsoc` ya está correcto en el wizard.
+- `get_factura_saldo_disponible`: no se toca.
+- Ventas sin factura AFIP: quedan sin acción de anulación en este paso (se puede tratar aparte).
+- Movimientos de caja por anulación: el wizard resuelve financieramente por caja o CC según su propia lógica; ya no se replica el `movimientos_caja` egreso que hacía `handleAnular`.

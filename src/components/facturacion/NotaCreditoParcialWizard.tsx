@@ -89,9 +89,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   factura: FacturaOrigen | null;
   onEmitida: () => void;
+  presetAlcance?: Alcance;
+  presetAnularVenta?: "si" | "no";
 }
 
-export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitida }: Props) {
+export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitida, presetAlcance, presetAnularVenta }: Props) {
   const { user } = useAuth();
   const { hasRole } = useAuth();
   const { config: comercioConfig } = useConfiguracionComercio();
@@ -131,8 +133,8 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setMotivo("devolucion");
     setObservaciones("");
     setModo("items");
-    setAlcance("parcial");
-    setAnularVenta("no");
+    setAlcance(presetAlcance ?? "parcial");
+    setAnularVenta(presetAnularVenta ?? "no");
     setCantidades({});
     setReingresarStock("si");
     setTipoBonif("importe");
