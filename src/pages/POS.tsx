@@ -3168,6 +3168,9 @@ export default function POS() {
           </DialogHeader>
           {transferenciaData && (
             <div className="space-y-3">
+              <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2">
+                Podés adjuntar el comprobante y dejar CUIL, titular y número de operación vacíos. Quedarán pendientes de completar desde Imputación con ayuda de IA. Fecha e importe siguen siendo obligatorios.
+              </div>
               <div>
                 <Label>Fecha del comprobante *</Label>
                 <Input
