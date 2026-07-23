@@ -1099,54 +1099,18 @@ export default function Ventas() {
         </DialogContent>
       </Dialog>
 
-      {/* Anular Dialog */}
-      <AlertDialog open={anularDialogOpen} onOpenChange={setAnularDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Anular venta?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción anulará el comprobante #{selectedVenta?.numero_comprobante.toString().padStart(8, '0')} 
-              y devolverá el stock de los productos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {selectedVenta?.comprobantes_afip && selectedVenta.comprobantes_afip.length > 0 && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              <p className="font-semibold mb-1">Se emitirá una Nota de Crédito electrónica</p>
-              <p>
-                Al anular esta venta, el sistema emitirá automáticamente una Nota de Crédito en AFIP
-                referenciando la factura original{' '}
-                <span className="font-mono font-semibold">
-                  {TIPOS_COMPROBANTE[selectedVenta.comprobantes_afip[0].tipo_comprobante] || ''}{' '}
-                  {String(selectedVenta.comprobantes_afip[0].punto_venta).padStart(4, '0')}-
-                  {String(selectedVenta.comprobantes_afip[0].numero_comprobante).padStart(8, '0')}
-                </span>
-                {' '}por el mismo importe.
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="motivo">Motivo de anulación *</Label>
-            <Textarea
-              id="motivo"
-              value={motivoAnulacion}
-              onChange={(e) => setMotivoAnulacion(e.target.value)}
-              placeholder="Ingrese el motivo de la anulación..."
-            />
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setMotivoAnulacion('')}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleAnular} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Anular Venta
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* NC Wizard (parcial o total) */}
+      <NotaCreditoParcialWizard
+        open={ncWizardOpen}
+        onOpenChange={setNcWizardOpen}
+        factura={facturaParaNc}
+        presetAlcance={ncPreset.alcance}
+        presetAnularVenta={ncPreset.anular}
+        onEmitida={() => {
+          fetchVentas();
+          setRefreshTotales((n) => n + 1);
+        }}
+      />
 
       {/* Factura Dialog for Reprint */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
