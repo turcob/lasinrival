@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, X, Search, Clock, CreditCard, Building2, FileUp, Paperclip, Eye, Upload } from 'lucide-react';
+import { Check, X, Search, Clock, CreditCard, Building2, FileUp, Paperclip, Eye, Upload, Sparkles, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -415,6 +415,27 @@ export default function Imputacion() {
     try {
       // Caso transferencia POS / standalone → actualiza la tabla transferencias
       if (selectedMovimiento.source === 'transferencia' && selectedMovimiento.transferencia_id) {
+        // Revalidación de duplicados global: si otro registro validado ya usa
+        // el mismo numero_operacion (incluso de otro cliente), avisamos.
+        const numOp = selectedMovimiento.numero_operacion?.trim();
+        if (numOp) {
+          const { data: dupes } = await supabase
+            .from('transferencias')
+            .select('id, cliente_id, importe, fecha_transferencia')
+            .eq('numero_operacion', numOp)
+            .eq('estado', 'validada')
+            .neq('id', selectedMovimiento.transferencia_id);
+          if (dupes && dupes.length > 0) {
+            const otroCliente = dupes.some(d => d.cliente_id !== selectedMovimiento.cliente_id);
+            const msg = otroCliente
+              ? `Ya existe una transferencia validada con el mismo Nº de operación (${numOp}) en OTRO cliente. ¿Confirmar de todas formas?`
+              : `Ya existe una transferencia validada con el mismo Nº de operación (${numOp}). ¿Confirmar de todas formas?`;
+            if (!window.confirm(msg)) {
+              setProcessing(false);
+              return;
+            }
+          }
+        }
         const { error } = await supabase
           .from('transferencias')
           .update({ estado: 'validada' })
@@ -599,10 +620,172 @@ export default function Imputacion() {
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [loadingComprobante, setLoadingComprobante] = useState(false);
 
+  // Edición de campos faltantes en transferencia pendiente + autocompletado con IA
+  type FieldSource = 'manual' | 'ai';
+  type ConfLevel = 'alta' | 'media' | 'baja';
+  interface EditableCampos {
+    numero_operacion: string;
+    titular_nombre: string;
+    titular_cuil: string;
+    fecha_transferencia: string;
+    banco: string; // solo display, no se persiste
+  }
+  const [editableCampos, setEditableCampos] = useState<EditableCampos | null>(null);
+  const [camposMeta, setCamposMeta] = useState<Record<string, { source: FieldSource; confianza?: ConfLevel }>>({});
+  const [autocompletandoIA, setAutocompletandoIA] = useState(false);
+  const [savingCampos, setSavingCampos] = useState(false);
+
+  const transferenciaPendienteIncompleta = (mov: MovimientoPendiente | null) => {
+    if (!mov || mov.source !== 'transferencia') return false;
+    if (mov.estado_imputacion !== 'pendiente') return false;
+    return !mov.numero_operacion || !mov.titular_cuil || !mov.titular_nombre;
+  };
+
+  const setCampo = (key: keyof EditableCampos, value: string) => {
+    setEditableCampos(prev => (prev ? { ...prev, [key]: value } : prev));
+    // Al editar manualmente, marcar el campo como manual
+    setCamposMeta(prev => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      return next;
+    });
+  };
+
+  const handleAutocompletarIA = async () => {
+    if (!detalleTransfMov?.foto_comprobante_path || !editableCampos) return;
+    const path = detalleTransfMov.foto_comprobante_path;
+    if (/\.pdf$/i.test(path)) {
+      toast.error('Solo imágenes JPG/PNG por IA. Los PDF deben completarse manualmente.');
+      return;
+    }
+    setAutocompletandoIA(true);
+    try {
+      const { data: blob, error: dlErr } = await supabase.storage
+        .from('comprobantes-cobros')
+        .download(path);
+      if (dlErr || !blob) throw dlErr || new Error('No se pudo descargar el comprobante');
+
+      const mimeType = blob.type || 'image/jpeg';
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+      const imageBase64 = dataUrl.split(',')[1];
+
+      const { data, error } = await supabase.functions.invoke('extraer-numero-operacion', {
+        body: { imageBase64, mimeType },
+      });
+      if (error) throw error;
+
+      const r = (data || {}) as {
+        numero_operacion: string | null;
+        fecha: string | null;
+        cuil_titular: string | null;
+        titular: string | null;
+        banco: string | null;
+        confianza?: ConfLevel;
+        confianza_campos?: Record<string, ConfLevel>;
+      };
+
+      const cc = r.confianza_campos || {};
+      const nuevoMeta: Record<string, { source: FieldSource; confianza?: ConfLevel }> = { ...camposMeta };
+      const next = { ...editableCampos };
+
+      // Solo rellenar campos hoy vacíos; nunca pisar lo editado por el usuario
+      if (!next.numero_operacion && r.numero_operacion) {
+        next.numero_operacion = r.numero_operacion;
+        nuevoMeta.numero_operacion = { source: 'ai', confianza: r.confianza };
+      }
+      if (!next.fecha_transferencia && r.fecha) {
+        next.fecha_transferencia = r.fecha;
+        nuevoMeta.fecha_transferencia = { source: 'ai', confianza: cc.fecha };
+      }
+      if (!next.titular_cuil && r.cuil_titular) {
+        next.titular_cuil = r.cuil_titular;
+        nuevoMeta.titular_cuil = { source: 'ai', confianza: cc.cuil_titular };
+      }
+      if (!next.titular_nombre && r.titular) {
+        next.titular_nombre = r.titular;
+        nuevoMeta.titular_nombre = { source: 'ai', confianza: cc.titular };
+      }
+      if (!next.banco && r.banco) {
+        next.banco = r.banco;
+        nuevoMeta.banco = { source: 'ai', confianza: cc.banco };
+      }
+
+      setEditableCampos(next);
+      setCamposMeta(nuevoMeta);
+      toast.success('Comprobante analizado con IA. Revisá los datos antes de validar.');
+    } catch (e: any) {
+      console.error('Error autocompletando con IA:', e);
+      const msg = (e?.message || '').toLowerCase();
+      if (msg.includes('429')) toast.error('Demasiadas solicitudes de IA. Reintentá en unos segundos.');
+      else if (msg.includes('402')) toast.error('Créditos de IA insuficientes.');
+      else toast.error('No se pudo analizar el comprobante con IA');
+    } finally {
+      setAutocompletandoIA(false);
+    }
+  };
+
+  const handleGuardarCampos = async () => {
+    if (!detalleTransfMov?.transferencia_id || !editableCampos) return;
+    const cuilDigits = editableCampos.titular_cuil.replace(/\D/g, '');
+    if (cuilDigits && cuilDigits.length !== 11) {
+      toast.error('El CUIL/CUIT debe tener 11 dígitos, o dejarse vacío');
+      return;
+    }
+    if (editableCampos.fecha_transferencia && !/^\d{4}-\d{2}-\d{2}$/.test(editableCampos.fecha_transferencia)) {
+      toast.error('Fecha inválida');
+      return;
+    }
+    setSavingCampos(true);
+    try {
+      const payload: any = {
+        numero_operacion: editableCampos.numero_operacion.trim() || null,
+        titular_nombre: editableCampos.titular_nombre.trim() || null,
+        titular_cuil: cuilDigits || null,
+      };
+      if (editableCampos.fecha_transferencia) {
+        payload.fecha_transferencia = editableCampos.fecha_transferencia;
+      }
+      const { error } = await supabase
+        .from('transferencias')
+        .update(payload)
+        .eq('id', detalleTransfMov.transferencia_id);
+      if (error) throw error;
+
+      toast.success('Datos de la transferencia actualizados');
+      setDetalleTransfMov({
+        ...detalleTransfMov,
+        numero_operacion: payload.numero_operacion,
+        titular_nombre: payload.titular_nombre,
+        titular_cuil: payload.titular_cuil,
+        fecha_transferencia: payload.fecha_transferencia || detalleTransfMov.fecha_transferencia,
+      });
+      setCamposMeta({});
+      fetchMovimientos();
+    } catch (e: any) {
+      console.error('Error guardando campos:', e);
+      toast.error('No se pudo guardar: ' + (e?.message || ''));
+    } finally {
+      setSavingCampos(false);
+    }
+  };
+
   const openDetalleTransferencia = async (mov: MovimientoPendiente) => {
     setDetalleTransfMov(mov);
     setDetalleTransfOpen(true);
     setComprobanteUrl(null);
+    setCamposMeta({});
+    setEditableCampos({
+      numero_operacion: mov.numero_operacion || '',
+      titular_nombre: mov.titular_nombre || '',
+      titular_cuil: mov.titular_cuil || '',
+      fecha_transferencia: mov.fecha_transferencia || '',
+      banco: '',
+    });
     if (mov.foto_comprobante_path) {
       setLoadingComprobante(true);
       try {
@@ -1122,6 +1305,80 @@ export default function Imputacion() {
                         Rechazada el {format(new Date(detalleTransfMov.rechazado_at), "dd/MM/yyyy HH:mm", { locale: es })}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {detalleTransfMov.estado_imputacion === 'pendiente' && editableCampos && (
+                  <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-medium">Datos de la transferencia</Label>
+                        <div className="text-xs text-muted-foreground">
+                          Podés completar o corregir los campos. Usá "Autocompletar con IA" para leer el comprobante.
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!detalleTransfMov.foto_comprobante_path || autocompletandoIA}
+                          onClick={handleAutocompletarIA}
+                        >
+                          <Sparkles className="h-4 w-4 mr-1" />
+                          {autocompletandoIA ? 'Analizando...' : 'Autocompletar con IA'}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleGuardarCampos}
+                          disabled={savingCampos}
+                        >
+                          <Save className="h-4 w-4 mr-1" />
+                          {savingCampos ? 'Guardando...' : 'Guardar cambios'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const renderCampo = (
+                        key: keyof EditableCampos,
+                        label: string,
+                        opts: { mono?: boolean; type?: string; placeholder?: string } = {}
+                      ) => {
+                        const meta = camposMeta[key];
+                        const isAI = meta?.source === 'ai';
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Label className="text-xs">{label}</Label>
+                              {isAI && (
+                                <Badge variant="secondary" className="h-4 text-[10px] gap-1 px-1.5">
+                                  <Sparkles className="h-2.5 w-2.5" />
+                                  IA{meta?.confianza ? ` · ${meta.confianza}` : ''}
+                                </Badge>
+                              )}
+                            </div>
+                            <Input
+                              type={opts.type || 'text'}
+                              value={editableCampos[key]}
+                              onChange={(e) => setCampo(key, e.target.value)}
+                              placeholder={opts.placeholder}
+                              className={`${opts.mono ? 'font-mono' : ''} ${isAI ? 'border-primary/60 bg-primary/5' : ''}`}
+                            />
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="grid grid-cols-2 gap-3">
+                          {renderCampo('numero_operacion', 'Nº Operación', { mono: true })}
+                          {renderCampo('fecha_transferencia', 'Fecha', { type: 'date' })}
+                          {renderCampo('titular_nombre', 'Titular')}
+                          {renderCampo('titular_cuil', 'CUIL/CUIT', { mono: true, placeholder: '11 dígitos' })}
+                          {renderCampo('banco', 'Banco (referencia)')}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

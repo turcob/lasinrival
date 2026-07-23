@@ -867,11 +867,25 @@ export default function POS() {
   const handleConfirmarTransferencia = () => {
     if (!transferenciaData) return;
     if (!transferenciaData.fecha) return toast.error('Ingrese la fecha del comprobante');
-    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
-    if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
     const importeNum = parseFloat(transferenciaData.importe.replace(',', '.'));
     if (isNaN(importeNum) || importeNum <= 0) return toast.error('Ingrese un importe válido');
-    if (!transferenciaData.numero_operacion.trim()) return toast.error('Ingrese el número de comprobante / operación');
+
+    const cuilLimpio = transferenciaData.cuil.replace(/\D/g, '');
+    const numOpTrim = transferenciaData.numero_operacion.trim();
+    const tieneComprobante = !!transferenciaData.archivo;
+
+    if (tieneComprobante) {
+      // Modo flexible: se pueden dejar CUIL / titular / nro operación vacíos
+      // para completarlos luego desde Imputación (con ayuda de IA).
+      // Pero si el usuario cargó CUIL parcial, lo rechazamos: no aceptamos basura.
+      if (cuilLimpio.length > 0 && cuilLimpio.length !== 11) {
+        return toast.error('El CUIL/CUIT debe tener 11 dígitos, o dejarse vacío');
+      }
+    } else {
+      // Sin comprobante adjunto: obligamos los campos como siempre.
+      if (!cuilLimpio || cuilLimpio.length < 7) return toast.error('Ingrese un CUIL/CUIT válido');
+      if (!numOpTrim) return toast.error('Ingrese el número de comprobante / operación, o adjunte el comprobante');
+    }
 
     // Validar que el importe no exceda el pendiente
     const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
@@ -1552,8 +1566,8 @@ export default function POS() {
           fecha_transferencia: transferenciaData.fecha,
           cliente_id: selectedCliente?.id || null,
           titular_nombre: transferenciaData.titular.trim() || null,
-          titular_cuil: transferenciaData.cuil,
-          numero_operacion: transferenciaData.numero_operacion.trim(),
+          titular_cuil: transferenciaData.cuil.replace(/\D/g, '') || null,
+          numero_operacion: transferenciaData.numero_operacion.trim() || null,
           importe: parseFloat(transferenciaData.importe),
           foto_comprobante_path: fotoPath,
           foto_comprobante_nombre: fotoNombre,
@@ -3154,6 +3168,9 @@ export default function POS() {
           </DialogHeader>
           {transferenciaData && (
             <div className="space-y-3">
+              <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2">
+                Podés adjuntar el comprobante y dejar CUIL, titular y número de operación vacíos. Quedarán pendientes de completar desde Imputación con ayuda de IA. Fecha e importe siguen siendo obligatorios.
+              </div>
               <div>
                 <Label>Fecha del comprobante *</Label>
                 <Input
