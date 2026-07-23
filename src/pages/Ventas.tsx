@@ -673,18 +673,25 @@ export default function Ventas() {
                 <RefreshCw className={`h-4 w-4 text-amber-600 ${reintentandoAfipId === item.id ? 'animate-spin' : ''}`} />
               </Button>
             )}
-          {!item._es_pedido && !item.anulada && canAnular && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setSelectedVenta(item);
-                setAnularDialogOpen(true);
-              }}
-              title="Anular venta"
-            >
-              <XCircle className="h-4 w-4 text-destructive" />
-            </Button>
+          {!item._es_pedido && !item.anulada && canAnular && item.comprobantes_afip && item.comprobantes_afip.length > 0 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openNcWizard(item, { alcance: 'parcial', anular: 'no' })}
+                title="Emitir Nota de Crédito"
+              >
+                <FileMinus className="h-4 w-4 text-amber-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openNcWizard(item, { alcance: 'total', anular: 'si' })}
+                title="Anular venta (NC total)"
+              >
+                <XCircle className="h-4 w-4 text-destructive" />
+              </Button>
+            </>
           )}
         </div>
       ),
