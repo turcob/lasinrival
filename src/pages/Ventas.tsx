@@ -427,6 +427,16 @@ export default function Ventas() {
     }
   };
 
+  const openNcWizard = (item: Venta, preset: { alcance: 'parcial' | 'total'; anular: 'si' | 'no' }) => {
+    const comp = item.comprobantes_afip?.[0];
+    if (!comp) {
+      toast.error('La venta no tiene factura electrónica; no se puede emitir NC');
+      return;
+    }
+    setFacturaParaNc(comp);
+    setNcPreset(preset);
+    setNcWizardOpen(true);
+  };
 
   const handleReintentarAfip = async (venta: Venta) => {
     if (!user) return;
