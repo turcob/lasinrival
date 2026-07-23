@@ -880,8 +880,6 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
             </>
           )}
         </DialogFooter>
-        </>
-        )}
       </DialogContent>
     </Dialog>
   );
