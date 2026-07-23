@@ -118,14 +118,10 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
   const [tipoBonif, setTipoBonif] = useState<"importe" | "porcentaje">("importe");
   const [valorBonif, setValorBonif] = useState<number>(0);
 
-  // Resolución financiera (post-emisión, obligatoria)
-  const [ncEmitida, setNcEmitida] = useState<NcEmitidaState | null>(null);
-  const [tipoResolucionAuto, setTipoResolucionAuto] = useState<ResolucionTipo | null>(null);
-  const [motivoResolucion, setMotivoResolucion] = useState<string>("");
+  // Resolución financiera (sincrónica con la emisión)
   const [cajaPropia, setCajaPropia] = useState<CajaAbierta | null>(null);
-  const [cajasAbiertas, setCajasAbiertas] = useState<CajaAbierta[]>([]);
-  const [cajaSeleccionadaId, setCajaSeleccionadaId] = useState<string | null>(null);
-  const [resolviendo, setResolviendo] = useState(false);
+  const [compraMovId, setCompraMovId] = useState<string | null>(null);
+  const [saldoImpago, setSaldoImpago] = useState<number>(0);
 
   useEffect(() => {
     if (!open || !factura) return;
@@ -139,12 +135,9 @@ export function NotaCreditoParcialWizard({ open, onOpenChange, factura, onEmitid
     setReingresarStock("si");
     setTipoBonif("importe");
     setValorBonif(0);
-    setNcEmitida(null);
-    setTipoResolucionAuto(null);
-    setMotivoResolucion("");
     setCajaPropia(null);
-    setCajasAbiertas([]);
-    setCajaSeleccionadaId(null);
+    setCompraMovId(null);
+    setSaldoImpago(0);
     cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, factura?.id]);
