@@ -1,114 +1,95 @@
-## Objetivo
 
-Que toda NC quede resuelta financieramente **en el mismo acto de emisión**, contra la caja del usuario que la emite, salvo excepción de CC impaga. Precheck obligatorio antes de ir a AFIP, y vinculación atómica NC ↔ movimiento vía RPC.
+# Etapa 0 + Etapa 1 — POS mayorista tras feature flag
 
-## Cómo resuelvo la excepción de CC impaga (explícito, antes de aplicar)
+## Verificaciones previas (respondidas antes de decidir nada)
 
-Cuando la factura de origen tiene `venta_id`, calculo el saldo impago de esa venta puntual (no del cliente entero):
+### V1. ¿Preparar un pedido descuenta stock?
+**No.** `src/components/pedidos/PrepararPedidoDialog.tsx` solo lee `productos.stock_actual` para mostrarlo en pantalla; no hace ningún `UPDATE productos` ni inserta en `movimientos_inventario`. El único punto que descuenta stock en el circuito es `pos_registrar_venta` (bloque 4 "STOCK + MOVIMIENTOS INVENTARIO"). Compatible con lo que se necesita.
 
-1. Ubico el movimiento "compra" que la venta generó:
-   ```sql
-   select id, monto from cliente_movimientos
-   where venta_id = :venta_id and tipo = 'compra'
-     and coalesce(origen,'sistema') <> 'historico'
-   order by created_at asc limit 1;
-   ```
-2. Calculo lo ya imputado a esa factura:
-   ```sql
-   select coalesce(sum(monto),0) from cliente_movimiento_imputaciones
-   where movimiento_factura_id = :compra_id;
-   ```
-3. `saldo_impago = max(0, compra.monto - imputado)`.
+### V2. ¿Doble movimiento de caja si el pedido tiene `cobrado_en_entrega=true`?
+**Sí, si no lo bloqueamos.** `pedidos.cobrado_en_entrega` y `pedidos.monto_cobrado` los setean `RegistrarCobroDialog` (logística) y `useEncargado`. Esos flujos NO llaman a `pos_registrar_venta`: hoy insertan directo en `cliente_movimientos` (cobro CC) sin generar `movimientos_caja` de la venta (porque la venta todavía no existe). Pero si después el mostrador retoma ese pedido con la nueva rama y cobra, `pos_registrar_venta` volvería a asentar el ingreso completo en caja y el cliente_movimiento de la compra, contando dos veces el mismo dinero.
 
-Con eso reparto el `total_nc`:
+**Mitigación** (parte de esta etapa): la nueva rama rechaza pedidos con `monto_cobrado > 0` o `cobrado_en_entrega=true`. Si el usuario los intenta cobrar desde el POS, mostrar mensaje explícito y bloquear. Migración de esos casos queda fuera de alcance.
 
-- `monto_cc  = min(total_nc, saldo_impago)` → se imputa como NCR contra la deuda.
-- `monto_caja = total_nc - monto_cc` → egreso en la caja del emisor.
+## Atribución del vendedor — opciones a decidir
 
-Casos que quedan cubiertos:
+**Contexto verificado:**
+- El vendedor de campo se registra en `pedidos.vendedor_id` (FK a `vendedores`), NO en `pedidos.usuario_id` (usuario que creó la fila).
+- **Liquidaciones/comisiones ya se calculan sobre `pedidos.vendedor_id`** (`LiquidacionSection.tsx` L164, L454). No leen `ventas.usuario_id`. Cobrar desde el mostrador NO afecta comisiones hoy.
+- El único problema real es visibilidad en `/ventas`: `get_ventas_lista` filtra por `v.usuario_id = auth.uid()` y para pedidos por `p.usuario_id = auth.uid()`. Si el mostrador cobra, el vendedor de campo pierde de vista "su" venta.
 
-| Escenario | monto_cc | monto_caja | Requiere caja abierta |
-|---|---|---|---|
-| Venta contado (sin `compra` en CC) | 0 | total_nc | Sí |
-| Venta CC ya pagada | 0 | total_nc | Sí (le "devolvés" lo que ya cobraste) |
-| Venta CC totalmente impaga y NC ≤ saldo | total_nc | 0 | No |
-| Venta CC parcialmente pagada y NC > saldo | saldo_impago | resto | Sí, sólo por el resto |
-| NC sin `venta_id` (bonificación suelta) | 0 | total_nc | Sí |
+### Opción A — No hacer nada
+- `ventas.usuario_id` = mostrador. Vendedor no ve la venta en `/ventas`.
+- Comisiones: sin impacto (usan `pedidos.vendedor_id`).
+- Impacto `get_ventas_lista`: 0.
+- Impacto liquidaciones: 0.
+- Costo: bajo. Riesgo: el vendedor reclama no ver sus ventas cobradas.
 
-Consumidor Final entra siempre por caja porque no hay `cliente_movimientos` a imputar.
+### Opción B — Nuevo campo `ventas.vendedor_id` + visibilidad OR
+- Al cobrar un pedido, copiar `pedidos.vendedor_id` (traducido a `user_id` via `empleados.user_id`/`vendedores`) a `ventas.vendedor_id`.
+- `get_ventas_lista`: cambiar la cláusula a `v.usuario_id = uid OR v.vendedor_id = uid` (y análogo para `pedidos`). El admin sigue viendo todo.
+- Impacto liquidaciones: 0 (siguen usando `pedidos.vendedor_id`, no cambian).
+- Costo: 1 columna nueva + 1 RPC modificada + copia en `pos_registrar_venta`.
+- Riesgo: bajo. Requiere resolver el mapeo `vendedores → user_id`. Si un vendedor no tiene `user_id` asociado, `vendedor_id` en la venta queda NULL — no rompe nada, solo no gana visibilidad extra.
 
-## Precheck antes de AFIP
+### Opción C — Sobrescribir `ventas.usuario_id` con el vendedor
+- Descartado. Rompe la relación "quién operó la caja" que hoy usan reportes de caja, arqueo y auditoría.
 
-Se corre **antes** de invocar la edge `afip-facturacion/emitir`. Si falla, no se emite:
+**Necesito que elijas A o B antes de aplicar.** Recomendaría B, pero es tu llamado.
 
-- Si `monto_caja > 0` y el usuario no tiene una caja en estado `abierta` (buscada por `usuario_id = auth.uid()`), se bloquea con mensaje:
-  > "No podés emitir esta Nota de Crédito: necesitás una caja abierta a tu nombre para registrar el egreso de $X. Abrí tu caja y volvé a intentar."
+## Alcance a implementar (una vez elegida la opción)
 
-Se elimina el selector de "elegir caja" para admin: siempre la caja propia del emisor. Menos superficie de error, más trazabilidad.
+### Etapa 0 — Feature flag
+- Migración: `ALTER TABLE public.configuracion_comercio ADD COLUMN pos_flujo_mayorista_activo boolean NOT NULL DEFAULT false;`
+- Extender `useConfiguracionComercio` para exponer el flag.
+- Con flag=false, cero cambios de comportamiento.
 
-## Registro atómico post-CAE
+### Etapa 1 — Cobrar pedido preparado
+1. **Enum `pedido_estado`**: agregar valor `'facturado'` (`ALTER TYPE public.pedido_estado ADD VALUE IF NOT EXISTS 'facturado';`). Se ejecuta en su propia migración por restricción de Postgres (ADD VALUE no puede usarse en la misma transacción que consultas contra el enum).
 
-Nueva RPC `public.resolver_nota_credito` (SECURITY DEFINER):
+2. **Migración de `pos_registrar_venta`** — agregar parámetro opcional `p_pedido_id uuid DEFAULT NULL` (distinto de `p_editing_pedido_id` que es para el legado). Cuando viene:
+   - `SET LOCAL lock_timeout = '5s'` + `pg_advisory_xact_lock(hashtext('pos_registrar_venta:pedido_mayorista:' || p_pedido_id))`.
+   - `SELECT ... FROM public.pedidos WHERE id = p_pedido_id FOR UPDATE` con validaciones: estado='preparado', `venta_id IS NULL`, `COALESCE(cobrado_en_entrega,false)=false`, `COALESCE(monto_cobrado,0)=0`. `RAISE EXCEPTION` explícito en cada caso.
+   - Al final del bloque, `UPDATE public.pedidos SET estado='facturado', venta_id = v_venta_id, updated_at = now() WHERE id = p_pedido_id;`
+   - Insertar en `pedido_historial` la transición.
+   - (Opción B, si se elige): copiar `vendedor_id` a `ventas.vendedor_id` (requiere agregar la columna en una migración previa).
 
-```
-resolver_nota_credito(
-  p_comprobante_nc_id uuid,
-  p_caja_id uuid,            -- null si monto_caja = 0
-  p_cliente_id uuid,         -- null si monto_cc = 0
-  p_monto_caja numeric,
-  p_monto_cc numeric,
-  p_factura_compra_mov_id uuid, -- para imputación (opcional)
-  p_concepto_caja text,
-  p_concepto_cc text,
-  p_venta_id uuid
-) returns jsonb
-```
+3. **UI en `POS.tsx`** — nueva rama condicionada al flag:
+   - Nueva pantalla/tab "Cobrar pedido preparado" (aparece solo si `pos_flujo_mayorista_activo=true`; sino, todo queda como hoy).
+   - Lista de `pedidos` con `estado='preparado'` y `venta_id IS NULL` y `cobrado_en_entrega=false`.
+   - Al seleccionar: carga cart desde `pedido_detalles.cantidad_entregada` (fallback a `cantidad_pedida` si es NULL), permite ajuste final de cantidades/precio/descuento (mismo componente de línea).
+   - Al confirmar cobro: llama `pos_registrar_venta` con `p_pedido_id` en vez de `p_editing_pedido_id`. Reutiliza toda la pipeline de medios de pago existente.
+   - Post-cobro: imprime ticket/factura como el flujo actual.
+   - La rama vieja ("Guardar pedido" con `ventas.estado='pedido'` + "Cargar pedido") permanece sin cambios.
 
-En una única transacción:
-1. Bloquea la fila de `comprobantes_afip` con `for update`.
-2. Rechaza si ya tiene `resolucion_financiera` (idempotencia).
-3. Si `p_monto_caja > 0`: inserta `movimientos_caja` (tipo `egreso`), actualiza `cajas.total_egresos`.
-4. Si `p_monto_cc > 0`: inserta `cliente_movimientos` (tipo `nota_credito`) y, si viene `p_factura_compra_mov_id`, inserta `cliente_movimiento_imputaciones` por `p_monto_cc`.
-5. `update comprobantes_afip set resolucion_financiera = case when caja>0 and cc>0 then 'mixta' when caja>0 then 'caja' else 'cuenta_corriente' end, caja_movimiento_id = ..., resolucion_cliente_movimiento_id = ..., resolucion_at = now(), resolucion_por = auth.uid()`.
-6. Todo en la misma transacción: si falla cualquier paso, `raise` y se revierte.
+4. **Ocultar la pantalla vieja bajo flag**: NO — la conservamos accesible siempre (requisito del rediseño). Solo se agrega la nueva.
 
-Los UNIQUE parciales existentes (`comprobantes_afip_caja_mov_uniq`, `comprobantes_afip_cc_mov_uniq`) siguen previniendo doble uso.
+## Archivos que se tocan
 
-Emisión ↔ resolución: como el CAE de AFIP no se puede rollbackear, la garantía viene por el precheck (nunca se llama a AFIP si la caja no está abierta) más la RPC atómica. Si algo excepcional fallara post-CAE (ej. la fila de la NC se guardó pero la RPC falla por race), la NC queda visible en `ResolucionesPendientes` — que sigue funcionando sin cambios.
+- Migración 1: `configuracion_comercio.pos_flujo_mayorista_activo`.
+- Migración 2: `ALTER TYPE pedido_estado ADD VALUE 'facturado'`.
+- Migración 3 (solo Opción B): `ventas.vendedor_id uuid` + index.
+- Migración 4: `CREATE OR REPLACE FUNCTION public.pos_registrar_venta(...)` con nuevo parámetro y bloque de pedido mayorista.
+- `src/hooks/useConfiguracionComercio.ts` (o donde viva) — exponer flag.
+- `src/pages/POS.tsx` — nueva rama + selector de pedido preparado + wiring a la RPC.
+- `src/integrations/supabase/types.ts` — regenerado tras migraciones.
+- `src/components/pedidos/PrepararPedidoDialog.tsx` — sin cambios (verificado, no afecta stock).
 
-## Cambios de código
+## Qué se puede romper y cómo se prueba
 
-### 1. `supabase/migration` — nueva RPC `resolver_nota_credito`
+- **Doble facturación de un pedido:** cubierto por advisory lock + validación `venta_id IS NULL`. Test manual: dos pestañas cobrando el mismo pedido — la segunda debe fallar limpiamente.
+- **Doble cobro (entrega + POS):** cubierto por validación `cobrado_en_entrega=false AND monto_cobrado=0`. Test: cobrar parcialmente en entrega, intentar cobrar en POS → error explícito.
+- **Flag off:** POS luce idéntico a hoy. Test: crear pedido, cobrar por rama vieja "Cargar pedido", verificar que todo funciona.
+- **Flag on:** nueva pantalla visible, cobrar un pedido preparado, verificar `pedidos.estado='facturado'`, `pedidos.venta_id`, `ventas.estado='confirmada'`, stock descontado 1 sola vez, `movimientos_caja` con 1 sola entrada, `cliente_movimientos` con 1 sola compra, ticket impreso, AFIP emitido si corresponde.
+- **Visibilidad (Opción B):** vendedor de campo entra a `/ventas` y ve la venta cobrada por el mostrador.
+- **Regresión legado:** rama `estado='pedido'` en `ventas` sigue funcionando (no se toca `crear_venta_completa` ni la rama `p_editing_pedido_id`).
 
-Contiene la lógica descrita arriba. También agrega `resolucion_financiera in ('caja','cuenta_corriente','mixta')` implícito por uso (no se agrega CHECK para no romper histórico).
+## Fuera de alcance (etapas siguientes)
 
-### 2. `src/components/facturacion/NotaCreditoParcialWizard.tsx`
+- Etapa 2: crear pedidos desde POS (que "Guardar pedido" escriba en `pedidos` en vez de `ventas.estado='pedido'`).
+- Migración masiva de `ventas.estado='pedido'` legadas.
+- Cobro parcial desde POS de pedidos con `monto_cobrado > 0` (requiere lógica de conciliación separada).
 
-- **Cargar caja propia y saldo de CC antes de emitir** (`cargarDatos`):
-  - Buscar caja abierta del `user.id`.
-  - Si `factura.venta_id`, cargar `compra_mov` y `saldo_impago` (dos selects).
-  - Calcular `montoCaja / montoCC` en un `useMemo` a partir del `totalNc`.
-- **Deshabilitar el botón "Emitir"** cuando `montoCaja > 0 && !cajaPropia`, con banner rojo indicando el motivo.
-- **En `handleEmitir`**, antes del `invoke("afip-facturacion/emitir", ...)`:
-  - Re-chequear caja abierta si `montoCaja > 0`. Si no hay → `toast.error` y return sin llamar a AFIP.
-- **Reemplazar** todo el bloque de "resolución financiera automática" (líneas 571–644) por una única llamada a `supabase.rpc("resolver_nota_credito", { ... })` con los parámetros calculados. Ya no hay tres inserts sueltos ni actualización manual de `total_egresos`.
-- **Eliminar** el modo "post-emisión con selector de caja del admin" (bloque `ncEmitida` en el render, líneas ~660–818, y estados `ncEmitida`, `cajaSeleccionadaId`, `cajasAbiertas`, `confirmarResolucion`, `resolviendo`). Ya no aplica: la resolución es sincrónica con la emisión y siempre en la caja propia.
-- Se conserva `tipoResolucionAuto` sólo como label informativo en el paso 4 ("Se descontará $X de tu caja y $Y de la CC del cliente").
+## Decisión que necesito antes de tocar código
 
-### 3. `src/components/facturacion/ResolucionesPendientes.tsx`
-
-**No se toca.** Sigue leyendo NCs con `resolucion_financiera is null` para las históricas. Puede llamar internamente a la nueva RPC en lugar de sus inserts sueltos (mejora opcional), pero fuera del alcance.
-
-## Fuera de alcance
-
-- Cambios en `afip-facturacion` (no se toca).
-- Cambio del comportamiento de `ResolucionesPendientes` (sigue igual).
-- CHECK constraint sobre `resolucion_financiera` (histórico puede tener otros valores).
-- POS / NC desde Ventas: usan el mismo wizard, así que quedan cubiertos por el cambio en `NotaCreditoParcialWizard.tsx`.
-
-## Orden de aplicación
-
-1. Migración con la RPC `resolver_nota_credito`.
-2. Cambios en `NotaCreditoParcialWizard.tsx`.
-
-Antes de aplicar te muestro el diff concreto de cada archivo.
+Elegí **A** (no propagar vendedor) o **B** (nueva columna `ventas.vendedor_id` + visibilidad OR). El resto del plan no cambia.
