@@ -757,6 +757,14 @@ export default function Imputacion() {
     setDetalleTransfMov(mov);
     setDetalleTransfOpen(true);
     setComprobanteUrl(null);
+    setCamposMeta({});
+    setEditableCampos({
+      numero_operacion: mov.numero_operacion || '',
+      titular_nombre: mov.titular_nombre || '',
+      titular_cuil: mov.titular_cuil || '',
+      fecha_transferencia: mov.fecha_transferencia || '',
+      banco: '',
+    });
     if (mov.foto_comprobante_path) {
       setLoadingComprobante(true);
       try {
