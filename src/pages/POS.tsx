@@ -1767,30 +1767,9 @@ export default function POS() {
     }
   };
 
-  const fetchPedidos = async () => {
-    if (!user) return;
-    setLoadingPedidos(true);
-    try {
-      const { data, error } = await supabase
-        .from('ventas')
-        .select(`
-          *,
-          clientes(id, nombre, dni_cuit, condicion_iva),
-          empleados(id, nombre, dni),
-          venta_detalles(*, productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo))
-        `)
-        .eq('estado', 'pedido')
-        .eq('anulada', false)
-        .order('fecha', { ascending: false });
-
-      if (error) throw error;
-      setPedidos(data || []);
-    } catch (error) {
-      toast.error('Error al cargar los pedidos');
-    } finally {
-      setLoadingPedidos(false);
-    }
-  };
+  // Nota: la lista de pedidos en curso (borrador / en_preparacion / preparado)
+  // ahora vive en <PedidosMostradorPanel/>, que maneja su propio fetch y refresco.
+  // Cambios locales piden refresco vía bumpPedidosPanel().
 
   const fetchPedidosMayorista = async () => {
     if (!user) return;
