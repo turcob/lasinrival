@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ClipboardList, Printer, Trash2, Package, CircleDashed, RefreshCw, Plus } from 'lucide-react';
+import { ClipboardList, Printer, Trash2, Package, CircleDashed, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type PedidoMostradorEstado = 'pedido' | 'en_preparacion' | 'preparado';
