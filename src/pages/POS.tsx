@@ -232,11 +232,14 @@ export default function POS() {
   const emitiendoRef = useRef(false);
   
   // Pedidos
-  const [pedidosDialogOpen, setPedidosDialogOpen] = useState(false);
-  const [pedidos, setPedidos] = useState<any[]>([]);
-  const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
+  const [editingPedidoEstado, setEditingPedidoEstado] = useState<'pedido' | 'en_preparacion' | 'preparado' | null>(null);
   const [guardandoPedido, setGuardandoPedido] = useState(false);
+  const [pedidosPanelRefreshKey, setPedidosPanelRefreshKey] = useState(0);
+  const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
+  const [pedidoParaPreparar, setPedidoParaPreparar] = useState<any | null>(null);
+  const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
+  const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
   const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
