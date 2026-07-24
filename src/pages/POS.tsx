@@ -4373,6 +4373,73 @@ export default function POS() {
         productoId={pendingDescuento?.productoId}
         descripcionProducto={pendingDescuento?.descripcion}
       />
+
+      {/* Pedidos Preparados (Flujo Mayorista) */}
+      <Dialog open={pedidosMayoristaDialogOpen} onOpenChange={setPedidosMayoristaDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Pedidos preparados listos para cobrar
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {loadingPedidosMayorista ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Cargando pedidos...</p>
+              </div>
+            ) : pedidosMayorista.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mb-2" />
+                <p>No hay pedidos preparados pendientes de cobro</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pedidosMayorista.map((pedido) => (
+                  <Card key={pedido.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-mono font-medium">
+                              #{String(pedido.numero_pedido).padStart(6, '0')}
+                            </span>
+                            <Badge variant="secondary">{pedido.tipo_pedido}</Badge>
+                            <Badge variant="outline">Preparado</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(pedido.fecha_pedido).toLocaleString('es-AR')}
+                          </p>
+                          <p className="text-sm mt-1 truncate">
+                            Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {(pedido.pedido_detalles || []).length} ítem(s)
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-lg">
+                            ${Number(pedido.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="mt-2"
+                            onClick={() => handleCargarPedidoMayorista(pedido)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Cobrar
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
