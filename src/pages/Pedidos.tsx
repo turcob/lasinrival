@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -48,6 +48,7 @@ import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog'
 import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
 import { TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
+import { TipoPedidoProvider, useTipoPedido } from '@/contexts/TipoPedidoContext';
 
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   borrador: { label: 'Borrador', color: 'bg-muted text-muted-foreground', icon: Clock },
@@ -65,7 +66,11 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
-  return <PedidosContent />;
+  return (
+    <TipoPedidoProvider>
+      <PedidosContent />
+    </TipoPedidoProvider>
+  );
 }
 
 function PedidosContent() {
@@ -82,6 +87,13 @@ function PedidosContent() {
   const [tabActiva, setTabActiva] = useState<'reparto' | 'web' | 'consolidado'>('reparto');
 
   const tipoPedidoFiltro: 'web' | 'reparto' = tabActiva === 'web' ? 'web' : 'reparto';
+
+  const { setTipo, setModalAbierto } = useTipoPedido();
+
+  useEffect(() => {
+    setModalAbierto(false);
+    setTipo(tabActiva === 'consolidado' ? 'ambos' : tipoPedidoFiltro);
+  }, [tabActiva, tipoPedidoFiltro, setTipo, setModalAbierto]);
 
   const { data: pedidos, isLoading } = usePedidos({
     tipoPedido: tabActiva === 'consolidado' ? undefined : tipoPedidoFiltro,
