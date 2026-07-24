@@ -4407,6 +4407,8 @@ export type Database = {
           monto_acreditado: number
           motivo_anulacion: string | null
           numero_comprobante: number | null
+          preparado_at: string | null
+          preparado_por: string | null
           subtotal: number
           total: number
           usuario_id: string
@@ -4428,6 +4430,8 @@ export type Database = {
           monto_acreditado?: number
           motivo_anulacion?: string | null
           numero_comprobante?: number | null
+          preparado_at?: string | null
+          preparado_por?: string | null
           subtotal?: number
           total?: number
           usuario_id: string
@@ -4449,6 +4453,8 @@ export type Database = {
           monto_acreditado?: number
           motivo_anulacion?: string | null
           numero_comprobante?: number | null
+          preparado_at?: string | null
+          preparado_por?: string | null
           subtotal?: number
           total?: number
           usuario_id?: string
@@ -5103,6 +5109,15 @@ export type Database = {
       is_route_owner: { Args: { route_id: string }; Returns: boolean }
       is_route_responsable: { Args: { route_id: string }; Returns: boolean }
       is_stop_owner: { Args: { stop_id: string }; Returns: boolean }
+      pos_actualizar_pedido_estado: {
+        Args: {
+          p_detalles?: Json
+          p_nuevo_estado: string
+          p_venta?: Json
+          p_venta_id: string
+        }
+        Returns: Json
+      }
       pos_registrar_venta: {
         Args: {
           p_caja_movimiento?: Json

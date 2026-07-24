@@ -62,6 +62,9 @@ import {
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
+import { PedidosMostradorPanel, type PedidoMostrador } from '@/components/pos/PedidosMostradorPanel';
+import { PrepararMostradorDialog } from '@/components/pos/PrepararMostradorDialog';
+import { imprimirPickingMostrador } from '@/lib/imprimirPickingMostrador';
 
 interface Producto {
   id: string;
@@ -229,11 +232,29 @@ export default function POS() {
   const emitiendoRef = useRef(false);
   
   // Pedidos
-  const [pedidosDialogOpen, setPedidosDialogOpen] = useState(false);
-  const [pedidos, setPedidos] = useState<any[]>([]);
-  const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
+  const [editingPedidoEstado, setEditingPedidoEstado] = useState<'pedido' | 'en_preparacion' | 'preparado' | null>(null);
   const [guardandoPedido, setGuardandoPedido] = useState(false);
+  const [pedidosPanelRefreshKey, setPedidosPanelRefreshKey] = useState(0);
+  const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
+  const [pedidoParaPreparar, setPedidoParaPreparar] = useState<any | null>(null);
+  const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
+  const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
+
+  const adaptarVentaParaPicking = (v: any) => ({
+    numero: v.numero_comprobante
+      ? `#${String(v.numero_comprobante).padStart(6, '0')}`
+      : `P-${String(v.id).slice(0, 6).toUpperCase()}`,
+    fecha: new Date(v.fecha),
+    cliente: v.clientes?.nombre || v.empleados?.nombre || 'Consumidor Final',
+    items: (v.venta_detalles || []).map((d: any) => ({
+      codigo: d.productos?.codigo_articulo ?? null,
+      descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Producto',
+      cantidad: Number(d.cantidad ?? 0),
+      unidad_medida: d.productos?.unidad_medida ?? 'u',
+      es_temporal: !!d.producto_temporal_nombre,
+    })),
+  });
 
   // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
   const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
@@ -1751,7 +1772,8 @@ export default function POS() {
       setTransferenciaData(null);
       
       fetchData();
-      fetchPedidos();
+      bumpPedidosPanel();
+      setEditingPedidoEstado(null);
     } catch (error) {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
@@ -1761,30 +1783,9 @@ export default function POS() {
     }
   };
 
-  const fetchPedidos = async () => {
-    if (!user) return;
-    setLoadingPedidos(true);
-    try {
-      const { data, error } = await supabase
-        .from('ventas')
-        .select(`
-          *,
-          clientes(id, nombre, dni_cuit, condicion_iva),
-          empleados(id, nombre, dni),
-          venta_detalles(*, productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo))
-        `)
-        .eq('estado', 'pedido')
-        .eq('anulada', false)
-        .order('fecha', { ascending: false });
-
-      if (error) throw error;
-      setPedidos(data || []);
-    } catch (error) {
-      toast.error('Error al cargar los pedidos');
-    } finally {
-      setLoadingPedidos(false);
-    }
-  };
+  // Nota: la lista de pedidos en curso (borrador / en_preparacion / preparado)
+  // ahora vive en <PedidosMostradorPanel/>, que maneja su propio fetch y refresco.
+  // Cambios locales piden refresco vía bumpPedidosPanel().
 
   const fetchPedidosMayorista = async () => {
     if (!user) return;
@@ -2004,7 +2005,12 @@ export default function POS() {
 
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
-    setPedidosDialogOpen(false);
+    setEditingPedidoEstado((pedido.estado as any) || 'pedido');
+    if (pedido.clientes) setSelectedCliente(pedido.clientes);
+    if (pedido.empleados) {
+      setSelectedEmpleado(pedido.empleados);
+      setIsVentaEmpleado(true);
+    }
   };
 
   const handleEliminarPedido = async (pedidoId: string) => {
@@ -2019,10 +2025,74 @@ export default function POS() {
         .update({ anulada: true, motivo_anulacion: 'Pedido cancelado' })
         .eq('id', pedidoId);
 
-      fetchPedidos();
+      bumpPedidosPanel();
+      if (editingPedidoId === pedidoId) {
+        setEditingPedidoId(null);
+        setEditingPedidoEstado(null);
+        setCart([]);
+      }
     } catch (error) {
       toast.error('Error al eliminar el pedido');
     }
+  };
+
+  const handleEnviarPreparacion = async () => {
+    if (!editingPedidoId) {
+      toast.error('Primero guardá el borrador');
+      return;
+    }
+    setEnviandoPreparacion(true);
+    try {
+      const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
+        p_venta_id: editingPedidoId,
+        p_nuevo_estado: 'en_preparacion',
+      } as any);
+      if (error) throw error;
+
+      // Traer el pedido completo para imprimir el picking
+      const { data: ped } = await supabase
+        .from('ventas')
+        .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+        .eq('id', editingPedidoId)
+        .single();
+      if (ped) imprimirPickingMostrador(adaptarVentaParaPicking(ped));
+
+      setCart([]);
+      setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
+      setDescuentoGlobal(0);
+      setEditingPedidoId(null);
+      setEditingPedidoEstado(null);
+      bumpPedidosPanel();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo enviar a preparación');
+    } finally {
+      setEnviandoPreparacion(false);
+    }
+  };
+
+  const handleAbrirPreparacion = async (pedido: PedidoMostrador) => {
+    const { data, error } = await supabase
+      .from('ventas')
+      .select(`*, clientes(nombre), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+      .eq('id', pedido.id)
+      .single();
+    if (error || !data) {
+      toast.error('No se pudo cargar el pedido');
+      return;
+    }
+    setPedidoParaPreparar(data);
+    setPrepararDialogOpen(true);
+  };
+
+  const handleReimprimirPicking = async (pedido: PedidoMostrador) => {
+    const { data } = await supabase
+      .from('ventas')
+      .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+      .eq('id', pedido.id)
+      .single();
+    if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
   };
 
   const handleImprimirPedido = (pedido: any) => {
@@ -2892,7 +2962,7 @@ export default function POS() {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || guardandoPedido}
                 onClick={handleGuardarPedido}
               >
                 {guardandoPedido ? (
@@ -2900,26 +2970,81 @@ export default function POS() {
                 ) : editingPedidoId ? (
                   <>
                     <Check className="mr-1 h-4 w-4" />
-                    Actualizar
+                    Actualizar borrador
                   </>
                 ) : (
                   <>
                     <ClipboardList className="mr-1 h-4 w-4" />
-                    Pedido
+                    Guardar borrador
                   </>
                 )}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  fetchPedidos();
-                  setPedidosDialogOpen(true);
-                }}
+                disabled={
+                  cart.length === 0 ||
+                  enviandoPreparacion ||
+                  guardandoPedido ||
+                  !editingPedidoId ||
+                  editingPedidoEstado !== 'pedido'
+                }
+                onClick={handleEnviarPreparacion}
+                title={
+                  !editingPedidoId
+                    ? 'Primero guardá el borrador'
+                    : 'Enviar a preparación e imprimir picking'
+                }
               >
-                <Edit className="mr-1 h-4 w-4" />
-                Ver Pedidos
+                {enviandoPreparacion ? (
+                  'Enviando...'
+                ) : (
+                  <>
+                    <Printer className="mr-1 h-4 w-4" />
+                    Enviar a preparar
+                  </>
+                )}
               </Button>
             </div>
+
+            {editingPedidoId && editingPedidoEstado && (
+              <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded text-sm">
+                <span>
+                  Editando pedido —{' '}
+                  <strong>
+                    {editingPedidoEstado === 'pedido'
+                      ? 'Borrador'
+                      : editingPedidoEstado === 'en_preparacion'
+                      ? 'En preparación'
+                      : 'Preparado'}
+                  </strong>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingPedidoId(null);
+                    setEditingPedidoEstado(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                >
+                  Salir
+                </Button>
+              </div>
+            )}
+
+            <PedidosMostradorPanel
+              activoId={editingPedidoId}
+              refreshKey={pedidosPanelRefreshKey}
+              onSeleccionar={(p) => handleCargarPedido(p)}
+              onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
+              onCobrar={(p) => handleCargarPedido(p)}
+              onImprimirPicking={(p) => handleReimprimirPicking(p)}
+              onEliminar={(id) => handleEliminarPedido(id)}
+            />
 
             {flujoMayoristaActivo && (
               <Button
@@ -4166,86 +4291,16 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Pedidos Pendientes Dialog */}
-      <Dialog open={pedidosDialogOpen} onOpenChange={setPedidosDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" />
-              Pedidos Pendientes
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            {loadingPedidos ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">Cargando pedidos...</p>
-              </div>
-            ) : pedidos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <ClipboardList className="h-12 w-12 mb-2" />
-                <p>No hay pedidos pendientes</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pedidos.map((pedido) => (
-                  <Card key={pedido.id} className="overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono font-medium">
-                              {pedido.numero_comprobante
-                                ? `#${String(pedido.numero_comprobante).padStart(8, '0')}`
-                                : 'Sin Nº (pendiente de cobro)'}
-                            </span>
-                            <Badge variant="secondary">Pedido</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(pedido.fecha).toLocaleString('es-AR')}
-                          </p>
-                          <p className="text-sm mt-1">
-                            Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-lg">
-                            ${pedido.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </p>
-                          <div className="flex gap-1 mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleImprimirPedido(pedido)}
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleCargarPedido(pedido)}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => handleEliminarPedido(pedido.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      {/* Preparación del pedido (ajuste de cantidades reales y precios en items pesables) */}
+      <PrepararMostradorDialog
+        open={prepararDialogOpen}
+        onOpenChange={setPrepararDialogOpen}
+        pedido={pedidoParaPreparar}
+        onConfirmado={() => {
+          setPedidoParaPreparar(null);
+          bumpPedidosPanel();
+        }}
+      />
 
       {/* Dialog para ingresar peso */}
       <Dialog open={pesoDialogOpen} onOpenChange={setPesoDialogOpen}>

@@ -1,40 +1,123 @@
+
+# Rediseño del flujo Mostrador en Punto de Venta
+
 ## Objetivo
+Modelar en el POS el flujo real del mayorista presencial:
+**Armar → imprimir picking → preparar (ajustar unidades / anotar peso real) → cobrar**, con múltiples borradores conviviendo al mismo tiempo.
 
-Desde el detalle de la venta (pantalla **Ventas**), permitir ver el comprobante adjunto de la transferencia y saltar directo a la pantalla de **Imputación de Pagos** para validar los datos con IA.
+Se mantiene el flujo actual (Pedido POS sobre `ventas.estado='pedido'`) pero se lo transforma en un circuito de tres estados con UI clara. NO se toca el flujo mayorista de reparto (tabla `pedidos`), ni el botón "Cobrar pedido preparado" que ya activamos.
 
-## Cambios
+---
 
-### 1. `src/pages/Ventas.tsx` — Detalle de venta enriquecido con transferencia
+## Nuevo circuito de un Pedido de Mostrador
 
-En `openDetalleDialog`, además de traer `venta_pagos`, hacer un `SELECT` a `transferencias` filtrando por `venta_id = venta.id`. Guardar el resultado en un nuevo estado `transferenciasVenta` (array).
+```
+[Borrador]  →  [En preparación]  →  [Preparado]  →  [Cobrado]
+    ^              (imprime           (listo             (venta
+    |               picking)           para cobrar)       confirmada)
+    └── editable libremente ─┘                └── carrito bloqueado ──┘
+```
 
-En el modal de detalle (bloque "Formas de Pago"), para cada pago cuyo método sea Transferencia y exista una transferencia asociada, agregar una tarjeta / bloque adicional con:
+- **Borrador**: el operador arma el carrito y lo guarda. Editable, sin imprimir. Igual al "Pedido POS" de hoy.
+- **En preparación**: se imprime el ticket de picking y el pedido queda "en depósito". El operador del POS puede seguir atendiendo otros clientes; los borradores conviven en un panel lateral.
+- **Preparado**: al volver el preparador con la mercadería, desde el POS se abre el pedido y se ajustan cantidades reales (unidades) y precios/subtotales (kg pesados). Se marca preparado.
+- **Cobrado**: se toca "Cobrar" y se dispara el flujo de pagos normal (efectivo, tarjeta, transferencia, CC). La venta se confirma y numera.
 
-- Estado de la transferencia (`pendiente` / `validada` / `rechazada`) con badge.
-- Nº de operación, titular, CUIL, banco, fecha, importe (los que estén cargados).
-- **Botón "Ver comprobante"**: abre `foto_comprobante_path` en Supabase Storage (bucket usado por Imputación, generar signed URL igual que en `Imputacion.tsx`).
-- **Botón "Ir a validación"** (solo si `estado = 'pendiente'`): navega a `/imputacion?transferencia_id=<uuid>`.
+Cancelar en cualquier estado previo repone stock si ya se había descontado (hoy no se descuenta hasta cobrar; se mantiene así).
 
-### 2. `src/pages/Imputacion.tsx` — Auto-apertura del modal de validación por URL
+---
 
-- Leer `useSearchParams()` al montar.
-- Si viene `?transferencia_id=<uuid>`, tras cargar la lista de movimientos pendientes, localizar el movimiento con `source === 'transferencia'` y `transferencia_id` coincidente y ejecutar la misma acción que hace click "Validar / completar" hoy: setear `selectedMovimiento` y abrir el modal de detalle/edición existente.
-- Cambiar automáticamente a la pestaña **Pendientes** si no está activa.
-- Si la transferencia ya no está pendiente (fue validada/rechazada), abrir el modal en modo lectura sobre la pestaña correspondiente y mostrar un toast informativo.
-- Limpiar el query param con `setSearchParams({})` luego de abrir para evitar reaperturas al refrescar.
+## Cambios en la interfaz del POS
 
-### 3. Sin cambios de backend
+### 1. Panel lateral "Pedidos en curso"
+Reemplaza al botón "Ver Pedidos" que abre diálogo. En lugar de un modal, un panel siempre visible (colapsable en mobile) que lista los borradores del día agrupados por estado con badge de color:
 
-No se toca la base de datos ni RLS. `transferencias` ya está vinculada a `venta_id` y la RLS actual permite al usuario ver sus transferencias.
+- Amarillo: Borrador
+- Naranja: En preparación
+- Verde: Preparado (listo para cobrar)
 
-## Fuera de alcance
+Cada tarjeta muestra: cliente, cantidad de items, total estimado, hora, y botón principal según estado (Editar / Ver ticket / Cobrar). Click en la tarjeta lo carga en el carrito.
 
-- No se modifica el flujo de validación en sí (IA, guardado, imputación FIFO).
-- No se modifica el POS ni la creación de transferencias.
-- No se agregan nuevas columnas ni migraciones.
+Multiselección visual clara para tener varios pedidos abiertos en paralelo.
 
-## Detalle técnico
+### 2. Botones del carrito rediseñados
+Se simplifican los dos botones actuales ("Pedido" + "Ver Pedidos") en uno solo contextual:
 
-- Ruta destino: `navigate(`/imputacion?transferencia_id=${t.id}`)` usando `useNavigate` (ya importado en Ventas).
-- Signed URL del comprobante: replicar el helper que usa `Imputacion.tsx` (`supabase.storage.from(<bucket>).createSignedUrl(path, 60)`).
-- El botón "Ir a validación" queda visible únicamente para usuarios con acceso a la sección Imputación (ya protegida por rutas/permisos existentes; no se agrega gating extra en Ventas para evitar duplicar lógica — si el usuario no tiene permiso, la ruta lo redirige).
+- Carrito vacío + ningún borrador cargado: sin acción de pedido.
+- Carrito con items sin cargar: **Guardar como borrador**.
+- Editando borrador: **Actualizar borrador** / **Enviar a preparar**.
+- Editando preparación: **Confirmar preparado**.
+- Editando preparado: **Cobrar** (ya está el botón grande de siempre).
+
+Cartel de contexto arriba del carrito con el estado actual y botón X para descartar cambios.
+
+### 3. Diálogo de preparación desde el POS
+Al abrir un pedido en estado "En preparación", en vez de cargar todo al carrito editable se abre una vista dedicada con tabla:
+
+| Producto | Unidad | Cant. pedida | Cant. real | Precio unit. | Subtotal |
+|----------|--------|--------------|------------|--------------|----------|
+| Muslo pollo | kg | 5 kg | [input] | [input] | auto |
+| Coca 2.25 | u | 6 u | [input] | fijo | auto |
+
+- Items por unidad: input numérico para ajustar cantidad, precio bloqueado.
+- Items por peso (`es_pesable` / unidad kg): inputs de cantidad **y** precio unitario editable (el peso real cambia el subtotal, no el precio del catálogo).
+- Botón "Marcar preparado" al final. Recalcula totales antes de pasar al cobro.
+
+Se aprovecha la lógica de pesaje que ya usa `PrepararPedidoDialog` del módulo Pedidos (parsing decimal para KG), portada como componente compartido.
+
+### 4. Ticket de picking mejorado
+El `handleImprimirPedido` actual muestra precios; se reemplaza (en el paso "Enviar a preparar") por un ticket de picking sin precios:
+
+- Encabezado: #Pedido, hora, cliente, operador
+- Tabla por item con columnas: **Código | Descripción | Unidad | Cant. pedida | ☐ Preparado | Peso/Cant. real ___ | $ Precio ___**
+- Los últimos dos campos son líneas en blanco para escribir a mano en el papel.
+- Sin total, sin subtotales por línea.
+- Pie: espacio para firma del preparador.
+
+Se puede reimprimir desde la tarjeta del panel lateral en cualquier momento.
+
+---
+
+## Cambios técnicos (para revisión)
+
+### Base de datos
+- Reutilizar `ventas.estado`. Ampliar el CHECK/enum para aceptar: `pedido` (borrador), `en_preparacion`, `preparado` además de `confirmada`, `anulada`.
+- Nuevo campo `ventas.preparado_at` y `ventas.preparado_por` para trazabilidad.
+- El trigger `ventas_asignar_numero_comprobante` sigue asignando número **solo al pasar a `confirmada`**, no antes. Estados intermedios no consumen numeración.
+- `venta_detalles` ya acepta cantidad y precio libres — no requiere cambios de esquema. El "precio del catálogo" para pesables se guarda como referencia; el precio efectivo lo escribe el operador.
+
+### Backend
+- Nueva RPC `pos_actualizar_pedido_estado(p_venta_id, p_nuevo_estado, p_detalles)` que:
+  - Valida transición legal (borrador→en_preparacion→preparado, o borrador→cancelado).
+  - Reemplaza `venta_detalles` con los detalles ajustados (para el paso preparado).
+  - Escribe `preparado_at`/`preparado_por` cuando corresponda.
+  - Nunca descuenta stock (eso lo sigue haciendo `pos_registrar_venta` en la confirmación).
+- `pos_registrar_venta` ya soporta `p_editing_pedido_id` — se extiende para aceptar también `en_preparacion` y `preparado` como estado anterior válido al confirmar.
+
+### Frontend
+- Componente nuevo `PedidosMostradorPanel.tsx` (panel lateral).
+- Componente nuevo `PrepararMostradorDialog.tsx` (tabla de ajuste).
+- Utilidad nueva `imprimirPickingMostrador.ts` para el ticket sin precios.
+- Refactor de los handlers de `POS.tsx`: `handleGuardarPedido`, `handleCargarPedido` y `handleEliminarPedido` se extienden con los nuevos estados; se elimina el modal "Ver Pedidos" y el toast informativo.
+- Filtro por estado y refresco automático del panel cada 30 s (o con `postgres_changes` si ya hay realtime en la pantalla).
+
+### Compatibilidad y datos existentes
+- Los borradores actuales (hay N filas en `ventas` con `estado='pedido'`) siguen apareciendo como Borrador — sin migración de datos.
+- El flujo de reparto mayorista y "Cobrar pedido preparado" no se ven afectados: son tabla `pedidos`, no `ventas`.
+
+---
+
+## Alcance del cambio
+
+Incluido:
+- Panel lateral y rediseño de botones del carrito
+- Diálogo de preparación con pesaje
+- Nuevo ticket de picking sin precios
+- Nueva RPC y ampliación del enum/CHECK de `ventas.estado`
+- Integración con `pos_registrar_venta` existente
+
+No incluido (queda para otra iteración si hace falta):
+- Notificaciones push al preparador
+- Múltiples preparadores simultáneos con asignación
+- Impresión automática en impresora de depósito (por ahora se sigue mandando al navegador)
+- Cambios en el flujo de reparto o en `Cobrar pedido preparado` mayorista
