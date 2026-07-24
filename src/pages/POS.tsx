@@ -234,6 +234,13 @@ export default function POS() {
   const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
   const [guardandoPedido, setGuardandoPedido] = useState(false);
+
+  // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
+  const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
+  const [pedidosMayoristaDialogOpen, setPedidosMayoristaDialogOpen] = useState(false);
+  const [pedidosMayorista, setPedidosMayorista] = useState<any[]>([]);
+  const [loadingPedidosMayorista, setLoadingPedidosMayorista] = useState(false);
+  const [editingPedidoMayoristaId, setEditingPedidoMayoristaId] = useState<string | null>(null);
   
   // Peso para productos por KG
   const [pesoDialogOpen, setPesoDialogOpen] = useState(false);
@@ -1250,6 +1257,7 @@ export default function POS() {
         p_cheque: null as any,
         p_motivo_inventario: 'Venta a Empleado',
         p_editing_pedido_id: editingPedidoId,
+        p_pedido_id: editingPedidoMayoristaId,
       });
       if (rpcErr) throw rpcErr;
       const created: any = rpcRes;
@@ -1283,6 +1291,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       
       // Mostrar ticket
       setTicketDialogOpen(true);
@@ -1369,6 +1378,7 @@ export default function POS() {
         p_cheque: null as any,
         p_motivo_inventario: 'Venta a Cliente (CC)',
         p_editing_pedido_id: editingPedidoId,
+        p_pedido_id: editingPedidoMayoristaId,
       });
       if (rpcErr) throw rpcErr;
       const created: any = rpcRes;
@@ -1486,6 +1496,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       setFacturaDialogOpen(false);
       setModoVentaCC(null);
       
@@ -1642,6 +1653,7 @@ export default function POS() {
         p_cheque: chequePayload as any,
         p_motivo_inventario: 'Venta',
         p_editing_pedido_id: editingPedidoId,
+        p_pedido_id: editingPedidoMayoristaId,
       });
       if (rpcErr) throw rpcErr;
       const created: any = rpcRes;
@@ -1749,6 +1761,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setEmpleadoModalidadPago('cuenta_corriente');
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       setDescuentoGlobal(0);
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
@@ -1790,6 +1803,82 @@ export default function POS() {
     } finally {
       setLoadingPedidos(false);
     }
+  };
+
+  const fetchPedidosMayorista = async () => {
+    if (!user) return;
+    setLoadingPedidosMayorista(true);
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select(`
+          id, numero_pedido, fecha_pedido, tipo_pedido, estado, subtotal, descuento, total,
+          cliente_id, vendedor_id, venta_id,
+          clientes(id, nombre, dni_cuit, condicion_iva),
+          pedido_detalles(
+            id, cantidad_pedida, cantidad_entregada, precio_unitario, descuento_porcentaje, subtotal,
+            producto_id,
+            productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo)
+          )
+        `)
+        .eq('estado', 'preparado')
+        .is('venta_id', null)
+        .order('fecha_pedido', { ascending: false });
+      if (error) throw error;
+      setPedidosMayorista(data || []);
+    } catch (error) {
+      console.error('Error al cargar pedidos preparados:', error);
+      toast.error('Error al cargar los pedidos preparados');
+    } finally {
+      setLoadingPedidosMayorista(false);
+    }
+  };
+
+  const handleCargarPedidoMayorista = (pedido: any) => {
+    // Cliente
+    if (pedido.clientes) {
+      setSelectedCliente({
+        id: pedido.clientes.id,
+        nombre: pedido.clientes.nombre,
+        dni_cuit: pedido.clientes.dni_cuit,
+        condicion_iva: pedido.clientes.condicion_iva,
+      } as any);
+    } else {
+      setSelectedCliente(null);
+    }
+    setSelectedEmpleado(null);
+    setIsVentaEmpleado(false);
+
+    const detalles = pedido.pedido_detalles || [];
+    const cartItems: CartItem[] = detalles
+      .filter((d: any) => d.producto_id && d.productos)
+      .map((d: any) => {
+        const cantidad = Number(d.cantidad_entregada ?? d.cantidad_pedida ?? 0);
+        const precio = Number(d.precio_unitario ?? 0);
+        const descPct = Number(d.descuento_porcentaje ?? 0);
+        const sub = cantidad * precio * (1 - descPct / 100);
+        return {
+          id: crypto.randomUUID(),
+          producto: {
+            id: d.productos.id,
+            codigo_articulo: d.productos.codigo_articulo,
+            descripcion: d.productos.descripcion,
+            stock_actual: d.productos.stock_actual,
+            unidad_medida: d.productos.unidad_medida,
+            precio_costo: d.productos.precio_costo,
+          },
+          cantidad,
+          precio,
+          subtotal: Number(d.subtotal ?? sub),
+          descuento_porcentaje: descPct,
+        } as CartItem;
+      });
+
+    setCart(cartItems);
+    setEditingPedidoMayoristaId(pedido.id);
+    setEditingPedidoId(null);
+    setPedidosMayoristaDialogOpen(false);
+    toast.info(`Pedido #${String(pedido.numero_pedido).padStart(6, '0')} cargado para cobro`);
   };
 
   const handleGuardarPedido = async () => {
@@ -2855,6 +2944,43 @@ export default function POS() {
                 Ver Pedidos
               </Button>
             </div>
+
+            {flujoMayoristaActivo && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => {
+                  fetchPedidosMayorista();
+                  setPedidosMayoristaDialogOpen(true);
+                }}
+              >
+                <Package className="mr-1 h-4 w-4" />
+                Cobrar pedido preparado
+              </Button>
+            )}
+
+            {editingPedidoMayoristaId && (
+              <div className="flex items-center justify-between p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm">
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  Cobrando pedido preparado
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => {
+                    setEditingPedidoMayoristaId(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
 
             {editingPedidoId && (
               <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/30 rounded text-sm">
@@ -4247,6 +4373,73 @@ export default function POS() {
         productoId={pendingDescuento?.productoId}
         descripcionProducto={pendingDescuento?.descripcion}
       />
+
+      {/* Pedidos Preparados (Flujo Mayorista) */}
+      <Dialog open={pedidosMayoristaDialogOpen} onOpenChange={setPedidosMayoristaDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Pedidos preparados listos para cobrar
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {loadingPedidosMayorista ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Cargando pedidos...</p>
+              </div>
+            ) : pedidosMayorista.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mb-2" />
+                <p>No hay pedidos preparados pendientes de cobro</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pedidosMayorista.map((pedido) => (
+                  <Card key={pedido.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-mono font-medium">
+                              #{String(pedido.numero_pedido).padStart(6, '0')}
+                            </span>
+                            <Badge variant="secondary">{pedido.tipo_pedido}</Badge>
+                            <Badge variant="outline">Preparado</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(pedido.fecha_pedido).toLocaleString('es-AR')}
+                          </p>
+                          <p className="text-sm mt-1 truncate">
+                            Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {(pedido.pedido_detalles || []).length} ítem(s)
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-lg">
+                            ${Number(pedido.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="mt-2"
+                            onClick={() => handleCargarPedidoMayorista(pedido)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Cobrar
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
