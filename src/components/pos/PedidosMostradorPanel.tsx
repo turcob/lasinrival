@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ClipboardList, Printer, Trash2, Package, CircleDashed, RefreshCw, Plus } from 'lucide-react';
+import { ClipboardList, Printer, Trash2, Package, CircleDashed, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type PedidoMostradorEstado = 'pedido' | 'en_preparacion' | 'preparado';
@@ -120,33 +120,24 @@ export function PedidosMostradorPanel({
 
   return (
     <div className="flex flex-col h-full border rounded-lg bg-card overflow-hidden">
-      <div className="flex items-center justify-between p-3 border-b bg-muted/30 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <ClipboardList className="h-4 w-4 shrink-0" />
-          <span className="font-semibold text-sm">Pedidos en curso</span>
-          <Badge variant="secondary">{total}</Badge>
-          {porEstado.preparado > 0 && (
-            <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hidden sm:inline-flex">
-              {porEstado.preparado} listo{porEstado.preparado === 1 ? '' : 's'}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
+      <div className="p-3 border-b bg-muted/30 shrink-0 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            <ClipboardList className="h-4 w-4 shrink-0" />
+            <span className="font-semibold text-sm truncate">Pedidos en curso</span>
+            <Badge variant="secondary" className="shrink-0">{total}</Badge>
+          </div>
           {onNuevoPedido && (
-            <Button size="sm" variant="default" className="h-8" onClick={onNuevoPedido}>
+            <Button size="sm" variant="default" className="h-8 shrink-0" onClick={onNuevoPedido}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Nuevo
             </Button>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            aria-label="Refrescar"
-            onClick={() => fetchPedidos()}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
+        {porEstado.preparado > 0 && (
+          <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+            {porEstado.preparado} listo{porEstado.preparado === 1 ? '' : 's'}
+          </Badge>
+        )}
       </div>
       <div className="flex-1 min-h-0">
         {total === 0 && !loading ? (
