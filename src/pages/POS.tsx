@@ -2962,7 +2962,7 @@ export default function POS() {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || guardandoPedido}
                 onClick={handleGuardarPedido}
               >
                 {guardandoPedido ? (
@@ -2970,26 +2970,81 @@ export default function POS() {
                 ) : editingPedidoId ? (
                   <>
                     <Check className="mr-1 h-4 w-4" />
-                    Actualizar
+                    Actualizar borrador
                   </>
                 ) : (
                   <>
                     <ClipboardList className="mr-1 h-4 w-4" />
-                    Pedido
+                    Guardar borrador
                   </>
                 )}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  fetchPedidos();
-                  setPedidosDialogOpen(true);
-                }}
+                disabled={
+                  cart.length === 0 ||
+                  enviandoPreparacion ||
+                  guardandoPedido ||
+                  !editingPedidoId ||
+                  editingPedidoEstado !== 'pedido'
+                }
+                onClick={handleEnviarPreparacion}
+                title={
+                  !editingPedidoId
+                    ? 'Primero guardá el borrador'
+                    : 'Enviar a preparación e imprimir picking'
+                }
               >
-                <Edit className="mr-1 h-4 w-4" />
-                Ver Pedidos
+                {enviandoPreparacion ? (
+                  'Enviando...'
+                ) : (
+                  <>
+                    <Printer className="mr-1 h-4 w-4" />
+                    Enviar a preparar
+                  </>
+                )}
               </Button>
             </div>
+
+            {editingPedidoId && editingPedidoEstado && (
+              <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded text-sm">
+                <span>
+                  Editando pedido —{' '}
+                  <strong>
+                    {editingPedidoEstado === 'pedido'
+                      ? 'Borrador'
+                      : editingPedidoEstado === 'en_preparacion'
+                      ? 'En preparación'
+                      : 'Preparado'}
+                  </strong>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingPedidoId(null);
+                    setEditingPedidoEstado(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                >
+                  Salir
+                </Button>
+              </div>
+            )}
+
+            <PedidosMostradorPanel
+              refreshKey={pedidosPanelRefreshKey}
+              editingPedidoId={editingPedidoId}
+              onEditar={(p) => handleCargarPedido(p)}
+              onConfirmarPreparado={(p) => handleAbrirPreparacion(p)}
+              onCobrar={(p) => handleCargarPedido(p)}
+              onReimprimirPicking={(p) => handleReimprimirPicking(p)}
+              onEliminar={(id) => handleEliminarPedido(id)}
+            />
 
             {flujoMayoristaActivo && (
               <Button
