@@ -1,123 +1,64 @@
 
-# Rediseño del flujo Mostrador en Punto de Venta
+## Rediseño POS con pestañas: Venta directa vs Pedidos mostrador
 
-## Objetivo
-Modelar en el POS el flujo real del mayorista presencial:
-**Armar → imprimir picking → preparar (ajustar unidades / anotar peso real) → cobrar**, con múltiples borradores conviviendo al mismo tiempo.
+### Problema con la interfaz actual
+- El panel lateral colapsable no tiene scroll adecuado y satura la vista del carrito.
+- El botón "Imprimir picking" imprime pero no cambia el estado a `en_preparacion`, obligando a un segundo click.
+- Todo convive en la misma pantalla — venta directa y pedidos mostrador — generando confusión visual entre dos botones que hacen cosas parecidas ("Guardar borrador" vs "Cobrar pedido preparado" mayorista).
 
-Se mantiene el flujo actual (Pedido POS sobre `ventas.estado='pedido'`) pero se lo transforma en un circuito de tres estados con UI clara. NO se toca el flujo mayorista de reparto (tabla `pedidos`), ni el botón "Cobrar pedido preparado" que ya activamos.
+### Nueva estructura: dos pestañas dentro de `/pos`
 
----
-
-## Nuevo circuito de un Pedido de Mostrador
-
+```text
+┌─────────────────────────────────────────────────┐
+│ [ Venta directa ]  [ Pedidos mostrador (3) ]    │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  contenido de la pestaña activa                 │
+│                                                 │
+└─────────────────────────────────────────────────┘
 ```
-[Borrador]  →  [En preparación]  →  [Preparado]  →  [Cobrado]
-    ^              (imprime           (listo             (venta
-    |               picking)           para cobrar)       confirmada)
-    └── editable libremente ─┘                └── carrito bloqueado ──┘
-```
 
-- **Borrador**: el operador arma el carrito y lo guarda. Editable, sin imprimir. Igual al "Pedido POS" de hoy.
-- **En preparación**: se imprime el ticket de picking y el pedido queda "en depósito". El operador del POS puede seguir atendiendo otros clientes; los borradores conviven en un panel lateral.
-- **Preparado**: al volver el preparador con la mercadería, desde el POS se abre el pedido y se ajustan cantidades reales (unidades) y precios/subtotales (kg pesados). Se marca preparado.
-- **Cobrado**: se toca "Cobrar" y se dispara el flujo de pagos normal (efectivo, tarjeta, transferencia, CC). La venta se confirma y numera.
+**Pestaña 1 · Venta directa** (default)
+- POS clásico tal como está hoy: buscar productos, armar carrito, cobrar (efectivo/tarjeta/transferencia/CC).
+- Se quita el panel lateral de pedidos y los botones "Pedido" / "Ver Pedidos" / "Cobrar pedido preparado" (mayorista/logístico).
+- Queda una UI limpia enfocada en el flujo rápido de mostrador presencial.
 
-Cancelar en cualquier estado previo repone stock si ya se había descontado (hoy no se descuenta hasta cobrar; se mantiene así).
+**Pestaña 2 · Pedidos mostrador**
+Layout de dos columnas:
 
----
+- **Izquierda — lista de pedidos en curso** (lo que hoy es el panel lateral, pero ahora ocupando su lugar natural, con scroll propio). Agrupa por estado con badges:
+  - Amarillo · Borrador
+  - Naranja · En preparación
+  - Verde · Preparado (listo para cobrar)
+  - Contador por grupo + botón "Nuevo pedido" arriba.
+- **Derecha — área de trabajo del pedido activo**: muestra el carrito/editor del pedido seleccionado. Sin pedido seleccionado, un empty state con CTA "Nuevo pedido de mostrador".
 
-## Cambios en la interfaz del POS
+Flujo dentro de la pestaña:
+1. **Nuevo pedido**: se arma el carrito (mismo buscador que la venta directa, componente compartido). Botón principal **"Enviar a preparar"** que en un solo click guarda como `en_preparacion` **e imprime el picking** (los dos pasos juntos, como pidió el usuario). Botón secundario "Guardar borrador" para casos donde todavía no se manda a depósito.
+2. **Editar borrador**: se abre en la misma columna derecha. Botón "Enviar a preparar" (guarda + imprime) o "Actualizar borrador".
+3. **Confirmar preparado**: al seleccionar un pedido en `en_preparacion`, se abre el diálogo de ajuste actual (`PrepararMostradorDialog`) con la tabla de pesaje. Al confirmar pasa a `preparado`.
+4. **Cobrar**: seleccionar un pedido `preparado` carga su contenido en la columna derecha (bloqueado, no editable) y activa el botón grande "Cobrar" que dispara el flujo de pagos existente (`pos_registrar_venta` con `p_editing_pedido_id`).
 
-### 1. Panel lateral "Pedidos en curso"
-Reemplaza al botón "Ver Pedidos" que abre diálogo. En lugar de un modal, un panel siempre visible (colapsable en mobile) que lista los borradores del día agrupados por estado con badge de color:
+Cancelar / reimprimir picking siguen disponibles como acciones secundarias en cada tarjeta.
 
-- Amarillo: Borrador
-- Naranja: En preparación
-- Verde: Preparado (listo para cobrar)
+### Cambios técnicos
 
-Cada tarjeta muestra: cliente, cantidad de items, total estimado, hora, y botón principal según estado (Editar / Ver ticket / Cobrar). Click en la tarjeta lo carga en el carrito.
+- `src/pages/POS.tsx`
+  - Envolver el contenido actual en `<Tabs>` con dos `TabsContent`: `directa` y `mostrador`.
+  - Extraer el carrito y sus handlers a componentes reutilizables (o pasarlos por props) para que ambas pestañas los compartan sin duplicar lógica.
+  - Estado local `modoActivo: 'directa' | 'mostrador'` para condicionar qué botones muestra el carrito.
+  - En modo `mostrador`, el botón principal del carrito se convierte en **"Enviar a preparar"** cuando hay items sin guardar; ese handler llama a `pos_actualizar_pedido_estado(..., 'en_preparacion', detalles)` y a continuación `imprimirPickingMostrador(...)` en una sola acción.
+  - Sacar el `PedidosMostradorPanel` de la parte superior del carrito y moverlo a la columna izquierda de la pestaña mostrador. Ajustarle el `ScrollArea` con altura fija (`h-[calc(100vh-16rem)]` o similar) para que scrollee bien.
+- `src/components/pos/PedidosMostradorPanel.tsx`
+  - Modo "sidebar" (columna, no colapsable). Se elimina el `Collapsible` y el `Card` externo; queda un contenedor con header fijo (buscador/filtros) + `ScrollArea` con altura definida.
+  - El botón "Imprimir picking" de cada tarjeta desaparece como acción aislada — sólo se conserva el "Reimprimir" para pedidos que ya están `en_preparacion` (porque en ese estado imprimir no cambia nada).
 
-Multiselección visual clara para tener varios pedidos abiertos en paralelo.
+### No incluido
 
-### 2. Botones del carrito rediseñados
-Se simplifican los dos botones actuales ("Pedido" + "Ver Pedidos") en uno solo contextual:
+- No se toca la base de datos (los estados `en_preparacion`/`preparado` y la RPC `pos_actualizar_pedido_estado` ya están aplicados y funcionando).
+- No se toca el flujo mayorista de reparto (tabla `pedidos`) ni el flag `pos_flujo_mayorista_activo` — ese botón "Cobrar pedido preparado" del mayorista logístico queda tal cual (¿lo movemos también a esta nueva pestaña o lo dejamos aparte? ver pregunta abajo).
+- No se toca el flujo de pagos ni la RPC `pos_registrar_venta`.
 
-- Carrito vacío + ningún borrador cargado: sin acción de pedido.
-- Carrito con items sin cargar: **Guardar como borrador**.
-- Editando borrador: **Actualizar borrador** / **Enviar a preparar**.
-- Editando preparación: **Confirmar preparado**.
-- Editando preparado: **Cobrar** (ya está el botón grande de siempre).
+### Pregunta abierta
 
-Cartel de contexto arriba del carrito con el estado actual y botón X para descartar cambios.
-
-### 3. Diálogo de preparación desde el POS
-Al abrir un pedido en estado "En preparación", en vez de cargar todo al carrito editable se abre una vista dedicada con tabla:
-
-| Producto | Unidad | Cant. pedida | Cant. real | Precio unit. | Subtotal |
-|----------|--------|--------------|------------|--------------|----------|
-| Muslo pollo | kg | 5 kg | [input] | [input] | auto |
-| Coca 2.25 | u | 6 u | [input] | fijo | auto |
-
-- Items por unidad: input numérico para ajustar cantidad, precio bloqueado.
-- Items por peso (`es_pesable` / unidad kg): inputs de cantidad **y** precio unitario editable (el peso real cambia el subtotal, no el precio del catálogo).
-- Botón "Marcar preparado" al final. Recalcula totales antes de pasar al cobro.
-
-Se aprovecha la lógica de pesaje que ya usa `PrepararPedidoDialog` del módulo Pedidos (parsing decimal para KG), portada como componente compartido.
-
-### 4. Ticket de picking mejorado
-El `handleImprimirPedido` actual muestra precios; se reemplaza (en el paso "Enviar a preparar") por un ticket de picking sin precios:
-
-- Encabezado: #Pedido, hora, cliente, operador
-- Tabla por item con columnas: **Código | Descripción | Unidad | Cant. pedida | ☐ Preparado | Peso/Cant. real ___ | $ Precio ___**
-- Los últimos dos campos son líneas en blanco para escribir a mano en el papel.
-- Sin total, sin subtotales por línea.
-- Pie: espacio para firma del preparador.
-
-Se puede reimprimir desde la tarjeta del panel lateral en cualquier momento.
-
----
-
-## Cambios técnicos (para revisión)
-
-### Base de datos
-- Reutilizar `ventas.estado`. Ampliar el CHECK/enum para aceptar: `pedido` (borrador), `en_preparacion`, `preparado` además de `confirmada`, `anulada`.
-- Nuevo campo `ventas.preparado_at` y `ventas.preparado_por` para trazabilidad.
-- El trigger `ventas_asignar_numero_comprobante` sigue asignando número **solo al pasar a `confirmada`**, no antes. Estados intermedios no consumen numeración.
-- `venta_detalles` ya acepta cantidad y precio libres — no requiere cambios de esquema. El "precio del catálogo" para pesables se guarda como referencia; el precio efectivo lo escribe el operador.
-
-### Backend
-- Nueva RPC `pos_actualizar_pedido_estado(p_venta_id, p_nuevo_estado, p_detalles)` que:
-  - Valida transición legal (borrador→en_preparacion→preparado, o borrador→cancelado).
-  - Reemplaza `venta_detalles` con los detalles ajustados (para el paso preparado).
-  - Escribe `preparado_at`/`preparado_por` cuando corresponda.
-  - Nunca descuenta stock (eso lo sigue haciendo `pos_registrar_venta` en la confirmación).
-- `pos_registrar_venta` ya soporta `p_editing_pedido_id` — se extiende para aceptar también `en_preparacion` y `preparado` como estado anterior válido al confirmar.
-
-### Frontend
-- Componente nuevo `PedidosMostradorPanel.tsx` (panel lateral).
-- Componente nuevo `PrepararMostradorDialog.tsx` (tabla de ajuste).
-- Utilidad nueva `imprimirPickingMostrador.ts` para el ticket sin precios.
-- Refactor de los handlers de `POS.tsx`: `handleGuardarPedido`, `handleCargarPedido` y `handleEliminarPedido` se extienden con los nuevos estados; se elimina el modal "Ver Pedidos" y el toast informativo.
-- Filtro por estado y refresco automático del panel cada 30 s (o con `postgres_changes` si ya hay realtime en la pantalla).
-
-### Compatibilidad y datos existentes
-- Los borradores actuales (hay N filas en `ventas` con `estado='pedido'`) siguen apareciendo como Borrador — sin migración de datos.
-- El flujo de reparto mayorista y "Cobrar pedido preparado" no se ven afectados: son tabla `pedidos`, no `ventas`.
-
----
-
-## Alcance del cambio
-
-Incluido:
-- Panel lateral y rediseño de botones del carrito
-- Diálogo de preparación con pesaje
-- Nuevo ticket de picking sin precios
-- Nueva RPC y ampliación del enum/CHECK de `ventas.estado`
-- Integración con `pos_registrar_venta` existente
-
-No incluido (queda para otra iteración si hace falta):
-- Notificaciones push al preparador
-- Múltiples preparadores simultáneos con asignación
-- Impresión automática en impresora de depósito (por ahora se sigue mandando al navegador)
-- Cambios en el flujo de reparto o en `Cobrar pedido preparado` mayorista
+El botón **"Cobrar pedido preparado"** del flujo mayorista logístico (tabla `pedidos`, activado con el flag) hoy está en el header del POS. ¿Lo dejamos en la pestaña "Venta directa" como está, o lo movemos también a la pestaña "Pedidos mostrador" para unificar todo lo que es "cobrar algo que ya viene preparado"? Mi recomendación: dejarlo en "Venta directa" porque los pedidos de reparto son otro circuito y mezclarlos confunde de nuevo. Confirmame antes de implementar.
