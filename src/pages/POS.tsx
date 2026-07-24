@@ -2747,7 +2747,7 @@ export default function POS() {
         </div>
 
         {/* Right Panel - Summary & Payment */}
-        <div className="w-80 flex flex-col gap-4">
+        <div className="w-80 flex flex-col gap-4 overflow-y-auto min-h-0 pr-1">
           {/* Client/Employee Selection */}
           <Card>
             <CardContent className="pt-4 space-y-3">
