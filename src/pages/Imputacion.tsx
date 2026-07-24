@@ -86,6 +86,7 @@ interface VentaPendiente {
 
 export default function Imputacion() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [movimientos, setMovimientos] = useState<MovimientoPendiente[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +108,35 @@ export default function Imputacion() {
   useEffect(() => {
     fetchMovimientos();
   }, []);
+
+  // Auto-open transferencia validation modal when arriving with ?transferencia_id=<uuid>
+  useEffect(() => {
+    const transferenciaId = searchParams.get('transferencia_id');
+    if (!transferenciaId || loading || movimientos.length === 0) return;
+
+    const mov = movimientos.find(
+      (m) => m.source === 'transferencia' && m.transferencia_id === transferenciaId
+    );
+
+    if (!mov) {
+      toast.error('No se encontró la transferencia solicitada');
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    // Move to the tab that matches the transfer state so it's visible in context.
+    if (mov.estado_imputacion === 'confirmado') setSelectedTab('confirmadas');
+    else if (mov.estado_imputacion === 'rechazado') setSelectedTab('rechazadas');
+    else setSelectedTab('pendientes');
+
+    if (mov.estado_imputacion !== 'pendiente') {
+      toast.info('La transferencia ya fue procesada. Se abre en modo lectura.');
+    }
+
+    openDetalleTransferencia(mov);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, movimientos, searchParams]);
 
   const fetchMovimientos = async () => {
     setLoading(true);
