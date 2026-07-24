@@ -2055,7 +2055,7 @@ export default function POS() {
         .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
         .eq('id', editingPedidoId)
         .single();
-      if (ped) imprimirPickingMostrador(ped);
+      if (ped) imprimirPickingMostrador(adaptarVentaParaPicking(ped));
 
       setCart([]);
       setSelectedCliente(null);
@@ -2092,7 +2092,7 @@ export default function POS() {
       .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
       .eq('id', pedido.id)
       .single();
-    if (data) imprimirPickingMostrador(data);
+    if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
   };
 
   const handleImprimirPedido = (pedido: any) => {
