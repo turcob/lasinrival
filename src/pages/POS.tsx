@@ -2008,6 +2008,7 @@ export default function POS() {
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
     setEditingPedidoEstado((pedido.estado as any) || 'pedido');
+    setModoPos('mostrador');
     if (pedido.clientes) setSelectedCliente(pedido.clientes);
     if (pedido.empleados) {
       setSelectedEmpleado(pedido.empleados);
@@ -2039,14 +2040,64 @@ export default function POS() {
   };
 
   const handleEnviarPreparacion = async () => {
-    if (!editingPedidoId) {
-      toast.error('Primero guardá el borrador');
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
       return;
     }
     setEnviandoPreparacion(true);
     try {
+      // Si aún no hay borrador, lo creamos primero (auto-guardado)
+      let ventaId = editingPedidoId;
+      if (!ventaId) {
+        const detallesPayload = cart.map((item) => ({
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        }));
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user!.id,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'pedido',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        ventaId = (rpcRes as any)?.venta_id || (rpcRes as any)?.id || (rpcRes as any);
+      } else if (editingPedidoEstado === 'pedido') {
+        // Persistir cambios del carrito antes de mover el estado
+        await supabase
+          .from('ventas')
+          .update({
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal, descuento: totalDescuentos, total,
+          })
+          .eq('id', ventaId);
+        await supabase.from('venta_detalles').delete().eq('venta_id', ventaId);
+        await supabase.from('venta_detalles').insert(cart.map((item) => ({
+          venta_id: ventaId,
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        })));
+      }
       const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
-        p_venta_id: editingPedidoId,
+        p_venta_id: ventaId,
         p_nuevo_estado: 'en_preparacion',
       } as any);
       if (error) throw error;
@@ -2055,7 +2106,7 @@ export default function POS() {
       const { data: ped } = await supabase
         .from('ventas')
         .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
-        .eq('id', editingPedidoId)
+        .eq('id', ventaId)
         .single();
       if (ped) imprimirPickingMostrador(adaptarVentaParaPicking(ped));
 
@@ -2075,6 +2126,7 @@ export default function POS() {
   };
 
   const handleAbrirPreparacion = async (pedido: PedidoMostrador) => {
+    setModoPos('mostrador');
     const { data, error } = await supabase
       .from('ventas')
       .select(`*, clientes(nombre), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
