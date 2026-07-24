@@ -692,7 +692,6 @@ export default function POS() {
     if (descuento <= maxDescuento) {
       // Dentro del límite permitido, aplicar directamente
       setDescuentoGlobal(descuento);
-      if (descuento > 0) toast.success(`Descuento global del ${descuento}% aplicado`);
     } else {
       // Excede el límite, solicitar autorización
       solicitarAutorizacionDescuento('global', descuento);
@@ -1646,9 +1645,6 @@ export default function POS() {
       const created: any = rpcRes;
       const { data: venta } = await supabase
         .from('ventas').select('*').eq('id', created.id).single();
-
-      if (transferPayload) toast.success('Transferencia registrada. Quedó pendiente de validación.');
-      if (chequePayload) toast.success('Cheque registrado. Quedó pendiente de validación.');
 
       let facturaInfo = null;
       if (emitirFactura) {
