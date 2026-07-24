@@ -3130,7 +3130,7 @@ export default function POS() {
             )}
 
             {modoPos === 'mostrador' && (
-              <div className="h-[320px]">
+              <div className="flex-1 min-h-[280px]">
                 <PedidosMostradorPanel
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
@@ -3139,6 +3139,7 @@ export default function POS() {
                   onCobrar={(p) => handleCargarPedido(p)}
                   onImprimirPicking={(p) => handleReimprimirPicking(p)}
                   onEliminar={(id) => handleEliminarPedido(id)}
+                  onImprimirYPreparar={(p) => handleImprimirYPreparar(p)}
                   onNuevoPedido={() => {
                     setEditingPedidoId(null);
                     setEditingPedidoEstado(null);
