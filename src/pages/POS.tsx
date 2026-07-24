@@ -3037,12 +3037,12 @@ export default function POS() {
             )}
 
             <PedidosMostradorPanel
+              activoId={editingPedidoId}
               refreshKey={pedidosPanelRefreshKey}
-              editingPedidoId={editingPedidoId}
-              onEditar={(p) => handleCargarPedido(p)}
-              onConfirmarPreparado={(p) => handleAbrirPreparacion(p)}
+              onSeleccionar={(p) => handleCargarPedido(p)}
+              onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
               onCobrar={(p) => handleCargarPedido(p)}
-              onReimprimirPicking={(p) => handleReimprimirPicking(p)}
+              onImprimirPicking={(p) => handleReimprimirPicking(p)}
               onEliminar={(id) => handleEliminarPedido(id)}
             />
 
