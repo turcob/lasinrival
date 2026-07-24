@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ClipboardList, Printer, Trash2, Package, CircleDashed, Edit, RefreshCw, Wallet, Plus } from 'lucide-react';
+import { ClipboardList, Printer, Trash2, Package, CircleDashed, RefreshCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type PedidoMostradorEstado = 'pedido' | 'en_preparacion' | 'preparado';
@@ -27,8 +27,6 @@ interface Props {
   onSeleccionar: (pedido: PedidoMostrador) => void;
   onImprimirPicking: (pedido: PedidoMostrador) => void;
   onEliminar: (pedidoId: string) => Promise<void>;
-  onCobrar: (pedido: PedidoMostrador) => void;
-  onAbrirPreparacion: (pedido: PedidoMostrador) => void;
   onNuevoPedido?: () => void;
   onImprimirYPreparar?: (pedido: PedidoMostrador) => Promise<void> | void;
 }
@@ -60,8 +58,6 @@ export function PedidosMostradorPanel({
   onSeleccionar,
   onImprimirPicking,
   onEliminar,
-  onCobrar,
-  onAbrirPreparacion,
   onNuevoPedido,
   onImprimirYPreparar,
 }: Props) {
@@ -179,7 +175,16 @@ export function PedidosMostradorPanel({
                       return (
                         <div
                           key={p.id}
-                          className={`border rounded p-2 text-xs transition ${
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onSeleccionar(p)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSeleccionar(p);
+                            }
+                          }}
+                          className={`border rounded p-2 text-xs transition cursor-pointer ${
                             isActive ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'
                           }`}
                         >
@@ -199,28 +204,16 @@ export function PedidosMostradorPanel({
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {p.estado === 'pedido' && (
-                              <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => onSeleccionar(p)}>
-                                <Edit className="h-3 w-3 mr-1" /> Editar
-                              </Button>
-                            )}
-                            {p.estado === 'en_preparacion' && (
-                              <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => onAbrirPreparacion(p)}>
-                                <Package className="h-3 w-3 mr-1" /> Confirmar preparado
-                              </Button>
-                            )}
-                            {p.estado === 'preparado' && (
-                              <Button size="sm" className="h-7 text-xs" onClick={() => onCobrar(p)}>
-                                <Wallet className="h-3 w-3 mr-1" /> Cobrar
-                              </Button>
-                            )}
                             {p.estado === 'pedido' && onImprimirYPreparar && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 w-7 p-0"
                                 title="Imprimir y enviar a preparar"
-                                onClick={() => onImprimirYPreparar(p)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onImprimirYPreparar(p);
+                                }}
                               >
                                 <Printer className="h-3.5 w-3.5" />
                               </Button>
@@ -231,7 +224,10 @@ export function PedidosMostradorPanel({
                                 variant="ghost"
                                 className="h-7 w-7 p-0"
                                 title="Reimprimir picking"
-                                onClick={() => onImprimirPicking(p)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onImprimirPicking(p);
+                                }}
                               >
                                 <Printer className="h-3.5 w-3.5" />
                               </Button>
@@ -241,7 +237,8 @@ export function PedidosMostradorPanel({
                               variant="ghost"
                               className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                               title="Eliminar pedido"
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return;
                                 await onEliminar(p.id);
                                 fetchPedidos();
