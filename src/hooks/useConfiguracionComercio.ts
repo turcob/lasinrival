@@ -17,6 +17,7 @@ interface ConfiguracionComercio {
   punto_venta: number;
   nombre_sistema: string | null;
   texto_login_footer: string | null;
+  pos_flujo_mayorista_activo?: boolean | null;
 }
 
 export function useConfiguracionComercio() {
