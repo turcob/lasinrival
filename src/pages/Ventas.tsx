@@ -121,6 +121,7 @@ const TIPOS_COMPROBANTE: Record<number, string> = {
 
 export default function Ventas() {
   const { user, hasPermission, hasRole } = useAuth();
+  const navigate = useNavigate();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const puedeVerTodas = hasRole('admin') || hasRole('encargado') || hasRole('administracion');
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -141,6 +142,7 @@ export default function Ventas() {
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
+  const [transferenciasVenta, setTransferenciasVenta] = useState<any[]>([]);
 
   // NC wizard state
   const [ncWizardOpen, setNcWizardOpen] = useState(false);
