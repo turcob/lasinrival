@@ -521,42 +521,6 @@ function PedidosContent() {
               </Table>
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="consolidado">
-          <ConsolidadoPedidos />
-        </TabsContent>
-      </Tabs>
-
-      <NuevoPedidoDialog 
-        open={nuevoDialogOpen} 
-        onOpenChange={setNuevoDialogOpen}
-        onEditarPedidoExistente={(pedidoId) => setEditarPedidoId(pedidoId)}
-      />
-
-      <DetallePedidoDialog
-        pedidoId={pedidoSeleccionado}
-        open={!!pedidoSeleccionado}
-        onOpenChange={(open) => !open && setPedidoSeleccionado(null)}
-        onPrepararPedido={(pedidoId) => {
-          setPedidoSeleccionado(null);
-          setPrepararPedidoId(pedidoId);
-        }}
-      />
-
-      <PrepararPedidoDialog
-        pedidoId={prepararPedidoId}
-        open={!!prepararPedidoId}
-        onOpenChange={(open) => !open && setPrepararPedidoId(null)}
-        pedidoIds={pedidosFiltrados.map(p => p.id)}
-        onNavigate={(id) => setPrepararPedidoId(id)}
-      />
-
-      <EditarPedidoDialog
-        pedidoId={editarPedidoId}
-        open={!!editarPedidoId}
-        onOpenChange={(open) => !open && setEditarPedidoId(null)}
-      />
-    </MainLayout>
-  );
+    );
+  }
 }
