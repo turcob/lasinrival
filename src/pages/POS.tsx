@@ -62,6 +62,9 @@ import {
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
+import { PedidosMostradorPanel, type PedidoMostrador } from '@/components/pos/PedidosMostradorPanel';
+import { PrepararMostradorDialog } from '@/components/pos/PrepararMostradorDialog';
+import { imprimirPickingMostrador } from '@/lib/imprimirPickingMostrador';
 
 interface Producto {
   id: string;
