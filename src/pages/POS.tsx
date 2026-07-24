@@ -560,10 +560,13 @@ export default function POS() {
       return;
     }
 
+    // En modo mostrador no pedimos peso al agregar: se ajusta al preparar el pedido.
+    const skipPesoPrompt = modoPos === 'mostrador';
+
     setCart((prev) => {
       const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
       if (existing) {
-        if (isProductoPorPeso(producto)) {
+        if (isProductoPorPeso(producto) && !skipPesoPrompt) {
           setEditingPesoItem(existing.id);
           setPesoInput(existing.cantidad.toString().replace('.', ','));
           setPesoDialogOpen(true);
@@ -576,7 +579,7 @@ export default function POS() {
         );
       }
       const newId = crypto.randomUUID();
-      if (isProductoPorPeso(producto)) {
+      if (isProductoPorPeso(producto) && !skipPesoPrompt) {
         const newCart = [...prev, { id: newId, producto, cantidad: 1, precio, subtotal: precio, descuento_porcentaje: 0 }];
         setTimeout(() => {
           setEditingPesoItem(newId);
@@ -2149,6 +2152,34 @@ export default function POS() {
     if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
   };
 
+  const handleImprimirYPreparar = async (pedido: PedidoMostrador) => {
+    try {
+      const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
+        p_venta_id: pedido.id,
+        p_nuevo_estado: 'en_preparacion',
+      } as any);
+      if (error) throw error;
+      const { data } = await supabase
+        .from('ventas')
+        .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+        .eq('id', pedido.id)
+        .single();
+      if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
+      if (editingPedidoId === pedido.id) {
+        setEditingPedidoId(null);
+        setEditingPedidoEstado(null);
+        setCart([]);
+        setSelectedCliente(null);
+        setSelectedEmpleado(null);
+        setIsVentaEmpleado(false);
+        setDescuentoGlobal(0);
+      }
+      bumpPedidosPanel();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo enviar a preparar');
+    }
+  };
+
   const handleImprimirPedido = (pedido: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -2716,7 +2747,7 @@ export default function POS() {
         </div>
 
         {/* Right Panel - Summary & Payment */}
-        <div className="w-80 flex flex-col gap-4">
+        <div className="w-80 flex flex-col gap-4 overflow-y-auto min-h-0 pr-1">
           {/* Client/Employee Selection */}
           <Card>
             <CardContent className="pt-4 space-y-3">
@@ -3099,7 +3130,7 @@ export default function POS() {
             )}
 
             {modoPos === 'mostrador' && (
-              <div className="h-[320px]">
+              <div className="h-[420px] shrink-0">
                 <PedidosMostradorPanel
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
@@ -3108,6 +3139,7 @@ export default function POS() {
                   onCobrar={(p) => handleCargarPedido(p)}
                   onImprimirPicking={(p) => handleReimprimirPicking(p)}
                   onEliminar={(id) => handleEliminarPedido(id)}
+                  onImprimirYPreparar={(p) => handleImprimirYPreparar(p)}
                   onNuevoPedido={() => {
                     setEditingPedidoId(null);
                     setEditingPedidoEstado(null);
