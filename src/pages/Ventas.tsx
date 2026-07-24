@@ -1130,6 +1130,83 @@ export default function Ventas() {
                   </CardContent>
                 </Card>
               </div>
+
+              {transferenciasVenta.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Transferencias asociadas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {transferenciasVenta.map((t) => {
+                      const estadoBadge =
+                        t.estado === 'validada' ? 'default'
+                        : t.estado === 'rechazada' ? 'destructive'
+                        : 'secondary';
+                      return (
+                        <div key={t.id} className="border rounded-md p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Badge variant={estadoBadge as any} className="capitalize">
+                              {t.estado}
+                            </Badge>
+                            <span className="font-medium">
+                              ${Number(t.importe || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Nº operación: </span>
+                              <span className="font-medium">{t.numero_operacion || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Fecha: </span>
+                              <span className="font-medium">{t.fecha_transferencia || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Titular: </span>
+                              <span className="font-medium">{t.titular_nombre || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">CUIL: </span>
+                              <span className="font-medium">{t.titular_cuil || '—'}</span>
+                            </div>
+                          </div>
+                          {t.estado === 'rechazada' && t.observacion_rechazo && (
+                            <p className="text-xs text-destructive">
+                              Motivo rechazo: {t.observacion_rechazo}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {t.foto_comprobante_path ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => verComprobanteTransferencia(t.foto_comprobante_path)}
+                              >
+                                <ImageIcon className="h-4 w-4 mr-1" />
+                                Ver comprobante
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sin comprobante adjunto</span>
+                            )}
+                            {t.estado === 'pendiente' && (
+                              <Button
+                                size="sm"
+                                onClick={() => irAValidarTransferencia(t.id)}
+                              >
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                Ir a validación
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </DialogContent>
