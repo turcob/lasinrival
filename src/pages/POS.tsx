@@ -2144,6 +2144,59 @@ export default function POS() {
     setPrepararDialogOpen(true);
   };
 
+  const handleConfirmarPreparadoInline = async () => {
+    if (!editingPedidoId) return;
+    if (cart.length === 0) {
+      toast.error('El pedido no puede quedar vacío');
+      return;
+    }
+    for (const item of cart) {
+      if (!(item.cantidad > 0)) {
+        toast.error(`Cantidad inválida en "${item.producto?.descripcion || item.nombre_temporal || 'item'}"`);
+        return;
+      }
+      if (!(item.precio > 0)) {
+        toast.error(`Precio inválido en "${item.producto?.descripcion || item.nombre_temporal || 'item'}"`);
+        return;
+      }
+    }
+    setConfirmandoPreparado(true);
+    try {
+      const detallesPayload = cart.map((item) => {
+        const bruto = item.cantidad * item.precio;
+        const descLinea = item.descuento_porcentaje > 0 ? bruto * (item.descuento_porcentaje / 100) : 0;
+        return {
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: descLinea,
+          descuento_porcentaje: item.descuento_porcentaje || 0,
+          subtotal: bruto - descLinea,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        };
+      });
+      const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
+        p_venta_id: editingPedidoId,
+        p_nuevo_estado: 'preparado',
+        p_detalles: detallesPayload as any,
+      } as any);
+      if (error) throw error;
+      setCart([]);
+      setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
+      setDescuentoGlobal(0);
+      setEditingPedidoId(null);
+      setEditingPedidoEstado(null);
+      bumpPedidosPanel();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo confirmar la preparación');
+    } finally {
+      setConfirmandoPreparado(false);
+    }
+  };
+
   const handleReimprimirPicking = async (pedido: PedidoMostrador) => {
     const { data } = await supabase
       .from('ventas')
