@@ -2152,6 +2152,34 @@ export default function POS() {
     if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
   };
 
+  const handleImprimirYPreparar = async (pedido: PedidoMostrador) => {
+    try {
+      const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
+        p_venta_id: pedido.id,
+        p_nuevo_estado: 'en_preparacion',
+      } as any);
+      if (error) throw error;
+      const { data } = await supabase
+        .from('ventas')
+        .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+        .eq('id', pedido.id)
+        .single();
+      if (data) imprimirPickingMostrador(adaptarVentaParaPicking(data));
+      if (editingPedidoId === pedido.id) {
+        setEditingPedidoId(null);
+        setEditingPedidoEstado(null);
+        setCart([]);
+        setSelectedCliente(null);
+        setSelectedEmpleado(null);
+        setIsVentaEmpleado(false);
+        setDescuentoGlobal(0);
+      }
+      bumpPedidosPanel();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo enviar a preparar');
+    }
+  };
+
   const handleImprimirPedido = (pedido: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
