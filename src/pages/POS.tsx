@@ -4291,86 +4291,16 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Pedidos Pendientes Dialog */}
-      <Dialog open={pedidosDialogOpen} onOpenChange={setPedidosDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" />
-              Pedidos Pendientes
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            {loadingPedidos ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">Cargando pedidos...</p>
-              </div>
-            ) : pedidos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <ClipboardList className="h-12 w-12 mb-2" />
-                <p>No hay pedidos pendientes</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pedidos.map((pedido) => (
-                  <Card key={pedido.id} className="overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono font-medium">
-                              {pedido.numero_comprobante
-                                ? `#${String(pedido.numero_comprobante).padStart(8, '0')}`
-                                : 'Sin Nº (pendiente de cobro)'}
-                            </span>
-                            <Badge variant="secondary">Pedido</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(pedido.fecha).toLocaleString('es-AR')}
-                          </p>
-                          <p className="text-sm mt-1">
-                            Cliente: {pedido.clientes?.nombre || 'Consumidor Final'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-lg">
-                            ${pedido.total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </p>
-                          <div className="flex gap-1 mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleImprimirPedido(pedido)}
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleCargarPedido(pedido)}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => handleEliminarPedido(pedido.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      {/* Preparación del pedido (ajuste de cantidades reales y precios en items pesables) */}
+      <PrepararMostradorDialog
+        open={prepararDialogOpen}
+        onOpenChange={setPrepararDialogOpen}
+        pedido={pedidoParaPreparar}
+        onConfirmado={() => {
+          setPedidoParaPreparar(null);
+          bumpPedidosPanel();
+        }}
+      />
 
       {/* Dialog para ingresar peso */}
       <Dialog open={pesoDialogOpen} onOpenChange={setPesoDialogOpen}>
