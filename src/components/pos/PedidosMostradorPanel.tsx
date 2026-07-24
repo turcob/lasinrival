@@ -30,6 +30,7 @@ interface Props {
   onCobrar: (pedido: PedidoMostrador) => void;
   onAbrirPreparacion: (pedido: PedidoMostrador) => void;
   onNuevoPedido?: () => void;
+  onImprimirYPreparar?: (pedido: PedidoMostrador) => Promise<void> | void;
 }
 
 const ESTADO_META: Record<PedidoMostradorEstado, { label: string; badgeClass: string; icon: any; orden: number }> = {
@@ -62,6 +63,7 @@ export function PedidosMostradorPanel({
   onCobrar,
   onAbrirPreparacion,
   onNuevoPedido,
+  onImprimirYPreparar,
 }: Props) {
   const [pedidos, setPedidos] = useState<PedidoMostrador[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,8 +95,23 @@ export function PedidosMostradorPanel({
 
   useEffect(() => {
     fetchPedidos();
-    const t = setInterval(fetchPedidos, 30_000);
-    return () => clearInterval(t);
+    // Realtime: refrescar cuando cambia cualquier venta en estado mostrador
+    const ch = supabase
+      .channel('pos-pedidos-mostrador')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ventas' },
+        () => fetchPedidos()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'venta_detalles' },
+        () => fetchPedidos()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
@@ -195,6 +212,17 @@ export function PedidosMostradorPanel({
                             {p.estado === 'preparado' && (
                               <Button size="sm" className="h-7 text-xs" onClick={() => onCobrar(p)}>
                                 <Wallet className="h-3 w-3 mr-1" /> Cobrar
+                              </Button>
+                            )}
+                            {p.estado === 'pedido' && onImprimirYPreparar && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                title="Imprimir y enviar a preparar"
+                                onClick={() => onImprimirYPreparar(p)}
+                              >
+                                <Printer className="h-3.5 w-3.5" />
                               </Button>
                             )}
                             {p.estado === 'en_preparacion' && (
