@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus, ImageIcon, ExternalLink } from 'lucide-react';
 import { imprimirTicketFactura } from '@/lib/imprimirTicketFactura';
 import { NotaCreditoParcialWizard } from '@/components/facturacion/NotaCreditoParcialWizard';
 import {
@@ -120,6 +121,7 @@ const TIPOS_COMPROBANTE: Record<number, string> = {
 
 export default function Ventas() {
   const { user, hasPermission, hasRole } = useAuth();
+  const navigate = useNavigate();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
   const puedeVerTodas = hasRole('admin') || hasRole('encargado') || hasRole('administracion');
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -140,6 +142,7 @@ export default function Ventas() {
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [detalles, setDetalles] = useState<VentaDetalle[]>([]);
   const [pagos, setPagos] = useState<VentaPago[]>([]);
+  const [transferenciasVenta, setTransferenciasVenta] = useState<any[]>([]);
 
   // NC wizard state
   const [ncWizardOpen, setNcWizardOpen] = useState(false);
@@ -346,8 +349,27 @@ export default function Ventas() {
     return <Banknote className="h-4 w-4" />;
   };
 
+  const verComprobanteTransferencia = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('comprobantes-cobros')
+        .createSignedUrl(path, 60 * 10);
+      if (error || !data?.signedUrl) throw error || new Error('No se pudo generar URL');
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      console.error('Error abriendo comprobante:', e);
+      toast.error('No se pudo abrir el comprobante');
+    }
+  };
+
+  const irAValidarTransferencia = (transferenciaId: string) => {
+    setDetalleDialogOpen(false);
+    navigate(`/imputacion?transferencia_id=${transferenciaId}`);
+  };
+
   const openDetalleDialog = async (venta: Venta) => {
     setSelectedVenta(venta);
+    setTransferenciasVenta([]);
     
     try {
       if (venta._es_pedido && venta._pedido_id) {
@@ -368,7 +390,7 @@ export default function Ventas() {
         setDetalleDialogOpen(true);
         return;
       }
-      const [detallesRes, pagosRes] = await Promise.all([
+      const [detallesRes, pagosRes, transfRes] = await Promise.all([
         supabase
           .from('venta_detalles')
           .select('*, productos(codigo_articulo, descripcion)')
@@ -377,10 +399,15 @@ export default function Ventas() {
           .from('venta_pagos')
           .select('*, formas_pago(nombre)')
           .eq('venta_id', venta.id),
+        supabase
+          .from('transferencias')
+          .select('id, estado, numero_operacion, importe, fecha_transferencia, titular_nombre, titular_cuil, foto_comprobante_path, foto_comprobante_nombre, observacion_rechazo')
+          .eq('venta_id', venta.id),
       ]);
 
       if (detallesRes.data) setDetalles(detallesRes.data);
       if (pagosRes.data) setPagos(pagosRes.data);
+      if (transfRes.data) setTransferenciasVenta(transfRes.data);
       setDetalleDialogOpen(true);
     } catch (error) {
       console.error('Error fetching details:', error);
@@ -1103,6 +1130,83 @@ export default function Ventas() {
                   </CardContent>
                 </Card>
               </div>
+
+              {transferenciasVenta.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Transferencias asociadas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {transferenciasVenta.map((t) => {
+                      const estadoBadge =
+                        t.estado === 'validada' ? 'default'
+                        : t.estado === 'rechazada' ? 'destructive'
+                        : 'secondary';
+                      return (
+                        <div key={t.id} className="border rounded-md p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Badge variant={estadoBadge as any} className="capitalize">
+                              {t.estado}
+                            </Badge>
+                            <span className="font-medium">
+                              ${Number(t.importe || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Nº operación: </span>
+                              <span className="font-medium">{t.numero_operacion || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Fecha: </span>
+                              <span className="font-medium">{t.fecha_transferencia || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Titular: </span>
+                              <span className="font-medium">{t.titular_nombre || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">CUIL: </span>
+                              <span className="font-medium">{t.titular_cuil || '—'}</span>
+                            </div>
+                          </div>
+                          {t.estado === 'rechazada' && t.observacion_rechazo && (
+                            <p className="text-xs text-destructive">
+                              Motivo rechazo: {t.observacion_rechazo}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {t.foto_comprobante_path ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => verComprobanteTransferencia(t.foto_comprobante_path)}
+                              >
+                                <ImageIcon className="h-4 w-4 mr-1" />
+                                Ver comprobante
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sin comprobante adjunto</span>
+                            )}
+                            {t.estado === 'pendiente' && (
+                              <Button
+                                size="sm"
+                                onClick={() => irAValidarTransferencia(t.id)}
+                              >
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                Ir a validación
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </DialogContent>
