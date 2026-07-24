@@ -49,6 +49,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -239,6 +240,7 @@ export default function POS() {
   const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
   const [pedidoParaPreparar, setPedidoParaPreparar] = useState<any | null>(null);
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
+  const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
@@ -2006,6 +2008,7 @@ export default function POS() {
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
     setEditingPedidoEstado((pedido.estado as any) || 'pedido');
+    setModoPos('mostrador');
     if (pedido.clientes) setSelectedCliente(pedido.clientes);
     if (pedido.empleados) {
       setSelectedEmpleado(pedido.empleados);
@@ -2037,14 +2040,64 @@ export default function POS() {
   };
 
   const handleEnviarPreparacion = async () => {
-    if (!editingPedidoId) {
-      toast.error('Primero guardá el borrador');
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
       return;
     }
     setEnviandoPreparacion(true);
     try {
+      // Si aún no hay borrador, lo creamos primero (auto-guardado)
+      let ventaId = editingPedidoId;
+      if (!ventaId) {
+        const detallesPayload = cart.map((item) => ({
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        }));
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('crear_venta_completa', {
+          p_venta: {
+            usuario_id: user!.id,
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal,
+            descuento: totalDescuentos,
+            total,
+            estado: 'pedido',
+          } as any,
+          p_detalles: detallesPayload as any,
+        });
+        if (rpcErr) throw rpcErr;
+        ventaId = (rpcRes as any)?.venta_id || (rpcRes as any)?.id || (rpcRes as any);
+      } else if (editingPedidoEstado === 'pedido') {
+        // Persistir cambios del carrito antes de mover el estado
+        await supabase
+          .from('ventas')
+          .update({
+            cliente_id: isVentaEmpleado ? null : (selectedCliente?.id || null),
+            empleado_id: isVentaEmpleado ? (selectedEmpleado?.id || null) : null,
+            subtotal, descuento: totalDescuentos, total,
+          })
+          .eq('id', ventaId);
+        await supabase.from('venta_detalles').delete().eq('venta_id', ventaId);
+        await supabase.from('venta_detalles').insert(cart.map((item) => ({
+          venta_id: ventaId,
+          producto_id: item.producto?.id || null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+          descuento: item.descuento_porcentaje > 0 ? item.cantidad * item.precio * item.descuento_porcentaje / 100 : 0,
+          descuento_porcentaje: item.descuento_porcentaje,
+          subtotal: item.subtotal,
+          producto_temporal_nombre: item.es_temporal ? item.nombre_temporal : null,
+          producto_temporal_precio: item.es_temporal ? item.precio : null,
+        })));
+      }
       const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
-        p_venta_id: editingPedidoId,
+        p_venta_id: ventaId,
         p_nuevo_estado: 'en_preparacion',
       } as any);
       if (error) throw error;
@@ -2053,7 +2106,7 @@ export default function POS() {
       const { data: ped } = await supabase
         .from('ventas')
         .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
-        .eq('id', editingPedidoId)
+        .eq('id', ventaId)
         .single();
       if (ped) imprimirPickingMostrador(adaptarVentaParaPicking(ped));
 
@@ -2073,6 +2126,7 @@ export default function POS() {
   };
 
   const handleAbrirPreparacion = async (pedido: PedidoMostrador) => {
+    setModoPos('mostrador');
     const { data, error } = await supabase
       .from('ventas')
       .select(`*, clientes(nombre), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
@@ -2377,7 +2431,18 @@ export default function POS() {
 
   return (
     <MainLayout>
-      <div className="h-[calc(100vh-2rem)] flex gap-4">
+      <div className="h-[calc(100vh-2rem)] flex flex-col gap-3">
+        <Tabs value={modoPos} onValueChange={(v) => setModoPos(v as any)}>
+          <TabsList>
+            <TabsTrigger value="directa">
+              <CreditCard className="h-4 w-4 mr-1" /> Venta directa
+            </TabsTrigger>
+            <TabsTrigger value="mostrador">
+              <ClipboardList className="h-4 w-4 mr-1" /> Pedidos mostrador
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex-1 min-h-0 flex gap-4">
         {/* Left Panel - Product Search */}
         <div className="flex-1 flex flex-col">
           <Card className="mb-4">
@@ -2959,6 +3024,7 @@ export default function POS() {
               )}
             </Button>
 
+            {modoPos === 'mostrador' && (
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
@@ -2985,15 +3051,10 @@ export default function POS() {
                   cart.length === 0 ||
                   enviandoPreparacion ||
                   guardandoPedido ||
-                  !editingPedidoId ||
-                  editingPedidoEstado !== 'pedido'
+                  (!!editingPedidoId && editingPedidoEstado !== 'pedido')
                 }
                 onClick={handleEnviarPreparacion}
-                title={
-                  !editingPedidoId
-                    ? 'Primero guardá el borrador'
-                    : 'Enviar a preparación e imprimir picking'
-                }
+                title="Enviar a preparación e imprimir picking"
               >
                 {enviandoPreparacion ? (
                   'Enviando...'
@@ -3005,8 +3066,9 @@ export default function POS() {
                 )}
               </Button>
             </div>
+            )}
 
-            {editingPedidoId && editingPedidoEstado && (
+            {modoPos === 'mostrador' && editingPedidoId && editingPedidoEstado && (
               <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded text-sm">
                 <span>
                   Editando pedido —{' '}
@@ -3036,15 +3098,28 @@ export default function POS() {
               </div>
             )}
 
-            <PedidosMostradorPanel
-              activoId={editingPedidoId}
-              refreshKey={pedidosPanelRefreshKey}
-              onSeleccionar={(p) => handleCargarPedido(p)}
-              onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
-              onCobrar={(p) => handleCargarPedido(p)}
-              onImprimirPicking={(p) => handleReimprimirPicking(p)}
-              onEliminar={(id) => handleEliminarPedido(id)}
-            />
+            {modoPos === 'mostrador' && (
+              <div className="h-[320px]">
+                <PedidosMostradorPanel
+                  activoId={editingPedidoId}
+                  refreshKey={pedidosPanelRefreshKey}
+                  onSeleccionar={(p) => handleCargarPedido(p)}
+                  onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
+                  onCobrar={(p) => handleCargarPedido(p)}
+                  onImprimirPicking={(p) => handleReimprimirPicking(p)}
+                  onEliminar={(id) => handleEliminarPedido(id)}
+                  onNuevoPedido={() => {
+                    setEditingPedidoId(null);
+                    setEditingPedidoEstado(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                />
+              </div>
+            )}
 
             {flujoMayoristaActivo && (
               <Button
@@ -3112,6 +3187,7 @@ export default function POS() {
               Debe abrir una caja para realizar ventas
             </p>
           )}
+        </div>
         </div>
       </div>
 
