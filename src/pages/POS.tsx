@@ -1291,6 +1291,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       
       // Mostrar ticket
       setTicketDialogOpen(true);
@@ -1495,6 +1496,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setDescuentoGlobal(0);
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       setFacturaDialogOpen(false);
       setModoVentaCC(null);
       
@@ -1759,6 +1761,7 @@ export default function POS() {
       setIsVentaEmpleado(false);
       setEmpleadoModalidadPago('cuenta_corriente');
       setEditingPedidoId(null);
+      setEditingPedidoMayoristaId(null);
       setDescuentoGlobal(0);
       setPagoDialogOpen(false);
       setFacturaDialogOpen(false);
