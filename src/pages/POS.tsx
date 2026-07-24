@@ -1298,6 +1298,7 @@ export default function POS() {
       fetchData();
     } catch (error) {
       console.error('Error al procesar venta a empleado:', error);
+      setEditingPedidoMayoristaId(null);
       toast.error('Error al procesar la venta');
     } finally {
       emitiendoRef.current = false;
