@@ -3178,6 +3178,7 @@ export default function POS() {
             </p>
           )}
         </div>
+        </div>
       </div>
 
       {/* Client Selection Dialog */}
