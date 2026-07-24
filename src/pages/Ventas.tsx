@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfiguracionComercio } from '@/hooks/useConfiguracionComercio';
-import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus } from 'lucide-react';
+import { Eye, XCircle, FileText, Download, Printer, Users, Calendar, Banknote, CreditCard, Landmark, ClipboardList, UserCheck, Globe, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, FileMinus, ImageIcon, ExternalLink } from 'lucide-react';
 import { imprimirTicketFactura } from '@/lib/imprimirTicketFactura';
 import { NotaCreditoParcialWizard } from '@/components/facturacion/NotaCreditoParcialWizard';
 import {
