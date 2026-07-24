@@ -1757,7 +1757,8 @@ export default function POS() {
       setTransferenciaData(null);
       
       fetchData();
-      fetchPedidos();
+      bumpPedidosPanel();
+      setEditingPedidoEstado(null);
     } catch (error) {
       console.error('Error processing sale:', error);
       toast.error('Error al procesar la venta');
@@ -1989,7 +1990,12 @@ export default function POS() {
 
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
-    setPedidosDialogOpen(false);
+    setEditingPedidoEstado((pedido.estado as any) || 'pedido');
+    if (pedido.clientes) setSelectedCliente(pedido.clientes);
+    if (pedido.empleados) {
+      setSelectedEmpleado(pedido.empleados);
+      setIsVentaEmpleado(true);
+    }
   };
 
   const handleEliminarPedido = async (pedidoId: string) => {
@@ -2004,10 +2010,74 @@ export default function POS() {
         .update({ anulada: true, motivo_anulacion: 'Pedido cancelado' })
         .eq('id', pedidoId);
 
-      fetchPedidos();
+      bumpPedidosPanel();
+      if (editingPedidoId === pedidoId) {
+        setEditingPedidoId(null);
+        setEditingPedidoEstado(null);
+        setCart([]);
+      }
     } catch (error) {
       toast.error('Error al eliminar el pedido');
     }
+  };
+
+  const handleEnviarPreparacion = async () => {
+    if (!editingPedidoId) {
+      toast.error('Primero guardá el borrador');
+      return;
+    }
+    setEnviandoPreparacion(true);
+    try {
+      const { error } = await supabase.rpc('pos_actualizar_pedido_estado' as any, {
+        p_venta_id: editingPedidoId,
+        p_nuevo_estado: 'en_preparacion',
+      } as any);
+      if (error) throw error;
+
+      // Traer el pedido completo para imprimir el picking
+      const { data: ped } = await supabase
+        .from('ventas')
+        .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+        .eq('id', editingPedidoId)
+        .single();
+      if (ped) imprimirPickingMostrador(ped);
+
+      setCart([]);
+      setSelectedCliente(null);
+      setSelectedEmpleado(null);
+      setIsVentaEmpleado(false);
+      setDescuentoGlobal(0);
+      setEditingPedidoId(null);
+      setEditingPedidoEstado(null);
+      bumpPedidosPanel();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo enviar a preparación');
+    } finally {
+      setEnviandoPreparacion(false);
+    }
+  };
+
+  const handleAbrirPreparacion = async (pedido: PedidoMostrador) => {
+    const { data, error } = await supabase
+      .from('ventas')
+      .select(`*, clientes(nombre), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+      .eq('id', pedido.id)
+      .single();
+    if (error || !data) {
+      toast.error('No se pudo cargar el pedido');
+      return;
+    }
+    setPedidoParaPreparar(data);
+    setPrepararDialogOpen(true);
+  };
+
+  const handleReimprimirPicking = async (pedido: PedidoMostrador) => {
+    const { data } = await supabase
+      .from('ventas')
+      .select(`*, clientes(nombre, dni_cuit), empleados(nombre), venta_detalles(*, productos(codigo_articulo, descripcion, unidad_medida))`)
+      .eq('id', pedido.id)
+      .single();
+    if (data) imprimirPickingMostrador(data);
   };
 
   const handleImprimirPedido = (pedido: any) => {
