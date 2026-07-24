@@ -3130,7 +3130,7 @@ export default function POS() {
             )}
 
             {modoPos === 'mostrador' && (
-              <div className="flex-1 min-h-[280px]">
+              <div className="h-[420px] shrink-0">
                 <PedidosMostradorPanel
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
