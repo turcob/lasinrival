@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ClipboardList, Printer, ChevronDown, ChevronUp, Trash2, Package, CircleDashed, Edit, RefreshCw, Wallet } from 'lucide-react';
+import { ClipboardList, Printer, Trash2, Package, CircleDashed, Edit, RefreshCw, Wallet, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type PedidoMostradorEstado = 'pedido' | 'en_preparacion' | 'preparado';
@@ -31,6 +29,7 @@ interface Props {
   onEliminar: (pedidoId: string) => Promise<void>;
   onCobrar: (pedido: PedidoMostrador) => void;
   onAbrirPreparacion: (pedido: PedidoMostrador) => void;
+  onNuevoPedido?: () => void;
 }
 
 const ESTADO_META: Record<PedidoMostradorEstado, { label: string; badgeClass: string; icon: any; orden: number }> = {
@@ -62,10 +61,10 @@ export function PedidosMostradorPanel({
   onEliminar,
   onCobrar,
   onAbrirPreparacion,
+  onNuevoPedido,
 }: Props) {
   const [pedidos, setPedidos] = useState<PedidoMostrador[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(true);
 
   const fetchPedidos = async () => {
     setLoading(true);
@@ -107,45 +106,43 @@ export function PedidosMostradorPanel({
   };
 
   return (
-    <Card className="mb-4">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition rounded-t-lg"
+    <div className="flex flex-col h-full border rounded-lg bg-card overflow-hidden">
+      <div className="flex items-center justify-between p-3 border-b bg-muted/30 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <ClipboardList className="h-4 w-4 shrink-0" />
+          <span className="font-semibold text-sm">Pedidos en curso</span>
+          <Badge variant="secondary">{total}</Badge>
+          {porEstado.preparado > 0 && (
+            <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hidden sm:inline-flex">
+              {porEstado.preparado} listo{porEstado.preparado === 1 ? '' : 's'}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {onNuevoPedido && (
+            <Button size="sm" variant="default" className="h-8" onClick={onNuevoPedido}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Nuevo
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Refrescar"
+            onClick={() => fetchPedidos()}
           >
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="font-semibold text-sm">Pedidos en curso</span>
-              <Badge variant="secondary" className="ml-1">{total}</Badge>
-              {porEstado.preparado > 0 && (
-                <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
-                  {porEstado.preparado} listo{porEstado.preparado === 1 ? '' : 's'} para cobrar
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <span
-                role="button"
-                aria-label="Refrescar"
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted"
-                onClick={(e) => { e.stopPropagation(); fetchPedidos(); }}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              </span>
-              {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </div>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="p-2 pt-0">
-            {total === 0 && !loading ? (
-              <p className="text-xs text-muted-foreground text-center py-3">
-                No hay pedidos en curso
-              </p>
-            ) : (
-              <ScrollArea className="max-h-[280px]">
-                <div className="space-y-2 pr-2">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0">
+        {total === 0 && !loading ? (
+          <p className="text-xs text-muted-foreground text-center py-6 px-3">
+            No hay pedidos en curso. Armá un carrito y tocá "Enviar a preparar" para crear uno.
+          </p>
+        ) : (
+          <ScrollArea className="h-full">
+            <div className="space-y-2 p-2">
                   {pedidos
                     .slice()
                     .sort((a, b) =>
@@ -200,12 +197,12 @@ export function PedidosMostradorPanel({
                                 <Wallet className="h-3 w-3 mr-1" /> Cobrar
                               </Button>
                             )}
-                            {(p.estado === 'pedido' || p.estado === 'en_preparacion') && (
+                            {p.estado === 'en_preparacion' && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 w-7 p-0"
-                                title="Imprimir picking"
+                                title="Reimprimir picking"
                                 onClick={() => onImprimirPicking(p)}
                               >
                                 <Printer className="h-3.5 w-3.5" />
@@ -228,12 +225,10 @@ export function PedidosMostradorPanel({
                         </div>
                       );
                     })}
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+    </div>
   );
 }
