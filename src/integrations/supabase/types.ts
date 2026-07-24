@@ -4410,7 +4410,7 @@ export type Database = {
           subtotal: number
           total: number
           usuario_id: string
-          vendedor_id: string | null
+          vendedor_user_id: string | null
         }
         Insert: {
           acreditada_parcial?: boolean
@@ -4431,7 +4431,7 @@ export type Database = {
           subtotal?: number
           total?: number
           usuario_id: string
-          vendedor_id?: string | null
+          vendedor_user_id?: string | null
         }
         Update: {
           acreditada_parcial?: boolean
@@ -4452,7 +4452,7 @@ export type Database = {
           subtotal?: number
           total?: number
           usuario_id?: string
-          vendedor_id?: string | null
+          vendedor_user_id?: string | null
         }
         Relationships: [
           {
