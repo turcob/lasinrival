@@ -349,6 +349,24 @@ export default function Ventas() {
     return <Banknote className="h-4 w-4" />;
   };
 
+  const verComprobanteTransferencia = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('comprobantes-cobros')
+        .createSignedUrl(path, 60 * 10);
+      if (error || !data?.signedUrl) throw error || new Error('No se pudo generar URL');
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      console.error('Error abriendo comprobante:', e);
+      toast.error('No se pudo abrir el comprobante');
+    }
+  };
+
+  const irAValidarTransferencia = (transferenciaId: string) => {
+    setDetalleDialogOpen(false);
+    navigate(`/imputacion?transferencia_id=${transferenciaId}`);
+  };
+
   const openDetalleDialog = async (venta: Venta) => {
     setSelectedVenta(venta);
     setTransferenciasVenta([]);
