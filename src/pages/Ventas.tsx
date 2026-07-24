@@ -351,6 +351,7 @@ export default function Ventas() {
 
   const openDetalleDialog = async (venta: Venta) => {
     setSelectedVenta(venta);
+    setTransferenciasVenta([]);
     
     try {
       if (venta._es_pedido && venta._pedido_id) {
@@ -371,7 +372,7 @@ export default function Ventas() {
         setDetalleDialogOpen(true);
         return;
       }
-      const [detallesRes, pagosRes] = await Promise.all([
+      const [detallesRes, pagosRes, transfRes] = await Promise.all([
         supabase
           .from('venta_detalles')
           .select('*, productos(codigo_articulo, descripcion)')
@@ -380,10 +381,15 @@ export default function Ventas() {
           .from('venta_pagos')
           .select('*, formas_pago(nombre)')
           .eq('venta_id', venta.id),
+        supabase
+          .from('transferencias')
+          .select('id, estado, numero_operacion, importe, fecha_transferencia, titular_nombre, titular_cuil, foto_comprobante_path, foto_comprobante_nombre, observacion_rechazo')
+          .eq('venta_id', venta.id),
       ]);
 
       if (detallesRes.data) setDetalles(detallesRes.data);
       if (pagosRes.data) setPagos(pagosRes.data);
+      if (transfRes.data) setTransferenciasVenta(transfRes.data);
       setDetalleDialogOpen(true);
     } catch (error) {
       console.error('Error fetching details:', error);
