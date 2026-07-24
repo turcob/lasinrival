@@ -597,7 +597,6 @@ export default function POS() {
       return [...prev, { id: newId, producto, cantidad, precio, subtotal: calcSubtotal(cantidad, precio, 0), descuento_porcentaje: 0 }];
     });
     
-    toast.success(`${producto.descripcion} agregado al pedido`);
   };
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
@@ -655,10 +654,8 @@ export default function POS() {
 
     if (pendingDescuento.type === 'item' && pendingDescuento.itemId) {
       updateDescuento(pendingDescuento.itemId, porcentajeAutorizado);
-      toast.success(`Descuento del ${porcentajeAutorizado}% aplicado al producto`);
     } else if (pendingDescuento.type === 'global') {
       setDescuentoGlobal(porcentajeAutorizado);
-      toast.success(`Descuento global del ${porcentajeAutorizado}% aplicado`);
     }
 
     setDescuentoAuthModalOpen(false);
@@ -673,7 +670,6 @@ export default function POS() {
     if (descuento <= maxDescuento) {
       // Dentro del límite permitido, aplicar directamente
       updateDescuento(itemId, descuento);
-      toast.success(`Descuento del ${descuento}% aplicado`);
     } else {
       // Excede el límite, solicitar autorización
       const nombreProducto = item?.es_temporal 
@@ -750,7 +746,6 @@ export default function POS() {
     setDescuentoDialogOpen(false);
     setEditingDescuentoItem(null);
     setDescuentoInput('');
-    toast.success(`Descuento del ${descuento}% aplicado`);
   };
 
   const handleAgregarProductoTemporal = () => {
@@ -778,7 +773,6 @@ export default function POS() {
     setCart(prev => [...prev, newItem]);
     setProductoTemporalDialogOpen(false);
     setProductoTemporal({ nombre: '', precio: '', cantidad: '1' });
-    toast.success('Producto agregado al carrito');
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
@@ -917,7 +911,6 @@ export default function POS() {
 
     setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
     setTransferenciaDialogOpen(false);
-    toast.success('Transferencia agregada');
   };
 
   // Agregar pago con tarjeta
@@ -966,9 +959,7 @@ export default function POS() {
     setLoteTarjeta('');
     
     if (coeficiente > 1) {
-      toast.success(`Pago agregado con ${((coeficiente - 1) * 100).toFixed(1)}% de interés`);
     } else {
-      toast.success('Pago con tarjeta agregado');
     }
   };
 
@@ -1002,7 +993,6 @@ export default function POS() {
     setEfectivoEntregado('');
     
     if (vuelto > 0) {
-      toast.success(`Vuelto: $${vuelto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`);
     }
   };
 
@@ -1282,7 +1272,6 @@ export default function POS() {
         descuento_global: descuentoGlobal,
       });
 
-      toast.success(`Venta #${venta.numero_comprobante} cargada a cuenta corriente de ${selectedEmpleado.nombre}`);
       
       // Limpiar todo
       setCart([]);
@@ -1458,7 +1447,6 @@ export default function POS() {
               console.error('Error guardando comprobante en DB:', insertCompError);
               toast.warning(`Factura emitida (CAE: ${facturaResult.cae}) pero hubo error al guardar: ${insertCompError.message}`);
             } else {
-              toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
             }
           }
         } catch (facturaErr: any) {
@@ -1486,7 +1474,6 @@ export default function POS() {
         factura: facturaInfo,
       });
 
-      toast.success(`Venta #${venta.numero_comprobante} cargada a cuenta corriente de ${selectedCliente.nombre}`);
       
       // Limpiar todo
       setCart([]);
@@ -1736,7 +1723,6 @@ export default function POS() {
               console.error('Error guardando comprobante en DB:', insertCompError);
               toast.warning(`Factura emitida (CAE: ${facturaResult.cae}) pero hubo error al guardar en base de datos: ${insertCompError.message}`);
             } else {
-              toast.success(`Factura emitida - CAE: ${facturaResult.cae}`);
             }
           }
         } catch (facturaErr: any) {
@@ -1768,7 +1754,6 @@ export default function POS() {
       setTicketDialogOpen(true);
       setTransferenciaData(null);
       
-      toast.success('Venta procesada correctamente');
       fetchData();
       fetchPedidos();
     } catch (error) {
@@ -1878,7 +1863,6 @@ export default function POS() {
     setEditingPedidoMayoristaId(pedido.id);
     setEditingPedidoId(null);
     setPedidosMayoristaDialogOpen(false);
-    toast.info(`Pedido #${String(pedido.numero_pedido).padStart(6, '0')} cargado para cobro`);
   };
 
   const handleGuardarPedido = async () => {
@@ -1928,7 +1912,6 @@ export default function POS() {
 
         if (detallesError) throw detallesError;
 
-        toast.success('Pedido actualizado correctamente');
         setEditingPedidoId(null);
       } else {
         const detallesPayload = cart.map((item) => ({
@@ -1954,7 +1937,6 @@ export default function POS() {
           p_detalles: detallesPayload as any,
         });
         if (rpcErr) throw rpcErr;
-        toast.success('Pedido guardado correctamente');
       }
 
       setCart([]);
@@ -2027,7 +2009,6 @@ export default function POS() {
     setCart(cartItems);
     setEditingPedidoId(pedido.id);
     setPedidosDialogOpen(false);
-    toast.info(`Pedido #${pedido.numero_comprobante} cargado para edición`);
   };
 
   const handleEliminarPedido = async (pedidoId: string) => {
@@ -2042,7 +2023,6 @@ export default function POS() {
         .update({ anulada: true, motivo_anulacion: 'Pedido cancelado' })
         .eq('id', pedidoId);
 
-      toast.success('Pedido eliminado');
       fetchPedidos();
     } catch (error) {
       toast.error('Error al eliminar el pedido');
