@@ -1805,6 +1805,82 @@ export default function POS() {
     }
   };
 
+  const fetchPedidosMayorista = async () => {
+    if (!user) return;
+    setLoadingPedidosMayorista(true);
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select(`
+          id, numero_pedido, fecha_pedido, tipo_pedido, estado, subtotal, descuento, total,
+          cliente_id, vendedor_id, venta_id,
+          clientes(id, nombre, dni_cuit, condicion_iva),
+          pedido_detalles(
+            id, cantidad_pedida, cantidad_entregada, precio_unitario, descuento_porcentaje, subtotal,
+            producto_id,
+            productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo)
+          )
+        `)
+        .eq('estado', 'preparado')
+        .is('venta_id', null)
+        .order('fecha_pedido', { ascending: false });
+      if (error) throw error;
+      setPedidosMayorista(data || []);
+    } catch (error) {
+      console.error('Error al cargar pedidos preparados:', error);
+      toast.error('Error al cargar los pedidos preparados');
+    } finally {
+      setLoadingPedidosMayorista(false);
+    }
+  };
+
+  const handleCargarPedidoMayorista = (pedido: any) => {
+    // Cliente
+    if (pedido.clientes) {
+      setSelectedCliente({
+        id: pedido.clientes.id,
+        nombre: pedido.clientes.nombre,
+        dni_cuit: pedido.clientes.dni_cuit,
+        condicion_iva: pedido.clientes.condicion_iva,
+      } as any);
+    } else {
+      setSelectedCliente(null);
+    }
+    setSelectedEmpleado(null);
+    setIsVentaEmpleado(false);
+
+    const detalles = pedido.pedido_detalles || [];
+    const cartItems: CartItem[] = detalles
+      .filter((d: any) => d.producto_id && d.productos)
+      .map((d: any) => {
+        const cantidad = Number(d.cantidad_entregada ?? d.cantidad_pedida ?? 0);
+        const precio = Number(d.precio_unitario ?? 0);
+        const descPct = Number(d.descuento_porcentaje ?? 0);
+        const sub = cantidad * precio * (1 - descPct / 100);
+        return {
+          id: crypto.randomUUID(),
+          producto: {
+            id: d.productos.id,
+            codigo_articulo: d.productos.codigo_articulo,
+            descripcion: d.productos.descripcion,
+            stock_actual: d.productos.stock_actual,
+            unidad_medida: d.productos.unidad_medida,
+            precio_costo: d.productos.precio_costo,
+          },
+          cantidad,
+          precio,
+          subtotal: Number(d.subtotal ?? sub),
+          descuento_porcentaje: descPct,
+        } as CartItem;
+      });
+
+    setCart(cartItems);
+    setEditingPedidoMayoristaId(pedido.id);
+    setEditingPedidoId(null);
+    setPedidosMayoristaDialogOpen(false);
+    toast.info(`Pedido #${String(pedido.numero_pedido).padStart(6, '0')} cargado para cobro`);
+  };
+
   const handleGuardarPedido = async () => {
     if (!user) return;
     if (cart.length === 0) {
