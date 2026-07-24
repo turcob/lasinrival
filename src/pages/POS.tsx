@@ -2945,6 +2945,43 @@ export default function POS() {
               </Button>
             </div>
 
+            {flujoMayoristaActivo && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => {
+                  fetchPedidosMayorista();
+                  setPedidosMayoristaDialogOpen(true);
+                }}
+              >
+                <Package className="mr-1 h-4 w-4" />
+                Cobrar pedido preparado
+              </Button>
+            )}
+
+            {editingPedidoMayoristaId && (
+              <div className="flex items-center justify-between p-2 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm">
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  Cobrando pedido preparado
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => {
+                    setEditingPedidoMayoristaId(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+
             {editingPedidoId && (
               <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/30 rounded text-sm">
                 <span className="text-amber-600 dark:text-amber-400">Editando pedido</span>
