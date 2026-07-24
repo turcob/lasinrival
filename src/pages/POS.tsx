@@ -241,6 +241,21 @@ export default function POS() {
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
+  const adaptarVentaParaPicking = (v: any) => ({
+    numero: v.numero_comprobante
+      ? `#${String(v.numero_comprobante).padStart(6, '0')}`
+      : `P-${String(v.id).slice(0, 6).toUpperCase()}`,
+    fecha: new Date(v.fecha),
+    cliente: v.clientes?.nombre || v.empleados?.nombre || 'Consumidor Final',
+    items: (v.venta_detalles || []).map((d: any) => ({
+      codigo: d.productos?.codigo_articulo ?? null,
+      descripcion: d.productos?.descripcion || d.producto_temporal_nombre || 'Producto',
+      cantidad: Number(d.cantidad ?? 0),
+      unidad_medida: d.productos?.unidad_medida ?? 'u',
+      es_temporal: !!d.producto_temporal_nombre,
+    })),
+  });
+
   // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
   const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
   const [pedidosMayoristaDialogOpen, setPedidosMayoristaDialogOpen] = useState(false);
