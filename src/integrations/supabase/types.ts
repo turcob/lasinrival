@@ -5113,6 +5113,7 @@ export type Database = {
           p_empleado_movimiento?: Json
           p_motivo_inventario?: string
           p_pagos?: Json
+          p_pedido_id?: string
           p_transferencia?: Json
           p_venta: Json
         }
