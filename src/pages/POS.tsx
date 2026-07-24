@@ -2431,7 +2431,18 @@ export default function POS() {
 
   return (
     <MainLayout>
-      <div className="h-[calc(100vh-2rem)] flex gap-4">
+      <div className="h-[calc(100vh-2rem)] flex flex-col gap-3">
+        <Tabs value={modoPos} onValueChange={(v) => setModoPos(v as any)}>
+          <TabsList>
+            <TabsTrigger value="directa">
+              <CreditCard className="h-4 w-4 mr-1" /> Venta directa
+            </TabsTrigger>
+            <TabsTrigger value="mostrador">
+              <ClipboardList className="h-4 w-4 mr-1" /> Pedidos mostrador
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex-1 min-h-0 flex gap-4">
         {/* Left Panel - Product Search */}
         <div className="flex-1 flex flex-col">
           <Card className="mb-4">
