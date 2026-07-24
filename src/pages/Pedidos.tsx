@@ -16,7 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   PackageSearch,
-  Printer
+  Printer,
+  Globe
 } from 'lucide-react';
 import { imprimirDetallePedido } from '@/lib/imprimirDetallePedido';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -46,9 +47,7 @@ import { DetallePedidoDialog } from '@/components/pedidos/DetallePedidoDialog';
 import { PrepararPedidoDialog } from '@/components/pedidos/PrepararPedidoDialog';
 import { EditarPedidoDialog } from '@/components/pedidos/EditarPedidoDialog';
 import { ConsolidadoPedidos } from '@/components/pedidos/ConsolidadoPedidos';
-import { TipoPedidoProvider, useTipoPedido } from '@/contexts/TipoPedidoContext';
-import { SelectorTipoPedidoDialog } from '@/components/pedidos/SelectorTipoPedidoDialog';
-import { TipoPedidoSelector, TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
+import { TipoPedidoBadge } from '@/components/pedidos/TipoPedidoSelector';
 
 const estadoConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   borrador: { label: 'Borrador', color: 'bg-muted text-muted-foreground', icon: Clock },
@@ -66,12 +65,7 @@ const estadoConfig: Record<string, { label: string; color: string; icon: React.C
 const estadosActivos: PedidoEstado[] = ['pendiente', 'preparado', 'despachado', 'rechazado'];
 
 export default function Pedidos() {
-  return (
-    <TipoPedidoProvider>
-      <SelectorTipoPedidoDialog />
-      <PedidosContent />
-    </TipoPedidoProvider>
-  );
+  return <PedidosContent />;
 }
 
 function PedidosContent() {
@@ -85,11 +79,12 @@ function PedidosContent() {
   const [prepararPedidoId, setPrepararPedidoId] = useState<string | null>(null);
   const [editarPedidoId, setEditarPedidoId] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [tabActiva, setTabActiva] = useState<'reparto' | 'web' | 'consolidado'>('reparto');
 
-  const { tipo: tipoPedidoFiltro } = useTipoPedido();
+  const tipoPedidoFiltro: 'web' | 'reparto' = tabActiva === 'web' ? 'web' : 'reparto';
 
   const { data: pedidos, isLoading } = usePedidos({
-    tipoPedido: tipoPedidoFiltro !== 'ambos' ? tipoPedidoFiltro : undefined,
+    tipoPedido: tabActiva === 'consolidado' ? undefined : tipoPedidoFiltro,
   });
 
   const toggleExpandido = (id: string) => {
@@ -205,13 +200,66 @@ function PedidosContent() {
         description="Administra los pedidos y preventas del sistema"
       />
 
-      <Tabs defaultValue="pedidos" className="space-y-4">
+      <Tabs value={tabActiva} onValueChange={(v) => setTabActiva(v as any)} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+          <TabsTrigger value="reparto">
+            <Truck className="h-4 w-4 mr-2 text-blue-600" />
+            Pedidos de Reparto
+          </TabsTrigger>
+          <TabsTrigger value="web">
+            <Globe className="h-4 w-4 mr-2 text-red-600" />
+            Pedidos Web
+          </TabsTrigger>
           <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pedidos">
+        <TabsContent value="reparto">
+          {renderPedidosContent()}
+        </TabsContent>
+        <TabsContent value="web">
+          {renderPedidosContent()}
+        </TabsContent>
+
+        <TabsContent value="consolidado">
+          <ConsolidadoPedidos />
+        </TabsContent>
+      </Tabs>
+
+      {/* dialogs below */}
+      <NuevoPedidoDialog 
+        open={nuevoDialogOpen} 
+        onOpenChange={setNuevoDialogOpen}
+        onEditarPedidoExistente={(pedidoId) => setEditarPedidoId(pedidoId)}
+      />
+
+      <DetallePedidoDialog
+        pedidoId={pedidoSeleccionado}
+        open={!!pedidoSeleccionado}
+        onOpenChange={(open) => !open && setPedidoSeleccionado(null)}
+        onPrepararPedido={(pedidoId) => {
+          setPedidoSeleccionado(null);
+          setPrepararPedidoId(pedidoId);
+        }}
+      />
+
+      <PrepararPedidoDialog
+        pedidoId={prepararPedidoId}
+        open={!!prepararPedidoId}
+        onOpenChange={(open) => !open && setPrepararPedidoId(null)}
+        pedidoIds={pedidosFiltrados.map(p => p.id)}
+        onNavigate={(id) => setPrepararPedidoId(id)}
+      />
+
+      <EditarPedidoDialog
+        pedidoId={editarPedidoId}
+        open={!!editarPedidoId}
+        onOpenChange={(open) => !open && setEditarPedidoId(null)}
+      />
+    </MainLayout>
+  );
+
+  function renderPedidosContent() {
+    return (
           <div className="space-y-4">
             {/* Toolbar */}
             <div className="flex flex-col sm:flex-row gap-4">
@@ -263,7 +311,6 @@ function PedidosContent() {
                   ))}
                 </SelectContent>
               </Select>
-              <TipoPedidoSelector />
               <Button onClick={() => setNuevoDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Pedido
