@@ -39,7 +39,20 @@ function esPeso(unidad?: string | null) {
 
 function parseNumeroLocal(v: string): number {
   if (!v) return 0;
-  const s = v.replace(/\./g, '').replace(',', '.').trim();
+  // Tratar tanto '.' como ',' como separador decimal.
+  // Si hay más de un separador, los previos se consideran miles y solo el último es decimal.
+  const raw = v.trim();
+  const lastDot = raw.lastIndexOf('.');
+  const lastComma = raw.lastIndexOf(',');
+  const lastSep = Math.max(lastDot, lastComma);
+  let s: string;
+  if (lastSep === -1) {
+    s = raw;
+  } else {
+    const intPart = raw.slice(0, lastSep).replace(/[.,]/g, '');
+    const decPart = raw.slice(lastSep + 1);
+    s = intPart + '.' + decPart;
+  }
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 }
