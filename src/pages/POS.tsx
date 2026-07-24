@@ -3057,6 +3057,8 @@ export default function POS() {
 
             {modoPos === 'mostrador' && (
             <div className="grid grid-cols-2 gap-2">
+              {(!editingPedidoId || editingPedidoEstado === 'pedido') && (
+              <>
               <Button
                 variant="outline"
                 disabled={cart.length === 0 || guardandoPedido}
@@ -3096,6 +3098,25 @@ export default function POS() {
                   </>
                 )}
               </Button>
+              </>
+              )}
+              {editingPedidoId && editingPedidoEstado === 'en_preparacion' && (
+                <Button
+                  variant="default"
+                  className="col-span-2"
+                  disabled={cart.length === 0 || confirmandoPreparado}
+                  onClick={handleConfirmarPreparadoInline}
+                >
+                  {confirmandoPreparado ? (
+                    'Confirmando...'
+                  ) : (
+                    <>
+                      <Check className="mr-1 h-4 w-4" />
+                      Confirmar preparado
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
             )}
 
@@ -3135,8 +3156,6 @@ export default function POS() {
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
                   onSeleccionar={(p) => handleCargarPedido(p)}
-                  onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
-                  onCobrar={(p) => handleCargarPedido(p)}
                   onImprimirPicking={(p) => handleReimprimirPicking(p)}
                   onEliminar={(id) => handleEliminarPedido(id)}
                   onImprimirYPreparar={(p) => handleImprimirYPreparar(p)}
