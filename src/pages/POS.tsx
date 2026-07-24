@@ -1257,6 +1257,7 @@ export default function POS() {
         p_cheque: null as any,
         p_motivo_inventario: 'Venta a Empleado',
         p_editing_pedido_id: editingPedidoId,
+        p_pedido_id: editingPedidoMayoristaId,
       });
       if (rpcErr) throw rpcErr;
       const created: any = rpcRes;
