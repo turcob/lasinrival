@@ -234,6 +234,13 @@ export default function POS() {
   const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
   const [guardandoPedido, setGuardandoPedido] = useState(false);
+
+  // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
+  const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
+  const [pedidosMayoristaDialogOpen, setPedidosMayoristaDialogOpen] = useState(false);
+  const [pedidosMayorista, setPedidosMayorista] = useState<any[]>([]);
+  const [loadingPedidosMayorista, setLoadingPedidosMayorista] = useState(false);
+  const [editingPedidoMayoristaId, setEditingPedidoMayoristaId] = useState<string | null>(null);
   
   // Peso para productos por KG
   const [pesoDialogOpen, setPesoDialogOpen] = useState(false);
