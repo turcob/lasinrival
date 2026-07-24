@@ -49,6 +49,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -239,6 +240,7 @@ export default function POS() {
   const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
   const [pedidoParaPreparar, setPedidoParaPreparar] = useState<any | null>(null);
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
+  const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
