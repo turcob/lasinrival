@@ -1103,6 +1103,7 @@ export type Database = {
           monto_adeudado_bloqueo: number
           nombre_fantasia: string | null
           nombre_sistema: string | null
+          pos_flujo_mayorista_activo: boolean
           provincia: string | null
           punto_venta: number
           razon_social: string
@@ -1126,6 +1127,7 @@ export type Database = {
           monto_adeudado_bloqueo?: number
           nombre_fantasia?: string | null
           nombre_sistema?: string | null
+          pos_flujo_mayorista_activo?: boolean
           provincia?: string | null
           punto_venta?: number
           razon_social: string
@@ -1149,6 +1151,7 @@ export type Database = {
           monto_adeudado_bloqueo?: number
           nombre_fantasia?: string | null
           nombre_sistema?: string | null
+          pos_flujo_mayorista_activo?: boolean
           provincia?: string | null
           punto_venta?: number
           razon_social?: string
@@ -4407,6 +4410,7 @@ export type Database = {
           subtotal: number
           total: number
           usuario_id: string
+          vendedor_id: string | null
         }
         Insert: {
           acreditada_parcial?: boolean
@@ -4427,6 +4431,7 @@ export type Database = {
           subtotal?: number
           total?: number
           usuario_id: string
+          vendedor_id?: string | null
         }
         Update: {
           acreditada_parcial?: boolean
@@ -4447,6 +4452,7 @@ export type Database = {
           subtotal?: number
           total?: number
           usuario_id?: string
+          vendedor_id?: string | null
         }
         Relationships: [
           {
@@ -5180,6 +5186,7 @@ export type Database = {
         | "devuelto"
         | "anulado"
         | "rechazado"
+        | "facturado"
       proveedor_movimiento_tipo:
         | "factura"
         | "pago"
@@ -5367,6 +5374,7 @@ export const Constants = {
         "devuelto",
         "anulado",
         "rechazado",
+        "facturado",
       ],
       proveedor_movimiento_tipo: [
         "factura",
