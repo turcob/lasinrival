@@ -3024,6 +3024,7 @@ export default function POS() {
               )}
             </Button>
 
+            {modoPos === 'mostrador' && (
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
@@ -3050,15 +3051,10 @@ export default function POS() {
                   cart.length === 0 ||
                   enviandoPreparacion ||
                   guardandoPedido ||
-                  !editingPedidoId ||
-                  editingPedidoEstado !== 'pedido'
+                  (!!editingPedidoId && editingPedidoEstado !== 'pedido')
                 }
                 onClick={handleEnviarPreparacion}
-                title={
-                  !editingPedidoId
-                    ? 'Primero guardá el borrador'
-                    : 'Enviar a preparación e imprimir picking'
-                }
+                title="Enviar a preparación e imprimir picking"
               >
                 {enviandoPreparacion ? (
                   'Enviando...'
@@ -3070,8 +3066,9 @@ export default function POS() {
                 )}
               </Button>
             </div>
+            )}
 
-            {editingPedidoId && editingPedidoEstado && (
+            {modoPos === 'mostrador' && editingPedidoId && editingPedidoEstado && (
               <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded text-sm">
                 <span>
                   Editando pedido —{' '}
@@ -3101,15 +3098,28 @@ export default function POS() {
               </div>
             )}
 
-            <PedidosMostradorPanel
-              activoId={editingPedidoId}
-              refreshKey={pedidosPanelRefreshKey}
-              onSeleccionar={(p) => handleCargarPedido(p)}
-              onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
-              onCobrar={(p) => handleCargarPedido(p)}
-              onImprimirPicking={(p) => handleReimprimirPicking(p)}
-              onEliminar={(id) => handleEliminarPedido(id)}
-            />
+            {modoPos === 'mostrador' && (
+              <div className="h-[320px]">
+                <PedidosMostradorPanel
+                  activoId={editingPedidoId}
+                  refreshKey={pedidosPanelRefreshKey}
+                  onSeleccionar={(p) => handleCargarPedido(p)}
+                  onAbrirPreparacion={(p) => handleAbrirPreparacion(p)}
+                  onCobrar={(p) => handleCargarPedido(p)}
+                  onImprimirPicking={(p) => handleReimprimirPicking(p)}
+                  onEliminar={(id) => handleEliminarPedido(id)}
+                  onNuevoPedido={() => {
+                    setEditingPedidoId(null);
+                    setEditingPedidoEstado(null);
+                    setCart([]);
+                    setSelectedCliente(null);
+                    setSelectedEmpleado(null);
+                    setIsVentaEmpleado(false);
+                    setDescuentoGlobal(0);
+                  }}
+                />
+              </div>
+            )}
 
             {flujoMayoristaActivo && (
               <Button
