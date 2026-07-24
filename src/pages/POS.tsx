@@ -560,10 +560,13 @@ export default function POS() {
       return;
     }
 
+    // En modo mostrador no pedimos peso al agregar: se ajusta al preparar el pedido.
+    const skipPesoPrompt = modoPos === 'mostrador';
+
     setCart((prev) => {
       const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
       if (existing) {
-        if (isProductoPorPeso(producto)) {
+        if (isProductoPorPeso(producto) && !skipPesoPrompt) {
           setEditingPesoItem(existing.id);
           setPesoInput(existing.cantidad.toString().replace('.', ','));
           setPesoDialogOpen(true);
@@ -576,7 +579,7 @@ export default function POS() {
         );
       }
       const newId = crypto.randomUUID();
-      if (isProductoPorPeso(producto)) {
+      if (isProductoPorPeso(producto) && !skipPesoPrompt) {
         const newCart = [...prev, { id: newId, producto, cantidad: 1, precio, subtotal: precio, descuento_porcentaje: 0 }];
         setTimeout(() => {
           setEditingPesoItem(newId);
