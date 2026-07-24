@@ -240,6 +240,7 @@ export default function POS() {
   const [prepararDialogOpen, setPrepararDialogOpen] = useState(false);
   const [pedidoParaPreparar, setPedidoParaPreparar] = useState<any | null>(null);
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
+  const [confirmandoPreparado, setConfirmandoPreparado] = useState(false);
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
