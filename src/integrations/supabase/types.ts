@@ -5031,6 +5031,16 @@ export type Database = {
         Args: { p_detalles: Json; p_pagos?: Json; p_venta: Json }
         Returns: Json
       }
+      get_arqueo_por_medio: {
+        Args: { p_caja_id: string }
+        Returns: {
+          cantidad_operaciones: number
+          categoria: string
+          forma_pago_id: string
+          forma_pago_nombre: string
+          total: number
+        }[]
+      }
       get_empleado_id: { Args: never; Returns: string }
       get_factura_saldo_disponible: {
         Args: { p_factura_id: string }
