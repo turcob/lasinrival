@@ -1,83 +1,82 @@
-## Paso b — RPC `get_arqueo_por_medio(p_caja_id uuid)`
+## Paso d — Persistencia de `esperado` + `diferencia` por medio en `arqueo_otros_medios`
 
-Función de solo lectura, `SECURITY DEFINER`, con control de acceso interno.
+Extensión chica de la tabla existente (sin tabla nueva), con backfill legacy y sin tocar caminos críticos.
 
-### Elección de lenguaje: `plpgsql`
+### Verificaciones previas (read-only, hechas)
 
-`LANGUAGE sql` no permite `RAISE EXCEPTION` ni ramificación de control condicional previa al `SELECT`. Como necesitamos rechazar con mensaje explícito antes de devolver filas, uso `plpgsql` con `RETURN QUERY`. Sigue siendo `STABLE` (solo lecturas).
+**Semántica de `monto`.** En todos los read/write paths existentes `monto` = "declarado por el cajero":
+- `src/pages/Cajas.tsx` (cierre): inserta `monto: otrosMedios.posnet` / `monto: otrosMedios.transferencias` desde inputs del cajero.
+- `src/components/cajas/EditarArqueoDialog.tsx`: idem.
+- `src/components/cajas/ConfirmarArqueoDialog.tsx`: lee `monto` y lo suma como "total otros medios" declarado.
 
-### SQL propuesto
+No hay otro read path con semántica distinta. Podemos colgar `diferencia = monto - esperado` con seguridad.
+
+**Tipo de `monto`.** `numeric` sin escala explícita (`min=71.76`, `max=3.631.856`). `esperado numeric(12,2)` y la resta `monto - esperado` no rompen (Postgres promueve al tipo más ancho). La columna generated queda como `numeric` (sin `(12,2)` para no perder decimales si `monto` tiene más de 2).
+
+**Filas legacy actuales.**
+- `tipo = 'posnet'` → 82 filas.
+- `tipo = 'transferencias'` → 197 filas.
+
+**RLS.** Policies existentes de `arqueo_otros_medios`:
+- INSERT: `with_check: true` (cualquier authenticated).
+- UPDATE/DELETE: dueño de la caja con `arqueo_confirmado = false`.
+- SELECT: `true`.
+
+Las nuevas columnas quedan cubiertas por las mismas policies (no hay filtros por columna). **No hace falta policy nueva.** Grants existentes ya alcanzan.
+
+### Migración propuesta
 
 ```sql
-CREATE OR REPLACE FUNCTION public.get_arqueo_por_medio(p_caja_id uuid)
-RETURNS TABLE (
-  categoria text,
-  forma_pago_id uuid,
-  forma_pago_nombre text,
-  total numeric,
-  cantidad_operaciones bigint
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user uuid := auth.uid();
-  v_owner uuid;
-BEGIN
-  IF v_user IS NULL THEN
-    RAISE EXCEPTION 'Usuario no autenticado';
-  END IF;
+-- 1. Columnas nuevas
+ALTER TABLE public.arqueo_otros_medios
+  ADD COLUMN categoria text
+    CHECK (categoria IN ('efectivo','debito','credito','transferencia','cheque','otro')),
+  ADD COLUMN forma_pago_id uuid NULL REFERENCES public.formas_pago(id),
+  ADD COLUMN esperado numeric(12,2) NOT NULL DEFAULT 0;
 
-  SELECT usuario_id INTO v_owner
-  FROM public.cajas
-  WHERE id = p_caja_id;
+-- 2. Generated column (después de tener esperado con default)
+ALTER TABLE public.arqueo_otros_medios
+  ADD COLUMN diferencia numeric GENERATED ALWAYS AS (monto - esperado) STORED;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Caja no encontrada';
-  END IF;
+-- 3. Backfill legacy
+UPDATE public.arqueo_otros_medios
+   SET categoria = 'transferencia'
+ WHERE tipo = 'transferencias' AND categoria IS NULL;
 
-  IF v_owner IS DISTINCT FROM v_user
-     AND NOT public.has_role(v_user, 'admin'::app_role)
-     AND NOT public.has_role(v_user, 'encargado'::app_role) THEN
-    RAISE EXCEPTION 'No tenés permiso para ver el arqueo de esta caja';
-  END IF;
-
-  RETURN QUERY
-  SELECT
-    fp.categoria,
-    fp.id  AS forma_pago_id,
-    fp.nombre AS forma_pago_nombre,
-    SUM(vp.monto)::numeric AS total,
-    COUNT(*)::bigint       AS cantidad_operaciones
-  FROM public.venta_pagos vp
-  JOIN public.ventas v      ON v.id = vp.venta_id
-  JOIN public.formas_pago fp ON fp.id = vp.forma_pago_id
-  WHERE v.caja_id = p_caja_id
-    AND v.anulada = false
-    AND v.estado  = 'confirmada'
-  GROUP BY fp.categoria, fp.id, fp.nombre
-  ORDER BY fp.categoria, fp.nombre;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.get_arqueo_por_medio(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_arqueo_por_medio(uuid) TO authenticated;
+UPDATE public.arqueo_otros_medios
+   SET categoria = 'otro'
+ WHERE tipo = 'posnet' AND categoria IS NULL;
+-- posnet mezcla débito+crédito: se recategoriza desde el flujo nuevo.
 ```
 
-### Notas de diseño
+- `categoria` queda **nullable** a propósito para no romper filas legacy; el write path nuevo (paso c/d front) siempre la setea.
+- `forma_pago_id` nullable — legacy no lo tiene; el flujo nuevo lo completará cuando el desglose sea por forma puntual.
+- `esperado = 0` en legacy → `diferencia = monto` para esas filas (esperado, no teníamos el dato).
+- Se **mantiene** `tipo` (legacy). El flujo nuevo usa `categoria`.
 
-- **Filtro exacto** al validado en EVAL b.5: `anulada = false AND estado = 'confirmada'`. En cajas limpias empata al centavo con `cajas.total_ventas`; en cajas con anuladas post-cierre devuelve el número real cobrado.
-- **No incluye** `fondo_inicial` ni egresos — eso queda para el paso c (front global).
-- **Acceso**: dueño de la caja (`cajas.usuario_id = auth.uid()`), o roles `admin` / `encargado`. Se omite `administracion` por pedido explícito.
-- **Sin `.in()` ni listas grandes**: todo se resuelve con joins server-side.
-- **No toca** `pos_registrar_venta`, tablas ni otras RPCs.
+### Restricciones respetadas
+
+- No se toca `cajas.diferencia` (global) ni `confirmar_arqueo_con_ajuste`. El ajuste a CC del empleado sigue por el path legacy.
+- No se toca `pos_registrar_venta` ni cobros.
+- No se abren permisos: RLS actual cubre las nuevas columnas.
+
+### Estado esperado tras el backfill
+
+Después de aplicar, deberíamos ver:
+
+```
+tipo             | categoria       | filas
+transferencias   | transferencia   | 197
+posnet           | otro            | 82
+(cualquier otro) | NULL            | 0
+```
+
+Y para todas: `esperado = 0`, `diferencia = monto`. Lo confirmo con un `SELECT` post-migration antes de dar por cerrado el paso.
 
 ### Superficie de deploy
 
-- **Solo DB migration** (creación/replace de función + GRANT).
-- **Sin ventana off-hours**. `CREATE OR REPLACE FUNCTION` es instantáneo, sin locks sobre tablas.
-- Reversible con `DROP FUNCTION public.get_arqueo_por_medio(uuid);`.
+- **Solo DB migration.** ALTERs de columnas + backfill sobre 279 filas.
+- **Sin ventana off-hours.** `ADD COLUMN` con default constante es metadata-only en Postgres 11+. La generated column exige rewrite pero la tabla es chica (<300 filas). El backfill es un UPDATE trivial.
+- Reversible: `ALTER TABLE ... DROP COLUMN diferencia, DROP COLUMN esperado, DROP COLUMN forma_pago_id, DROP COLUMN categoria;`
 
 Confirmá y aplico.
