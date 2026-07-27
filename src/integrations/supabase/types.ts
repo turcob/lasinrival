@@ -106,21 +106,33 @@ export type Database = {
       arqueo_otros_medios: {
         Row: {
           caja_id: string
+          categoria: string | null
           created_at: string | null
+          diferencia: number | null
+          esperado: number
+          forma_pago_id: string | null
           id: string
           monto: number
           tipo: string
         }
         Insert: {
           caja_id: string
+          categoria?: string | null
           created_at?: string | null
+          diferencia?: number | null
+          esperado?: number
+          forma_pago_id?: string | null
           id?: string
           monto?: number
           tipo: string
         }
         Update: {
           caja_id?: string
+          categoria?: string | null
           created_at?: string | null
+          diferencia?: number | null
+          esperado?: number
+          forma_pago_id?: string | null
           id?: string
           monto?: number
           tipo?: string
@@ -131,6 +143,13 @@ export type Database = {
             columns: ["caja_id"]
             isOneToOne: false
             referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arqueo_otros_medios_forma_pago_id_fkey"
+            columns: ["forma_pago_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pago"
             referencedColumns: ["id"]
           },
         ]
