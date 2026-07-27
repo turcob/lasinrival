@@ -1590,18 +1590,21 @@ export type Database = {
       formas_pago: {
         Row: {
           activo: boolean | null
+          categoria: string
           created_at: string | null
           id: string
           nombre: string
         }
         Insert: {
           activo?: boolean | null
+          categoria?: string
           created_at?: string | null
           id?: string
           nombre: string
         }
         Update: {
           activo?: boolean | null
+          categoria?: string
           created_at?: string | null
           id?: string
           nombre?: string
