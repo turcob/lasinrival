@@ -927,14 +927,15 @@ export default function POS() {
     }
 
     // Agregar o actualizar el pago de transferencia con el importe ingresado
+    const importeR = r2(importeNum);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto: importeNum };
+        next[idx] = { ...next[idx], monto: importeR };
         return next;
       }
-      return [...prev, { forma_pago_id: fpTransf.id, monto: importeNum }];
+      return [...prev, { forma_pago_id: fpTransf.id, monto: importeR }];
     });
 
     setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
@@ -967,7 +968,7 @@ export default function POS() {
     }
     
     const coeficiente = cuotaConfig?.coeficiente || 1;
-    const montoConInteres = monto * coeficiente;
+    const montoConInteres = r2(monto * coeficiente);
     
     setPagos(prev => [...prev, {
       forma_pago_id: selectedFormaPago,
@@ -1001,8 +1002,8 @@ export default function POS() {
       return;
     }
     
-    const montoAplicado = Math.min(entregado, pendiente);
-    const vuelto = entregado > pendiente ? entregado - pendiente : 0;
+    const montoAplicado = r2(Math.min(entregado, pendiente));
+    const vuelto = entregado > pendiente ? r2(entregado - pendiente) : 0;
     
     const efectivoFP = formasPago.find(fp => fp.nombre.toLowerCase().includes('efectivo'));
     if (!efectivoFP) {
@@ -1041,7 +1042,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
@@ -1053,7 +1054,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
@@ -1065,7 +1066,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
