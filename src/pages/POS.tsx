@@ -821,6 +821,8 @@ export default function POS() {
   };
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio), 0), [cart]);
+  // Redondeo a 2 decimales (centavos). Local al POS: no reemplaza .toFixed existentes.
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   const totalDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
   const subtotalConDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
   const montoDescuentoGlobal = useMemo(() => subtotalConDescuentosProductos * (descuentoGlobal / 100), [subtotalConDescuentosProductos, descuentoGlobal]);
