@@ -835,8 +835,6 @@ export default function POS() {
     return sum;
   }, 0), [pagos]);
   const totalConRecargo = useMemo(() => r2(total + recargoTarjeta), [total, recargoTarjeta]);
-  // Redondeo a 2 decimales (centavos). Local al POS: no reemplaza .toFixed existentes.
-  function r2(n: number) { return Math.round(n * 100) / 100; }
   // Total a facturar: si hay pagos con intereses, usar totalPagado; sino usar total de productos
   const totalFacturar = useMemo(() => totalPagado > 0 ? totalPagado : total, [totalPagado, total]);
 
