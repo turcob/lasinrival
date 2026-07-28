@@ -479,6 +479,12 @@ export default function Cajas() {
       const esperado = cajaParaCerrar.fondo_inicial + (cajaParaCerrar.total_ventas || 0) - (cajaParaCerrar.total_egresos || 0);
       const diferencia = totalArqueo - esperado;
 
+      // Delete-then-insert de arqueo_otros_medios ANTES del UPDATE a 'cerrada'
+      // para evitar duplicados en reintentos y limpiar filas legacy (categoria NULL)
+      // preexistentes. Corre mientras arqueo_confirmado=false y estado='abierta',
+      // así pasa cualquier variante de la policy endurecida.
+      await supabase.from('arqueo_otros_medios').delete().eq('caja_id', cajaParaCerrar.id);
+
       const { error } = await supabase
         .from('cajas')
         .update({
@@ -1239,10 +1245,11 @@ export default function Cajas() {
                 {(() => {
                   const totalRpc = Object.values(esperadoPorCategoria).reduce((s, v) => s + v, 0);
                   const totalLegacy = cajaParaCalculos?.total_ventas || 0;
-                  if (totalRpc - totalLegacy > 0.01) {
+                  const diff = totalRpc - totalLegacy;
+                  if (Math.abs(diff) > 0.01) {
                     return (
                       <p className="text-xs text-muted-foreground pt-2 border-t">
-                        Hay ventas anuladas no reflejadas en el total legacy (diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}).
+                        El total por medio no coincide con el total registrado de la caja (posibles ventas anuladas u otros ajustes). Diferencia informativa: ${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}.
                       </p>
                     );
                   }
