@@ -117,24 +117,17 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
       }
       setEsperadoPorCategoria(esp);
 
-      // Declarado: preferir fila guardada (categoria); fallback a legacy tipo; fallback a esperado
+      // Prefill: fila nueva con `categoria` seteada → si no, esperado del RPC.
+      // Legacy (posnet/transferencias sin categoria) queda en BD para auditoría
+      // pero NO se inyecta al input: posnet mezcla débito+crédito y duplicaría
+      // el conteo contra el desglose del RPC.
       const dec: Record<CategoriaMedio, number> = { ...esp };
-      const otros = (otrosRes.data || []) as Array<{ tipo: string; monto: number; categoria?: string | null }>;
-      // Índices por categoria y por tipo legacy
       const porCategoria = new Map<string, number>();
-      const porTipoLegacy = new Map<string, number>();
-      for (const o of otros) {
+      for (const o of (otrosRes.data || []) as Array<{ monto: number; categoria?: string | null }>) {
         if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
-        porTipoLegacy.set(o.tipo, Number(o.monto) || 0);
       }
       for (const cat of CATEGORIAS_NO_EFECTIVO) {
-        if (porCategoria.has(cat)) {
-          dec[cat] = porCategoria.get(cat) || 0;
-        } else if (cat === 'transferencia' && porTipoLegacy.has('transferencias')) {
-          dec[cat] = porTipoLegacy.get('transferencias') || 0;
-        } else if (cat === 'otro' && porTipoLegacy.has('posnet')) {
-          dec[cat] = porTipoLegacy.get('posnet') || 0;
-        }
+        if (porCategoria.has(cat)) dec[cat] = porCategoria.get(cat) || 0;
       }
       setDeclaradoPorCategoria(dec);
 
