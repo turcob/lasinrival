@@ -22,6 +22,19 @@ interface ArqueoOtroMedio {
   monto: number;
 }
 
+type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
+const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
+  'debito', 'credito', 'transferencia', 'cheque', 'otro',
+];
+const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
+  efectivo: 'Efectivo',
+  debito: 'Débito',
+  credito: 'Crédito',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  otro: 'Otro',
+};
+
 interface Caja {
   id: string;
   usuario_id: string;
@@ -60,9 +73,11 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
   const [arqueo, setArqueo] = useState<Record<string, number>>({
     '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
   });
-  const [otrosMedios, setOtrosMedios] = useState({
-    posnet: 0,
-    transferencias: 0,
+  const [esperadoPorCategoria, setEsperadoPorCategoria] = useState<Record<CategoriaMedio, number>>({
+    efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+  });
+  const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
+    efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
   });
   const [observaciones, setObservaciones] = useState('');
 
@@ -76,9 +91,10 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
     if (!caja) return;
     setLoading(true);
     try {
-      const [detallesRes, otrosRes] = await Promise.all([
+      const [detallesRes, otrosRes, rpcRes] = await Promise.all([
         supabase.from('arqueo_detalles').select('*').eq('caja_id', caja.id),
         supabase.from('arqueo_otros_medios').select('*').eq('caja_id', caja.id),
+        supabase.rpc('get_arqueo_por_medio', { p_caja_id: caja.id }),
       ]);
 
       // Cargar denominaciones
@@ -90,13 +106,37 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
       });
       setArqueo(nuevasDenominaciones);
 
-      // Cargar otros medios
-      const nuevosOtros = { posnet: 0, transferencias: 0 };
-      (otrosRes.data || []).forEach((o) => {
-        if (o.tipo === 'posnet') nuevosOtros.posnet = o.monto;
-        if (o.tipo === 'transferencias') nuevosOtros.transferencias = o.monto;
-      });
-      setOtrosMedios(nuevosOtros);
+      // Esperado por categoría desde RPC
+      const esp: Record<CategoriaMedio, number> = {
+        efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+      };
+      for (const r of ((rpcRes as any).data || []) as Array<{ categoria: string | null; total: number }>) {
+        const cat = (r.categoria || 'otro') as CategoriaMedio;
+        if (cat in esp) esp[cat] += Number(r.total) || 0;
+        else esp.otro += Number(r.total) || 0;
+      }
+      setEsperadoPorCategoria(esp);
+
+      // Declarado: preferir fila guardada (categoria); fallback a legacy tipo; fallback a esperado
+      const dec: Record<CategoriaMedio, number> = { ...esp };
+      const otros = (otrosRes.data || []) as Array<{ tipo: string; monto: number; categoria?: string | null }>;
+      // Índices por categoria y por tipo legacy
+      const porCategoria = new Map<string, number>();
+      const porTipoLegacy = new Map<string, number>();
+      for (const o of otros) {
+        if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
+        porTipoLegacy.set(o.tipo, Number(o.monto) || 0);
+      }
+      for (const cat of CATEGORIAS_NO_EFECTIVO) {
+        if (porCategoria.has(cat)) {
+          dec[cat] = porCategoria.get(cat) || 0;
+        } else if (cat === 'transferencia' && porTipoLegacy.has('transferencias')) {
+          dec[cat] = porTipoLegacy.get('transferencias') || 0;
+        } else if (cat === 'otro' && porTipoLegacy.has('posnet')) {
+          dec[cat] = porTipoLegacy.get('posnet') || 0;
+        }
+      }
+      setDeclaradoPorCategoria(dec);
 
       setObservaciones(caja.observaciones || '');
     } catch (error) {
@@ -110,7 +150,7 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
     return sum + (parseInt(denominacion) * cantidad);
   }, 0);
 
-  const totalArqueo = totalEfectivo + otrosMedios.posnet + otrosMedios.transferencias;
+  const totalArqueo = totalEfectivo + CATEGORIAS_NO_EFECTIVO.reduce((s, c) => s + (declaradoPorCategoria[c] || 0), 0);
 
   const esperado = caja
     ? caja.fondo_inicial + (caja.total_ventas || 0) - (caja.total_egresos || 0)
@@ -143,22 +183,17 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
       // Eliminar arqueo_otros_medios existentes
       await supabase.from('arqueo_otros_medios').delete().eq('caja_id', caja.id);
 
-      // Insertar nuevos otros medios
-      const otrosMediosInserts = [];
-      if (otrosMedios.posnet > 0) {
-        otrosMediosInserts.push({
+      // Insertar arqueo por categoría (grilla dinámica)
+      const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
+        .filter(cat => (declaradoPorCategoria[cat] || 0) > 0 || (esperadoPorCategoria[cat] || 0) > 0)
+        .map(cat => ({
           caja_id: caja.id,
-          tipo: 'posnet',
-          monto: otrosMedios.posnet,
-        });
-      }
-      if (otrosMedios.transferencias > 0) {
-        otrosMediosInserts.push({
-          caja_id: caja.id,
-          tipo: 'transferencias',
-          monto: otrosMedios.transferencias,
-        });
-      }
+          tipo: cat === 'transferencia' ? 'transferencias' : cat === 'otro' ? 'posnet' : cat,
+          categoria: cat,
+          forma_pago_id: null,
+          monto: declaradoPorCategoria[cat] || 0,
+          esperado: esperadoPorCategoria[cat] || 0,
+        }));
 
       if (otrosMediosInserts.length > 0) {
         const { error: otrosError } = await supabase.from('arqueo_otros_medios').insert(otrosMediosInserts);
