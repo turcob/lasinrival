@@ -1,131 +1,131 @@
+# Fix redondeo POS — quirúrgico, 3 puntos + prefill tarjeta
 
-Diffs por sub-punto, aprobación individual. P2/P5 se pueden aplicar ya; P1/P3/P4 son front (off-hours + UpdateBanner).
+Superficie única: `src/pages/POS.tsx`. Sin refactor, sin tocar tolerancias, sin tocar RPC ni payload de factura.
 
 ---
 
-## P1 — Duplicados en `handleCerrarCaja` (Cajas.tsx ~512) — front
+## 1. Helper local (nuevo, junto a los `useMemo` de totales, ~L822)
 
-Replicar delete-then-insert como en `EditarArqueoDialog.handleGuardar`. El DELETE corre antes del cambio de estado a `cerrada`+`arqueo_confirmado=true` (la policy endurecida de c.1 permite delete al dueño mientras `arqueo_confirmado=false`, que es el estado en ese momento). Además limpia legacy (`categoria NULL`) preexistente para esa caja.
+```ts
+// Redondeo a 2 decimales (centavos). Local al POS: no reemplaza .toFixed existentes.
+const r2 = (n: number) => Math.round(n * 100) / 100;
+```
+
+---
+
+## 2. Aplicar `r2` en los 3 puntos que alimentan `totalConRecargo − totalPagado`
+
+### 2.a — `montoConInteres` (L968, `handleAddPagoTarjeta`)
+
+Fuente real del 3er decimal (`monto * coeficiente`).
 
 ```diff
-@@ src/pages/Cajas.tsx  handleCerrarCaja
-       // Guardar arqueo por categoría (grilla dinámica)
-+      // Delete-then-insert para evitar duplicados si el cierre se reintenta,
-+      // y limpia filas legacy (categoria NULL) preexistentes de esa caja.
-+      await supabase.from('arqueo_otros_medios').delete().eq('caja_id', cajaParaCerrar.id);
+-    const coeficiente = cuotaConfig?.coeficiente || 1;
+-    const montoConInteres = monto * coeficiente;
+-
+-    setPagos(prev => [...prev, {
+-      forma_pago_id: selectedFormaPago,
+-      monto: montoConInteres,
++    const coeficiente = cuotaConfig?.coeficiente || 1;
++    const montoConInteres = r2(monto * coeficiente);
 +
-       const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
++    setPagos(prev => [...prev, {
++      forma_pago_id: selectedFormaPago,
++      monto: montoConInteres,
 ```
 
-Nota: el UPDATE de `cajas` a estado cerrado ya corrió arriba (línea ~490). Verificar que la policy de DELETE de `arqueo_otros_medios` no dependa de `cajas.estado='abierta'` — sí depende sólo de `arqueo_confirmado=false`, que en este punto sigue false. Si en producción la policy exige `estado='abierta'`, mover el bloque DELETE+INSERT antes del UPDATE de estado.
+`recargoTarjeta` (L831-836) queda igual: como `p.monto` y `p.monto/coef` ya parten de un valor en centavos, el residuo cae debajo de la tolerancia y `totalConRecargo` se cierra con el r2 del paso 2.c.
 
----
+### 2.b — `p.monto` al empujar cada medio al array `pagos`
 
-## P2 — Limpieza correctiva de duplicados (DB, sin off-hours)
+Redondear el monto parseado *justo antes* del `setPagos`, en cada handler:
 
-Conteo actual (ya medido):
-- `dup_cat` (misma `caja_id + categoria` repetida, `categoria` no NULL): **28 filas en 24 cajas**.
-- `coexist_legacy_new` (fila legacy conviviendo con nueva del mismo tipo): **0**.
-
-Propuesta: DELETE de duplicados dejando la fila con `esperado` no NULL más reciente (`created_at DESC`). Migración:
-
-```sql
-WITH ranked AS (
-  SELECT id,
-         row_number() OVER (
-           PARTITION BY caja_id, categoria
-           ORDER BY (esperado IS NOT NULL) DESC, created_at DESC
-         ) rn
-  FROM public.arqueo_otros_medios
-  WHERE categoria IS NOT NULL
-)
-DELETE FROM public.arqueo_otros_medios a
-USING ranked r
-WHERE a.id = r.id AND r.rn > 1;
+**Transferencia** (L928-936, `handleConfirmarTransferencia`)
+```diff
+-    setPagos(prev => {
+-      const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
+-      if (idx >= 0) {
+-        const next = [...prev];
+-        next[idx] = { ...next[idx], monto: importeNum };
+-        return next;
+-      }
+-      return [...prev, { forma_pago_id: fpTransf.id, monto: importeNum }];
+-    });
++    const importeR = r2(importeNum);
++    setPagos(prev => {
++      const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
++      if (idx >= 0) {
++        const next = [...prev];
++        next[idx] = { ...next[idx], monto: importeR };
++        return next;
++      }
++      return [...prev, { forma_pago_id: fpTransf.id, monto: importeR }];
++    });
 ```
 
-Opcional refuerzo (índice único) para prevenir reincidencia — a decidir en aprobación:
-
-```sql
-CREATE UNIQUE INDEX IF NOT EXISTS uq_arqueo_otros_medios_caja_cat
-  ON public.arqueo_otros_medios (caja_id, categoria)
-  WHERE categoria IS NOT NULL;
+**Efectivo** (L1002-1016, `handleAddPagoEfectivo`)
+```diff
+-    const montoAplicado = Math.min(entregado, pendiente);
+-    const vuelto = entregado > pendiente ? entregado - pendiente : 0;
++    const montoAplicado = r2(Math.min(entregado, pendiente));
++    const vuelto = entregado > pendiente ? r2(entregado - pendiente) : 0;
 ```
+(`entregado` queda sin redondear en `efectivo_entregado` para no alterar lo que declaró el cliente; el `monto` que suma al total sí queda en centavos.)
 
----
+**Genérico** (L1141-1149, `handleAddPagoGenerico`) — reemplazar `monto` por `r2(monto)` en los dos ramas del set.
 
-## P3 — Nota de divergencia (Cajas.tsx ~1239) — front
+**Cheque** (L1175-1182, `handleAddPagoCheque`) — idem, `monto` → `r2(monto)` en ambas ramas.
+
+**Tarjeta** ya cubierto en 2.a con `r2(monto * coeficiente)`.
+
+### 2.c — `totalConRecargo` (L837)
 
 ```diff
--                  if (totalRpc - totalLegacy > 0.01) {
-+                  if (Math.abs(totalRpc - totalLegacy) > 0.01) {
-                     return (
-                       <p className="text-xs text-muted-foreground pt-2 border-t">
--                        Hay ventas anuladas no reflejadas en el total legacy (diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}).
-+                        El total por medio no coincide con el total registrado de la caja (posibles ventas anuladas u otros ajustes). Diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}.
-                       </p>
-                     );
-                   }
+-  const totalConRecargo = useMemo(() => total + recargoTarjeta, [total, recargoTarjeta]);
++  const totalConRecargo = useMemo(() => r2(total + recargoTarjeta), [total, recargoTarjeta]);
 ```
+
+`totalPagado` (L829) ya queda naturalmente en centavos porque cada `p.monto` entra redondeado (2.a + 2.b).
 
 ---
 
-## P4 — Prefill legacy en `EditarArqueoDialog` (~120-139) — front
-
-Eliminar fallback a `porTipoLegacy` (posnet/transferencias). Sólo: fila nueva con `categoria` → esperado RPC.
+## 3. Prefill tarjeta: `.toString()` → `.toFixed(2)` (L1042, L1054, L1066)
 
 ```diff
-@@ src/components/cajas/EditarArqueoDialog.tsx loadArqueoData
--      const dec: Record<CategoriaMedio, number> = { ...esp };
--      const otros = (otrosRes.data || []) as Array<{ tipo: string; monto: number; categoria?: string | null }>;
--      // Índices por categoria y por tipo legacy
--      const porCategoria = new Map<string, number>();
--      const porTipoLegacy = new Map<string, number>();
--      for (const o of otros) {
--        if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
--        porTipoLegacy.set(o.tipo, Number(o.monto) || 0);
--      }
--      for (const cat of CATEGORIAS_NO_EFECTIVO) {
--        if (porCategoria.has(cat)) {
--          dec[cat] = porCategoria.get(cat) || 0;
--        } else if (cat === 'transferencia' && porTipoLegacy.has('transferencias')) {
--          dec[cat] = porTipoLegacy.get('transferencias') || 0;
--        } else if (cat === 'otro' && porTipoLegacy.has('posnet')) {
--          dec[cat] = porTipoLegacy.get('posnet') || 0;
--        }
--      }
-+      // Prefill: fila nueva con `categoria` → si no, esperado del RPC.
-+      // Legacy (posnet/transferencias sin categoria) queda en BD para auditoría,
-+      // no se inyecta al input (posnet mezcla débito+crédito y duplicaría el conteo).
-+      const dec: Record<CategoriaMedio, number> = { ...esp };
-+      const porCategoria = new Map<string, number>();
-+      for (const o of (otrosRes.data || []) as Array<{ monto: number; categoria?: string | null }>) {
-+        if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
-+      }
-+      for (const cat of CATEGORIAS_NO_EFECTIVO) {
-+        if (porCategoria.has(cat)) dec[cat] = porCategoria.get(cat) || 0;
-+      }
-       setDeclaradoPorCategoria(dec);
+-      const pendiente = totalConRecargo - totalPagado;
+-      setMontoTarjeta(pendiente.toString());
++      const pendiente = totalConRecargo - totalPagado;
++      setMontoTarjeta(pendiente.toFixed(2));
 ```
+
+Los 3 bloques (débito, crédito, tarjeta genérica) — mismo cambio.
 
 ---
 
-## P5 — QR → transferencia (DB, sin off-hours)
+## Validación aritmética (los 3 escenarios pedidos)
 
-Fila actual: `id=4d814345-…, nombre=QR, categoria=otro, activo=true`.
+| Escenario | Detalle | Sin fix `totalPagado` | Sin fix `totalConRecargo` | Sin fix diff | Con fix `totalPagado` | Con fix `totalConRecargo` | Con fix diff |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **a** Efectivo exacto | Total=1000, entrega=1000 | 1000.00 | 1000.00 | 0.00 | 1000.00 | 1000.00 | **0.00** |
+| **b** Tarjeta c/ recargo | 1234.56 × 1.15 | 1419.7440000000001 | 1419.7439999999999 | ~2e-13 | 1419.74 | 1419.74 | **0.00** |
+| **c** Split transf + efectivo | Total=1000; transf=500.554; efectivo=499.45 | 1000.000 (con residuo float) | 1000.00 | ~e-13 | transf 500.55 + efectivo 499.45 = 1000.00 | 1000.00 | **0.00** |
 
-```sql
-UPDATE public.formas_pago SET categoria = 'transferencia' WHERE nombre = 'QR';
-```
-
-Devolveré la fila resultante tras aplicar.
+En los 3 la diff queda dentro del gate `> 0.009` de L873 → **ninguna venta que hoy cierra deja de cerrar**. El caso (b), que hoy visualmente arrastra el 3er decimal (aunque numéricamente cierra por casualidad de float), pasa a cerrar en centavos limpios.
 
 ---
 
-## Orden sugerido
+## Fuera de alcance (NO se toca — según instrucción)
 
-1. **P5** (UPDATE 1 fila, inmediato).
-2. **P2** (limpieza duplicados; opcional índice único).
-3. **P1 + P3 + P4** en un solo deploy front, off-hours + aviso vía UpdateBanner.
+- **Tolerancias `0.009`**: L873, L923, L1072, L1137, L1171, L3540, L3553 quedan intactas. Quitarlas o modificarlas puede rechazar splits válidos y no es este fix.
+- **L1542 `if (totalPagado < totalConRecargo)`** sin tolerancia: **hallazgo** — con los `r2` puestos, ambas partes quedan en centavos y el comparador estricto se vuelve seguro para los 3 escenarios anteriores. Aun así, si en runtime `totalPagado` viniera de un flujo no cubierto (p.ej. edición manual futura), el `<` sin `+ 0.009` podría disparar false negatives. **No se modifica en este fix**; queda listado para decisión posterior.
+- `pos_registrar_venta` y payload de facturación (`importe_neto`/`iva` ya usan `toFixed`) — sin cambios.
 
-Aprobá sub-punto por sub-punto (P1/P2/P3/P4/P5) y aplico.
+---
+
+## Deploy
+
+- Cambio 100% front en `src/pages/POS.tsx`.
+- Off-hours + aviso vía `UpdateBanner` (versionCheck ya reactivo).
+- Rollback: revertir el commit — no hay migración ni cambio de esquema.
+
+Aprobá y aplico el diff tal cual.
