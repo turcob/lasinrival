@@ -96,6 +96,26 @@ interface ArqueoOtroMedio {
   monto: number;
 }
 
+type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
+const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
+  'debito', 'credito', 'transferencia', 'cheque', 'otro',
+];
+const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
+  efectivo: 'Efectivo',
+  debito: 'Débito',
+  credito: 'Crédito',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  otro: 'Otro',
+};
+interface ArqueoPorMedioRow {
+  categoria: string | null;
+  forma_pago_id: string | null;
+  forma_pago_nombre: string | null;
+  total: number;
+  cantidad_operaciones: number;
+}
+
 export default function Cajas() {
   const { user, profile, hasRole } = useAuth();
   const isAdmin = hasRole('admin');
@@ -140,6 +160,10 @@ export default function Cajas() {
     posnet: 0,
     transferencias: 0,
   });
+  const [arqueoPorMedio, setArqueoPorMedio] = useState<ArqueoPorMedioRow[]>([]);
+  const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
+    efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+  });
 
   const denominaciones = [
     { valor: 20000, label: '$20.000' },
@@ -155,7 +179,22 @@ export default function Cajas() {
     return sum + (parseInt(denominacion) * cantidad);
   }, 0);
 
-  const totalArqueo = totalEfectivo + otrosMedios.posnet + otrosMedios.transferencias;
+  // Esperado por categoría a partir del RPC
+  const esperadoPorCategoria: Record<CategoriaMedio, number> = (() => {
+    const acc: Record<CategoriaMedio, number> = {
+      efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+    };
+    for (const row of arqueoPorMedio) {
+      const cat = (row.categoria || 'otro') as CategoriaMedio;
+      if (cat in acc) acc[cat] += Number(row.total) || 0;
+      else acc.otro += Number(row.total) || 0;
+    }
+    return acc;
+  })();
+
+  const totalArqueo =
+    totalEfectivo +
+    CATEGORIAS_NO_EFECTIVO.reduce((s, c) => s + (declaradoPorCategoria[c] || 0), 0);
 
   useEffect(() => {
     fetchData();
@@ -163,6 +202,33 @@ export default function Cajas() {
       fetchUsuarios();
     }
   }, [user, isAdmin]);
+
+  // Cargar arqueo por medio (RPC) al abrir el diálogo de cierre
+  useEffect(() => {
+    const load = async () => {
+      const caja = cajaACerrar || cajaActiva;
+      if (!cierreDialogOpen || !caja) return;
+      const { data, error } = await supabase.rpc('get_arqueo_por_medio', { p_caja_id: caja.id });
+      if (error) {
+        console.error('Error get_arqueo_por_medio', error);
+        setArqueoPorMedio([]);
+        return;
+      }
+      const rows = (data || []) as ArqueoPorMedioRow[];
+      setArqueoPorMedio(rows);
+      // Prefill declarado por categoría con esperado
+      const acc: Record<CategoriaMedio, number> = {
+        efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+      };
+      for (const r of rows) {
+        const cat = (r.categoria || 'otro') as CategoriaMedio;
+        if (cat in acc) acc[cat] += Number(r.total) || 0;
+        else acc.otro += Number(r.total) || 0;
+      }
+      setDeclaradoPorCategoria(acc);
+    };
+    load();
+  }, [cierreDialogOpen, cajaACerrar, cajaActiva]);
 
   const fetchUsuarios = async () => {
     const { data } = await supabase
@@ -443,22 +509,17 @@ export default function Cajas() {
         if (arqueoError) console.error('Error saving arqueo details:', arqueoError);
       }
 
-      // Guardar otros medios (posnet, transferencias)
-      const otrosMediosInserts = [];
-      if (otrosMedios.posnet > 0) {
-        otrosMediosInserts.push({
+      // Guardar arqueo por categoría (grilla dinámica)
+      const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
+        .filter(cat => (declaradoPorCategoria[cat] || 0) > 0 || (esperadoPorCategoria[cat] || 0) > 0)
+        .map(cat => ({
           caja_id: cajaParaCerrar.id,
-          tipo: 'posnet',
-          monto: otrosMedios.posnet,
-        });
-      }
-      if (otrosMedios.transferencias > 0) {
-        otrosMediosInserts.push({
-          caja_id: cajaParaCerrar.id,
-          tipo: 'transferencias',
-          monto: otrosMedios.transferencias,
-        });
-      }
+          tipo: cat === 'transferencia' ? 'transferencias' : cat === 'otro' ? 'posnet' : cat,
+          categoria: cat,
+          forma_pago_id: null,
+          monto: declaradoPorCategoria[cat] || 0,
+          esperado: esperadoPorCategoria[cat] || 0,
+        }));
 
       if (otrosMediosInserts.length > 0) {
         const { error: otrosError } = await supabase
@@ -475,6 +536,8 @@ export default function Cajas() {
         '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
       });
       setOtrosMedios({ posnet: 0, transferencias: 0 });
+      setDeclaradoPorCategoria({ efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0 });
+      setArqueoPorMedio([]);
       fetchData();
     } catch (error) {
       console.error('Error closing caja:', error);
@@ -1113,50 +1176,78 @@ export default function Cajas() {
               </CardContent>
             </Card>
 
-            {/* Otros Medios de Pago */}
+            {/* Cotejo por medio de pago */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Comprobantes Posnet y Transferencias</CardTitle>
+                <CardTitle className="text-sm font-medium">Cotejo por medio de pago</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="posnet">Comprobantes Posnet (Débito/Crédito)</Label>
-                    <Input
-                      id="posnet"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={otrosMedios.posnet || ''}
-                      onChange={(e) => setOtrosMedios({
-                        ...otrosMedios,
-                        posnet: parseFloat(e.target.value) || 0
-                      })}
-                      placeholder="0.00"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Suma total de los comprobantes del posnet
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="transferencias">Transferencias Bancarias</Label>
-                    <Input
-                      id="transferencias"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={otrosMedios.transferencias || ''}
-                      onChange={(e) => setOtrosMedios({
-                        ...otrosMedios,
-                        transferencias: parseFloat(e.target.value) || 0
-                      })}
-                      placeholder="0.00"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Suma total de transferencias recibidas
-                    </p>
-                  </div>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
+                  <div className="font-medium text-muted-foreground">Medio</div>
+                  <div className="text-right font-medium text-muted-foreground">Esperado</div>
+                  <div className="text-right font-medium text-muted-foreground">Declarado</div>
+                  <div className="text-right font-medium text-muted-foreground">Diferencia</div>
+
+                  {/* Efectivo (readonly, viene del conteo de billetes) */}
+                  {(() => {
+                    const esp = (cajaParaCalculos?.fondo_inicial || 0)
+                      + (esperadoPorCategoria.efectivo || 0)
+                      - (cajaParaCalculos?.total_egresos || 0);
+                    const diff = totalEfectivo - esp;
+                    return (
+                      <>
+                        <div>Efectivo</div>
+                        <div className="text-right tabular-nums">${esp.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div className="text-right tabular-nums">${totalEfectivo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                          {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  {CATEGORIAS_NO_EFECTIVO.map(cat => {
+                    const esp = esperadoPorCategoria[cat] || 0;
+                    const dec = declaradoPorCategoria[cat] || 0;
+                    if (esp === 0 && dec === 0) return null;
+                    const diff = dec - esp;
+                    return (
+                      <div key={cat} className="contents">
+                        <div>{LABEL_CATEGORIA[cat]}</div>
+                        <div className="text-right tabular-nums">${esp.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={dec || ''}
+                            onChange={(e) => setDeclaradoPorCategoria({
+                              ...declaradoPorCategoria,
+                              [cat]: parseFloat(e.target.value) || 0,
+                            })}
+                            className="h-8 text-right tabular-nums"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                          {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+                {(() => {
+                  const totalRpc = Object.values(esperadoPorCategoria).reduce((s, v) => s + v, 0);
+                  const totalLegacy = cajaParaCalculos?.total_ventas || 0;
+                  if (totalRpc - totalLegacy > 0.01) {
+                    return (
+                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                        Hay ventas anuladas no reflejadas en el total legacy (diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}).
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </CardContent>
             </Card>
 
