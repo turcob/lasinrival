@@ -302,43 +302,62 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
               </CardContent>
             </Card>
 
-            {/* Otros Medios de Pago */}
+            {/* Cotejo por medio de pago */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Comprobantes Posnet y Transferencias</CardTitle>
+                <CardTitle className="text-sm font-medium">Cotejo por medio de pago</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="posnet">Comprobantes Posnet (Débito/Crédito)</Label>
-                    <Input
-                      id="posnet"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={otrosMedios.posnet || ''}
-                      onChange={(e) => setOtrosMedios({
-                        ...otrosMedios,
-                        posnet: parseFloat(e.target.value) || 0
-                      })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="transferencias">Transferencias Bancarias</Label>
-                    <Input
-                      id="transferencias"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={otrosMedios.transferencias || ''}
-                      onChange={(e) => setOtrosMedios({
-                        ...otrosMedios,
-                        transferencias: parseFloat(e.target.value) || 0
-                      })}
-                      placeholder="0.00"
-                    />
-                  </div>
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
+                  <div className="font-medium text-muted-foreground">Medio</div>
+                  <div className="text-right font-medium text-muted-foreground">Esperado</div>
+                  <div className="text-right font-medium text-muted-foreground">Declarado</div>
+                  <div className="text-right font-medium text-muted-foreground">Diferencia</div>
+
+                  {(() => {
+                    const esp = (caja?.fondo_inicial || 0) + (esperadoPorCategoria.efectivo || 0) - (caja?.total_egresos || 0);
+                    const diff = totalEfectivo - esp;
+                    return (
+                      <>
+                        <div>Efectivo</div>
+                        <div className="text-right tabular-nums">${esp.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div className="text-right tabular-nums">${totalEfectivo.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                          {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  {CATEGORIAS_NO_EFECTIVO.map(cat => {
+                    const esp = esperadoPorCategoria[cat] || 0;
+                    const dec = declaradoPorCategoria[cat] || 0;
+                    if (esp === 0 && dec === 0) return null;
+                    const diff = dec - esp;
+                    return (
+                      <div key={cat} className="contents">
+                        <div>{LABEL_CATEGORIA[cat]}</div>
+                        <div className="text-right tabular-nums">${esp.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={dec || ''}
+                            onChange={(e) => setDeclaradoPorCategoria({
+                              ...declaradoPorCategoria,
+                              [cat]: parseFloat(e.target.value) || 0,
+                            })}
+                            className="h-8 text-right tabular-nums"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                          {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
