@@ -1176,14 +1176,15 @@ export default function POS() {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
     }
+    const montoR = r2(monto);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === chequeFormaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto };
+        next[idx] = { ...next[idx], monto: montoR };
         return next;
       }
-      return [...prev, { forma_pago_id: chequeFormaPagoId, monto }];
+      return [...prev, { forma_pago_id: chequeFormaPagoId, monto: montoR }];
     });
     setChequeDialogOpen(false);
   };
