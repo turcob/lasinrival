@@ -1,119 +1,131 @@
-## Paso c — Grilla de cotejo por medio en cierre y edición
 
-Reemplazar el bloque manual "Comprobantes Posnet y Transferencias" en `Cajas.tsx` y `EditarArqueoDialog.tsx` por una grilla dinámica alimentada por `get_arqueo_por_medio(caja_id)`, y endurecer la policy INSERT de `arqueo_otros_medios`.
-
-Deploy en 3 sub-pasos aprobables por separado.
+Diffs por sub-punto, aprobación individual. P2/P5 se pueden aplicar ya; P1/P3/P4 son front (off-hours + UpdateBanner).
 
 ---
 
-### c.1 — Migración: endurecer policy INSERT de `arqueo_otros_medios`
+## P1 — Duplicados en `handleCerrarCaja` (Cajas.tsx ~512) — front
 
-**Estado actual** (verificado): la policy INSERT tiene `with_check: true` — cualquier authenticated inserta contra cualquier caja. UPDATE/DELETE ya están restringidos a dueño + `arqueo_confirmado = false`.
+Replicar delete-then-insert como en `EditarArqueoDialog.handleGuardar`. El DELETE corre antes del cambio de estado a `cerrada`+`arqueo_confirmado=true` (la policy endurecida de c.1 permite delete al dueño mientras `arqueo_confirmado=false`, que es el estado en ese momento). Además limpia legacy (`categoria NULL`) preexistente para esa caja.
 
-**Cambio propuesto**:
-
-```sql
-DROP POLICY <policy_insert_actual> ON public.arqueo_otros_medios;
-
-CREATE POLICY "Dueño de caja puede insertar arqueo_otros_medios"
-  ON public.arqueo_otros_medios
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.cajas c
-      WHERE c.id = arqueo_otros_medios.caja_id
-        AND c.usuario_id = auth.uid()
-        AND COALESCE(c.arqueo_confirmado, false) = false
-    )
-  );
+```diff
+@@ src/pages/Cajas.tsx  handleCerrarCaja
+       // Guardar arqueo por categoría (grilla dinámica)
++      // Delete-then-insert para evitar duplicados si el cierre se reintenta,
++      // y limpia filas legacy (categoria NULL) preexistentes de esa caja.
++      await supabase.from('arqueo_otros_medios').delete().eq('caja_id', cajaParaCerrar.id);
++
+       const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
 ```
 
-**Confirmación write path del cajero**: el cajero que cierra su propia caja cumple `c.usuario_id = auth.uid()` y `arqueo_confirmado = false` (recién cerrada, aún sin confirmar por admin) → INSERT pasa. La edición desde `EditarArqueoDialog.tsx` también entra por el dueño con la caja no confirmada → pasa. Admins que quisieran insertar en cajas ajenas no pasarían por esta policy — hoy no hay caso de uso para eso; si aparece, se agrega policy separada con `has_role('admin')`.
-
-**Superficie**: solo DB. Reversible con re-crear la policy antigua. No off-hours.
+Nota: el UPDATE de `cajas` a estado cerrado ya corrió arriba (línea ~490). Verificar que la policy de DELETE de `arqueo_otros_medios` no dependa de `cajas.estado='abierta'` — sí depende sólo de `arqueo_confirmado=false`, que en este punto sigue false. Si en producción la policy exige `estado='abierta'`, mover el bloque DELETE+INSERT antes del UPDATE de estado.
 
 ---
 
-### c.2 — `src/pages/Cajas.tsx` (cierre de caja)
+## P2 — Limpieza correctiva de duplicados (DB, sin off-hours)
 
-**Cambios**:
+Conteo actual (ya medido):
+- `dup_cat` (misma `caja_id + categoria` repetida, `categoria` no NULL): **28 filas en 24 cajas**.
+- `coexist_legacy_new` (fila legacy conviviendo con nueva del mismo tipo): **0**.
 
-1. Al abrir el diálogo de cierre (`cierreDialogOpen = true` para la caja del usuario), llamar `supabase.rpc('get_arqueo_por_medio', { p_caja_id })`. Guardar resultado en `arqueoPorMedio: { categoria, forma_pago_id, forma_pago_nombre, total, cantidad_operaciones }[]`.
+Propuesta: DELETE de duplicados dejando la fila con `esperado` no NULL más reciente (`created_at DESC`). Migración:
 
-2. Agrupar por `categoria` (sumando `total` si hay varias formas por categoría). Categorías a mostrar siempre en este orden: `efectivo`, `debito`, `credito`, `transferencia`, `cheque`, `otro`. Mostrar la fila aunque `esperado = 0` solo si hubo operaciones o si el usuario declara algo (sino se oculta para no ensuciar).
+```sql
+WITH ranked AS (
+  SELECT id,
+         row_number() OVER (
+           PARTITION BY caja_id, categoria
+           ORDER BY (esperado IS NOT NULL) DESC, created_at DESC
+         ) rn
+  FROM public.arqueo_otros_medios
+  WHERE categoria IS NOT NULL
+)
+DELETE FROM public.arqueo_otros_medios a
+USING ranked r
+WHERE a.id = r.id AND r.rn > 1;
+```
 
-3. Reemplazar el bloque actual "Comprobantes Posnet y Transferencias" (líneas ~1115-1160) por `<Card>` "Cotejo por medio de pago" con:
-   - Fila **Efectivo**: `esperado = fondo_inicial + total_efectivo_RPC − total_egresos`. `declarado = totalEfectivo` (del conteo de denominaciones existente, sin input propio en la grilla). Muestra diferencia.
-   - Filas **Débito / Crédito / Transferencia / Cheque / Otro**: input numérico con prefill = esperado (editable). Estado local `declaradoPorCategoria: Record<Categoria, number>`.
-   - Diferencia por fila: `declarado − esperado`. Clases: `text-success` si `Math.abs(diff) < 0.01`, `text-destructive` en caso contrario. Sin colores hardcoded.
-   - Total al pie: suma esperada vs suma declarada + diferencia global (informativa, no toca `cajas.diferencia`).
+Opcional refuerzo (índice único) para prevenir reincidencia — a decidir en aprobación:
 
-4. Nota informativa: si `SUM(total_RPC) − (cajas.total_ventas ?? 0) > 0.01`, mostrar aviso "Hay ventas anuladas no reflejadas en el total legacy" con `text-muted-foreground` (caso b.5).
-
-5. Reemplazar `otrosMedios` state (`posnet`, `transferencias`) por `declaradoPorCategoria`. `totalArqueo` recalculado como `totalEfectivo + sum(declaradoPorCategoria en no-efectivo)`.
-
-6. En `handleCerrarCaja`, cambiar los inserts de `arqueo_otros_medios`:
-   ```ts
-   const inserts = (['debito','credito','transferencia','cheque','otro'] as const)
-     .filter(cat => declaradoPorCategoria[cat] > 0 || esperadoPorCategoria[cat] > 0)
-     .map(cat => ({
-       caja_id,
-       tipo: cat,                  // legacy col; usamos categoria como valor
-       categoria: cat,
-       forma_pago_id: null,        // agregado por categoría
-       monto: declaradoPorCategoria[cat] ?? 0,
-       esperado: esperadoPorCategoria[cat] ?? 0,
-     }));
-   ```
-   `diferencia` es generated column — no la seteamos.
-
-7. NO tocar `cajas.diferencia` global ni la llamada legacy que la calcula. El cotejo por medio es informativo/persistido, no altera el ajuste a CC del empleado.
-
-**Superficie**: solo `src/pages/Cajas.tsx`. Toca UI con SW → coordinar ventana off-hours + `UpdateBanner` para forzar refresco a cajeros abiertos.
-
-**Confirmación write path**: el cajero dueño con caja no confirmada → policy INSERT de c.1 pasa. ✓
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS uq_arqueo_otros_medios_caja_cat
+  ON public.arqueo_otros_medios (caja_id, categoria)
+  WHERE categoria IS NOT NULL;
+```
 
 ---
 
-### c.3 — `src/components/cajas/EditarArqueoDialog.tsx` (edición post-cierre)
+## P3 — Nota de divergencia (Cajas.tsx ~1239) — front
 
-**Cambios**:
-
-1. En `loadArqueoData`, además de leer `arqueo_detalles` y `arqueo_otros_medios`, llamar `get_arqueo_por_medio(caja.id)` para calcular esperados por categoría.
-
-2. Reemplazar el bloque actual (líneas ~270-309) por la misma grilla dinámica de c.2.
-
-3. Prefill del input por categoría:
-   - Si existe fila en `arqueo_otros_medios` con esa `categoria` → usar `monto` guardado.
-   - Sino, si categoria mapea a legacy (`transferencia` ← `tipo='transferencias'`, `otro` ← `tipo='posnet'`) → usar el monto legacy para no perder datos históricos en la primera edición post-migración.
-   - Sino → prefill con el esperado del RPC.
-
-4. En `handleGuardar`, mismo insert nuevo con `categoria`/`esperado` que c.2. Sigue seteando `arqueo_pendiente_revision = true` y `arqueo_confirmado = false` para pasar a revisión de admin.
-
-5. Mostrar diferencia por fila con los mismos tokens semánticos.
-
-**Radix**: se mantiene el `Dialog` existente (no es formulario complejo, ya funciona sin loops). No hace falta migrar a `Sheet`.
-
-**Confirmación write path**: el dueño edita su propia caja aún no confirmada → `usuario_id = auth.uid()` y `arqueo_confirmado = false` → policy INSERT de c.1 pasa. ✓
+```diff
+-                  if (totalRpc - totalLegacy > 0.01) {
++                  if (Math.abs(totalRpc - totalLegacy) > 0.01) {
+                     return (
+                       <p className="text-xs text-muted-foreground pt-2 border-t">
+-                        Hay ventas anuladas no reflejadas en el total legacy (diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}).
++                        El total por medio no coincide con el total registrado de la caja (posibles ventas anuladas u otros ajustes). Diferencia informativa: ${(totalRpc - totalLegacy).toLocaleString('es-AR', { minimumFractionDigits: 2 })}.
+                       </p>
+                     );
+                   }
+```
 
 ---
 
-### Restricciones respetadas
+## P4 — Prefill legacy en `EditarArqueoDialog` (~120-139) — front
 
-- No se toca `pos_registrar_venta`, remitos, ni el estado `despachado`.
-- No se hardcodean colores — se usan `text-success`, `text-destructive`, `text-muted-foreground`.
-- El total legacy `cajas.diferencia` y `confirmar_arqueo_con_ajuste` quedan intactos.
-- Bypass 1K con `.range()` no aplica: el RPC devuelve una fila por forma de pago (máximo ~10-20 filas por caja).
+Eliminar fallback a `porTipoLegacy` (posnet/transferencias). Sólo: fila nueva con `categoria` → esperado RPC.
 
-### Categorización de deploy
+```diff
+@@ src/components/cajas/EditarArqueoDialog.tsx loadArqueoData
+-      const dec: Record<CategoriaMedio, number> = { ...esp };
+-      const otros = (otrosRes.data || []) as Array<{ tipo: string; monto: number; categoria?: string | null }>;
+-      // Índices por categoria y por tipo legacy
+-      const porCategoria = new Map<string, number>();
+-      const porTipoLegacy = new Map<string, number>();
+-      for (const o of otros) {
+-        if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
+-        porTipoLegacy.set(o.tipo, Number(o.monto) || 0);
+-      }
+-      for (const cat of CATEGORIAS_NO_EFECTIVO) {
+-        if (porCategoria.has(cat)) {
+-          dec[cat] = porCategoria.get(cat) || 0;
+-        } else if (cat === 'transferencia' && porTipoLegacy.has('transferencias')) {
+-          dec[cat] = porTipoLegacy.get('transferencias') || 0;
+-        } else if (cat === 'otro' && porTipoLegacy.has('posnet')) {
+-          dec[cat] = porTipoLegacy.get('posnet') || 0;
+-        }
+-      }
++      // Prefill: fila nueva con `categoria` → si no, esperado del RPC.
++      // Legacy (posnet/transferencias sin categoria) queda en BD para auditoría,
++      // no se inyecta al input (posnet mezcla débito+crédito y duplicaría el conteo).
++      const dec: Record<CategoriaMedio, number> = { ...esp };
++      const porCategoria = new Map<string, number>();
++      for (const o of (otrosRes.data || []) as Array<{ monto: number; categoria?: string | null }>) {
++        if (o.categoria) porCategoria.set(o.categoria, Number(o.monto) || 0);
++      }
++      for (const cat of CATEGORIAS_NO_EFECTIVO) {
++        if (porCategoria.has(cat)) dec[cat] = porCategoria.get(cat) || 0;
++      }
+       setDeclaradoPorCategoria(dec);
+```
 
-| Sub-paso | Superficie | Off-hours |
-|---|---|---|
-| c.1 | DB migration (1 policy) | No |
-| c.2 | Front-end `Cajas.tsx` + SW | **Sí — coordinar con UpdateBanner** |
-| c.3 | Front-end `EditarArqueoDialog.tsx` + SW | **Sí — junto con c.2** |
+---
 
-Recomiendo aplicar c.1 primero (aprobable sola, sin impacto UI), y luego c.2 + c.3 en la misma ventana off-hours para que el refresco forzado del SW llegue a todos los cajeros a la vez.
+## P5 — QR → transferencia (DB, sin off-hours)
 
-Confirmá qué sub-paso arranco y muestro el diff antes de aplicar.
+Fila actual: `id=4d814345-…, nombre=QR, categoria=otro, activo=true`.
+
+```sql
+UPDATE public.formas_pago SET categoria = 'transferencia' WHERE nombre = 'QR';
+```
+
+Devolveré la fila resultante tras aplicar.
+
+---
+
+## Orden sugerido
+
+1. **P5** (UPDATE 1 fila, inmediato).
+2. **P2** (limpieza duplicados; opcional índice único).
+3. **P1 + P3 + P4** en un solo deploy front, off-hours + aviso vía UpdateBanner.
+
+Aprobá sub-punto por sub-punto (P1/P2/P3/P4/P5) y aplico.
