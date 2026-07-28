@@ -203,6 +203,33 @@ export default function Cajas() {
     }
   }, [user, isAdmin]);
 
+  // Cargar arqueo por medio (RPC) al abrir el diálogo de cierre
+  useEffect(() => {
+    const load = async () => {
+      const caja = cajaACerrar || cajaActiva;
+      if (!cierreDialogOpen || !caja) return;
+      const { data, error } = await supabase.rpc('get_arqueo_por_medio', { p_caja_id: caja.id });
+      if (error) {
+        console.error('Error get_arqueo_por_medio', error);
+        setArqueoPorMedio([]);
+        return;
+      }
+      const rows = (data || []) as ArqueoPorMedioRow[];
+      setArqueoPorMedio(rows);
+      // Prefill declarado por categoría con esperado
+      const acc: Record<CategoriaMedio, number> = {
+        efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+      };
+      for (const r of rows) {
+        const cat = (r.categoria || 'otro') as CategoriaMedio;
+        if (cat in acc) acc[cat] += Number(r.total) || 0;
+        else acc.otro += Number(r.total) || 0;
+      }
+      setDeclaradoPorCategoria(acc);
+    };
+    load();
+  }, [cierreDialogOpen, cajaACerrar, cajaActiva]);
+
   const fetchUsuarios = async () => {
     const { data } = await supabase
       .from('profiles')
