@@ -821,6 +821,8 @@ export default function POS() {
   };
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio), 0), [cart]);
+  // Redondeo a 2 decimales (centavos). Local al POS: no reemplaza .toFixed existentes.
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   const totalDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + (item.cantidad * item.precio * item.descuento_porcentaje / 100), 0), [cart]);
   const subtotalConDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
   const montoDescuentoGlobal = useMemo(() => subtotalConDescuentosProductos * (descuentoGlobal / 100), [subtotalConDescuentosProductos, descuentoGlobal]);
@@ -834,7 +836,7 @@ export default function POS() {
     }
     return sum;
   }, 0), [pagos]);
-  const totalConRecargo = useMemo(() => total + recargoTarjeta, [total, recargoTarjeta]);
+  const totalConRecargo = useMemo(() => r2(total + recargoTarjeta), [total, recargoTarjeta]);
   // Total a facturar: si hay pagos con intereses, usar totalPagado; sino usar total de productos
   const totalFacturar = useMemo(() => totalPagado > 0 ? totalPagado : total, [totalPagado, total]);
 
@@ -925,14 +927,15 @@ export default function POS() {
     }
 
     // Agregar o actualizar el pago de transferencia con el importe ingresado
+    const importeR = r2(importeNum);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto: importeNum };
+        next[idx] = { ...next[idx], monto: importeR };
         return next;
       }
-      return [...prev, { forma_pago_id: fpTransf.id, monto: importeNum }];
+      return [...prev, { forma_pago_id: fpTransf.id, monto: importeR }];
     });
 
     setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
@@ -965,7 +968,7 @@ export default function POS() {
     }
     
     const coeficiente = cuotaConfig?.coeficiente || 1;
-    const montoConInteres = monto * coeficiente;
+    const montoConInteres = r2(monto * coeficiente);
     
     setPagos(prev => [...prev, {
       forma_pago_id: selectedFormaPago,
@@ -999,8 +1002,8 @@ export default function POS() {
       return;
     }
     
-    const montoAplicado = Math.min(entregado, pendiente);
-    const vuelto = entregado > pendiente ? entregado - pendiente : 0;
+    const montoAplicado = r2(Math.min(entregado, pendiente));
+    const vuelto = entregado > pendiente ? r2(entregado - pendiente) : 0;
     
     const efectivoFP = formasPago.find(fp => fp.nombre.toLowerCase().includes('efectivo'));
     if (!efectivoFP) {
@@ -1039,7 +1042,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
@@ -1051,7 +1054,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
@@ -1063,7 +1066,7 @@ export default function POS() {
       setSelectedTarjeta(null);
       setSelectedCuotas(1);
       const pendiente = totalConRecargo - totalPagado;
-      setMontoTarjeta(pendiente.toString());
+      setMontoTarjeta(pendiente.toFixed(2));
       setTarjetaDialogOpen(true);
       return;
     }
@@ -1138,14 +1141,15 @@ export default function POS() {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
     }
+    const montoR = r2(monto);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
+        next[idx] = { ...next[idx], monto: montoR, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
         return next;
       }
-      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto: montoR, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
     });
     setMontoGenericoDialogOpen(false);
     setMontoGenericoData(null);
@@ -1172,14 +1176,15 @@ export default function POS() {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
     }
+    const montoR = r2(monto);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === chequeFormaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto };
+        next[idx] = { ...next[idx], monto: montoR };
         return next;
       }
-      return [...prev, { forma_pago_id: chequeFormaPagoId, monto }];
+      return [...prev, { forma_pago_id: chequeFormaPagoId, monto: montoR }];
     });
     setChequeDialogOpen(false);
   };
