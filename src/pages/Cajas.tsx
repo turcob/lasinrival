@@ -96,6 +96,26 @@ interface ArqueoOtroMedio {
   monto: number;
 }
 
+type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
+const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
+  'debito', 'credito', 'transferencia', 'cheque', 'otro',
+];
+const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
+  efectivo: 'Efectivo',
+  debito: 'Débito',
+  credito: 'Crédito',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  otro: 'Otro',
+};
+interface ArqueoPorMedioRow {
+  categoria: string | null;
+  forma_pago_id: string | null;
+  forma_pago_nombre: string | null;
+  total: number;
+  cantidad_operaciones: number;
+}
+
 export default function Cajas() {
   const { user, profile, hasRole } = useAuth();
   const isAdmin = hasRole('admin');
@@ -140,6 +160,10 @@ export default function Cajas() {
     posnet: 0,
     transferencias: 0,
   });
+  const [arqueoPorMedio, setArqueoPorMedio] = useState<ArqueoPorMedioRow[]>([]);
+  const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
+    efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+  });
 
   const denominaciones = [
     { valor: 20000, label: '$20.000' },
@@ -155,7 +179,22 @@ export default function Cajas() {
     return sum + (parseInt(denominacion) * cantidad);
   }, 0);
 
-  const totalArqueo = totalEfectivo + otrosMedios.posnet + otrosMedios.transferencias;
+  // Esperado por categoría a partir del RPC
+  const esperadoPorCategoria: Record<CategoriaMedio, number> = (() => {
+    const acc: Record<CategoriaMedio, number> = {
+      efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+    };
+    for (const row of arqueoPorMedio) {
+      const cat = (row.categoria || 'otro') as CategoriaMedio;
+      if (cat in acc) acc[cat] += Number(row.total) || 0;
+      else acc.otro += Number(row.total) || 0;
+    }
+    return acc;
+  })();
+
+  const totalArqueo =
+    totalEfectivo +
+    CATEGORIAS_NO_EFECTIVO.reduce((s, c) => s + (declaradoPorCategoria[c] || 0), 0);
 
   useEffect(() => {
     fetchData();
@@ -443,22 +482,17 @@ export default function Cajas() {
         if (arqueoError) console.error('Error saving arqueo details:', arqueoError);
       }
 
-      // Guardar otros medios (posnet, transferencias)
-      const otrosMediosInserts = [];
-      if (otrosMedios.posnet > 0) {
-        otrosMediosInserts.push({
+      // Guardar arqueo por categoría (grilla dinámica)
+      const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
+        .filter(cat => (declaradoPorCategoria[cat] || 0) > 0 || (esperadoPorCategoria[cat] || 0) > 0)
+        .map(cat => ({
           caja_id: cajaParaCerrar.id,
-          tipo: 'posnet',
-          monto: otrosMedios.posnet,
-        });
-      }
-      if (otrosMedios.transferencias > 0) {
-        otrosMediosInserts.push({
-          caja_id: cajaParaCerrar.id,
-          tipo: 'transferencias',
-          monto: otrosMedios.transferencias,
-        });
-      }
+          tipo: cat === 'transferencia' ? 'transferencias' : cat === 'otro' ? 'posnet' : cat,
+          categoria: cat,
+          forma_pago_id: null,
+          monto: declaradoPorCategoria[cat] || 0,
+          esperado: esperadoPorCategoria[cat] || 0,
+        }));
 
       if (otrosMediosInserts.length > 0) {
         const { error: otrosError } = await supabase
@@ -475,6 +509,8 @@ export default function Cajas() {
         '20000': 0, '10000': 0, '2000': 0, '1000': 0, '500': 0, '200': 0, '100': 0,
       });
       setOtrosMedios({ posnet: 0, transferencias: 0 });
+      setDeclaradoPorCategoria({ efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0 });
+      setArqueoPorMedio([]);
       fetchData();
     } catch (error) {
       console.error('Error closing caja:', error);
