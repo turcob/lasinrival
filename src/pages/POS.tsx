@@ -1141,14 +1141,15 @@ export default function POS() {
       toast.error(`El importe excede el pendiente ($${pendienteDisponible.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
       return;
     }
+    const montoR = r2(monto);
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === montoGenericoData.formaPagoId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
+        next[idx] = { ...next[idx], monto: montoR, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined };
         return next;
       }
-      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
+      return [...prev, { forma_pago_id: montoGenericoData.formaPagoId, monto: montoR, terminal: montoGenericoData.terminal?.trim() || undefined, lote: montoGenericoData.lote?.trim() || undefined }];
     });
     setMontoGenericoDialogOpen(false);
     setMontoGenericoData(null);
