@@ -3203,11 +3203,11 @@ export default function POS() {
                     title="Guardar cambios y reimprimir picking"
                   >
                     {actualizandoPicking ? (
-                      'Actualizando...'
+                      'Imprimiendo...'
                     ) : (
                       <>
                         <Printer className="mr-1 h-4 w-4" />
-                        Actualizar y reimprimir
+                        Imprimir
                       </>
                     )}
                   </Button>
@@ -3217,11 +3217,11 @@ export default function POS() {
                     onClick={handleConfirmarPreparadoInline}
                   >
                     {confirmandoPreparado ? (
-                      'Confirmando...'
+                      'Guardando...'
                     ) : (
                       <>
                         <Check className="mr-1 h-4 w-4" />
-                        Confirmar preparado
+                        Preparado
                       </>
                     )}
                   </Button>
