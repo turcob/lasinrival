@@ -289,7 +289,7 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
                 <CardTitle className="text-sm font-medium">Cotejo por medio de pago</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
+                <div className="grid grid-cols-[1fr_auto_minmax(120px,140px)_auto] gap-x-3 gap-y-2 items-center text-sm">
                   <div className="font-medium text-muted-foreground">Medio</div>
                   <div className="text-right font-medium text-muted-foreground">Esperado</div>
                   <div className="text-right font-medium text-muted-foreground">Declarado</div>
@@ -329,7 +329,7 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
                               ...declaradoPorCategoria,
                               [cat]: parseFloat(e.target.value) || 0,
                             })}
-                            className="h-8 text-right tabular-nums"
+                            className="h-9 w-full text-right tabular-nums"
                             placeholder="0.00"
                           />
                         </div>
