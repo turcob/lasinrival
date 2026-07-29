@@ -1517,6 +1517,15 @@ export default function Cajas() {
         onSuccess={fetchData}
       />
 
+      {/* Drill-down operaciones por categoría (solo lectura) */}
+      <DetalleOperacionesArqueoDialog
+        open={drillDown.open}
+        onOpenChange={(open) => setDrillDown((d) => ({ ...d, open }))}
+        cajaId={(cajaACerrar || cajaActiva)?.id || null}
+        categoria={drillDown.categoria}
+        esperado={drillDown.esperado}
+      />
+
       {/* Editar Movimiento Dialog (solo admin) */}
       <Dialog open={editarMovimientoDialogOpen} onOpenChange={(open) => {
         setEditarMovimientoDialogOpen(open);
