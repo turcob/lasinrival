@@ -13,6 +13,7 @@ import Clientes from "./pages/Clientes";
 import Usuarios from "./pages/Usuarios";
 import Roles from "./pages/Roles";
 import Cajas from "./pages/Cajas";
+import CajaDetalle from "./pages/CajaDetalle";
 import POS from "./pages/POS";
 import Ventas from "./pages/Ventas";
 import ListasPrecios from "./pages/ListasPrecios";
@@ -83,6 +84,7 @@ function AppRoutes() {
       <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
       <Route path="/ventas" element={<ProtectedRoute><Ventas /></ProtectedRoute>} />
       <Route path="/cajas" element={<ProtectedRoute><Cajas /></ProtectedRoute>} />
+      <Route path="/cajas/:id" element={<ProtectedRoute><CajaDetalle /></ProtectedRoute>} />
       <Route path="/facturacion" element={<ProtectedRoute><Facturacion /></ProtectedRoute>} />
       <Route path="/tarjetas" element={<ProtectedRoute><Tarjetas /></ProtectedRoute>} />
       <Route path="/inventario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
