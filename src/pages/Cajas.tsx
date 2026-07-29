@@ -827,7 +827,7 @@ export default function Cajas() {
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => openDetalleDialog(item)}>
+                <Button variant="ghost" size="icon" onClick={() => navigate(`/cajas/${item.id}`)}>
                   <Eye className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
