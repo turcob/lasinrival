@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -18,7 +19,8 @@ import {
   Edit,
   CheckCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
 import {
   Select,
@@ -107,9 +109,18 @@ interface ArqueoPorMedioRow {
 }
 
 export default function Cajas() {
-  const { user, profile, hasRole } = useAuth();
+  const { user, profile, hasRole, hasPermission } = useAuth();
   const isAdmin = hasRole('admin');
   const isVendedor = hasRole('vendedor');
+  const navigate = useNavigate();
+  const [canVerTransferencias, setCanVerTransferencias] = useState(false);
+  useEffect(() => {
+    (async () => {
+      if (hasRole('admin')) { setCanVerTransferencias(true); return; }
+      setCanVerTransferencias(await hasPermission('transferencias', 'ver'));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
@@ -1260,7 +1271,7 @@ export default function Cajas() {
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex items-center justify-end gap-2">
                           {ops > 0 ? (
                             <Button
                               type="button"
@@ -1273,6 +1284,18 @@ export default function Cajas() {
                             </Button>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {cat === 'transferencia' && canVerTransferencias && cajaParaCalculos && (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs gap-1"
+                              onClick={() => navigate(`/imputacion?caja=${cajaParaCalculos.id}`)}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Ver en Imputación
+                            </Button>
                           )}
                         </div>
                       </div>

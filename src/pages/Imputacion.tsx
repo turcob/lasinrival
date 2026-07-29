@@ -66,6 +66,7 @@ interface MovimientoPendiente {
   transferencia_id?: string;
   cheque_id?: string;
   venta_numero?: number | null;
+  venta_id?: string | null;
   foto_comprobante_path?: string | null;
   foto_comprobante_nombre?: string | null;
   titular_nombre?: string | null;
@@ -105,9 +106,32 @@ export default function Imputacion() {
   const [loadingVentas, setLoadingVentas] = useState(false);
   const [conceptoImputacion, setConceptoImputacion] = useState('');
   const [importarBancoOpen, setImportarBancoOpen] = useState(false);
+  const [ventaIdsCaja, setVentaIdsCaja] = useState<Set<string> | null>(null);
+  const cajaFiltroId = searchParams.get('caja');
   useEffect(() => {
     fetchMovimientos();
   }, []);
+
+  // Filtro por caja (?caja=<id>): resuelve venta_ids de esa caja para filtrar
+  // el listado de transferencias. Independiente de ?transferencia_id.
+  useEffect(() => {
+    if (!cajaFiltroId) { setVentaIdsCaja(null); return; }
+    let cancel = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('ventas')
+        .select('id')
+        .eq('caja_id', cajaFiltroId);
+      if (cancel) return;
+      if (error) {
+        toast.error('No se pudo cargar la caja para filtrar');
+        setVentaIdsCaja(new Set());
+        return;
+      }
+      setVentaIdsCaja(new Set((data || []).map((v: any) => v.id)));
+    })();
+    return () => { cancel = true; };
+  }, [cajaFiltroId]);
 
   // Auto-open transferencia validation modal when arriving with ?transferencia_id=<uuid>
   useEffect(() => {
@@ -248,6 +272,7 @@ export default function Imputacion() {
           source: 'transferencia' as const,
           transferencia_id: t.id,
           venta_numero: ventaNro || null,
+          venta_id: t.venta_id || null,
           foto_comprobante_path: t.foto_comprobante_path || null,
           foto_comprobante_nombre: t.foto_comprobante_nombre || null,
           titular_nombre: t.titular_nombre || null,
@@ -344,6 +369,11 @@ export default function Imputacion() {
   };
 
   const filteredMovimientos = movimientos.filter(m => {
+    // Filtro por caja: solo transferencias con venta_id de esa caja
+    if (ventaIdsCaja !== null) {
+      if (m.source !== 'transferencia') return false;
+      if (!m.venta_id || !ventaIdsCaja.has(m.venta_id)) return false;
+    }
     const matchesSearch = 
       m.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -910,6 +940,26 @@ export default function Imputacion() {
           title="Imputación de Pagos"
           description="Gestión de cheques y transferencias pendientes de confirmación"
         />
+
+        {cajaFiltroId && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Filtrando por caja <span className="font-mono">{cajaFiltroId.slice(0, 8)}</span>
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setSearchParams({}, { replace: true })}
+              aria-label="Quitar filtro de caja"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground">
+              No se muestran transferencias manuales sin venta asociada
+            </span>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
