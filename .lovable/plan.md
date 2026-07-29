@@ -1,54 +1,51 @@
-# Reimpresión de picking con items agregados
+## 1. Arqueo de caja — sumar Débito + Crédito + Transferencia (QR)
 
-## Problema
+Los POSTNET liquidan un único total combinando débito, crédito y QR. Hoy el arqueo compara cada categoría por separado y aparecen falsos desvíos.
 
-Hoy, cuando un pedido pasa a **En preparación**, la cajera lo puede volver a abrir para editar el carrito, pero las únicas acciones disponibles son:
-- **Confirmar preparado** (cierra la preparación).
-- **Salir** sin guardar.
+**Cambios**
+- `src/components/cajas/EditarArqueoDialog.tsx` y `ConfirmarArqueoDialog.tsx`: fusionar las filas `debito`, `credito` y `transferencia` en una única fila **"Tarjetas + QR (POSTNET)"** que muestre:
+  - Sistema = suma de los tres subtotales (con detalle desplegable por medio).
+  - Declarado = un solo input editable.
+  - Diferencia calculada sobre el total combinado.
+- `Cajas.tsx` / `CajaDetalle.tsx` (KPIs de arqueo): agrupar igual al mostrar el resumen.
+- Persistencia: guardar el declarado del bloque prorrateado por categoría (o en un único registro categoría `tarjetas_qr`). Elegimos prorrateo proporcional al sistema para no romper el histórico ni la tabla `arqueo_detalles`.
+- Efectivo, Cheque y Otro quedan iguales.
 
-No hay forma de **agregar items** y **reimprimir el picking actualizado** manteniendo el pedido en `en_preparacion`. Además, la RPC `pos_actualizar_pedido_estado` sólo acepta transiciones entre estados distintos, así que "guardar sin cambiar estado" tampoco es posible hoy.
+## 2. Subir Fotos — OCR automático + validación por lote
 
-## Objetivo
+**Flujo nuevo en `/subir-fotos`**
+- Al seleccionar/tomar la foto, subir a storage y disparar automáticamente `extraer-numero-operacion` (ya devuelve nº operación, monto, fecha, CUIL, titular, banco + confianzas).
+- Guardar los campos extraídos en la fila `transferencias` (numero_operacion, fecha_transferencia, cuil_titular, titular_nombre, banco) sin intervención del usuario.
+- Mostrar en la tarjeta el estado: **Coincide** / **No coincide** / **Sin match**, comparando contra la venta asociada (monto y, si hay, CUIL cliente).
 
-Cuando la cajera esté editando un pedido `en_preparacion`, poder:
-1. Sumar/quitar items en el carrito.
-2. Guardar los cambios en el pedido.
-3. Reimprimir el ticket de picking con los items actualizados.
-4. Que el pedido siga en `en_preparacion` (no se marca como preparado).
+**Nueva pantalla `/imputacion` (o pestaña dentro de Subir Fotos para admins)**
+- Dos listas: **Coinciden** y **No coinciden / revisar**.
+- Checkbox por fila + **"Seleccionar todas las coincidentes"**.
+- Botón **"Validar seleccionadas"** que llama en lote a la lógica actual de validación (marcar `estado='validada'`).
+- Las que no coinciden se validan solo una a una desde el detalle actual.
 
-## Cambios
+**Backend**
+- RPC `validar_transferencias_lote(ids uuid[])` con `SECURITY DEFINER` que aplica las mismas reglas que la validación individual (roles admin/encargado/administracion) y devuelve conteo ok/error.
+- Índice/constraint ya existente sobre `numero_operacion` evita duplicados.
 
-### 1. Migración DB — `pos_actualizar_pedido_estado`
+## 3. Renombrar "Imputación de Pagos" → "Imputación de Cobros"
 
-Extender la lista de transiciones válidas para aceptar el "no-op" que sólo persiste detalles:
+Reemplazar el título/labels en:
+- `src/pages/Imputacion.tsx` (encabezado, breadcrumb, toasts).
+- `src/components/layout/AppSidebar.tsx` (item de menú).
+- Cualquier botón "Ver en Imputación de pagos" (Cajas, Ventas detalle).
+- Título de página / `document.title` si aplica.
 
-```text
-en_preparacion  →  en_preparacion    (permitido)
-preparado       →  preparado         (permitido, por si se re-abre un preparado)
-```
+La ruta `/imputacion` no cambia para no romper links guardados.
 
-El resto de la lógica queda igual: ownership, lock, reemplazo de `venta_detalles` cuando `p_detalles` viene, recálculo de `subtotal / descuento / total`. No se toca `preparado_at` / `preparado_por` porque el estado no cambia a `preparado`.
+## Detalles técnicos
 
-### 2. Front — `src/pages/POS.tsx`
-
-- Nuevo handler `handleActualizarYReimprimir()` (variante de `handleConfirmarPreparadoInline`):
-  - Valida cart no vacío y cantidades/precios > 0.
-  - Arma `detallesPayload` igual que hoy.
-  - Llama `rpc('pos_actualizar_pedido_estado', { p_venta_id, p_nuevo_estado: 'en_preparacion', p_detalles })`.
-  - Trae el pedido completo con `clientes / empleados / venta_detalles / productos` e invoca `imprimirPickingMostrador(adaptarVentaParaPicking(data))`.
-  - Mantiene `editingPedidoId` / `editingPedidoEstado` (no limpia el carrito): la cajera sigue viendo el pedido abierto.
-  - `bumpPedidosPanel()` para refrescar el total en la lista lateral.
-
-- En el bloque de botones (`editingPedidoId && editingPedidoEstado === 'en_preparacion'`), pasar de un solo botón "Confirmar preparado" (col-span-2) a **dos botones lado a lado**:
-  - `Actualizar y reimprimir picking` (variant `outline`, con ícono `Printer`).
-  - `Confirmar preparado` (variant `default`, con ícono `Check`).
-
-  El contenedor pasa de `grid-cols-1` a `grid-cols-2` sólo para este caso (el flujo de borrador queda como está: un único botón "Enviar a preparar" en 1 columna).
-
-- Estado `actualizandoPicking` para deshabilitar el botón mientras corre.
+- **Arqueo agrupado**: en `get_arqueo_por_medio` no hace falta cambiar la RPC; agrupamos en el front. Al confirmar, dividimos el declarado total en 3 filas proporcionales al sistema (si sistema=0, se asigna todo a la categoría con más operaciones) para respetar el esquema actual de `arqueo_detalles`.
+- **OCR auto**: llamar la edge function desde el cliente después del `upload` exitoso, con timeout y fallback silencioso — si falla, la foto queda igual y se puede reintentar.
+- **Validación por lote**: la RPC debe ser transaccional y saltear (no abortar) filas ya validadas.
+- **Realtime opcional** en `/subir-fotos` para reflejar cambios de estado tras la validación.
 
 ## Fuera de alcance
-
-- No se cambia la lógica de `Confirmar preparado` ni la de `Enviar a preparar`.
-- No se toca el layout del ticket de picking (`imprimirPickingMostrador`).
-- No se agregan campos nuevos a `ventas` ni auditoría específica de reimpresiones (si más adelante hace falta rastrearlas, se hace aparte).
+- No se toca el flujo del POS ni la creación de transferencias.
+- No se cambian permisos existentes ni el layout general.
+- No se migran datos históricos de arqueos ya cerrados.
