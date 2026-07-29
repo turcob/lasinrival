@@ -3195,21 +3195,37 @@ export default function POS() {
               </>
               )}
               {editingPedidoId && editingPedidoEstado === 'en_preparacion' && (
-                <Button
-                  variant="default"
-                  className="col-span-2"
-                  disabled={cart.length === 0 || confirmandoPreparado}
-                  onClick={handleConfirmarPreparadoInline}
-                >
-                  {confirmandoPreparado ? (
-                    'Confirmando...'
-                  ) : (
-                    <>
-                      <Check className="mr-1 h-4 w-4" />
-                      Confirmar preparado
-                    </>
-                  )}
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={cart.length === 0 || actualizandoPicking || confirmandoPreparado}
+                    onClick={handleActualizarYReimprimir}
+                    title="Guardar cambios y reimprimir picking"
+                  >
+                    {actualizandoPicking ? (
+                      'Actualizando...'
+                    ) : (
+                      <>
+                        <Printer className="mr-1 h-4 w-4" />
+                        Actualizar y reimprimir
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="default"
+                    disabled={cart.length === 0 || confirmandoPreparado || actualizandoPicking}
+                    onClick={handleConfirmarPreparadoInline}
+                  >
+                    {confirmandoPreparado ? (
+                      'Confirmando...'
+                    ) : (
+                      <>
+                        <Check className="mr-1 h-4 w-4" />
+                        Confirmar preparado
+                      </>
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
             )}
