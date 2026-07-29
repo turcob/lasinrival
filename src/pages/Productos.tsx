@@ -552,6 +552,12 @@ export default function Productos() {
           Impresión de Precios
         </Button>
         {!isVendedor && (
+          <Button variant="outline" onClick={() => setCargaCodBarraOpen(true)}>
+            <Barcode className="mr-2 h-4 w-4" />
+            Cargar códigos de barra
+          </Button>
+        )}
+        {!isVendedor && (
           <Button variant="outline" onClick={() => setImportarFriosOpen(true)}>
             <Snowflake className="mr-2 h-4 w-4" />
             Importar Fríos
