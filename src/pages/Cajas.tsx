@@ -1193,11 +1193,12 @@ export default function Cajas() {
                 <CardTitle className="text-sm font-medium">Cotejo por medio de pago</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
                   <div className="font-medium text-muted-foreground">Medio</div>
                   <div className="text-right font-medium text-muted-foreground">Esperado</div>
                   <div className="text-right font-medium text-muted-foreground">Declarado</div>
                   <div className="text-right font-medium text-muted-foreground">Diferencia</div>
+                  <div className="text-right font-medium text-muted-foreground">Ops</div>
 
                   {/* Efectivo (readonly, viene del conteo de billetes) */}
                   {(() => {
@@ -1213,6 +1214,21 @@ export default function Cajas() {
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </div>
+                        <div className="text-right">
+                          {(operacionesPorCategoria.efectivo || 0) > 0 && cajaParaCalculos ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => setDrillDown({ open: true, categoria: 'efectivo', esperado: esperadoPorCategoria.efectivo || 0 })}
+                            >
+                              Ver ({operacionesPorCategoria.efectivo})
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
                       </>
                     );
                   })()}
@@ -1222,6 +1238,7 @@ export default function Cajas() {
                     const dec = declaradoPorCategoria[cat] || 0;
                     if (esp === 0 && dec === 0) return null;
                     const diff = dec - esp;
+                    const ops = operacionesPorCategoria[cat] || 0;
                     return (
                       <div key={cat} className="contents">
                         <div>{LABEL_CATEGORIA[cat]}</div>
@@ -1242,6 +1259,21 @@ export default function Cajas() {
                         </div>
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-right">
+                          {ops > 0 ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => setDrillDown({ open: true, categoria: cat, esperado: esp })}
+                            >
+                              Ver ({ops})
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </div>
                     );
