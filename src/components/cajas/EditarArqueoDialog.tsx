@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Calculator, Save } from 'lucide-react';
+import { type CategoriaMedio, CATEGORIAS_NO_EFECTIVO, LABEL_CATEGORIA } from './categoriaMedio';
 
 interface ArqueoDetalle {
   id?: string;
@@ -21,19 +22,6 @@ interface ArqueoOtroMedio {
   tipo: string;
   monto: number;
 }
-
-type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
-const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
-  'debito', 'credito', 'transferencia', 'cheque', 'otro',
-];
-const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
-  efectivo: 'Efectivo',
-  debito: 'Débito',
-  credito: 'Crédito',
-  transferencia: 'Transferencia',
-  cheque: 'Cheque',
-  otro: 'Otro',
-};
 
 interface Caja {
   id: string;

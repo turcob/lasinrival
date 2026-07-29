@@ -52,6 +52,8 @@ import { es } from 'date-fns/locale';
 import type { Database } from '@/integrations/supabase/types';
 import { EditarArqueoDialog } from '@/components/cajas/EditarArqueoDialog';
 import { ConfirmarArqueoDialog } from '@/components/cajas/ConfirmarArqueoDialog';
+import { DetalleOperacionesArqueoDialog } from '@/components/cajas/DetalleOperacionesArqueoDialog';
+import { type CategoriaMedio, CATEGORIAS_NO_EFECTIVO, LABEL_CATEGORIA } from '@/components/cajas/categoriaMedio';
 
 type CashRegisterStatus = Database['public']['Enums']['cash_register_status'];
 
@@ -96,18 +98,6 @@ interface ArqueoOtroMedio {
   monto: number;
 }
 
-type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
-const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
-  'debito', 'credito', 'transferencia', 'cheque', 'otro',
-];
-const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
-  efectivo: 'Efectivo',
-  debito: 'Débito',
-  credito: 'Crédito',
-  transferencia: 'Transferencia',
-  cheque: 'Cheque',
-  otro: 'Otro',
-};
 interface ArqueoPorMedioRow {
   categoria: string | null;
   forma_pago_id: string | null;
@@ -164,6 +154,21 @@ export default function Cajas() {
   const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
     efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
   });
+  const [drillDown, setDrillDown] = useState<{ open: boolean; categoria: CategoriaMedio | null; esperado: number }>({
+    open: false, categoria: null, esperado: 0,
+  });
+
+  const operacionesPorCategoria: Record<CategoriaMedio, number> = (() => {
+    const acc: Record<CategoriaMedio, number> = {
+      efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+    };
+    for (const row of arqueoPorMedio) {
+      const cat = (row.categoria || 'otro') as CategoriaMedio;
+      if (cat in acc) acc[cat] += Number(row.cantidad_operaciones) || 0;
+      else acc.otro += Number(row.cantidad_operaciones) || 0;
+    }
+    return acc;
+  })();
 
   const denominaciones = [
     { valor: 20000, label: '$20.000' },
@@ -1188,11 +1193,12 @@ export default function Cajas() {
                 <CardTitle className="text-sm font-medium">Cotejo por medio de pago</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-2 items-center text-sm">
                   <div className="font-medium text-muted-foreground">Medio</div>
                   <div className="text-right font-medium text-muted-foreground">Esperado</div>
                   <div className="text-right font-medium text-muted-foreground">Declarado</div>
                   <div className="text-right font-medium text-muted-foreground">Diferencia</div>
+                  <div className="text-right font-medium text-muted-foreground">Ops</div>
 
                   {/* Efectivo (readonly, viene del conteo de billetes) */}
                   {(() => {
@@ -1208,6 +1214,21 @@ export default function Cajas() {
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </div>
+                        <div className="text-right">
+                          {(operacionesPorCategoria.efectivo || 0) > 0 && cajaParaCalculos ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => setDrillDown({ open: true, categoria: 'efectivo', esperado: esperadoPorCategoria.efectivo || 0 })}
+                            >
+                              Ver ({operacionesPorCategoria.efectivo})
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
                       </>
                     );
                   })()}
@@ -1217,6 +1238,7 @@ export default function Cajas() {
                     const dec = declaradoPorCategoria[cat] || 0;
                     if (esp === 0 && dec === 0) return null;
                     const diff = dec - esp;
+                    const ops = operacionesPorCategoria[cat] || 0;
                     return (
                       <div key={cat} className="contents">
                         <div>{LABEL_CATEGORIA[cat]}</div>
@@ -1237,6 +1259,21 @@ export default function Cajas() {
                         </div>
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-right">
+                          {ops > 0 ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => setDrillDown({ open: true, categoria: cat, esperado: esp })}
+                            >
+                              Ver ({ops})
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </div>
                     );
@@ -1478,6 +1515,15 @@ export default function Cajas() {
         onOpenChange={setConfirmarArqueoDialogOpen}
         caja={selectedCaja}
         onSuccess={fetchData}
+      />
+
+      {/* Drill-down operaciones por categoría (solo lectura) */}
+      <DetalleOperacionesArqueoDialog
+        open={drillDown.open}
+        onOpenChange={(open) => setDrillDown((d) => ({ ...d, open }))}
+        cajaId={(cajaACerrar || cajaActiva)?.id || null}
+        categoria={drillDown.categoria}
+        esperado={drillDown.esperado}
       />
 
       {/* Editar Movimiento Dialog (solo admin) */}
