@@ -1271,7 +1271,7 @@ export default function Cajas() {
                         <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
                           {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex items-center justify-end gap-2">
                           {ops > 0 ? (
                             <Button
                               type="button"
@@ -1284,6 +1284,18 @@ export default function Cajas() {
                             </Button>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {cat === 'transferencia' && canVerTransferencias && cajaParaCalculos && (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs gap-1"
+                              onClick={() => navigate(`/imputacion?caja=${cajaParaCalculos.id}`)}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Ver en Imputación
+                            </Button>
                           )}
                         </div>
                       </div>
