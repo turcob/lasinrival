@@ -881,6 +881,18 @@ export default function Productos() {
         open={imprimirPreciosOpen}
         onOpenChange={setImprimirPreciosOpen}
       />
+
+      <CargaCodigosBarraDialog
+        open={cargaCodBarraOpen}
+        onOpenChange={setCargaCodBarraOpen}
+        productos={productos.map((p) => ({
+          id: p.id,
+          codigo_articulo: p.codigo_articulo,
+          descripcion: p.descripcion,
+          codigo_barra: p.codigo_barra,
+        }))}
+        onUpdated={fetchData}
+      />
     </MainLayout>
   );
 }
