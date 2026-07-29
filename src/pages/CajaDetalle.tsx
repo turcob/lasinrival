@@ -467,6 +467,11 @@ export default function CajaDetalle() {
                   <Printer className="h-4 w-4 mr-1" /> Imprimir arqueo
                 </Button>
               )}
+              {caja.estado === 'abierta' && (
+                <Button size="sm" onClick={() => navigate(`/cajas?cerrar=${caja.id}`)}>
+                  <Lock className="h-4 w-4 mr-1" /> Cerrar caja
+                </Button>
+              )}
           </div>
         </PageHeader>
 
