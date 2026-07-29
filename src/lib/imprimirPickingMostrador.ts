@@ -29,7 +29,7 @@ export function imprimirPickingMostrador(pedido: PickingPedido) {
   const w = window.open('', '_blank');
   if (!w) return;
 
-  const rows = pedido.items
+  const items = pedido.items
     .map((it) => {
       const pesable = esPeso(it.unidad_medida);
       const unidad = it.unidad_medida || 'u';
@@ -39,14 +39,14 @@ export function imprimirPickingMostrador(pedido: PickingPedido) {
       });
       const codigo = it.codigo || (it.es_temporal ? 'TEMP' : '—');
       return `
-        <tr>
-          <td class="check">☐</td>
-          <td class="cod">${escapeHtml(codigo)}</td>
-          <td class="desc">${escapeHtml(it.descripcion)}</td>
-          <td class="cant">${cant} ${escapeHtml(unidad)}</td>
-          <td class="real">${pesable ? '____ kg' : '____ u'}</td>
-          <td class="precio">${pesable ? '$ __________' : '—'}</td>
-        </tr>
+        <div class="item">
+          <div class="row1">
+            <span class="left"><span class="check">☐</span> <span class="cod">${escapeHtml(codigo)}</span></span>
+            <span class="cant">CANT: ${cant} ${escapeHtml(unidad)}</span>
+          </div>
+          <div class="desc">${escapeHtml(it.descripcion)}</div>
+          ${pesable ? `<div class="manual">Real: ______ kg &nbsp;&nbsp; Precio: $ __________</div>` : ''}
+        </div>
       `;
     })
     .join('');
@@ -60,16 +60,14 @@ export function imprimirPickingMostrador(pedido: PickingPedido) {
   .meta { text-align: center; margin-bottom: 6px; font-size: 11px; }
   .meta p { margin: 1px 0; }
   .cliente { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; margin-bottom: 6px; font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th, td { text-align: left; padding: 3px 2px; vertical-align: top; }
-  thead th { border-bottom: 1px solid #000; font-size: 10px; text-transform: uppercase; }
-  tbody tr { border-bottom: 1px dotted #999; }
-  td.check { font-size: 14px; width: 6mm; }
-  td.cod { font-size: 10px; color: #333; width: 12mm; }
-  td.desc { word-break: break-word; }
-  td.cant { white-space: nowrap; text-align: right; }
-  td.real { white-space: nowrap; font-size: 10px; }
-  td.precio { white-space: nowrap; font-size: 10px; }
+  .items { margin-top: 4px; }
+  .item { border-bottom: 1px dotted #666; padding: 4px 0; page-break-inside: avoid; }
+  .row1 { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+  .row1 .check { font-size: 14px; margin-right: 4px; }
+  .row1 .cod { font-size: 11px; font-weight: bold; }
+  .row1 .cant { font-weight: bold; white-space: nowrap; font-size: 12px; }
+  .desc { word-break: break-word; font-size: 12px; margin: 2px 0 0; line-height: 1.25; }
+  .manual { margin-top: 3px; font-size: 11px; letter-spacing: 0.5px; }
   .firma { margin-top: 12px; font-size: 10px; }
   .firma .line { border-top: 1px solid #000; margin-top: 20px; padding-top: 2px; text-align: center; }
   .aviso { margin-top: 8px; text-align: center; font-weight: bold; font-size: 11px; letter-spacing: 1px; }
@@ -85,12 +83,7 @@ export function imprimirPickingMostrador(pedido: PickingPedido) {
   <div class="cliente">
     <strong>Cliente:</strong> ${escapeHtml(pedido.cliente || 'Consumidor Final')}
   </div>
-  <table>
-    <thead>
-      <tr><th></th><th>Cód.</th><th>Descripción</th><th>Cant.</th><th>Real</th><th>Precio</th></tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+  <div class="items">${items}</div>
   <div class="aviso">*** PREPARACIÓN ***</div>
   <div class="firma">
     <div class="line">Firma preparador</div>
