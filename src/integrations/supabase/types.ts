@@ -5037,6 +5037,10 @@ export type Database = {
       }
     }
     Functions: {
+      adjuntar_comprobante_transferencia: {
+        Args: { p_nombre: string; p_path: string; p_transferencia_id: string }
+        Returns: Json
+      }
       auto_expire_solicitudes: { Args: never; Returns: number }
       confirmar_arqueo_con_ajuste: {
         Args: {
