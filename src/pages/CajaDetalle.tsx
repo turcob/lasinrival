@@ -164,7 +164,7 @@ export default function CajaDetalle() {
     if (!id) return;
     setLoading(true);
     try {
-      const [cajaRes, movsRes, ventasRes, pagosRes, detRes, otrosRes, porMedioRes] = await Promise.all([
+      const [cajaRes, movsRes, ventasRes, detRes, otrosRes, porMedioRes] = await Promise.all([
         supabase.from('cajas').select('*, profiles:usuario_id(nombre)').eq('id', id).single(),
         supabase.from('movimientos_caja').select('*').eq('caja_id', id).order('created_at', { ascending: false }),
         supabase
@@ -175,8 +175,6 @@ export default function CajaDetalle() {
         supabase.from('arqueo_detalles').select('denominacion, cantidad, subtotal').eq('caja_id', id).order('denominacion', { ascending: false }),
         supabase.from('arqueo_otros_medios').select('tipo, monto').eq('caja_id', id),
         supabase.rpc('get_arqueo_por_medio', { p_caja_id: id }),
-        // placeholder for pagos, resuelto abajo
-        Promise.resolve({ data: null, error: null } as any),
       ]);
 
       if (cajaRes.error) throw cajaRes.error;
@@ -434,8 +432,8 @@ export default function CajaDetalle() {
         <PageHeader
           title={`Caja ${format(new Date(caja.fecha_apertura), 'dd/MM/yyyy HH:mm', { locale: es })}`}
           description={`${caja.usuario_nombre || ''} — ${caja.estado === 'abierta' ? 'Abierta' : 'Cerrada'}`}
-          actions={
-            <div className="flex gap-2">
+        >
+          <div className="flex gap-2">
               {canVerTransferencias && (
                 <Button variant="outline" size="sm" onClick={() => navigate(`/imputacion?caja=${caja.id}`)}>
                   <ExternalLink className="h-4 w-4 mr-1" /> Ver en Imputación
@@ -446,9 +444,8 @@ export default function CajaDetalle() {
                   <Printer className="h-4 w-4 mr-1" /> Imprimir arqueo
                 </Button>
               )}
-            </div>
-          }
-        />
+          </div>
+        </PageHeader>
 
         {/* KPIs */}
         <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
