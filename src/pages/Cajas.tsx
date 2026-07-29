@@ -52,6 +52,8 @@ import { es } from 'date-fns/locale';
 import type { Database } from '@/integrations/supabase/types';
 import { EditarArqueoDialog } from '@/components/cajas/EditarArqueoDialog';
 import { ConfirmarArqueoDialog } from '@/components/cajas/ConfirmarArqueoDialog';
+import { DetalleOperacionesArqueoDialog } from '@/components/cajas/DetalleOperacionesArqueoDialog';
+import { type CategoriaMedio, CATEGORIAS_NO_EFECTIVO, LABEL_CATEGORIA } from '@/components/cajas/categoriaMedio';
 
 type CashRegisterStatus = Database['public']['Enums']['cash_register_status'];
 
@@ -96,18 +98,6 @@ interface ArqueoOtroMedio {
   monto: number;
 }
 
-type CategoriaMedio = 'efectivo' | 'debito' | 'credito' | 'transferencia' | 'cheque' | 'otro';
-const CATEGORIAS_NO_EFECTIVO: Exclude<CategoriaMedio, 'efectivo'>[] = [
-  'debito', 'credito', 'transferencia', 'cheque', 'otro',
-];
-const LABEL_CATEGORIA: Record<CategoriaMedio, string> = {
-  efectivo: 'Efectivo',
-  debito: 'Débito',
-  credito: 'Crédito',
-  transferencia: 'Transferencia',
-  cheque: 'Cheque',
-  otro: 'Otro',
-};
 interface ArqueoPorMedioRow {
   categoria: string | null;
   forma_pago_id: string | null;
