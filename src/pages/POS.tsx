@@ -1759,7 +1759,12 @@ export default function POS() {
         empleadoPagoDirecto: isVentaEmpleado && empleadoModalidadPago === 'pago_directo',
         factura: facturaInfo 
       });
-      
+
+      // Aviso: si la transferencia quedó sin foto, recordar cargar desde el celular
+      if (transferPayload && !transferPayload.foto_comprobante_path) {
+        toast.info('Recordá subir la foto del comprobante desde el celular en /subir-fotos', { duration: 6000 });
+      }
+
       setCart([]);
       setPagos([]);
       setSelectedCliente(null);
