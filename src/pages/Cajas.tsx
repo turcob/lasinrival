@@ -154,6 +154,21 @@ export default function Cajas() {
   const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
     efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
   });
+  const [drillDown, setDrillDown] = useState<{ open: boolean; categoria: CategoriaMedio | null; esperado: number }>({
+    open: false, categoria: null, esperado: 0,
+  });
+
+  const operacionesPorCategoria: Record<CategoriaMedio, number> = (() => {
+    const acc: Record<CategoriaMedio, number> = {
+      efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
+    };
+    for (const row of arqueoPorMedio) {
+      const cat = (row.categoria || 'otro') as CategoriaMedio;
+      if (cat in acc) acc[cat] += Number(row.cantidad_operaciones) || 0;
+      else acc.otro += Number(row.cantidad_operaciones) || 0;
+    }
+    return acc;
+  })();
 
   const denominaciones = [
     { valor: 20000, label: '$20.000' },
