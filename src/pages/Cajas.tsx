@@ -113,6 +113,7 @@ export default function Cajas() {
   const isAdmin = hasRole('admin');
   const isVendedor = hasRole('vendedor');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [canVerTransferencias, setCanVerTransferencias] = useState(false);
   useEffect(() => {
     (async () => {
