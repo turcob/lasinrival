@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -113,6 +113,7 @@ export default function Cajas() {
   const isAdmin = hasRole('admin');
   const isVendedor = hasRole('vendedor');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [canVerTransferencias, setCanVerTransferencias] = useState(false);
   useEffect(() => {
     (async () => {
@@ -218,6 +219,23 @@ export default function Cajas() {
       fetchUsuarios();
     }
   }, [user, isAdmin]);
+
+  // Soporte para abrir el diálogo de cierre desde /cajas/:id → /cajas?cerrar=<id>
+  useEffect(() => {
+    const cerrarId = searchParams.get('cerrar');
+    if (!cerrarId || cajas.length === 0) return;
+    const target = cajas.find((c) => c.id === cerrarId && c.estado === 'abierta');
+    if (target) {
+      if (target.usuario_id === user?.id) {
+        setCajaACerrar(null);
+      } else {
+        setCajaACerrar(target);
+      }
+      setCierreDialogOpen(true);
+    }
+    searchParams.delete('cerrar');
+    setSearchParams(searchParams, { replace: true });
+  }, [cajas, searchParams, user?.id]);
 
   // Cargar arqueo por medio (RPC) al abrir el diálogo de cierre
   useEffect(() => {
@@ -819,9 +837,8 @@ export default function Cajas() {
         const canConfirm = isAdmin && 
                           item.estado === 'cerrada' && 
                           item.arqueo_pendiente_revision;
-        const canClose = isAdmin && 
-                         item.estado === 'abierta' && 
-                         item.usuario_id !== user?.id;
+        const canClose = item.estado === 'abierta' &&
+                         (item.usuario_id === user?.id || isAdmin);
         
         return (
           <div className="flex items-center gap-1">
