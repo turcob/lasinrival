@@ -1,56 +1,54 @@
-# Detalle de caja a pantalla completa
+# Reimpresión de picking con items agregados
 
-## Contexto
+## Problema
 
-Hoy en `/cajas`, al tocar el ícono "Ver detalle" se abre el `Dialog` de líneas 1372-1525 con un resumen limitado: solo movimientos manuales de `movimientos_caja` (ingresos/egresos) más el arqueo si está cerrada. No se ven las ventas ni los pagos que efectivamente pasaron por la caja, y el modal quedó chico para mucha información.
+Hoy, cuando un pedido pasa a **En preparación**, la cajera lo puede volver a abrir para editar el carrito, pero las únicas acciones disponibles son:
+- **Confirmar preparado** (cierra la preparación).
+- **Salir** sin guardar.
+
+No hay forma de **agregar items** y **reimprimir el picking actualizado** manteniendo el pedido en `en_preparacion`. Además, la RPC `pos_actualizar_pedido_estado` sólo acepta transiciones entre estados distintos, así que "guardar sin cambiar estado" tampoco es posible hoy.
+
+## Objetivo
+
+Cuando la cajera esté editando un pedido `en_preparacion`, poder:
+1. Sumar/quitar items en el carrito.
+2. Guardar los cambios en el pedido.
+3. Reimprimir el ticket de picking con los items actualizados.
+4. Que el pedido siga en `en_preparacion` (no se marca como preparado).
 
 ## Cambios
 
-### 1. Nueva ruta `/cajas/:id` — `src/pages/CajaDetalle.tsx`
+### 1. Migración DB — `pos_actualizar_pedido_estado`
 
-Página full-screen dentro de `MainLayout`, cargada con `React.lazy` en `src/App.tsx`, ruta protegida igual que `/cajas`.
+Extender la lista de transiciones válidas para aceptar el "no-op" que sólo persiste detalles:
 
-**Header sticky** con:
-- Fecha/hora de apertura y cierre, usuario, sucursal, estado (badge).
-- KPIs: fondo inicial, total ventas, total egresos, esperado, declarado, diferencia.
-- Botones: "Volver", "Imprimir arqueo" (si cerrada), "Ver en Imputación" (si tiene permiso transferencias.ver), "Confirmar arqueo" (admin, pendiente revisión).
+```text
+en_preparacion  →  en_preparacion    (permitido)
+preparado       →  preparado         (permitido, por si se re-abre un preparado)
+```
 
-**Tabs**:
+El resto de la lógica queda igual: ownership, lock, reemplazo de `venta_detalles` cuando `p_detalles` viene, recálculo de `subtotal / descuento / total`. No se toca `preparado_at` / `preparado_por` porque el estado no cambia a `preparado`.
 
-1. **Resumen** — grilla `get_arqueo_por_medio` (esperado vs declarado por categoría) con drill-down inline (reusa `DetalleOperacionesArqueoDialog`).
-2. **Ventas** — tabla de `ventas` filtradas por `caja_id`, con columnas: hora, N°, cliente, vendedor, total, medios de pago (chips desde `venta_pagos`+`formas_pago`), estado. Filtros: rango de fecha (por defecto la caja), texto (N°/cliente), forma de pago, anuladas sí/no. Acción por fila: "Abrir venta" → `/ventas?venta=<id>` (o modal actual si existe).
-3. **Pagos** — tabla plana de `venta_pagos` unidos a la venta y forma de pago, filtros por categoría (efectivo/débito/crédito/transferencia/cheque/otro) y por forma de pago. Acción contextual:
-   - transferencia → "Ver comprobante" (navega a `/imputacion?transferencia=<id>` — extender `Imputacion.tsx` para aceptar `?transferencia=` además del `?caja=` actual).
-   - cheque → link a `/cheques?id=<id>`.
-   - tarjeta → mostrar cuotas y N° operación en un popover.
-4. **Ingresos/Egresos** — tabla de `movimientos_caja` (lo que hoy se muestra) con filtro por tipo y por texto. Admin conserva "Editar" e "Eliminar" (nueva acción, borrado suave restando del total correspondiente y refrescando `total_ventas`/`total_egresos` como ya hace `handleEditarMovimiento`).
-5. **Arqueo** (solo si cerrada) — lo que hoy muestra el diálogo: detalle de efectivo por denominación + otros medios + total contado + diferencia. Botón "Imprimir arqueo".
+### 2. Front — `src/pages/POS.tsx`
 
-Filtros comunes en la barra superior de cada tab: texto libre + limpiar. Persisten en el estado local, no en URL.
+- Nuevo handler `handleActualizarYReimprimir()` (variante de `handleConfirmarPreparadoInline`):
+  - Valida cart no vacío y cantidades/precios > 0.
+  - Arma `detallesPayload` igual que hoy.
+  - Llama `rpc('pos_actualizar_pedido_estado', { p_venta_id, p_nuevo_estado: 'en_preparacion', p_detalles })`.
+  - Trae el pedido completo con `clientes / empleados / venta_detalles / productos` e invoca `imprimirPickingMostrador(adaptarVentaParaPicking(data))`.
+  - Mantiene `editingPedidoId` / `editingPedidoEstado` (no limpia el carrito): la cajera sigue viendo el pedido abierto.
+  - `bumpPedidosPanel()` para refrescar el total en la lista lateral.
 
-### 2. Cambios en `src/pages/Cajas.tsx`
+- En el bloque de botones (`editingPedidoId && editingPedidoEstado === 'en_preparacion'`), pasar de un solo botón "Confirmar preparado" (col-span-2) a **dos botones lado a lado**:
+  - `Actualizar y reimprimir picking` (variant `outline`, con ícono `Printer`).
+  - `Confirmar preparado` (variant `default`, con ícono `Check`).
 
-- Reemplazar el `openDetalleDialog` por `navigate(\`/cajas/\${caja.id}\`)`.
-- Eliminar el `Dialog` de detalle (líneas 1372-1525) y todos los estados/handlers que sólo lo servían: `detalleDialogOpen`, `selectedCaja` (si no lo necesita otro flujo), `movimientos`, `arqueoDetalles`, `arqueoOtrosMedios`, `handlePrintArqueo`, `openDetalleDialog`. Verificar que `EditarArqueoDialog`, `ConfirmarArqueoDialog` y `DetalleOperacionesArqueoDialog` sigan recibiendo `caja` desde otras fuentes (arqueo pendiente / cierre) — si no, migrarlos también a `/cajas/:id`.
-- Mantener el listado y las acciones de la fila (abrir, cerrar, arqueo pendiente).
+  El contenedor pasa de `grid-cols-1` a `grid-cols-2` sólo para este caso (el flujo de borrador queda como está: un único botón "Enviar a preparar" en 1 columna).
 
-### 3. Extensión chica en `src/pages/Imputacion.tsx`
-
-Aceptar `?transferencia=<id>` además del ya soportado `?caja=<id>`: si viene, filtrar a esa fila y expandirla (chip "Filtrando por transferencia..." con opción de limpiar). Sin cambios de RLS.
-
-### 4. Sin cambios de DB
-
-Toda la data ya existe. Las consultas usan RLS existente (`ventas`, `venta_pagos`, `movimientos_caja`, `arqueo_*`).
-
-## Consideraciones técnicas
-
-- Todas las tablas nuevas se paginan client-side; para cajas con muchos movimientos, cargar `.range(0, 999)` es suficiente (una caja abarca ≤24 h).
-- `venta_pagos` se resuelve con un join a `ventas` (`caja_id.eq(id)`) y a `formas_pago` para el nombre; hoy `Cajas.tsx` ya hace algo similar en el cierre — reutilizar patrón.
-- Impresión: mover `handlePrintArqueo` a `src/lib/imprimirArqueo.ts` para poder usarla desde ambos lugares (o desde la nueva página solamente si eliminamos el modal).
-- Permisos: la lectura de la caja hoy ya está filtrada por RLS/rol. La nueva ruta hereda `MainLayout` y la protección de rutas existente.
+- Estado `actualizandoPicking` para deshabilitar el botón mientras corre.
 
 ## Fuera de alcance
 
-- No se cambia el arqueo asistido ni las RPCs `get_arqueo_por_medio` / `confirmar_arqueo_con_ajuste`.
-- No se agregan exports Excel/PDF en esta iteración (se puede pedir después).
-- No se rehace el estilo del listado principal `/cajas`.
+- No se cambia la lógica de `Confirmar preparado` ni la de `Enviar a preparar`.
+- No se toca el layout del ticket de picking (`imprimirPickingMostrador`).
+- No se agregan campos nuevos a `ventas` ni auditoría específica de reimpresiones (si más adelante hace falta rastrearlas, se hace aparte).
