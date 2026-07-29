@@ -3573,7 +3573,7 @@ export default function POS() {
           {transferenciaData && (
             <div className="space-y-3">
               <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2">
-                Podés adjuntar el comprobante y dejar CUIL, titular y número de operación vacíos. Quedarán pendientes de completar desde Imputación con ayuda de IA. Fecha e importe siguen siendo obligatorios.
+                Solo <b>fecha</b> e <b>importe</b> son obligatorios. Podés dejar CUIL, titular, número de operación y foto vacíos y completarlos después desde el celular en <b>/subir-fotos</b> (o desde Imputación con ayuda de IA).
               </div>
               <div>
                 <Label>Fecha del comprobante *</Label>
@@ -3593,7 +3593,7 @@ export default function POS() {
                 />
               </div>
               <div>
-                <Label>CUIL / CUIT *</Label>
+                <Label>CUIL / CUIT (opcional)</Label>
                 <Input
                   inputMode="numeric"
                   value={transferenciaData.cuil}
@@ -3610,7 +3610,7 @@ export default function POS() {
                 />
               </div>
               <div>
-                <Label>Número de comprobante / operación *</Label>
+                <Label>Número de comprobante / operación (opcional)</Label>
                 <Input
                   value={transferenciaData.numero_operacion}
                   onChange={(e) => setTransferenciaData({ ...transferenciaData, numero_operacion: e.target.value })}
