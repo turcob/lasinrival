@@ -39,6 +39,7 @@ import {
   Edit,
   Trash2,
   Eye,
+  Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
