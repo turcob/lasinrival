@@ -941,6 +941,26 @@ export default function Imputacion() {
           description="Gestión de cheques y transferencias pendientes de confirmación"
         />
 
+        {cajaFiltroId && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Filtrando por caja <span className="font-mono">{cajaFiltroId.slice(0, 8)}</span>
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setSearchParams({}, { replace: true })}
+              aria-label="Quitar filtro de caja"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground">
+              No se muestran transferencias manuales sin venta asociada
+            </span>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
