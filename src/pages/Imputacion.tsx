@@ -272,6 +272,7 @@ export default function Imputacion() {
           source: 'transferencia' as const,
           transferencia_id: t.id,
           venta_numero: ventaNro || null,
+          venta_id: t.venta_id || null,
           foto_comprobante_path: t.foto_comprobante_path || null,
           foto_comprobante_nombre: t.foto_comprobante_nombre || null,
           titular_nombre: t.titular_nombre || null,
