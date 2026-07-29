@@ -165,11 +165,11 @@ export default function CajaDetalle() {
     setLoading(true);
     try {
       const [cajaRes, movsRes, ventasRes, detRes, otrosRes, porMedioRes] = await Promise.all([
-        supabase.from('cajas').select('*, profiles:usuario_id(nombre)').eq('id', id).single(),
+        supabase.from('cajas').select('*').eq('id', id).single(),
         supabase.from('movimientos_caja').select('*').eq('caja_id', id).order('created_at', { ascending: false }),
         supabase
           .from('ventas')
-          .select('id, numero_comprobante, fecha, total, anulada, estado, cliente_id, usuario_id, clientes:cliente_id(nombre), profiles:usuario_id(nombre)')
+          .select('id, numero_comprobante, fecha, total, anulada, estado, cliente_id, usuario_id, clientes:cliente_id(nombre)')
           .eq('caja_id', id)
           .order('fecha', { ascending: false }),
         supabase.from('arqueo_detalles').select('denominacion, cantidad, subtotal').eq('caja_id', id).order('denominacion', { ascending: false }),
@@ -179,15 +179,25 @@ export default function CajaDetalle() {
 
       if (cajaRes.error) throw cajaRes.error;
       const cajaData = cajaRes.data as any;
-      setCaja({
-        ...cajaData,
-        usuario_nombre: cajaData.profiles?.nombre || null,
-      });
+      let usuarioNombre: string | null = null;
+      if (cajaData.usuario_id) {
+        const { data: prof } = await supabase.from('profiles').select('nombre').eq('id', cajaData.usuario_id).maybeSingle();
+        usuarioNombre = (prof as any)?.nombre || null;
+      }
+      setCaja({ ...cajaData, usuario_nombre: usuarioNombre });
 
       setMovimientos((movsRes.data || []) as MovimientoRow[]);
 
       const ventasBase = (ventasRes.data || []) as any[];
       const ventaIds = ventasBase.map(v => v.id);
+
+      // Fetch usuario names for ventas separately (no FK to profiles)
+      const userIds = Array.from(new Set(ventasBase.map(v => v.usuario_id).filter(Boolean))) as string[];
+      const usuarioMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: profs } = await supabase.from('profiles').select('id, nombre').in('id', userIds);
+        (profs || []).forEach((p: any) => usuarioMap.set(p.id, p.nombre));
+      }
 
       // Fetch pagos + formas_pago
       let pagosFlat: PagoRow[] = [];
@@ -248,7 +258,7 @@ export default function CajaDetalle() {
         cliente_id: v.cliente_id,
         cliente_nombre: v.clientes?.nombre || null,
         usuario_id: v.usuario_id,
-        usuario_nombre: v.profiles?.nombre || null,
+        usuario_nombre: v.usuario_id ? usuarioMap.get(v.usuario_id) || null : null,
         pagos: (pagosPorVenta.get(v.id) || []).map(p => ({
           forma_pago_id: p.forma_pago_id,
           forma_pago_nombre: p.forma_pago_nombre,
