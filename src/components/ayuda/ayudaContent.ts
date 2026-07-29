@@ -285,7 +285,7 @@ export const flujos: Flujo[] = [
         icon: CreditCard,
       },
       {
-        titulo: "Imputación de pagos",
+        titulo: "Imputación de Cobros",
         descripcion:
           "Los pagos (REC/NCR) se aplican FIFO a las facturas pendientes del cliente. Las transferencias requieren validación con comprobante.",
         pantallaId: "pantalla-imputacion",
