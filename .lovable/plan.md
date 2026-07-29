@@ -1,42 +1,38 @@
-## Problema
+# Diferir la carga del comprobante de transferencia al celular
 
-`src/lib/imprimirPickingMostrador.ts` arma una tabla con **6 columnas** (check, código, descripción, cantidad, real, precio) sobre un ancho útil de 72 mm. En la impresora térmica esas columnas quedan tan angostas que la descripción se corta y el resto de los campos se pisan. El ticket factura se ve bien porque tiene menos columnas.
+## Contexto
 
-## Objetivo
+Hoy en POS, al elegir pago con **Transferencia**, el diálogo `handleConfirmarTransferencia` obliga a una de dos cosas:
 
-Reordenar el ticket de picking para que cada ítem ocupe **más de una fila**, priorizando la legibilidad de descripción + cantidad, y dejando el espacio manuscrito (Real / Precio) sólo en pesables.
+- Adjuntar la foto del comprobante en el momento, **o**
+- Cargar CUIL/CUIT válido (11 dígitos) + número de operación.
 
-Solo cambia `src/lib/imprimirPickingMostrador.ts`. Sin cambios de datos, firmas ni llamados.
+La cajera muchas veces no tiene la foto ni el CUIL en el momento (el cliente todavía no le mostró el comprobante), pero necesita cerrar la venta. Ya existe la ruta mobile **`/subir-fotos`** que permite adjuntar la foto a una transferencia propia después, vía la RPC `adjuntar_comprobante_transferencia`. Falta permitir que la venta se cierre "en descubierto" y quede lista para completar desde ahí.
 
-## Nuevo layout por ítem (80mm)
+## Cambios
 
-```text
-☐  [CÓDIGO]                         CANT: 2 u
-   Descripción completa del producto sin truncar
-   Real: ______ kg    Precio: $ __________   <- solo pesables
-   ---------------------------------------------
-```
+### Frontend — `src/pages/POS.tsx`
 
-- Fila 1: checkbox + código a la izquierda, cantidad + unidad a la derecha, en negrita.
-- Fila 2: descripción a ancho total del ticket, con `word-break` para nombres largos.
-- Fila 3 (condicional, solo pesables): línea manuscrita "Real: ____ kg   Precio: $ __________".
-- Separador punteado entre ítems.
+1. **Relajar la validación en `handleConfirmarTransferencia`** (líneas ~896-942):
+   - Obligatorios: **fecha** e **importe** > 0.
+   - Opcionales: archivo, CUIL, número de operación, titular.
+   - Si el CUIL viene cargado parcial (>0 y ≠11 dígitos), seguir rechazando (evitar basura). Igual para número de operación: si viene lo respetamos, si no queda `null`.
+   - Quitar el bloqueo "Sin comprobante adjunto: obligamos los campos como siempre".
 
-## Cambios en `imprimirPickingMostrador.ts`
+2. **UI del diálogo de transferencia**:
+   - Marcar CUIL y N° operación como "opcional" en el label.
+   - Agregar una nota informativa al pie:
+     > "Podés dejar la foto y los datos para después. La cajera puede completarlo desde el celular en **/subir-fotos** una vez que reciba el comprobante."
+   - Mantener el botón "Extraer con IA" cuando sí hay foto.
 
-1. Reemplazar la `<table>` de 6 columnas por una lista de bloques `<div class="item">…</div>`, uno por ítem, con:
-   - `row1`: check + código a la izquierda, cantidad a la derecha (flex, `justify-content: space-between`).
-   - `desc`: descripción a ancho completo.
-   - `manual`: "Real: ____ kg   Precio: $ __________" solo cuando `esPeso(unidad_medida)` es true.
-2. Ajustar estilos:
-   - Font base 12px, código 10px, cantidad en negrita 12px.
-   - `.desc { word-break: break-word; font-size: 12px; margin: 2px 0; }`.
-   - Borde punteado inferior en `.item` para separar visualmente.
-   - Quitar reglas de `table/th/td`.
-3. Mantener sin tocar: encabezado `PICKING`, meta (número, fecha, operador), bloque `Cliente:`, aviso `*** PREPARACIÓN ***`, firma, script de auto-print y `@page 80mm`.
+3. **Al persistir la venta** (líneas ~1570-1602): el payload `p_transferencia` ya acepta `foto_comprobante_path: null` y campos opcionales — no requiere cambios de RPC. Sólo asegurar que el toast post-venta avise "Recordá subir la foto desde /subir-fotos" cuando la transferencia se guardó sin archivo.
+
+### Sin cambios de DB
+
+La transferencia ya se puede crear con `foto_comprobante_path = null`, `titular_cuil = null`, `numero_operacion = null`. La RPC `adjuntar_comprobante_transferencia` ya cubre el adjunto posterior con ownership.
 
 ## Fuera de alcance
 
-- No se toca el ticket factura ni `imprimirTicketFactura.ts`.
-- No se cambia el contenido de los datos ni el flujo de impresión desde `PrepararMostradorDialog`.
-- No se modifican estilos globales de `index.css`.
+- No se toca `/subir-fotos` — ya lista todas las transferencias de los últimos 60 días del usuario sin foto.
+- No se agrega notificación push ni recordatorio automático (se puede evaluar aparte).
+- No se cambian políticas RLS de `transferencias`.
