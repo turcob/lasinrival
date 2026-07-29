@@ -67,6 +67,9 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
   const [declaradoPorCategoria, setDeclaradoPorCategoria] = useState<Record<CategoriaMedio, number>>({
     efectivo: 0, debito: 0, credito: 0, transferencia: 0, cheque: 0, otro: 0,
   });
+  // POSTNET liquida un único total combinando débito+crédito+transferencia (QR).
+  // Mantenemos un solo input "Tarjetas + QR" y prorrateamos al guardar.
+  const [declaradoPostnet, setDeclaradoPostnet] = useState<number>(0);
   const [observaciones, setObservaciones] = useState('');
 
   useEffect(() => {
@@ -118,6 +121,8 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
         if (porCategoria.has(cat)) dec[cat] = porCategoria.get(cat) || 0;
       }
       setDeclaradoPorCategoria(dec);
+      // Inicializar el combinado POSTNET con la suma de lo declarado en las 3 categorías
+      setDeclaradoPostnet((dec.debito || 0) + (dec.credito || 0) + (dec.transferencia || 0));
 
       setObservaciones(caja.observaciones || '');
     } catch (error) {
@@ -131,7 +136,14 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
     return sum + (parseInt(denominacion) * cantidad);
   }, 0);
 
-  const totalArqueo = totalEfectivo + CATEGORIAS_NO_EFECTIVO.reduce((s, c) => s + (declaradoPorCategoria[c] || 0), 0);
+  // Categorías individuales que se muestran fuera del bloque POSTNET
+  const OTRAS_CATEGORIAS: CategoriaMedio[] = ['cheque', 'otro'];
+  const POSTNET_CATS: CategoriaMedio[] = ['debito', 'credito', 'transferencia'];
+  const esperadoPostnet = POSTNET_CATS.reduce((s, c) => s + (esperadoPorCategoria[c] || 0), 0);
+  const totalArqueo =
+    totalEfectivo +
+    declaradoPostnet +
+    OTRAS_CATEGORIAS.reduce((s, c) => s + (declaradoPorCategoria[c] || 0), 0);
 
   const esperado = caja
     ? caja.fondo_inicial + (caja.total_ventas || 0) - (caja.total_egresos || 0)
@@ -142,6 +154,27 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
     setLoading(true);
     try {
       const diferencia = totalArqueo - esperado;
+
+      // Prorrateo del declarado POSTNET (Tarjetas + QR) entre débito, crédito y transferencia,
+      // proporcional al esperado por categoría. Si esperado=0, todo va a débito por defecto.
+      const prorrateado: Record<CategoriaMedio, number> = { ...declaradoPorCategoria };
+      const espSum = esperadoPostnet;
+      if (espSum > 0) {
+        let acumulado = 0;
+        POSTNET_CATS.forEach((cat, idx) => {
+          if (idx === POSTNET_CATS.length - 1) {
+            prorrateado[cat] = Math.max(0, Math.round((declaradoPostnet - acumulado) * 100) / 100);
+          } else {
+            const parte = Math.round(((declaradoPostnet * (esperadoPorCategoria[cat] || 0)) / espSum) * 100) / 100;
+            prorrateado[cat] = parte;
+            acumulado += parte;
+          }
+        });
+      } else {
+        prorrateado.debito = declaradoPostnet;
+        prorrateado.credito = 0;
+        prorrateado.transferencia = 0;
+      }
 
       // Eliminar arqueo_detalles existentes
       await supabase.from('arqueo_detalles').delete().eq('caja_id', caja.id);
@@ -166,13 +199,13 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
 
       // Insertar arqueo por categoría (grilla dinámica)
       const otrosMediosInserts = CATEGORIAS_NO_EFECTIVO
-        .filter(cat => (declaradoPorCategoria[cat] || 0) > 0 || (esperadoPorCategoria[cat] || 0) > 0)
+        .filter(cat => (prorrateado[cat] || 0) > 0 || (esperadoPorCategoria[cat] || 0) > 0)
         .map(cat => ({
           caja_id: caja.id,
           tipo: cat === 'transferencia' ? 'transferencias' : cat === 'otro' ? 'posnet' : cat,
           categoria: cat,
           forma_pago_id: null,
-          monto: declaradoPorCategoria[cat] || 0,
+          monto: prorrateado[cat] || 0,
           esperado: esperadoPorCategoria[cat] || 0,
         }));
 
@@ -310,7 +343,40 @@ export function EditarArqueoDialog({ open, onOpenChange, caja, onSuccess }: Edit
                     );
                   })()}
 
-                  {CATEGORIAS_NO_EFECTIVO.map(cat => {
+                  {/* Fila combinada POSTNET (Débito + Crédito + Transferencia/QR) */}
+                  {(() => {
+                    const dec = declaradoPostnet;
+                    const esp = esperadoPostnet;
+                    if (esp === 0 && dec === 0) return null;
+                    const diff = dec - esp;
+                    return (
+                      <div className="contents">
+                        <div>
+                          <div>Tarjetas + QR (POSTNET)</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Déb ${(esperadoPorCategoria.debito || 0).toLocaleString('es-AR')} · Créd ${(esperadoPorCategoria.credito || 0).toLocaleString('es-AR')} · QR ${(esperadoPorCategoria.transferencia || 0).toLocaleString('es-AR')}
+                          </div>
+                        </div>
+                        <div className="text-right tabular-nums">${esp.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                        <div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={dec || ''}
+                            onChange={(e) => setDeclaradoPostnet(parseFloat(e.target.value) || 0)}
+                            className="h-9 w-full text-right tabular-nums"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className={`text-right tabular-nums font-medium ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                          {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {OTRAS_CATEGORIAS.map(cat => {
                     const esp = esperadoPorCategoria[cat] || 0;
                     const dec = declaradoPorCategoria[cat] || 0;
                     if (esp === 0 && dec === 0) return null;
