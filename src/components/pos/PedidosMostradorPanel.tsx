@@ -75,7 +75,7 @@ export function PedidosMostradorPanel({
           empleados(id, nombre, dni),
           venta_detalles(*, productos(id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo))
         `)
-        .in('estado', ['pedido', 'en_preparacion', 'preparado'])
+        .in('estado', ['en_preparacion', 'preparado'])
         .eq('anulada', false)
         .order('fecha', { ascending: false })
         .limit(50);
@@ -113,7 +113,6 @@ export function PedidosMostradorPanel({
 
   const total = pedidos.length;
   const porEstado = {
-    pedido: pedidos.filter((p) => p.estado === 'pedido').length,
     en_preparacion: pedidos.filter((p) => p.estado === 'en_preparacion').length,
     preparado: pedidos.filter((p) => p.estado === 'preparado').length,
   };
@@ -163,6 +162,9 @@ export function PedidosMostradorPanel({
                         minute: '2-digit',
                       });
                       const items = p.venta_detalles?.length || 0;
+                      const numero = p.numero_comprobante
+                        ? `#${String(p.numero_comprobante).padStart(6, '0')}`
+                        : '#s/n';
                       return (
                         <div
                           key={p.id}
@@ -188,6 +190,7 @@ export function PedidosMostradorPanel({
                                 </Badge>
                                 <span className="text-muted-foreground">{hora}</span>
                               </div>
+                              <p className="font-semibold text-[11px] text-primary">{numero}</p>
                               <p className="font-medium truncate">{clienteNombre}</p>
                               <p className="text-muted-foreground">
                                 {items} item{items === 1 ? '' : 's'} · ${Number(p.total || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
