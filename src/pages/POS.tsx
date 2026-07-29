@@ -1023,6 +1023,8 @@ export default function POS() {
     
     // Si es efectivo, abrir diálogo de efectivo
     if (fpNombre.includes('efectivo')) {
+      const pendiente = totalConRecargo - totalPagado;
+      if (pendiente > 0) setEfectivoEntregado(pendiente.toFixed(2));
       setEfectivoDialogOpen(true);
       return;
     }
