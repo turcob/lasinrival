@@ -220,6 +220,23 @@ export default function Cajas() {
     }
   }, [user, isAdmin]);
 
+  // Soporte para abrir el diálogo de cierre desde /cajas/:id → /cajas?cerrar=<id>
+  useEffect(() => {
+    const cerrarId = searchParams.get('cerrar');
+    if (!cerrarId || cajas.length === 0) return;
+    const target = cajas.find((c) => c.id === cerrarId && c.estado === 'abierta');
+    if (target) {
+      if (target.usuario_id === user?.id) {
+        setCajaACerrar(null);
+      } else {
+        setCajaACerrar(target);
+      }
+      setCierreDialogOpen(true);
+    }
+    searchParams.delete('cerrar');
+    setSearchParams(searchParams, { replace: true });
+  }, [cajas, searchParams, user?.id]);
+
   // Cargar arqueo por medio (RPC) al abrir el diálogo de cierre
   useEffect(() => {
     const load = async () => {
