@@ -369,6 +369,11 @@ export default function Imputacion() {
   };
 
   const filteredMovimientos = movimientos.filter(m => {
+    // Filtro por caja: solo transferencias con venta_id de esa caja
+    if (ventaIdsCaja !== null) {
+      if (m.source !== 'transferencia') return false;
+      if (!m.venta_id || !ventaIdsCaja.has(m.venta_id)) return false;
+    }
     const matchesSearch = 
       m.cliente_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
