@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -18,7 +19,8 @@ import {
   Edit,
   CheckCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
 import {
   Select,
@@ -107,9 +109,18 @@ interface ArqueoPorMedioRow {
 }
 
 export default function Cajas() {
-  const { user, profile, hasRole } = useAuth();
+  const { user, profile, hasRole, hasPermission } = useAuth();
   const isAdmin = hasRole('admin');
   const isVendedor = hasRole('vendedor');
+  const navigate = useNavigate();
+  const [canVerTransferencias, setCanVerTransferencias] = useState(false);
+  useEffect(() => {
+    (async () => {
+      if (hasRole('admin')) { setCanVerTransferencias(true); return; }
+      setCanVerTransferencias(await hasPermission('transferencias', 'ver'));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [usuarios, setUsuarios] = useState<{ id: string; nombre: string }[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
