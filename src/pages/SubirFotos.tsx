@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -28,6 +29,9 @@ interface TransferenciaRow {
   foto_comprobante_nombre: string | null;
   created_at: string;
   origen: string | null;
+  numero_operacion?: string | null;
+  titular_cuil?: string | null;
+  banco?: string | null;
 }
 
 interface VentaRow {
@@ -36,6 +40,7 @@ interface VentaRow {
   fecha: string | null;
   cliente_id: string | null;
   usuario_id: string | null;
+  total?: number | null;
 }
 
 interface ClienteRow {
@@ -60,10 +65,14 @@ const estadoBadge = (e: string) => {
 };
 
 export default function SubirFotos() {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, hasRole } = useAuth();
+  const puedeValidar = hasRole('admin') || hasRole('encargado') || hasRole('administracion');
   const [filas, setFilas] = useState<FilaTransf[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [analizandoId, setAnalizandoId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [validandoLote, setValidandoLote] = useState(false);
   const [previewFila, setPreviewFila] = useState<FilaTransf | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -79,7 +88,7 @@ export default function SubirFotos() {
 
       const { data: transfData, error: transfErr } = await supabase
         .from('transferencias')
-        .select(sel('id, venta_id, cliente_id, titular_nombre, importe, fecha_transferencia, estado, foto_comprobante_path, foto_comprobante_nombre, created_at, origen'))
+        .select(sel('id, venta_id, cliente_id, titular_nombre, importe, fecha_transferencia, estado, foto_comprobante_path, foto_comprobante_nombre, created_at, origen, numero_operacion, titular_cuil, banco'))
         .gte('created_at', desde.toISOString())
         .order('created_at', { ascending: false })
         .returns<TransferenciaRow[]>();
@@ -97,7 +106,7 @@ export default function SubirFotos() {
       if (ventaIds.length > 0) {
         const { data: ventasData, error: ventasErr } = await supabase
           .from('ventas')
-          .select(sel('id, numero_comprobante, fecha, cliente_id, usuario_id'))
+          .select(sel('id, numero_comprobante, fecha, cliente_id, usuario_id, total'))
           .in('id', ventaIds)
           .returns<VentaRow[]>();
         if (ventasErr) throw ventasErr;
@@ -121,8 +130,10 @@ export default function SubirFotos() {
       }
 
       // Filtro de ownership en cliente: venta.usuario_id === user.id
+      // Admin/encargado/administracion ven todas para poder validar en lote.
       const misFilas: FilaTransf[] = transferencias
         .filter((t) => {
+          if (puedeValidar) return true;
           if (!t.venta_id) return false;
           const v = ventasMap.get(t.venta_id);
           return v?.usuario_id === user.id;
@@ -149,14 +160,22 @@ export default function SubirFotos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const { sinFoto, conFoto } = useMemo(() => {
+  const { sinFoto, conFoto, coincidentes, revisar, pendientesValidar } = useMemo(() => {
     const sf: FilaTransf[] = [];
     const cf: FilaTransf[] = [];
+    const ok: FilaTransf[] = [];
+    const rev: FilaTransf[] = [];
+    const pv: FilaTransf[] = [];
     filas.forEach((f) => {
       if (f.transferencia.foto_comprobante_path) cf.push(f);
       else sf.push(f);
+      if (f.transferencia.estado === 'pendiente' && f.transferencia.foto_comprobante_path) {
+        pv.push(f);
+        if (matchStatus(f) === 'coincide') ok.push(f);
+        else rev.push(f);
+      }
     });
-    return { sinFoto: sf, conFoto: cf };
+    return { sinFoto: sf, conFoto: cf, coincidentes: ok, revisar: rev, pendientesValidar: pv };
   }, [filas]);
 
   const handleSubirClick = async (fila: FilaTransf) => {
@@ -213,12 +232,82 @@ export default function SubirFotos() {
       }
 
       toast.success('Comprobante adjuntado');
+      // Auto-OCR con IA para autocompletar datos sin intervención del usuario.
+      analizarConIA(transferenciaId, file).catch((e) => {
+        console.warn('[SubirFotos] OCR falló', e);
+      });
       await fetchData();
     } catch (e: any) {
       console.error('[SubirFotos] upload error', e);
       toast.error(e.message || 'Error inesperado');
     } finally {
       setUploadingId(null);
+    }
+  };
+
+  const analizarConIA = async (transferenciaId: string, file: File) => {
+    setAnalizandoId(transferenciaId);
+    try {
+      const base64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke('extraer-numero-operacion', {
+        body: { imageBase64: base64, mimeType: file.type || 'image/jpeg' },
+      });
+      if (error) throw error;
+      const r = data as any;
+      if (!r || (typeof r === 'object' && r.error)) throw new Error(r?.error || 'OCR error');
+
+      const update: Record<string, any> = {};
+      if (r.numero_operacion) update.numero_operacion = r.numero_operacion;
+      if (r.fecha) update.fecha_transferencia = r.fecha;
+      if (r.cuil_titular) update.titular_cuil = r.cuil_titular;
+      if (r.titular) update.titular_nombre = r.titular;
+      if (r.banco) update.banco = r.banco;
+
+      if (Object.keys(update).length > 0) {
+        const { error: upErr } = await supabase
+          .from('transferencias')
+          .update(update)
+          .eq('id', transferenciaId);
+        if (!upErr) {
+          toast.success('Datos autocompletados con IA');
+          await fetchData();
+        }
+      }
+    } finally {
+      setAnalizandoId(null);
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const seleccionarCoincidentes = () => {
+    setSelectedIds(new Set(coincidentes.map((f) => f.transferencia.id)));
+  };
+
+  const validarSeleccionadas = async () => {
+    if (selectedIds.size === 0) return;
+    setValidandoLote(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('transferencias')
+        .update({ estado: 'validada' })
+        .in('id', ids);
+      if (error) throw error;
+      toast.success(`${ids.length} transferencia(s) validada(s)`);
+      setSelectedIds(new Set());
+      await fetchData();
+    } catch (e: any) {
+      toast.error(e.message || 'No se pudo validar el lote');
+    } finally {
+      setValidandoLote(false);
     }
   };
 
@@ -271,9 +360,12 @@ export default function SubirFotos() {
 
       <main className="max-w-md mx-auto p-3">
         <Tabs defaultValue="sin" className="w-full">
-          <TabsList className="grid grid-cols-2 w-full">
+          <TabsList className={`grid ${puedeValidar ? 'grid-cols-3' : 'grid-cols-2'} w-full`}>
             <TabsTrigger value="sin">Sin comprobante ({sinFoto.length})</TabsTrigger>
             <TabsTrigger value="con">Con comprobante ({conFoto.length})</TabsTrigger>
+            {puedeValidar && (
+              <TabsTrigger value="validar">Validar ({pendientesValidar.length})</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="sin" className="space-y-2 mt-3">
@@ -292,6 +384,7 @@ export default function SubirFotos() {
                   key={f.transferencia.id}
                   fila={f}
                   loading={uploadingId === f.transferencia.id}
+                  analizando={analizandoId === f.transferencia.id}
                   onSubir={() => handleSubirClick(f)}
                 />
               ))
@@ -313,12 +406,63 @@ export default function SubirFotos() {
                 <FilaCard
                   key={f.transferencia.id}
                   fila={f}
+                  analizando={analizandoId === f.transferencia.id}
                   conFoto
                   onVer={() => abrirPreview(f)}
                 />
               ))
             )}
           </TabsContent>
+
+          {puedeValidar && (
+            <TabsContent value="validar" className="space-y-2 mt-3">
+              {pendientesValidar.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <ShieldCheck className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>Sin transferencias pendientes de validar</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2 sticky top-14 bg-muted/30 py-2 z-10">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={seleccionarCoincidentes} disabled={coincidentes.length === 0}>
+                      Seleccionar coincidentes ({coincidentes.length})
+                    </Button>
+                    <Button size="sm" className="flex-1" onClick={validarSeleccionadas} disabled={selectedIds.size === 0 || validandoLote}>
+                      {validandoLote ? <Loader2 className="h-4 w-4 animate-spin" /> : `Validar (${selectedIds.size})`}
+                    </Button>
+                  </div>
+                  {coincidentes.length > 0 && (
+                    <p className="text-xs font-medium text-green-700 mt-2">Coincidentes</p>
+                  )}
+                  {coincidentes.map((f) => (
+                    <FilaCard
+                      key={f.transferencia.id}
+                      fila={f}
+                      conFoto
+                      selectable
+                      selected={selectedIds.has(f.transferencia.id)}
+                      onToggle={() => toggleSelected(f.transferencia.id)}
+                      onVer={() => abrirPreview(f)}
+                    />
+                  ))}
+                  {revisar.length > 0 && (
+                    <p className="text-xs font-medium text-amber-700 mt-3">Revisar</p>
+                  )}
+                  {revisar.map((f) => (
+                    <FilaCard
+                      key={f.transferencia.id}
+                      fila={f}
+                      conFoto
+                      selectable
+                      selected={selectedIds.has(f.transferencia.id)}
+                      onToggle={() => toggleSelected(f.transferencia.id)}
+                      onVer={() => abrirPreview(f)}
+                    />
+                  ))}
+                </>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
@@ -366,18 +510,28 @@ export default function SubirFotos() {
 interface FilaCardProps {
   fila: FilaTransf;
   loading?: boolean;
+  analizando?: boolean;
   conFoto?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
   onSubir?: () => void;
   onVer?: () => void;
 }
 
-function FilaCard({ fila, loading, conFoto, onSubir, onVer }: FilaCardProps) {
+function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer }: FilaCardProps) {
   const { transferencia: t, venta, clienteNombre } = fila;
   const fecha = t.fecha_transferencia || venta?.fecha || t.created_at;
+  const match = matchStatus(fila);
   return (
     <Card className={conFoto ? 'active:scale-[0.99] transition cursor-pointer' : ''} onClick={conFoto ? onVer : undefined}>
       <CardContent className="p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
+          {selectable && (
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <Checkbox checked={!!selected} onCheckedChange={() => onToggle?.()} />
+            </div>
+          )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold">
@@ -391,10 +545,28 @@ function FilaCard({ fila, loading, conFoto, onSubir, onVer }: FilaCardProps) {
                   <CheckCircle2 className="h-3 w-3 mr-1" /> Adjuntado
                 </Badge>
               )}
+              {analizando && (
+                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
+                  <Sparkles className="h-3 w-3 mr-1 animate-pulse" /> Analizando IA
+                </Badge>
+              )}
+              {conFoto && !analizando && match === 'coincide' && (
+                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 border-green-500/30">
+                  Coincide
+                </Badge>
+              )}
+              {conFoto && !analizando && match === 'revisar' && (
+                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 border-amber-500/30">
+                  <AlertTriangle className="h-3 w-3 mr-1" /> Revisar
+                </Badge>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {fecha ? format(new Date(fecha), "d MMM yyyy", { locale: es }) : '—'}
             </p>
+            {t.numero_operacion && (
+              <p className="text-[11px] text-muted-foreground">Op. {t.numero_operacion}</p>
+            )}
           </div>
           <div className="text-right shrink-0">
             <p className="font-semibold text-sm">{money(Number(t.importe))}</p>
@@ -421,4 +593,31 @@ function FilaCard({ fila, loading, conFoto, onSubir, onVer }: FilaCardProps) {
       </CardContent>
     </Card>
   );
+}
+
+// Helpers
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function matchStatus(f: FilaTransf): 'coincide' | 'revisar' | 'sin_datos' {
+  const t = f.transferencia;
+  if (!t.numero_operacion || !t.fecha_transferencia) return 'sin_datos';
+  const importe = Number(t.importe) || 0;
+  const total = Number((f.venta as any)?.total) || 0;
+  // Match si hay número de operación, fecha y (si hay venta con total) importe cuadra a $1
+  if (total > 0) {
+    if (Math.abs(importe - total) <= 1) return 'coincide';
+    return 'revisar';
+  }
+  return 'coincide';
 }

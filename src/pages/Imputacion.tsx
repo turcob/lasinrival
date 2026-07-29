@@ -937,7 +937,7 @@ export default function Imputacion() {
     <MainLayout>
       <div className="space-y-6">
         <PageHeader
-          title="Imputación de Pagos"
+          title="Imputación de Cobros"
           description="Gestión de cheques y transferencias pendientes de confirmación"
         />
 

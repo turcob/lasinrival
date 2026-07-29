@@ -72,7 +72,7 @@ const operationsNavItems: NavItem[] = [
   { title: 'Horarios Zona', href: '/horarios-zona', icon: Calendar, module: 'logistica' },
   { title: 'Proveedores', href: '/proveedores', icon: Building2, module: 'proveedores' },
   { title: 'Agenda Visitas', href: '/agenda-visitas', icon: Calendar, module: 'ventas' },
-  { title: 'Imputación', href: '/imputacion', icon: CreditCard, module: 'clientes' },
+  { title: 'Imputación de Cobros', href: '/imputacion', icon: CreditCard, module: 'clientes' },
   { title: 'Asociar Pagos', href: '/asociacion-pagos', icon: CreditCard, module: 'clientes' },
   { title: 'Tarjetas', href: '/tarjetas', icon: CreditCard, module: 'tarjetas' },
   { title: 'Clover', href: '/clover', icon: Smartphone, module: 'clientes' },
