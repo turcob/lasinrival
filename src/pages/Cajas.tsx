@@ -820,9 +820,8 @@ export default function Cajas() {
         const canConfirm = isAdmin && 
                           item.estado === 'cerrada' && 
                           item.arqueo_pendiente_revision;
-        const canClose = isAdmin && 
-                         item.estado === 'abierta' && 
-                         item.usuario_id !== user?.id;
+        const canClose = item.estado === 'abierta' &&
+                         (item.usuario_id === user?.id || isAdmin);
         
         return (
           <div className="flex items-center gap-1">
