@@ -192,25 +192,37 @@ export default function CajaDetalle() {
       // Fetch pagos + formas_pago
       let pagosFlat: PagoRow[] = [];
       if (ventaIds.length > 0) {
-        const { data: pagosData } = await supabase
-          .from('venta_pagos')
-          .select('id, venta_id, forma_pago_id, monto, cuotas, created_at, numero_operacion, transferencia_id, cheque_id, formas_pago:forma_pago_id(nombre, categoria)')
-          .in('venta_id', ventaIds);
+        const [pagosR, transfR, chequesR] = await Promise.all([
+          supabase
+            .from('venta_pagos')
+            .select('id, venta_id, forma_pago_id, monto, cuotas, created_at, formas_pago:forma_pago_id(nombre, categoria)')
+            .in('venta_id', ventaIds),
+          supabase.from('transferencias').select('id, venta_id, numero_operacion').in('venta_id', ventaIds),
+          supabase.from('cheques').select('id, venta_id').in('venta_id', ventaIds),
+        ]);
+        const pagosData = pagosR.data;
+        const transfByVenta = new Map<string, { id: string; numero_operacion: string | null }>();
+        (transfR.data || []).forEach((t: any) => transfByVenta.set(t.venta_id, { id: t.id, numero_operacion: t.numero_operacion }));
+        const chequeByVenta = new Map<string, string>();
+        (chequesR.data || []).forEach((c: any) => chequeByVenta.set(c.venta_id, c.id));
         const ventaMap = new Map(ventasBase.map(v => [v.id, v]));
         pagosFlat = ((pagosData || []) as any[]).map((p) => {
           const v = ventaMap.get(p.venta_id);
+          const cat = p.formas_pago?.categoria || null;
+          const t = cat === 'transferencia' ? transfByVenta.get(p.venta_id) : undefined;
+          const chId = cat === 'cheque' ? chequeByVenta.get(p.venta_id) : undefined;
           return {
             id: p.id,
             venta_id: p.venta_id,
             forma_pago_id: p.forma_pago_id,
             forma_pago_nombre: p.formas_pago?.nombre || '—',
-            categoria: p.formas_pago?.categoria || null,
+            categoria: cat,
             monto: Number(p.monto || 0),
             cuotas: p.cuotas,
             created_at: p.created_at,
-            numero_operacion: p.numero_operacion || null,
-            transferencia_id: p.transferencia_id || null,
-            cheque_id: p.cheque_id || null,
+            numero_operacion: t?.numero_operacion || null,
+            transferencia_id: t?.id || null,
+            cheque_id: chId || null,
             venta_numero: v?.numero_comprobante || null,
             cliente_nombre: v?.clientes?.nombre || null,
           } as PagoRow;
@@ -242,8 +254,8 @@ export default function CajaDetalle() {
           forma_pago_nombre: p.forma_pago_nombre,
           categoria: p.categoria,
           monto: p.monto,
-          transferencia_id: p.transferencia_id,
-          cheque_id: p.cheque_id,
+          transferencia_id: p.transferencia_id || null,
+          cheque_id: p.cheque_id || null,
         })),
       })));
 
