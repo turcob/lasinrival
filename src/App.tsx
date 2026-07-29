@@ -43,6 +43,7 @@ import Encargado from "./pages/Encargado";
 import EncargadoHojaDetalle from "./pages/EncargadoHojaDetalle";
 import PendientesChofer from "./pages/PendientesChofer";
 import Ayuda from "./pages/Ayuda";
+import SubirFotos from "./pages/SubirFotos";
 import { UpdateBanner } from "@/components/UpdateBanner";
 
 const queryClient = new QueryClient();
@@ -110,6 +111,7 @@ function AppRoutes() {
       <Route path="/encargado/:id" element={<ProtectedRoute><EncargadoHojaDetalle /></ProtectedRoute>} />
       <Route path="/pendientes-chofer" element={<ProtectedRoute><PendientesChofer /></ProtectedRoute>} />
       <Route path="/ayuda" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />
+      <Route path="/subir-fotos" element={<ProtectedRoute redirectPath="/subir-fotos"><SubirFotos /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
