@@ -3114,28 +3114,9 @@ export default function POS() {
             </Button>
 
             {modoPos === 'mostrador' && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {(!editingPedidoId || editingPedidoEstado === 'pedido') && (
               <>
-              <Button
-                variant="outline"
-                disabled={cart.length === 0 || guardandoPedido}
-                onClick={handleGuardarPedido}
-              >
-                {guardandoPedido ? (
-                  'Guardando...'
-                ) : editingPedidoId ? (
-                  <>
-                    <Check className="mr-1 h-4 w-4" />
-                    Actualizar borrador
-                  </>
-                ) : (
-                  <>
-                    <ClipboardList className="mr-1 h-4 w-4" />
-                    Guardar borrador
-                  </>
-                )}
-              </Button>
               <Button
                 variant="outline"
                 disabled={
