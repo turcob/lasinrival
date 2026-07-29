@@ -5,13 +5,14 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer, Barcode } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
 import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPreciosDialog';
 import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
 import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
+import { CargaCodigosBarraDialog } from '@/components/productos/CargaCodigosBarraDialog';
 import {
   Dialog,
   DialogContent,
@@ -95,6 +96,7 @@ export default function Productos() {
   const [actualizadorOpen, setActualizadorOpen] = useState(false);
   const [importarFriosOpen, setImportarFriosOpen] = useState(false);
   const [imprimirPreciosOpen, setImprimirPreciosOpen] = useState(false);
+  const [cargaCodBarraOpen, setCargaCodBarraOpen] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [activeTab, setActiveTab] = useState('activos');
   const [categoriaFilter, setCategoriaFilter] = useState('');
