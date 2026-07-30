@@ -598,6 +598,32 @@ export default function POS() {
     setShowAllResults(false);
   };
 
+  // Búsqueda por código exacto (lector de código de barras HID: código + Enter)
+  const buscarPorCodigoExacto = (term: string): Producto[] => {
+    const code = term.trim().toLowerCase();
+    if (!code) return [];
+    return productos.filter(
+      (p) =>
+        (p.codigo_barra || '').trim().toLowerCase() === code ||
+        (p.codigo_articulo || '').trim().toLowerCase() === code
+    );
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const term = searchTerm.trim();
+    if (!term) return;
+    const matches = buscarPorCodigoExacto(term);
+    if (matches.length === 1) {
+      addToCart(matches[0]);
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    } else if (matches.length === 0) {
+      toast.error('Producto no encontrado');
+    }
+    // Más de 1 coincidencia: no agregar, dejar la lista filtrada visible
+  };
+
   // Handler para selección de producto desde el modal de búsqueda
   const handleProductSelectedFromModal = (producto: Producto) => {
     const precioCalc = getProductoPrice(producto);
