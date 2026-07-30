@@ -89,6 +89,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         const { data, error } = await supabase
           .from('productos')
           .select('id, codigo_articulo, descripcion, precio_costo, marca_id, tipo_producto_id, unidad_medida')
+          .select('id, codigo_articulo, codigo_barra, descripcion, precio_costo, marca_id, tipo_producto_id, unidad_medida')
           .eq('activo', true)
           .order('descripcion')
           .range(from, from + size - 1);
