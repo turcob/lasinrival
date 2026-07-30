@@ -124,9 +124,17 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       ? productos.filter(
           p =>
             p.codigo_articulo?.toLowerCase().includes(q) ||
+            p.codigo_barra?.toLowerCase().includes(q) ||
             p.descripcion?.toLowerCase().includes(q),
         )
       : productos;
+    if (q) {
+      const exactos = base.filter(p => p.codigo_barra?.toLowerCase() === q);
+      if (exactos.length) {
+        const restantes = base.filter(p => p.codigo_barra?.toLowerCase() !== q);
+        return [...exactos, ...restantes].slice(0, 200);
+      }
+    }
     return base.slice(0, 200);
   }, [productos, search]);
 
@@ -159,6 +167,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
           precioEntero: entero,
           precioDecimal: dec,
           unidad: p.unidad_medida === 'KG' ? 'x 1 KG' : '',
+          copias: 1,
         },
       ]);
     } else {
