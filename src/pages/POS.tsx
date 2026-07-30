@@ -76,6 +76,7 @@ interface Producto {
   precio_costo: number;
   marca_id?: string | null;
   tipo_producto_id?: string | null;
+  codigo_barra?: string | null;
 }
 
 interface ListaPrecio {
@@ -433,7 +434,7 @@ export default function POS() {
     setLoading(true);
     try {
       const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
-        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra').eq('activo', true).order('descripcion'),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
@@ -490,7 +491,8 @@ export default function POS() {
     const results = productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.codigo_barra || '').toLowerCase().includes(term)
     );
     return showAllResults ? results : results.slice(0, 8);
   }, [productos, searchTerm, showAllResults]);
@@ -501,7 +503,8 @@ export default function POS() {
     return productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.codigo_barra || '').toLowerCase().includes(term)
     ).length;
   }, [productos, searchTerm]);
 
