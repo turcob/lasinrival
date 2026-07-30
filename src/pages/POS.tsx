@@ -2658,6 +2658,7 @@ export default function POS() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    ref={searchInputRef}
                     className="pl-10"
                     placeholder="Buscar producto por código o descripción..."
                     value={searchTerm}
@@ -2665,6 +2666,7 @@ export default function POS() {
                       setSearchTerm(e.target.value);
                       setShowAllResults(false);
                     }}
+                    onKeyDown={handleSearchKeyDown}
                   />
                 </div>
                 <Button 
