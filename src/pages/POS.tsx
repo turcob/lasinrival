@@ -76,6 +76,7 @@ interface Producto {
   precio_costo: number;
   marca_id?: string | null;
   tipo_producto_id?: string | null;
+  codigo_barra?: string | null;
 }
 
 interface ListaPrecio {
@@ -195,6 +196,7 @@ export default function POS() {
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAllResults, setShowAllResults] = useState(false);
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -433,7 +435,7 @@ export default function POS() {
     setLoading(true);
     try {
       const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
-        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra').eq('activo', true).order('descripcion'),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
@@ -490,7 +492,8 @@ export default function POS() {
     const results = productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.codigo_barra || '').toLowerCase().includes(term)
     );
     return showAllResults ? results : results.slice(0, 8);
   }, [productos, searchTerm, showAllResults]);
@@ -501,7 +504,8 @@ export default function POS() {
     return productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.codigo_barra || '').toLowerCase().includes(term)
     ).length;
   }, [productos, searchTerm]);
 
@@ -593,6 +597,32 @@ export default function POS() {
     });
     setSearchTerm('');
     setShowAllResults(false);
+  };
+
+  // Búsqueda por código exacto (lector de código de barras HID: código + Enter)
+  const buscarPorCodigoExacto = (term: string): Producto[] => {
+    const code = term.trim().toLowerCase();
+    if (!code) return [];
+    return productos.filter(
+      (p) =>
+        (p.codigo_barra || '').trim().toLowerCase() === code ||
+        (p.codigo_articulo || '').trim().toLowerCase() === code
+    );
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const term = searchTerm.trim();
+    if (!term) return;
+    const matches = buscarPorCodigoExacto(term);
+    if (matches.length === 1) {
+      addToCart(matches[0]);
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    } else if (matches.length === 0) {
+      toast.error('Producto no encontrado');
+    }
+    // Más de 1 coincidencia: no agregar, dejar la lista filtrada visible
   };
 
   // Handler para selección de producto desde el modal de búsqueda
@@ -2628,6 +2658,7 @@ export default function POS() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    ref={searchInputRef}
                     className="pl-10"
                     placeholder="Buscar producto por código o descripción..."
                     value={searchTerm}
@@ -2635,6 +2666,7 @@ export default function POS() {
                       setSearchTerm(e.target.value);
                       setShowAllResults(false);
                     }}
+                    onKeyDown={handleSearchKeyDown}
                   />
                 </div>
                 <Button 

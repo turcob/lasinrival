@@ -1,41 +1,33 @@
-# Modo "Carga rápida de códigos de barra"
+## Respuesta al punto 4 (verificado en código)
 
-Agregar en la pantalla **Productos** un modo dedicado para cargar códigos de barra con lector/scanner de forma ágil, sin abrir el formulario completo de edición de cada producto.
+`addToCart` en `src/pages/POS.tsx` (L556) **ya incrementa cantidad** si el producto existe: busca `prev.find(item => item.producto?.id === producto.id && !item.es_temporal)` y, si lo encuentra, hace `cantidad + 1` recalculando subtotal, sin reordenar ni duplicar línea. No hay que cambiar esa lógica.
 
-## UX propuesta
+Salvedad: si el producto es por peso (KG/KILO) y el modo NO es `mostrador`, en vez de sumar abre el diálogo de peso (`setPesoDialogOpen(true)`) sobre la línea existente. En modo mostrador (`modoPos === 'mostrador'`) salta ese prompt y suma directo. Esto se mantiene tal cual: el escaneo reutiliza `addToCart`, así que hereda ese comportamiento.
 
-1. Botón nuevo en la barra de acciones de `src/pages/Productos.tsx`: **"Cargar códigos de barra"**.
-2. Al abrirlo, se muestra un Dialog a pantalla amplia con:
-   - **Buscador de producto** arriba (por código de artículo o descripción). Autofocus.
-   - Lista/resultado filtrado (máx. ~20 items) mostrando código de artículo, descripción y el código de barras actual (si lo tiene).
-   - El usuario selecciona un producto (click o Enter sobre el primer resultado).
-3. Al seleccionar producto:
-   - Se muestra una tarjeta con el producto elegido.
-   - El foco pasa **automáticamente** al input **"Código de barras"** (autofocus real, `ref.focus()` tras seleccionar).
-   - El input acepta el scan (los lectores mandan el código + Enter).
-4. Al presionar Enter (o blur con valor):
-   - Se guarda `codigo_barra` en `productos` vía `supabase.update` filtrando por `id`.
-   - Toast de éxito (solo error o feedback breve; según memoria, evitar toasts innecesarios — usaré uno mínimo de confirmación con auto-dismiss).
-   - Se limpia la selección y el buscador vuelve a tomar foco, listo para el siguiente producto.
-5. Historial en vivo dentro del diálogo: lista de los últimos N productos cargados en la sesión (código artículo → código barra) para verificar visualmente.
+En el modal, el click en un resultado llama `handleProductSelectedFromModal` → abre `ProductQuantityModal` → `handleConfirmProductQuantity`, que también suma sobre la línea existente. Para el escaneo dentro del modal, el plan usa `onSelectProduct` (la misma función de alta que el click), respetando la consigna.
 
-## Validaciones
+## Cambios (front-end únicamente)
 
-- Trim del código, rechazar vacío.
-- Verificar duplicado: si ya existe otro producto con ese `codigo_barra`, mostrar alerta y no guardar (permitir "sobrescribir en este producto" solo si el usuario confirma).
-- Si el producto ya tiene código, pedir confirmación antes de sobrescribir.
+### 1. `src/pages/POS.tsx`
+- `interface Producto` (L70): agregar `codigo_barra?: string | null`.
+- `fetchData` (L436): agregar `codigo_barra` al `select` de `productos`.
+- `filteredProductos` (L487) y `totalResults` (L497): sumar `(p.codigo_barra || '').toLowerCase().includes(term)` al filtro OR existente. Sin otros cambios de comportamiento.
+- Nuevo helper `buscarPorCodigoExacto(term)`: sobre `productos` (ya filtrados por `activo`), devuelve los que cumplen igualdad exacta (case-insensitive, trim) contra `codigo_barra` o `codigo_articulo`.
+- Nuevo `searchInputRef` en el `Input` de búsqueda (L2630) + `onKeyDown`:
+  - `Enter` → `preventDefault`; toma `searchTerm.trim()`; si vacío, no hace nada.
+  - 1 match exacto → `addToCart(producto)` (misma función que el click en resultado inline; ya suma cantidad si existe). `addToCart` limpia `searchTerm` y `showAllResults`; luego refoco al input con `setTimeout(..., 0)`.
+  - >1 match → no agrega nada; deja el término y la lista filtrada visible.
+  - 0 match → `toast.error('Producto no encontrado')`, sin limpiar el input.
+  - Enter nunca agrega resultados de la búsqueda por texto.
 
-## Archivos afectados
+### 2. `src/components/pos/ProductSearchModal.tsx`
+- `interface Producto`: agregar `codigo_barra?: string | null` (recibe productos por props, sin query propia).
+- `filteredProductos` (L53): sumar `codigo_barra` al `includes`.
+- `ref` en el `Input` (L93) + `onKeyDown` con la misma lógica de match exacto: 1 → `onSelectProduct(producto)` (idéntico al click en la tarjeta), limpiar `searchTerm` y refocar; >1 → dejar lista filtrada; 0 → `toast.error('Producto no encontrado')`.
+- Requiere importar `toast` de `sonner` y `useRef`.
 
-- **Nuevo:** `src/components/productos/CargaCodigosBarraDialog.tsx` — Dialog con buscador, selección, input scan y guardado.
-- **Editado:** `src/pages/Productos.tsx` — botón "Cargar códigos de barra" que abre el diálogo; refrescar lista tras cerrar.
+## Fuera de alcance (confirmado)
+Sin migraciones, sin tocar `pos_registrar_venta`, sin cambios de estilos/layout ni remitos, sin librerías de scanner, sin tocar `NuevoPedidoDialog.tsx`.
 
-## Detalles técnicos
-
-- Reusar el fetch de productos ya disponible en `Productos.tsx` (pasarlo por props) para no re-consultar.
-- Guardado: `supabase.from('productos').update({ codigo_barra }).eq('id', id)`.
-- Chequeo de duplicado: `select id, descripcion from productos where codigo_barra = ? and id != ? limit 1`.
-- Manejo de foco con `useRef<HTMLInputElement>` + `useEffect` cuando cambia el producto seleccionado.
-- Seguir el design system (tokens semánticos, sin colores hardcodeados).
-
-¿Confirmás para implementarlo así?
+## Nota
+Existen 2 códigos de barra duplicados (4 productos). Con el match exacto múltiple el flujo cae en el caso ">1" y el usuario elige de la lista, como pediste.
