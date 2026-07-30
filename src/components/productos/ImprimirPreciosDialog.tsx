@@ -196,7 +196,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
     // Área imprimible A4 con márgenes de 8mm
     const PAGE_W = 210 - 16;
-    const PAGE_H = 297 - 16;
+    const PAGE_H = 297 - 16 - 1; // 1mm de holgura para evitar salto de página
     const GAP = 3;
     const PAD = 4;
     const cellW = (PAGE_W - GAP * (layout.cols - 1)) / layout.cols;
@@ -242,7 +242,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         html, body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
         .sheet {
           width: ${PAGE_W}mm;
-          height: ${(PAGE_H - 1).toFixed(2)}mm;
+          height: ${PAGE_H.toFixed(2)}mm;
           display: grid;
           grid-template-columns: repeat(${layout.cols}, ${cellW.toFixed(2)}mm);
           grid-template-rows: repeat(${layout.rows}, ${cellH.toFixed(2)}mm);
