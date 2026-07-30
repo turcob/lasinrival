@@ -1,33 +1,24 @@
-## Respuesta al punto 4 (verificado en código)
+## Mejoras al diálogo de Impresión de Precios
 
-`addToCart` en `src/pages/POS.tsx` (L556) **ya incrementa cantidad** si el producto existe: busca `prev.find(item => item.producto?.id === producto.id && !item.es_temporal)` y, si lo encuentra, hace `cantidad + 1` recalculando subtotal, sin reordenar ni duplicar línea. No hay que cambiar esa lógica.
+Todo front-end, en `src/components/productos/ImprimirPreciosDialog.tsx`.
 
-Salvedad: si el producto es por peso (KG/KILO) y el modo NO es `mostrador`, en vez de sumar abre el diálogo de peso (`setPesoDialogOpen(true)`) sobre la línea existente. En modo mostrador (`modoPos === 'mostrador'`) salta ese prompt y suma directo. Esto se mantiene tal cual: el escaneo reutiliza `addToCart`, así que hereda ese comportamiento.
+### 1. Cantidad de copias por ítem
+- Agregar campo `copias: number` (default 1) a la interfaz `Cartel`.
+- En el panel derecho, cada cartel suma un input numérico "Copias" (min 1, max 100) junto a Entero / Decimales / Unidad.
+- Al imprimir, cada cartel se expande a `copias` celdas consecutivas antes de paginar por N por hoja.
+- El contador del header pasa a mostrar carteles y total de etiquetas (ej. "3 carteles · 12 etiquetas").
 
-En el modal, el click en un resultado llama `handleProductSelectedFromModal` → abre `ProductQuantityModal` → `handleConfirmProductQuantity`, que también suma sobre la línea existente. Para el escaneo dentro del modal, el plan usa `onSelectProduct` (la misma función de alta que el click), respetando la consigna.
+### 2. Búsqueda por código de barra
+- Sumar `codigo_barra` al `select` de productos y a la interfaz `ProductoRow`.
+- Incluirlo en el filtro de texto (además de código de artículo y descripción).
+- Si el término coincide exactamente con un `codigo_barra`, ese producto se ordena primero en la lista filtrada.
 
-## Cambios (front-end únicamente)
+### 3. Tamaño aproximado por etiqueta en el selector
+- Calcular en base al área imprimible A4 con márgenes 8mm y gap 3mm:
+  ancho = (194 − 3·(cols−1)) / cols, alto = (280 − 3·(rows−1)) / rows.
+- Mostrar en cada opción del select: `4 por hoja (95 × 138 mm)`, etc., redondeado a mm enteros.
+- Se calcula desde la misma constante `LAYOUTS` que usa la impresión, para que nunca se desincronice.
 
-### 1. `src/pages/POS.tsx`
-- `interface Producto` (L70): agregar `codigo_barra?: string | null`.
-- `fetchData` (L436): agregar `codigo_barra` al `select` de `productos`.
-- `filteredProductos` (L487) y `totalResults` (L497): sumar `(p.codigo_barra || '').toLowerCase().includes(term)` al filtro OR existente. Sin otros cambios de comportamiento.
-- Nuevo helper `buscarPorCodigoExacto(term)`: sobre `productos` (ya filtrados por `activo`), devuelve los que cumplen igualdad exacta (case-insensitive, trim) contra `codigo_barra` o `codigo_articulo`.
-- Nuevo `searchInputRef` en el `Input` de búsqueda (L2630) + `onKeyDown`:
-  - `Enter` → `preventDefault`; toma `searchTerm.trim()`; si vacío, no hace nada.
-  - 1 match exacto → `addToCart(producto)` (misma función que el click en resultado inline; ya suma cantidad si existe). `addToCart` limpia `searchTerm` y `showAllResults`; luego refoco al input con `setTimeout(..., 0)`.
-  - >1 match → no agrega nada; deja el término y la lista filtrada visible.
-  - 0 match → `toast.error('Producto no encontrado')`, sin limpiar el input.
-  - Enter nunca agrega resultados de la búsqueda por texto.
-
-### 2. `src/components/pos/ProductSearchModal.tsx`
-- `interface Producto`: agregar `codigo_barra?: string | null` (recibe productos por props, sin query propia).
-- `filteredProductos` (L53): sumar `codigo_barra` al `includes`.
-- `ref` en el `Input` (L93) + `onKeyDown` con la misma lógica de match exacto: 1 → `onSelectProduct(producto)` (idéntico al click en la tarjeta), limpiar `searchTerm` y refocar; >1 → dejar lista filtrada; 0 → `toast.error('Producto no encontrado')`.
-- Requiere importar `toast` de `sonner` y `useRef`.
-
-## Fuera de alcance (confirmado)
-Sin migraciones, sin tocar `pos_registrar_venta`, sin cambios de estilos/layout ni remitos, sin librerías de scanner, sin tocar `NuevoPedidoDialog.tsx`.
-
-## Nota
-Existen 2 códigos de barra duplicados (4 productos). Con el match exacto múltiple el flujo cae en el caso ">1" y el usuario elige de la lista, como pediste.
+### Notas técnicas
+- La lógica de escalado de precio y nombre (3 renglones, auto-achique) queda intacta.
+- El precio y el layout de la hoja no cambian; sólo se altera la cantidad de celdas generadas.
