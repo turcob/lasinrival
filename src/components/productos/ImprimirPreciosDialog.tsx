@@ -205,6 +205,11 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
   const layout = LAYOUTS[porHoja] || LAYOUTS[4];
 
+  const totalEtiquetas = useMemo(
+    () => seleccionados.reduce((acc, c) => acc + Math.max(1, Math.floor(Number(c.copias) || 1)), 0),
+    [seleccionados],
+  );
+
   const imprimir = () => {
     if (seleccionados.length === 0) {
       toast.error('No hay carteles para imprimir');
