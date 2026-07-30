@@ -342,7 +342,9 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(LAYOUTS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                        <SelectItem key={k} value={k}>
+                          {v.label} · {tamanoEtiqueta(v.cols, v.rows)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -387,7 +389,10 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
           {/* Carteles seleccionados (editables) */}
           <div className="flex flex-col border rounded-md overflow-hidden">
             <div className="p-3 border-b flex items-center justify-between">
-              <div className="text-sm font-medium">Carteles ({seleccionados.length})</div>
+              <div className="text-sm font-medium">
+                Carteles ({seleccionados.length})
+                {totalEtiquetas !== seleccionados.length && ` · ${totalEtiquetas} etiquetas`}
+              </div>
               <Button size="sm" onClick={imprimir} disabled={seleccionados.length === 0}>
                 <Printer className="h-4 w-4 mr-1" /> Imprimir
               </Button>
@@ -411,7 +416,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div>
                           <Label className="text-xs">$ Entero</Label>
                           <Input value={c.precioEntero} onChange={e => updateCartel(c.id, { precioEntero: e.target.value })} />
@@ -423,6 +428,19 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                         <div>
                           <Label className="text-xs">Unidad</Label>
                           <Input value={c.unidad} placeholder="x 1 KG" onChange={e => updateCartel(c.id, { unidad: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Copias</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={c.copias}
+                            onChange={e => {
+                              const n = Math.max(1, Math.min(100, Math.floor(Number(e.target.value) || 1)));
+                              updateCartel(c.id, { copias: n });
+                            }}
+                          />
                         </div>
                       </div>
                     </li>
