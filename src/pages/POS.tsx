@@ -196,6 +196,7 @@ export default function POS() {
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showAllResults, setShowAllResults] = useState(false);
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
