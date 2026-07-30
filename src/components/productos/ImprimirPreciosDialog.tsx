@@ -205,7 +205,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
     const innerH = cellH - PAD * 2 - 2;
 
     const logoMm = Math.min(innerH * 0.18, 22);
-    const nombreMm = Math.max(3, Math.min(innerH * 0.09, 12));
+    const nombreBaseMm = Math.max(3, Math.min(innerH * 0.09, 12));
 
     const cells = seleccionados
       .map(c => {
@@ -217,16 +217,23 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         const byWidth = (innerW * 0.96) / emWidth;
         const byHeight = innerH * 0.42;
         const enteroMm = Math.max(4, Math.min(byWidth, byHeight));
+        // El nombre se achica y usa hasta 3 renglones para entrar completo
+        const nombre = c.nombre || '';
+        const LINEAS = 3;
+        // caracteres que entran por renglón a tamaño base (Arial bold ≈ 0.55em por caracter)
+        const capBase = (innerW / (nombreBaseMm * 0.55)) * LINEAS;
+        const factor = nombre.length > capBase ? Math.sqrt(capBase / nombre.length) : 1;
+        const nombreMm = Math.max(2.2, nombreBaseMm * factor);
         return `
       <div class="cartel">
         <div class="logo"><img src="/logo-empresa.jpg" alt="Logo" /></div>
-        <div class="nombre">${escapeHtml(c.nombre)}</div>
+        <div class="nombre" style="font-size:${nombreMm.toFixed(2)}mm">${escapeHtml(nombre)}</div>
         <div class="precio-row" style="font-size:${enteroMm.toFixed(2)}mm">
           <span class="signo">$</span><span class="entero">${escapeHtml(enteroTxt)}</span>${
             decTxt ? `<span class="decimal">${escapeHtml(decTxt)}</span>` : ''
           }
         </div>
-        ${c.unidad ? `<div class="unidad">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
+        ${c.unidad ? `<div class="unidad" style="font-size:${(nombreMm * 0.8).toFixed(2)}mm">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
       </div>`;
       });
 
@@ -266,15 +273,15 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         .logo { width:100%; height:${logoMm.toFixed(2)}mm; display:flex; align-items:center; justify-content:center; }
         .logo img { max-height:100%; max-width: 70%; object-fit:contain; }
         .nombre {
-          font-weight: 800; font-size: ${nombreMm.toFixed(2)}mm; line-height:1.1;
+          font-weight: 800; line-height:1.12;
           width:100%; overflow:hidden; word-break:break-word;
-          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+          display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
         }
         .precio-row { display:flex; align-items:flex-start; justify-content:center; line-height:1; width:100%; }
         .signo { font-weight:900; font-size:0.45em; margin-right:0.06em; margin-top:0.12em; }
         .entero { font-weight:900; font-size:1em; letter-spacing:-0.02em; line-height:1; }
         .decimal { font-weight:900; font-size:0.42em; margin-left:0.04em; margin-top:0.08em; line-height:1; }
-        .unidad { font-weight:700; font-size:${(nombreMm * 0.8).toFixed(2)}mm; min-height:${(nombreMm * 0.9).toFixed(2)}mm; }
+        .unidad { font-weight:700; font-size:${(nombreBaseMm * 0.8).toFixed(2)}mm; min-height:${(nombreBaseMm * 0.9).toFixed(2)}mm; }
       </style></head><body>
       ${pagesHtml.join('')}
       <script>window.onload=()=>{setTimeout(()=>{window.focus();window.print();},400);}<\/script>
