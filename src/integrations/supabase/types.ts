@@ -4010,6 +4010,7 @@ export type Database = {
       }
       transferencias: {
         Row: {
+          banco: string | null
           cliente_id: string | null
           cliente_movimiento_id: string | null
           cobro_id: string | null
@@ -4034,6 +4035,7 @@ export type Database = {
           venta_id: string | null
         }
         Insert: {
+          banco?: string | null
           cliente_id?: string | null
           cliente_movimiento_id?: string | null
           cobro_id?: string | null
@@ -4058,6 +4060,7 @@ export type Database = {
           venta_id?: string | null
         }
         Update: {
+          banco?: string | null
           cliente_id?: string | null
           cliente_movimiento_id?: string | null
           cobro_id?: string | null

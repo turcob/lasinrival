@@ -1,0 +1,1 @@
+ALTER TABLE public.transferencias ADD COLUMN IF NOT EXISTS banco text;
