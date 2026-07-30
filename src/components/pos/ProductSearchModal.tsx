@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ interface Producto {
   precio_costo: number;
   marca_id?: string | null;
   tipo_producto_id?: string | null;
+  codigo_barra?: string | null;
 }
 
 interface ProductSearchModalProps {
@@ -49,6 +51,7 @@ export function ProductSearchModal({
 }: ProductSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const filteredProductos = useMemo(() => {
     if (!searchTerm) return productos;
@@ -56,7 +59,8 @@ export function ProductSearchModal({
     return productos.filter(
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term)
+        p.descripcion.toLowerCase().includes(term) ||
+        (p.codigo_barra || '').toLowerCase().includes(term)
     );
   }, [productos, searchTerm]);
 
@@ -75,6 +79,26 @@ export function ProductSearchModal({
     onOpenChange(false);
   };
 
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const code = searchTerm.trim().toLowerCase();
+    if (!code) return;
+    const matches = productos.filter(
+      (p) =>
+        (p.codigo_barra || '').trim().toLowerCase() === code ||
+        (p.codigo_articulo || '').trim().toLowerCase() === code
+    );
+    if (matches.length === 1) {
+      handleSelectProduct(matches[0]);
+      setSearchTerm('');
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    } else if (matches.length === 0) {
+      toast.error('Producto no encontrado');
+    }
+    // Más de 1 coincidencia: no agregar, dejar la lista filtrada visible
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
@@ -91,10 +115,12 @@ export function ProductSearchModal({
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               className="pl-10"
               placeholder="Buscar por código o descripción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               autoFocus
             />
           </div>
