@@ -193,38 +193,84 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       toast.error('No se pudo abrir la ventana de impresión');
       return;
     }
+
+    // Área imprimible A4 con márgenes de 8mm
+    const PAGE_W = 210 - 16;
+    const PAGE_H = 297 - 16;
+    const GAP = 3;
+    const PAD = 4;
+    const cellW = (PAGE_W - GAP * (layout.cols - 1)) / layout.cols;
+    const cellH = (PAGE_H - GAP * (layout.rows - 1)) / layout.rows;
+    const innerW = cellW - PAD * 2 - 2; // menos bordes
+    const innerH = cellH - PAD * 2 - 2;
+
+    const logoMm = Math.min(innerH * 0.18, 22);
+    const nombreMm = Math.max(3, Math.min(innerH * 0.09, 12));
+
     const cells = seleccionados
-      .map(
-        c => `
+      .map(c => {
+        const enteroTxt = formatMiles(c.precioEntero);
+        const decTxt = (c.precioDecimal || '').slice(0, 2);
+        // Ancho aproximado en "em" del bloque de precio (Arial bold ≈ 0.62em por dígito)
+        const emWidth =
+          0.62 * enteroTxt.length + 0.45 * 0.62 + 0.12 + (decTxt ? 0.42 * 0.62 * decTxt.length + 0.08 : 0);
+        const byWidth = (innerW * 0.96) / emWidth;
+        const byHeight = innerH * 0.42;
+        const enteroMm = Math.max(4, Math.min(byWidth, byHeight));
+        return `
       <div class="cartel">
         <div class="logo"><img src="/logo-empresa.jpg" alt="Logo" /></div>
         <div class="nombre">${escapeHtml(c.nombre)}</div>
-        <div class="precio-row">
-          <span class="signo">$</span>
-          <span class="entero">${escapeHtml(formatMiles(c.precioEntero))}</span><sup class="decimal">${escapeHtml(c.precioDecimal)}</sup>
+        <div class="precio-row" style="font-size:${enteroMm.toFixed(2)}mm">
+          <span class="signo">$</span><span class="entero">${escapeHtml(enteroTxt)}</span>${
+            decTxt ? `<span class="decimal">${escapeHtml(decTxt)}</span>` : ''
+          }
         </div>
-      </div>`,
-      )
+        ${c.unidad ? `<div class="unidad">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
+      </div>`;
+      })
       .join('');
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carteles de Precios</title>
       <style>
         @page { size: A4; margin: 8mm; }
         * { box-sizing: border-box; }
-        body { margin:0; font-family: Arial, Helvetica, sans-serif; }
-        .sheet { display:grid; grid-template-columns: repeat(${layout.cols}, 1fr); grid-auto-rows: ${(277 / layout.rows).toFixed(2)}mm; gap: 3mm; }
-        .cartel { border: 3px solid #4ade80; padding: 6mm; display:flex; flex-direction:column; justify-content:space-between; align-items:center; text-align:center; overflow:hidden; page-break-inside:avoid; }
-        .logo { width:100%; display:flex; justify-content:center; }
-        .logo img { max-height: ${logoH(porHoja)}; max-width: 80%; object-fit:contain; }
-        .nombre { font-weight: 800; font-size: ${nombreFs(porHoja)}; line-height:1.1; word-wrap:break-word; }
-        .precio-row { display:flex; align-items:flex-start; justify-content:center; line-height:1; margin: 2mm 0; }
-        .signo { font-weight:900; font-size: ${signoFs(porHoja)}; margin-right: 4mm; }
-        .entero { font-weight:900; font-size: ${enteroFs(porHoja)}; letter-spacing:-2px; line-height:1; }
-        .decimal { font-weight:900; font-size: ${decimalFs(porHoja)}; margin-left:3mm; line-height:1; align-self:flex-start; }
-        .sheet { page-break-after: always; }
+        html, body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
+        .sheet {
+          width: ${PAGE_W}mm;
+          height: ${PAGE_H}mm;
+          display: grid;
+          grid-template-columns: repeat(${layout.cols}, ${cellW.toFixed(2)}mm);
+          grid-template-rows: repeat(${layout.rows}, ${cellH.toFixed(2)}mm);
+          gap: ${GAP}mm;
+          align-content: start;
+          overflow: hidden;
+          page-break-after: always;
+          break-after: page;
+        }
+        .sheet:last-child { page-break-after: auto; break-after: auto; }
+        .cartel {
+          border: 1mm solid #4ade80;
+          padding: ${PAD}mm;
+          display:flex; flex-direction:column; justify-content:space-between; align-items:center;
+          text-align:center; overflow:hidden;
+          page-break-inside:avoid; break-inside:avoid;
+        }
+        .logo { width:100%; height:${logoMm.toFixed(2)}mm; display:flex; align-items:center; justify-content:center; }
+        .logo img { max-height:100%; max-width: 70%; object-fit:contain; }
+        .nombre {
+          font-weight: 800; font-size: ${nombreMm.toFixed(2)}mm; line-height:1.1;
+          width:100%; overflow:hidden; word-break:break-word;
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+        }
+        .precio-row { display:flex; align-items:flex-start; justify-content:center; line-height:1; width:100%; }
+        .signo { font-weight:900; font-size:0.45em; margin-right:0.06em; margin-top:0.12em; }
+        .entero { font-weight:900; font-size:1em; letter-spacing:-0.02em; line-height:1; }
+        .decimal { font-weight:900; font-size:0.42em; margin-left:0.04em; margin-top:0.08em; line-height:1; }
+        .unidad { font-weight:700; font-size:${(nombreMm * 0.8).toFixed(2)}mm; min-height:${(nombreMm * 0.9).toFixed(2)}mm; }
       </style></head><body>
       ${chunkPages(cells, porHoja)}
-      <script>window.onload=()=>{setTimeout(()=>{window.focus();window.print();},300);}<\/script>
+      <script>window.onload=()=>{setTimeout(()=>{window.focus();window.print();},400);}<\/script>
       </body></html>`);
     w.document.close();
   };
@@ -368,24 +414,6 @@ function chunkPages(cellsHtml: string, perPage: number) {
   return pages.join('');
 }
 
-function nombreFs(n: number) {
-  return ({ 1: '60pt', 2: '40pt', 4: '24pt', 6: '18pt', 8: '14pt', 9: '14pt' } as Record<number, string>)[n] || '20pt';
-}
-function signoFs(n: number) {
-  return ({ 1: '120pt', 2: '90pt', 4: '60pt', 6: '46pt', 8: '36pt', 9: '32pt' } as Record<number, string>)[n] || '50pt';
-}
-function enteroFs(n: number) {
-  return ({ 1: '220pt', 2: '160pt', 4: '110pt', 6: '80pt', 8: '64pt', 9: '56pt' } as Record<number, string>)[n] || '90pt';
-}
-function decimalFs(n: number) {
-  return ({ 1: '90pt', 2: '60pt', 4: '40pt', 6: '32pt', 8: '24pt', 9: '22pt' } as Record<number, string>)[n] || '36pt';
-}
-function unidadFs(n: number) {
-  return ({ 1: '40pt', 2: '28pt', 4: '20pt', 6: '16pt', 8: '12pt', 9: '12pt' } as Record<number, string>)[n] || '16pt';
-}
-function logoH(n: number) {
-  return ({ 1: '60mm', 2: '40mm', 4: '25mm', 6: '20mm', 8: '16mm', 9: '14mm' } as Record<number, string>)[n] || '20mm';
-}
 function formatMiles(s: string) {
   const neg = s.startsWith('-');
   const digits = s.replace(/[^0-9]/g, '');
