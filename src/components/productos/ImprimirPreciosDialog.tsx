@@ -196,7 +196,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
     // Área imprimible A4 con márgenes de 8mm
     const PAGE_W = 210 - 16;
-    const PAGE_H = 297 - 16;
+    const PAGE_H = 297 - 16 - 1; // 1mm de holgura para evitar salto de página
     const GAP = 3;
     const PAD = 4;
     const cellW = (PAGE_W - GAP * (layout.cols - 1)) / layout.cols;
@@ -228,8 +228,12 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         </div>
         ${c.unidad ? `<div class="unidad">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
       </div>`;
-      })
-      .join('');
+      });
+
+    const pagesHtml: string[] = [];
+    for (let i = 0; i < cells.length; i += porHoja) {
+      pagesHtml.push(`<div class="sheet">${cells.slice(i, i + porHoja).join('')}</div>`);
+    }
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carteles de Precios</title>
       <style>
@@ -238,15 +242,18 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         html, body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
         .sheet {
           width: ${PAGE_W}mm;
-          height: ${PAGE_H}mm;
+          height: ${PAGE_H.toFixed(2)}mm;
           display: grid;
           grid-template-columns: repeat(${layout.cols}, ${cellW.toFixed(2)}mm);
           grid-template-rows: repeat(${layout.rows}, ${cellH.toFixed(2)}mm);
           gap: ${GAP}mm;
           align-content: start;
+          justify-content: start;
           overflow: hidden;
           page-break-after: always;
           break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .sheet:last-child { page-break-after: auto; break-after: auto; }
         .cartel {
@@ -269,7 +276,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         .decimal { font-weight:900; font-size:0.42em; margin-left:0.04em; margin-top:0.08em; line-height:1; }
         .unidad { font-weight:700; font-size:${(nombreMm * 0.8).toFixed(2)}mm; min-height:${(nombreMm * 0.9).toFixed(2)}mm; }
       </style></head><body>
-      ${chunkPages(cells, porHoja)}
+      ${pagesHtml.join('')}
       <script>window.onload=()=>{setTimeout(()=>{window.focus();window.print();},400);}<\/script>
       </body></html>`);
     w.document.close();
@@ -402,16 +409,6 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-}
-
-function chunkPages(cellsHtml: string, perPage: number) {
-  // split cellsHtml by occurrences of <div class="cartel">
-  const parts = cellsHtml.split(/(?=<div class="cartel">)/g).filter(Boolean);
-  const pages: string[] = [];
-  for (let i = 0; i < parts.length; i += perPage) {
-    pages.push(`<div class="sheet">${parts.slice(i, i + perPage).join('')}</div>`);
-  }
-  return pages.join('');
 }
 
 function formatMiles(s: string) {
