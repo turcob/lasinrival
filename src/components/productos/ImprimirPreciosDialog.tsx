@@ -25,6 +25,7 @@ interface Props {
 interface ProductoRow {
   id: string;
   codigo_articulo: string;
+  codigo_barra: string | null;
   descripcion: string;
   precio_costo: number;
   marca_id: string | null;
@@ -38,6 +39,7 @@ interface Cartel {
   precioEntero: string;
   precioDecimal: string;
   unidad: string;
+  copias: number;
 }
 
 const LAYOUTS: Record<number, { cols: number; rows: number; label: string }> = {
@@ -48,6 +50,17 @@ const LAYOUTS: Record<number, { cols: number; rows: number; label: string }> = {
   8: { cols: 2, rows: 4, label: '8 por hoja' },
   9: { cols: 3, rows: 3, label: '9 por hoja' },
 };
+
+// Área imprimible A4 con márgenes de 8mm y gap de 3mm
+const AREA_W = 210 - 16;
+const AREA_H = 297 - 16 - 1;
+const GAP_MM = 3;
+
+function tamanoEtiqueta(cols: number, rows: number) {
+  const w = (AREA_W - GAP_MM * (cols - 1)) / cols;
+  const h = (AREA_H - GAP_MM * (rows - 1)) / rows;
+  return `${Math.round(w)} × ${Math.round(h)} mm`;
+}
 
 export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
@@ -75,7 +88,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       while (true) {
         const { data, error } = await supabase
           .from('productos')
-          .select('id, codigo_articulo, descripcion, precio_costo, marca_id, tipo_producto_id, unidad_medida')
+          .select('id, codigo_articulo, codigo_barra, descripcion, precio_costo, marca_id, tipo_producto_id, unidad_medida')
           .eq('activo', true)
           .order('descripcion')
           .range(from, from + size - 1);
@@ -111,9 +124,17 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       ? productos.filter(
           p =>
             p.codigo_articulo?.toLowerCase().includes(q) ||
+            p.codigo_barra?.toLowerCase().includes(q) ||
             p.descripcion?.toLowerCase().includes(q),
         )
       : productos;
+    if (q) {
+      const exactos = base.filter(p => p.codigo_barra?.toLowerCase() === q);
+      if (exactos.length) {
+        const restantes = base.filter(p => p.codigo_barra?.toLowerCase() !== q);
+        return [...exactos, ...restantes].slice(0, 200);
+      }
+    }
     return base.slice(0, 200);
   }, [productos, search]);
 
@@ -146,6 +167,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
           precioEntero: entero,
           precioDecimal: dec,
           unidad: p.unidad_medida === 'KG' ? 'x 1 KG' : '',
+          copias: 1,
         },
       ]);
     } else {
@@ -183,6 +205,11 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
   const layout = LAYOUTS[porHoja] || LAYOUTS[4];
 
+  const totalEtiquetas = useMemo(
+    () => seleccionados.reduce((acc, c) => acc + Math.max(1, Math.floor(Number(c.copias) || 1)), 0),
+    [seleccionados],
+  );
+
   const imprimir = () => {
     if (seleccionados.length === 0) {
       toast.error('No hay carteles para imprimir');
@@ -208,7 +235,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
     const nombreBaseMm = Math.max(3, Math.min(innerH * 0.09, 12));
 
     const cells = seleccionados
-      .map(c => {
+      .flatMap(c => {
         const enteroTxt = formatMiles(c.precioEntero);
         const decTxt = (c.precioDecimal || '').slice(0, 2);
         // Ancho aproximado en "em" del bloque de precio (Arial bold ≈ 0.62em por dígito)
@@ -224,7 +251,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         const capBase = (innerW / (nombreBaseMm * 0.55)) * LINEAS;
         const factor = nombre.length > capBase ? Math.sqrt(capBase / nombre.length) : 1;
         const nombreMm = Math.max(2.2, nombreBaseMm * factor);
-        return `
+        const html = `
       <div class="cartel">
         <div class="logo"><img src="/logo-empresa.jpg" alt="Logo" /></div>
         <div class="nombre" style="font-size:${nombreMm.toFixed(2)}mm">${escapeHtml(nombre)}</div>
@@ -235,6 +262,8 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         </div>
         ${c.unidad ? `<div class="unidad" style="font-size:${(nombreMm * 0.8).toFixed(2)}mm">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
       </div>`;
+        const copias = Math.max(1, Math.min(100, Math.floor(Number(c.copias) || 1)));
+        return Array.from({ length: copias }, () => html);
       });
 
     const pagesHtml: string[] = [];
@@ -318,7 +347,9 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(LAYOUTS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                        <SelectItem key={k} value={k}>
+                          {v.label} · {tamanoEtiqueta(v.cols, v.rows)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -363,7 +394,10 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
           {/* Carteles seleccionados (editables) */}
           <div className="flex flex-col border rounded-md overflow-hidden">
             <div className="p-3 border-b flex items-center justify-between">
-              <div className="text-sm font-medium">Carteles ({seleccionados.length})</div>
+              <div className="text-sm font-medium">
+                Carteles ({seleccionados.length})
+                {totalEtiquetas !== seleccionados.length && ` · ${totalEtiquetas} etiquetas`}
+              </div>
               <Button size="sm" onClick={imprimir} disabled={seleccionados.length === 0}>
                 <Printer className="h-4 w-4 mr-1" /> Imprimir
               </Button>
@@ -387,7 +421,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div>
                           <Label className="text-xs">$ Entero</Label>
                           <Input value={c.precioEntero} onChange={e => updateCartel(c.id, { precioEntero: e.target.value })} />
@@ -399,6 +433,19 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
                         <div>
                           <Label className="text-xs">Unidad</Label>
                           <Input value={c.unidad} placeholder="x 1 KG" onChange={e => updateCartel(c.id, { unidad: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Copias</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={c.copias}
+                            onChange={e => {
+                              const n = Math.max(1, Math.min(100, Math.floor(Number(e.target.value) || 1)));
+                              updateCartel(c.id, { copias: n });
+                            }}
+                          />
                         </div>
                       </div>
                     </li>
