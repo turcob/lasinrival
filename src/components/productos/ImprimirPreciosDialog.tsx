@@ -230,7 +230,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
     const nombreBaseMm = Math.max(3, Math.min(innerH * 0.09, 12));
 
     const cells = seleccionados
-      .map(c => {
+      .flatMap(c => {
         const enteroTxt = formatMiles(c.precioEntero);
         const decTxt = (c.precioDecimal || '').slice(0, 2);
         // Ancho aproximado en "em" del bloque de precio (Arial bold ≈ 0.62em por dígito)
@@ -246,7 +246,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         const capBase = (innerW / (nombreBaseMm * 0.55)) * LINEAS;
         const factor = nombre.length > capBase ? Math.sqrt(capBase / nombre.length) : 1;
         const nombreMm = Math.max(2.2, nombreBaseMm * factor);
-        return `
+        const html = `
       <div class="cartel">
         <div class="logo"><img src="/logo-empresa.jpg" alt="Logo" /></div>
         <div class="nombre" style="font-size:${nombreMm.toFixed(2)}mm">${escapeHtml(nombre)}</div>
@@ -257,6 +257,8 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         </div>
         ${c.unidad ? `<div class="unidad" style="font-size:${(nombreMm * 0.8).toFixed(2)}mm">${escapeHtml(c.unidad)}</div>` : '<div class="unidad"></div>'}
       </div>`;
+        const copias = Math.max(1, Math.min(100, Math.floor(Number(c.copias) || 1)));
+        return Array.from({ length: copias }, () => html);
       });
 
     const pagesHtml: string[] = [];
