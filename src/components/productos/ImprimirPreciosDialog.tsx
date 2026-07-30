@@ -414,24 +414,6 @@ function chunkPages(cellsHtml: string, perPage: number) {
   return pages.join('');
 }
 
-function nombreFs(n: number) {
-  return ({ 1: '60pt', 2: '40pt', 4: '24pt', 6: '18pt', 8: '14pt', 9: '14pt' } as Record<number, string>)[n] || '20pt';
-}
-function signoFs(n: number) {
-  return ({ 1: '120pt', 2: '90pt', 4: '60pt', 6: '46pt', 8: '36pt', 9: '32pt' } as Record<number, string>)[n] || '50pt';
-}
-function enteroFs(n: number) {
-  return ({ 1: '220pt', 2: '160pt', 4: '110pt', 6: '80pt', 8: '64pt', 9: '56pt' } as Record<number, string>)[n] || '90pt';
-}
-function decimalFs(n: number) {
-  return ({ 1: '90pt', 2: '60pt', 4: '40pt', 6: '32pt', 8: '24pt', 9: '22pt' } as Record<number, string>)[n] || '36pt';
-}
-function unidadFs(n: number) {
-  return ({ 1: '40pt', 2: '28pt', 4: '20pt', 6: '16pt', 8: '12pt', 9: '12pt' } as Record<number, string>)[n] || '16pt';
-}
-function logoH(n: number) {
-  return ({ 1: '60mm', 2: '40mm', 4: '25mm', 6: '20mm', 8: '16mm', 9: '14mm' } as Record<number, string>)[n] || '20mm';
-}
 function formatMiles(s: string) {
   const neg = s.startsWith('-');
   const digits = s.replace(/[^0-9]/g, '');
