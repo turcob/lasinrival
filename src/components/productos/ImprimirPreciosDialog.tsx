@@ -25,6 +25,7 @@ interface Props {
 interface ProductoRow {
   id: string;
   codigo_articulo: string;
+  codigo_barra: string | null;
   descripcion: string;
   precio_costo: number;
   marca_id: string | null;
@@ -38,6 +39,7 @@ interface Cartel {
   precioEntero: string;
   precioDecimal: string;
   unidad: string;
+  copias: number;
 }
 
 const LAYOUTS: Record<number, { cols: number; rows: number; label: string }> = {
@@ -48,6 +50,17 @@ const LAYOUTS: Record<number, { cols: number; rows: number; label: string }> = {
   8: { cols: 2, rows: 4, label: '8 por hoja' },
   9: { cols: 3, rows: 3, label: '9 por hoja' },
 };
+
+// Área imprimible A4 con márgenes de 8mm y gap de 3mm
+const AREA_W = 210 - 16;
+const AREA_H = 297 - 16 - 1;
+const GAP_MM = 3;
+
+function tamanoEtiqueta(cols: number, rows: number) {
+  const w = (AREA_W - GAP_MM * (cols - 1)) / cols;
+  const h = (AREA_H - GAP_MM * (rows - 1)) / rows;
+  return `${Math.round(w)} × ${Math.round(h)} mm`;
+}
 
 export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
