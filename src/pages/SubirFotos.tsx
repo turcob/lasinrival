@@ -397,6 +397,19 @@ export default function SubirFotos() {
       </header>
 
       <main className="max-w-md mx-auto p-3">
+        <div className="flex gap-1 mb-3 overflow-x-auto">
+          {RANGOS.map((r) => (
+            <Button
+              key={r.value}
+              size="sm"
+              variant={rango === r.value ? 'default' : 'outline'}
+              className="shrink-0"
+              onClick={() => setRango(r.value)}
+            >
+              {r.label}
+            </Button>
+          ))}
+        </div>
         <Tabs defaultValue="sin" className="w-full">
           <TabsList className={`grid ${puedeValidar ? 'grid-cols-3' : 'grid-cols-2'} w-full`}>
             <TabsTrigger value="sin">Sin comprobante ({sinFoto.length})</TabsTrigger>
@@ -507,7 +520,7 @@ export default function SubirFotos() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -532,6 +545,18 @@ export default function SubirFotos() {
             <div className="flex justify-center items-center min-h-[300px] bg-muted/30 rounded">
               {previewLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
+              ) : previewUrl && esPdf(previewFila?.transferencia.foto_comprobante_nombre, null) ? (
+                <div className="w-full">
+                  <iframe src={previewUrl} title="Comprobante PDF" className="w-full h-[55vh] rounded border-0" />
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 text-sm text-primary py-3 underline"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Abrir en pestaña nueva
+                  </a>
+                </div>
               ) : previewUrl ? (
                 <img src={previewUrl} alt="Comprobante" className="max-w-full max-h-[60vh] object-contain" />
               ) : (
