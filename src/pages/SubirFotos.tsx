@@ -605,7 +605,9 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               </Badge>
               {conFoto && (
                 <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 border-green-500/30">
-                  <CheckCircle2 className="h-3 w-3 mr-1" /> Adjuntado
+                  {esPdf(t.foto_comprobante_nombre, null)
+                    ? <><FileText className="h-3 w-3 mr-1" /> PDF</>
+                    : <><CheckCircle2 className="h-3 w-3 mr-1" /> Adjuntado</>}
                 </Badge>
               )}
               {analizando && (
@@ -649,7 +651,7 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
             {loading ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Subiendo...</>
             ) : (
-              <><Camera className="h-4 w-4 mr-2" /> Subir foto</>
+              <><Camera className="h-4 w-4 mr-2" /> Subir comprobante (foto o PDF)</>
             )}
           </Button>
         )}
