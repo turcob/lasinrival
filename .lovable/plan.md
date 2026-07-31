@@ -25,3 +25,9 @@ Hoy la pantalla de subida de comprobantes sólo acepta imágenes. Se agrega sopo
 - `src/pages/SubirFotos.tsx`: `accept` del input, detección de tipo por `file.type`/extensión, extensión dinámica en el path, render condicional de la preview (`<iframe>`/`<object>` + link firmado), y el flujo de OCR aceptando `application/pdf`.
 - `src/lib/nativeCamera.ts`: sin cambios funcionales obligatorios; el fallback web ya cubre PDF.
 - Sin cambios de base de datos ni de RLS: el bucket `comprobantes-cobros` ya acepta cualquier archivo y la RPC solo guarda path y nombre.
+
+## Filtro rápido de rango temporal
+
+- Se agrega un selector de rango arriba del listado: **Última hora** (por defecto para reducir ruido), Hoy, 7 días, 60 días.
+- El filtro se aplica sobre `created_at` de la transferencia en la consulta (no sólo en cliente), manteniendo el tope de 60 días como máximo.
+- Los contadores de las pestañas (Sin comprobante / Con comprobante / Validar) reflejan el rango elegido.
