@@ -582,9 +582,19 @@ interface FilaCardProps {
   onVer?: () => void;
 }
 
+// Evita el corrimiento de un día: "2026-07-31" se parsea como fecha local, no UTC.
+function parseFechaLocal(v?: string | null): Date | null {
+  if (!v) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim());
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer }: FilaCardProps) {
   const { transferencia: t, venta, clienteNombre } = fila;
   const fecha = t.fecha_transferencia || venta?.fecha || t.created_at;
+  const fechaDate = parseFechaLocal(fecha);
   const match = matchStatus(fila);
   return (
     <Card className={conFoto ? 'active:scale-[0.99] transition cursor-pointer' : ''} onClick={conFoto ? onVer : undefined}>
@@ -627,7 +637,7 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {fecha ? format(new Date(fecha), "d MMM yyyy", { locale: es }) : '—'}
+              {fechaDate ? format(fechaDate, "d MMM yyyy", { locale: es }) : '—'}
             </p>
             {t.numero_operacion && (
               <p className="text-[11px] text-muted-foreground">Op. {t.numero_operacion}</p>
