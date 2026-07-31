@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck, FileText, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -57,6 +57,31 @@ interface FilaTransf {
 const money = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n || 0);
 
+const MAX_FILE_MB = 10;
+
+type Rango = '1h' | 'hoy' | '7d' | '60d';
+
+const RANGOS: { value: Rango; label: string }[] = [
+  { value: '1h', label: 'Última hora' },
+  { value: 'hoy', label: 'Hoy' },
+  { value: '7d', label: '7 días' },
+  { value: '60d', label: '60 días' },
+];
+
+const desdeDeRango = (r: Rango): Date => {
+  const d = new Date();
+  if (r === '1h') { d.setHours(d.getHours() - 1); return d; }
+  if (r === 'hoy') { d.setHours(0, 0, 0, 0); return d; }
+  if (r === '7d') { d.setDate(d.getDate() - 7); return d; }
+  d.setDate(d.getDate() - 60);
+  return d;
+};
+
+const esPdf = (nombre?: string | null, tipo?: string | null) => {
+  if (tipo && tipo.toLowerCase().includes('pdf')) return true;
+  return !!nombre && nombre.toLowerCase().endsWith('.pdf');
+};
+
 const estadoBadge = (e: string) => {
   if (e === 'pendiente') return 'bg-amber-500/10 text-amber-700 border-amber-500/30';
   if (e === 'validada') return 'bg-green-500/10 text-green-700 border-green-500/30';
@@ -76,6 +101,7 @@ export default function SubirFotos() {
   const [previewFila, setPreviewFila] = useState<FilaTransf | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [rango, setRango] = useState<Rango>('1h');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFilaRef = useRef<FilaTransf | null>(null);
 
@@ -83,8 +109,7 @@ export default function SubirFotos() {
     if (!user) return;
     setLoadingData(true);
     try {
-      const desde = new Date();
-      desde.setDate(desde.getDate() - 60);
+      const desde = desdeDeRango(rango);
 
       const { data: transfData, error: transfErr } = await supabase
         .from('transferencias')
@@ -158,7 +183,7 @@ export default function SubirFotos() {
   useEffect(() => {
     if (user) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, rango]);
 
   const { sinFoto, conFoto, coincidentes, revisar, pendientesValidar } = useMemo(() => {
     const sf: FilaTransf[] = [];
@@ -196,6 +221,15 @@ export default function SubirFotos() {
     const fila = pendingFilaRef.current;
     pendingFilaRef.current = null;
     if (!file || !fila) return;
+    const pdf = esPdf(file.name, file.type);
+    if (!pdf && !file.type.startsWith('image/')) {
+      toast.error('Sólo se permiten imágenes o PDF');
+      return;
+    }
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      toast.error(`El archivo supera los ${MAX_FILE_MB} MB`);
+      return;
+    }
     await procesarUpload(fila, file);
   };
 
@@ -233,6 +267,7 @@ export default function SubirFotos() {
 
       toast.success('Comprobante adjuntado');
       // Auto-OCR con IA para autocompletar datos sin intervención del usuario.
+      // Si el modelo no puede leer el PDF, la transferencia queda adjuntada igual.
       analizarConIA(transferenciaId, file).catch((e) => {
         console.warn('[SubirFotos] OCR falló', e);
       });
@@ -249,8 +284,11 @@ export default function SubirFotos() {
     setAnalizandoId(transferenciaId);
     try {
       const base64 = await fileToBase64(file);
+      const mimeType = esPdf(file.name, file.type)
+        ? 'application/pdf'
+        : file.type || 'image/jpeg';
       const { data, error } = await supabase.functions.invoke('extraer-numero-operacion', {
-        body: { imageBase64: base64, mimeType: file.type || 'image/jpeg' },
+        body: { imageBase64: base64, mimeType },
       });
       if (error) throw error;
       const r = data as any;
@@ -359,6 +397,19 @@ export default function SubirFotos() {
       </header>
 
       <main className="max-w-md mx-auto p-3">
+        <div className="flex gap-1 mb-3 overflow-x-auto">
+          {RANGOS.map((r) => (
+            <Button
+              key={r.value}
+              size="sm"
+              variant={rango === r.value ? 'default' : 'outline'}
+              className="shrink-0"
+              onClick={() => setRango(r.value)}
+            >
+              {r.label}
+            </Button>
+          ))}
+        </div>
         <Tabs defaultValue="sin" className="w-full">
           <TabsList className={`grid ${puedeValidar ? 'grid-cols-3' : 'grid-cols-2'} w-full`}>
             <TabsTrigger value="sin">Sin comprobante ({sinFoto.length})</TabsTrigger>
@@ -469,7 +520,7 @@ export default function SubirFotos() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -494,6 +545,18 @@ export default function SubirFotos() {
             <div className="flex justify-center items-center min-h-[300px] bg-muted/30 rounded">
               {previewLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
+              ) : previewUrl && esPdf(previewFila?.transferencia.foto_comprobante_nombre, null) ? (
+                <div className="w-full">
+                  <iframe src={previewUrl} title="Comprobante PDF" className="w-full h-[55vh] rounded border-0" />
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 text-sm text-primary py-3 underline"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Abrir en pestaña nueva
+                  </a>
+                </div>
               ) : previewUrl ? (
                 <img src={previewUrl} alt="Comprobante" className="max-w-full max-h-[60vh] object-contain" />
               ) : (
@@ -542,7 +605,9 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               </Badge>
               {conFoto && (
                 <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 border-green-500/30">
-                  <CheckCircle2 className="h-3 w-3 mr-1" /> Adjuntado
+                  {esPdf(t.foto_comprobante_nombre, null)
+                    ? <><FileText className="h-3 w-3 mr-1" /> PDF</>
+                    : <><CheckCircle2 className="h-3 w-3 mr-1" /> Adjuntado</>}
                 </Badge>
               )}
               {analizando && (
@@ -586,7 +651,7 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
             {loading ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Subiendo...</>
             ) : (
-              <><Camera className="h-4 w-4 mr-2" /> Subir foto</>
+              <><Camera className="h-4 w-4 mr-2" /> Subir comprobante (foto o PDF)</>
             )}
           </Button>
         )}
