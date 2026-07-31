@@ -585,6 +585,7 @@ interface FilaCardProps {
 function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer }: FilaCardProps) {
   const { transferencia: t, venta, clienteNombre } = fila;
   const fecha = t.fecha_transferencia || venta?.fecha || t.created_at;
+  const fechaDate = parseFechaLocal(fecha);
   const match = matchStatus(fila);
   return (
     <Card className={conFoto ? 'active:scale-[0.99] transition cursor-pointer' : ''} onClick={conFoto ? onVer : undefined}>
@@ -627,7 +628,7 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {fecha ? format(new Date(fecha), "d MMM yyyy", { locale: es }) : '—'}
+              {fechaDate ? format(fechaDate, "d MMM yyyy", { locale: es }) : '—'}
             </p>
             {t.numero_operacion && (
               <p className="text-[11px] text-muted-foreground">Op. {t.numero_operacion}</p>
