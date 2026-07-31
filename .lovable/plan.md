@@ -1,24 +1,27 @@
-## Mejoras al diálogo de Impresión de Precios
+# Subir PDFs en /subir-fotos
 
-Todo front-end, en `src/components/productos/ImprimirPreciosDialog.tsx`.
+Hoy la pantalla de subida de comprobantes sólo acepta imágenes. Se agrega soporte para PDF.
 
-### 1. Cantidad de copias por ítem
-- Agregar campo `copias: number` (default 1) a la interfaz `Cartel`.
-- En el panel derecho, cada cartel suma un input numérico "Copias" (min 1, max 100) junto a Entero / Decimales / Unidad.
-- Al imprimir, cada cartel se expande a `copias` celdas consecutivas antes de paginar por N por hoja.
-- El contador del header pasa a mostrar carteles y total de etiquetas (ej. "3 carteles · 12 etiquetas").
+## Cambios
 
-### 2. Búsqueda por código de barra
-- Sumar `codigo_barra` al `select` de productos y a la interfaz `ProductoRow`.
-- Incluirlo en el filtro de texto (además de código de artículo y descripción).
-- Si el término coincide exactamente con un `codigo_barra`, ese producto se ordena primero en la lista filtrada.
+1. **Selección de archivo**
+   - El selector acepta `image/*` y `application/pdf`.
+   - Botón con texto adaptado: "Subir comprobante" (foto o PDF). En el APK se mantiene el atajo de cámara nativa, con opción de elegir archivo/PDF si el usuario no toma foto.
+   - Validación de tamaño (máx. ~10 MB) y de tipo antes de subir.
 
-### 3. Tamaño aproximado por etiqueta en el selector
-- Calcular en base al área imprimible A4 con márgenes 8mm y gap 3mm:
-  ancho = (194 − 3·(cols−1)) / cols, alto = (280 − 3·(rows−1)) / rows.
-- Mostrar en cada opción del select: `4 por hoja (95 × 138 mm)`, etc., redondeado a mm enteros.
-- Se calcula desde la misma constante `LAYOUTS` que usa la impresión, para que nunca se desincronice.
+2. **Subida y adjunto**
+   - Misma ruta de storage y misma RPC `adjuntar_comprobante_transferencia`; se conserva la extensión real (`.pdf`) y el `contentType` correcto.
 
-### Notas técnicas
-- La lógica de escalado de precio y nombre (3 renglones, auto-achique) queda intacta.
-- El precio y el layout de la hoja no cambian; sólo se altera la cantidad de celdas generadas.
+3. **Previsualización**
+   - Si el archivo es PDF, en lugar de `<img>` se muestra el PDF embebido (visor del navegador) más un enlace "Abrir en pestaña nueva" con la URL firmada, para móviles que no embeben PDFs.
+   - Las imágenes siguen mostrándose igual.
+
+4. **Lectura automática con IA (OCR)**
+   - Se intenta el análisis también para PDFs enviando el archivo al mismo endpoint de IA.
+   - Si el modelo no puede leer el PDF, no se rompe nada: la transferencia queda adjuntada y los datos se completan manualmente (mismo comportamiento actual cuando el OCR falla). El estado "Analizando IA" desaparece al finalizar.
+
+## Detalles técnicos
+
+- `src/pages/SubirFotos.tsx`: `accept` del input, detección de tipo por `file.type`/extensión, extensión dinámica en el path, render condicional de la preview (`<iframe>`/`<object>` + link firmado), y el flujo de OCR aceptando `application/pdf`.
+- `src/lib/nativeCamera.ts`: sin cambios funcionales obligatorios; el fallback web ya cubre PDF.
+- Sin cambios de base de datos ni de RLS: el bucket `comprobantes-cobros` ya acepta cualquier archivo y la RPC solo guarda path y nombre.
