@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -13,6 +13,14 @@ import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPr
 import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
 import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
 import { CargaCodigosBarraDialog } from '@/components/productos/CargaCodigosBarraDialog';
+import { FijarPrecioVentaDialog } from '@/components/productos/FijarPrecioVentaDialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  obtenerPrecioVentaProducto,
+  type ListaPrecio,
+  type PorcentajeMatriz,
+  type ExcepcionProducto,
+} from '@/lib/precioUtils';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +62,7 @@ interface Producto {
   categoria_id: string | null;
   subcategoria_id: string | null;
   marca_id: string | null;
+  tipo_producto_id?: string | null;
   codigo_barra: string | null;
   activo: boolean;
   stock_actual: number;
@@ -101,6 +110,14 @@ export default function Productos() {
   const [activeTab, setActiveTab] = useState('activos');
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [subcategoriaFilter, setSubcategoriaFilter] = useState('');
+  const [listas, setListas] = useState<ListaPrecio[]>([]);
+  const [porcentajes, setPorcentajes] = useState<PorcentajeMatriz[]>([]);
+  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [listaSeleccionada, setListaSeleccionada] = useState<string>(
+    () => localStorage.getItem('productos_lista_precio') || '',
+  );
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [fijarPrecioOpen, setFijarPrecioOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     codigo_articulo: '',
@@ -153,6 +170,21 @@ export default function Productos() {
         supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
+
+      const [listasRes, porcentajesRes, excepcionesRes] = await Promise.all([
+        supabase.from('listas_precios').select('*').eq('activo', true).order('orden'),
+        supabase.from('lista_precio_porcentajes').select('*'),
+        supabase.from('lista_precio_excepciones').select('*'),
+      ]);
+
+      if (listasRes.data) {
+        setListas(listasRes.data as ListaPrecio[]);
+        setListaSeleccionada((prev) =>
+          prev && listasRes.data.some((l) => l.id === prev) ? prev : (listasRes.data[0]?.id || ''),
+        );
+      }
+      if (porcentajesRes.data) setPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
+      if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
 
       if (productosData && productosData.length > 0) {
         // Obtener IDs únicos de usuarios que desactivaron productos
@@ -376,8 +408,107 @@ export default function Productos() {
   const productosActivos = productosFiltrados.filter((p) => p.activo);
   const productosDesactivados = productosFiltrados.filter((p) => !p.activo);
 
+  useEffect(() => {
+    if (listaSeleccionada) localStorage.setItem('productos_lista_precio', listaSeleccionada);
+  }, [listaSeleccionada]);
+
+  const preciosVenta = useMemo(() => {
+    if (!listaSeleccionada) return {} as Record<string, { precio: number; origen: string }>;
+    const map: Record<string, { precio: number; origen: string }> = {};
+    productos.forEach((p) => {
+      const r = obtenerPrecioVentaProducto(
+        {
+          id: p.id,
+          precio_costo: p.precio_costo || 0,
+          marca_id: p.marca_id,
+          tipo_producto_id: p.tipo_producto_id ?? null,
+        },
+        listaSeleccionada,
+        porcentajes,
+        excepciones,
+      );
+      map[p.id] = { precio: r.precioVenta, origen: r.origen };
+    });
+    return map;
+  }, [productos, listaSeleccionada, porcentajes, excepciones]);
+
+  const origenLabel: Record<string, string> = {
+    fijo: 'Precio fijo',
+    excepcion: 'Excepción',
+    marca: 'Por marca',
+    tipo: 'Por tipo',
+    general: 'General',
+    ninguno: 'Sin precio',
+  };
+
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const todosVisiblesSeleccionados =
+    productosActivos.length > 0 && productosActivos.every((p) => seleccionados.has(p.id));
+
+  const toggleTodosVisibles = () => {
+    setSeleccionados(
+      todosVisiblesSeleccionados ? new Set() : new Set(productosActivos.map((p) => p.id)),
+    );
+  };
+
+  const productosSeleccionados = productos
+    .filter((p) => seleccionados.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      codigo_articulo: p.codigo_articulo,
+      descripcion: p.descripcion,
+      precio_costo: p.precio_costo || 0,
+      precioActual: preciosVenta[p.id]?.precio ?? null,
+    }));
+
+  const columnaSeleccion = {
+    key: 'seleccion',
+    header: (
+      <Checkbox
+        checked={todosVisiblesSeleccionados}
+        onCheckedChange={toggleTodosVisibles}
+        aria-label="Seleccionar todos"
+      />
+    ) as unknown as string,
+    render: (item: Producto) => (
+      <Checkbox
+        checked={seleccionados.has(item.id)}
+        onCheckedChange={() => toggleSeleccion(item.id)}
+        aria-label={`Seleccionar ${item.descripcion}`}
+      />
+    ),
+  };
+
+  const columnaPrecioVenta = {
+    key: 'precio_venta',
+    header: 'Precio venta',
+    render: (item: Producto) => {
+      const info = preciosVenta[item.id];
+      if (!info || info.origen === 'ninguno') {
+        return <span className="text-muted-foreground text-xs">Sin precio</span>;
+      }
+      return (
+        <div className="leading-tight">
+          <span className="font-medium">
+            ${info.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <div className="text-[10px] text-muted-foreground">{origenLabel[info.origen]}</div>
+        </div>
+      );
+    },
+  };
+
 
   const columnsActivosFull = [
+    columnaSeleccion,
     { key: 'codigo_articulo', header: 'Código' },
     { key: 'descripcion', header: 'Descripción' },
     { key: 'unidad_medida', header: 'Unidad' },
@@ -400,6 +531,7 @@ export default function Productos() {
         </span>
       ),
     },
+    columnaPrecioVenta,
     {
       key: 'stock_actual',
       header: 'Stock',
@@ -824,8 +956,37 @@ export default function Productos() {
               </SelectContent>
             </Select>
           </div>
+          {!isVendedor && (
+            <div className="space-y-2 sm:flex-1">
+              <Label htmlFor="lista-precio-filter">Lista de precios</Label>
+              <Select value={listaSeleccionada} onValueChange={setListaSeleccionada}>
+                <SelectTrigger id="lista-precio-filter">
+                  <SelectValue placeholder="Seleccione una lista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {listas.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
-        
+
+        {!isVendedor && seleccionados.size > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-3">
+            <span className="text-sm font-medium">{seleccionados.size} seleccionados</span>
+            <Button size="sm" onClick={() => setFijarPrecioOpen(true)}>
+              Fijar precio de venta
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Set())}>
+              Limpiar selección
+            </Button>
+          </div>
+        )}
+
         <TabsContent value="activos">
           <DataTable
             data={productosActivos}
@@ -869,6 +1030,18 @@ export default function Productos() {
         open={actualizadorOpen}
         onOpenChange={setActualizadorOpen}
         onUpdate={fetchData}
+      />
+
+      <FijarPrecioVentaDialog
+        open={fijarPrecioOpen}
+        onOpenChange={setFijarPrecioOpen}
+        productos={productosSeleccionados}
+        listas={listas}
+        listaIdInicial={listaSeleccionada}
+        onSaved={() => {
+          setSeleccionados(new Set());
+          fetchData();
+        }}
       />
 
       <ImportarFriosDialog

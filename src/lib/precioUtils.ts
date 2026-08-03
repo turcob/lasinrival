@@ -22,7 +22,8 @@ export interface ExcepcionProducto {
   id: string;
   lista_precio_id: string | null; // null = aplica a todas las listas
   producto_id: string;
-  porcentaje: number;
+  porcentaje: number | null;
+  precio_fijo?: number | null; // precio de venta final, sin cálculo porcentual
   descripcion: string | null;
   fecha_inicio: string | null; // null = sin límite de inicio
   fecha_fin: string | null; // null = sin límite de fin
@@ -48,7 +49,7 @@ export function calcularPorcentajeProducto(
   listaId: string,
   matrizPorcentajes: PorcentajeMatriz[],
   excepciones: ExcepcionProducto[]
-): { porcentaje: number; origen: 'excepcion' | 'marca' | 'tipo' | 'general' | 'ninguno'; descripcion: string } {
+): { porcentaje: number; origen: 'excepcion' | 'fijo' | 'marca' | 'tipo' | 'general' | 'ninguno'; descripcion: string; precioFijo?: number } {
   
   // 1. Buscar excepción específica del producto (considerando vigencia)
   const hoy = new Date().toISOString().split('T')[0];
@@ -61,8 +62,16 @@ export function calcularPorcentajeProducto(
     return inicioOk && finOk;
   });
   if (excepcion) {
+    if (excepcion.precio_fijo !== null && excepcion.precio_fijo !== undefined) {
+      return {
+        porcentaje: 0,
+        origen: 'fijo',
+        descripcion: excepcion.descripcion || 'Precio fijo',
+        precioFijo: Number(excepcion.precio_fijo),
+      };
+    }
     return { 
-      porcentaje: excepcion.porcentaje, 
+      porcentaje: Number(excepcion.porcentaje ?? 0), 
       origen: 'excepcion',
       descripcion: excepcion.descripcion || 'Excepción'
     };
@@ -142,7 +151,9 @@ export function obtenerPrecioVentaProducto(
   excepciones: ExcepcionProducto[]
 ): { precioVenta: number; porcentaje: number; origen: string; descripcion: string } {
   const resultado = calcularPorcentajeProducto(producto, listaId, matrizPorcentajes, excepciones);
-  const precioVenta = calcularPrecioVenta(producto.precio_costo, resultado.porcentaje);
+  const precioVenta = resultado.origen === 'fijo' && resultado.precioFijo !== undefined
+    ? resultado.precioFijo
+    : calcularPrecioVenta(producto.precio_costo, resultado.porcentaje);
   
   return { 
     precioVenta, 

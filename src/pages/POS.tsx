@@ -460,7 +460,7 @@ export default function POS() {
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).neq('destino', 'paladini').order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
-        supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje'),
+        supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje, precio_fijo'),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
         supabase.from('tarjetas').select('*').eq('activo', true).order('tipo').order('nombre'),
         supabase.from('tarjeta_cuotas').select('*').eq('activo', true).order('cuotas'),
