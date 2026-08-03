@@ -301,6 +301,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         }
         .sheet:last-child { page-break-after: auto; break-after: auto; }
         .cartel {
+          width:100%; height:100%;
           border: 1mm solid #4ade80;
           padding: ${PAD}mm;
           display:flex; flex-direction:column; justify-content:space-between; align-items:center;
