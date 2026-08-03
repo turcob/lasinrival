@@ -956,8 +956,37 @@ export default function Productos() {
               </SelectContent>
             </Select>
           </div>
+          {!isVendedor && (
+            <div className="space-y-2 sm:flex-1">
+              <Label htmlFor="lista-precio-filter">Lista de precios</Label>
+              <Select value={listaSeleccionada} onValueChange={setListaSeleccionada}>
+                <SelectTrigger id="lista-precio-filter">
+                  <SelectValue placeholder="Seleccione una lista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {listas.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
-        
+
+        {!isVendedor && seleccionados.size > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-3">
+            <span className="text-sm font-medium">{seleccionados.size} seleccionados</span>
+            <Button size="sm" onClick={() => setFijarPrecioOpen(true)}>
+              Fijar precio de venta
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Set())}>
+              Limpiar selección
+            </Button>
+          </div>
+        )}
+
         <TabsContent value="activos">
           <DataTable
             data={productosActivos}
@@ -1001,6 +1030,18 @@ export default function Productos() {
         open={actualizadorOpen}
         onOpenChange={setActualizadorOpen}
         onUpdate={fetchData}
+      />
+
+      <FijarPrecioVentaDialog
+        open={fijarPrecioOpen}
+        onOpenChange={setFijarPrecioOpen}
+        productos={productosSeleccionados}
+        listas={listas}
+        listaIdInicial={listaSeleccionada}
+        onSaved={() => {
+          setSeleccionados(new Set());
+          fetchData();
+        }}
       />
 
       <ImportarFriosDialog
