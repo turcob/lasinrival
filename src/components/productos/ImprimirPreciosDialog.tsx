@@ -268,7 +268,12 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
     const pagesHtml: string[] = [];
     for (let i = 0; i < cells.length; i += porHoja) {
-      pagesHtml.push(`<div class="sheet">${cells.slice(i, i + porHoja).join('')}</div>`);
+      const pageCells = cells.slice(i, i + porHoja);
+      // Filas realmente usadas en esta hoja (la última puede estar incompleta)
+      const rowsUsadas = Math.max(1, Math.ceil(pageCells.length / layout.cols));
+      pagesHtml.push(
+        `<div class="sheet" style="grid-template-rows: repeat(${rowsUsadas}, ${cellH.toFixed(2)}mm)">${pageCells.join('')}</div>`
+      );
     }
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carteles de Precios</title>
@@ -276,15 +281,18 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
         @page { size: A4; margin: 8mm; }
         * { box-sizing: border-box; }
         html, body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
+        body { display:flex; flex-direction:column; align-items:center; }
         .sheet {
           width: ${PAGE_W}mm;
           height: ${PAGE_H.toFixed(2)}mm;
+          margin: 0 auto;
           display: grid;
           grid-template-columns: repeat(${layout.cols}, ${cellW.toFixed(2)}mm);
           grid-template-rows: repeat(${layout.rows}, ${cellH.toFixed(2)}mm);
           gap: ${GAP}mm;
-          align-content: start;
-          justify-content: start;
+          align-content: center;
+          justify-content: center;
+          justify-items: center;
           overflow: hidden;
           page-break-after: always;
           break-after: page;
