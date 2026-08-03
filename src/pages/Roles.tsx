@@ -221,10 +221,16 @@ export default function Roles() {
         );
 
         if (shouldHave && !existing) {
-          // Check if roleCodigo is a valid app_role enum
-          const validEnumRoles = ['admin', 'encargado', 'cajero', 'vendedor', 'deposito'];
-          const roleValue = validEnumRoles.includes(roleCodigo) ? roleCodigo as 'admin' | 'encargado' | 'cajero' | 'vendedor' | 'deposito' : 'vendedor'; // Use vendedor as fallback for enum
-          
+          // app_role enum values (must stay in sync with the DB enum)
+          const validEnumRoles = [
+            'admin', 'encargado', 'cajero', 'vendedor', 'deposito',
+            'chofer', 'administracion', 'responsable',
+          ] as const;
+          type EnumRole = typeof validEnumRoles[number];
+          const roleValue = (validEnumRoles as readonly string[]).includes(roleCodigo)
+            ? (roleCodigo as EnumRole)
+            : ('vendedor' as EnumRole);
+
           const { error } = await supabase
             .from('role_permissions')
             .insert([{ role: roleValue, rol_codigo: roleCodigo, modulo, permiso }]);
