@@ -434,8 +434,27 @@ export default function POS() {
     if (!user) return;
     setLoading(true);
     try {
+      // Traer TODOS los productos activos paginando (evita el límite de 1000 filas)
+      const fetchAllProductos = async () => {
+        const PAGE = 1000;
+        let from = 0;
+        const acc: any[] = [];
+        while (true) {
+          const { data, error } = await supabase
+            .from('productos')
+            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra')
+            .eq('activo', true)
+            .order('descripcion')
+            .range(from, from + PAGE - 1);
+          if (error) return { data: acc, error };
+          acc.push(...(data || []));
+          if (!data || data.length < PAGE) break;
+          from += PAGE;
+        }
+        return { data: acc, error: null };
+      };
       const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
-        supabase.from('productos').select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra').eq('activo', true).order('descripcion'),
+        fetchAllProductos(),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
         supabase.from('formas_pago').select('id, nombre').eq('activo', true),
