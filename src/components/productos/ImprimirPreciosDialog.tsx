@@ -51,9 +51,9 @@ const LAYOUTS: Record<number, { cols: number; rows: number; label: string }> = {
   9: { cols: 3, rows: 3, label: '9 por hoja' },
 };
 
-// Área imprimible A4 con márgenes de 8mm y gap de 3mm
+// Área imprimible A4: margen sup. 14mm, resto 8mm, gap 3mm
 const AREA_W = 210 - 16;
-const AREA_H = 297 - 16 - 1;
+const AREA_H = 297 - 14 - 8 - 1;
 const GAP_MM = 3;
 
 function tamanoEtiqueta(cols: number, rows: number) {
@@ -221,9 +221,9 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
       return;
     }
 
-    // Área imprimible A4 con márgenes de 8mm
+    // Área imprimible A4 (margen superior mayor para no cortar la etiqueta)
     const PAGE_W = 210 - 16;
-    const PAGE_H = 297 - 16 - 1; // 1mm de holgura para evitar salto de página
+    const PAGE_H = 297 - 14 - 8 - 1; // 1mm de holgura para evitar salto de página
     const GAP = 3;
     const PAD = 4;
     const cellW = (PAGE_W - GAP * (layout.cols - 1)) / layout.cols;
@@ -278,7 +278,7 @@ export function ImprimirPreciosDialog({ open, onOpenChange }: Props) {
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carteles de Precios</title>
       <style>
-        @page { size: A4; margin: 8mm; }
+        @page { size: A4; margin: 14mm 8mm 8mm 8mm; }
         * { box-sizing: border-box; }
         html, body { margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; }
         body { display:flex; flex-direction:column; align-items:center; }
