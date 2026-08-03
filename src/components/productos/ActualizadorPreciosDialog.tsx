@@ -345,7 +345,7 @@ export function ActualizadorPreciosDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Actualizador de Precios de Costo
+              Actualizador de Costo Agrupado
             </DialogTitle>
           </DialogHeader>
 
