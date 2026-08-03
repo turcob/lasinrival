@@ -508,6 +508,7 @@ export default function Productos() {
 
 
   const columnsActivosFull = [
+    columnaSeleccion,
     { key: 'codigo_articulo', header: 'Código' },
     { key: 'descripcion', header: 'Descripción' },
     { key: 'unidad_medida', header: 'Unidad' },
@@ -530,6 +531,7 @@ export default function Productos() {
         </span>
       ),
     },
+    columnaPrecioVenta,
     {
       key: 'stock_actual',
       header: 'Stock',
