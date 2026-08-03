@@ -171,6 +171,21 @@ export default function Productos() {
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
+      const [listasRes, porcentajesRes, excepcionesRes] = await Promise.all([
+        supabase.from('listas_precios').select('*').eq('activo', true).order('orden'),
+        supabase.from('lista_precio_porcentajes').select('*'),
+        supabase.from('lista_precio_excepciones').select('*'),
+      ]);
+
+      if (listasRes.data) {
+        setListas(listasRes.data as ListaPrecio[]);
+        setListaSeleccionada((prev) =>
+          prev && listasRes.data.some((l) => l.id === prev) ? prev : (listasRes.data[0]?.id || ''),
+        );
+      }
+      if (porcentajesRes.data) setPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
+      if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
+
       if (productosData && productosData.length > 0) {
         // Obtener IDs únicos de usuarios que desactivaron productos
         const desactivadosPorIds = [...new Set(
