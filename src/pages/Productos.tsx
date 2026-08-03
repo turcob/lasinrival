@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -13,6 +13,14 @@ import { ActualizadorPreciosDialog } from '@/components/productos/ActualizadorPr
 import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog';
 import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
 import { CargaCodigosBarraDialog } from '@/components/productos/CargaCodigosBarraDialog';
+import { FijarPrecioVentaDialog } from '@/components/productos/FijarPrecioVentaDialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  obtenerPrecioVentaProducto,
+  type ListaPrecio,
+  type PorcentajeMatriz,
+  type ExcepcionProducto,
+} from '@/lib/precioUtils';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +62,7 @@ interface Producto {
   categoria_id: string | null;
   subcategoria_id: string | null;
   marca_id: string | null;
+  tipo_producto_id?: string | null;
   codigo_barra: string | null;
   activo: boolean;
   stock_actual: number;
@@ -101,6 +110,14 @@ export default function Productos() {
   const [activeTab, setActiveTab] = useState('activos');
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [subcategoriaFilter, setSubcategoriaFilter] = useState('');
+  const [listas, setListas] = useState<ListaPrecio[]>([]);
+  const [porcentajes, setPorcentajes] = useState<PorcentajeMatriz[]>([]);
+  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [listaSeleccionada, setListaSeleccionada] = useState<string>(
+    () => localStorage.getItem('productos_lista_precio') || '',
+  );
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [fijarPrecioOpen, setFijarPrecioOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     codigo_articulo: '',
