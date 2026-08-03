@@ -2181,7 +2181,8 @@ export type Database = {
           fecha_inicio: string | null
           id: string
           lista_precio_id: string | null
-          porcentaje: number
+          porcentaje: number | null
+          precio_fijo: number | null
           producto_id: string
         }
         Insert: {
@@ -2191,7 +2192,8 @@ export type Database = {
           fecha_inicio?: string | null
           id?: string
           lista_precio_id?: string | null
-          porcentaje?: number
+          porcentaje?: number | null
+          precio_fijo?: number | null
           producto_id: string
         }
         Update: {
@@ -2201,7 +2203,8 @@ export type Database = {
           fecha_inicio?: string | null
           id?: string
           lista_precio_id?: string | null
-          porcentaje?: number
+          porcentaje?: number | null
+          precio_fijo?: number | null
           producto_id?: string
         }
         Relationships: [
