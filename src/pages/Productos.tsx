@@ -408,6 +408,104 @@ export default function Productos() {
   const productosActivos = productosFiltrados.filter((p) => p.activo);
   const productosDesactivados = productosFiltrados.filter((p) => !p.activo);
 
+  useEffect(() => {
+    if (listaSeleccionada) localStorage.setItem('productos_lista_precio', listaSeleccionada);
+  }, [listaSeleccionada]);
+
+  const preciosVenta = useMemo(() => {
+    if (!listaSeleccionada) return {} as Record<string, { precio: number; origen: string }>;
+    const map: Record<string, { precio: number; origen: string }> = {};
+    productos.forEach((p) => {
+      const r = obtenerPrecioVentaProducto(
+        {
+          id: p.id,
+          precio_costo: p.precio_costo || 0,
+          marca_id: p.marca_id,
+          tipo_producto_id: p.tipo_producto_id ?? null,
+        },
+        listaSeleccionada,
+        porcentajes,
+        excepciones,
+      );
+      map[p.id] = { precio: r.precioVenta, origen: r.origen };
+    });
+    return map;
+  }, [productos, listaSeleccionada, porcentajes, excepciones]);
+
+  const origenLabel: Record<string, string> = {
+    fijo: 'Precio fijo',
+    excepcion: 'Excepción',
+    marca: 'Por marca',
+    tipo: 'Por tipo',
+    general: 'General',
+    ninguno: 'Sin precio',
+  };
+
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const todosVisiblesSeleccionados =
+    productosActivos.length > 0 && productosActivos.every((p) => seleccionados.has(p.id));
+
+  const toggleTodosVisibles = () => {
+    setSeleccionados(
+      todosVisiblesSeleccionados ? new Set() : new Set(productosActivos.map((p) => p.id)),
+    );
+  };
+
+  const productosSeleccionados = productos
+    .filter((p) => seleccionados.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      codigo_articulo: p.codigo_articulo,
+      descripcion: p.descripcion,
+      precio_costo: p.precio_costo || 0,
+      precioActual: preciosVenta[p.id]?.precio ?? null,
+    }));
+
+  const columnaSeleccion = {
+    key: 'seleccion',
+    header: (
+      <Checkbox
+        checked={todosVisiblesSeleccionados}
+        onCheckedChange={toggleTodosVisibles}
+        aria-label="Seleccionar todos"
+      />
+    ) as unknown as string,
+    render: (item: Producto) => (
+      <Checkbox
+        checked={seleccionados.has(item.id)}
+        onCheckedChange={() => toggleSeleccion(item.id)}
+        aria-label={`Seleccionar ${item.descripcion}`}
+      />
+    ),
+  };
+
+  const columnaPrecioVenta = {
+    key: 'precio_venta',
+    header: 'Precio venta',
+    render: (item: Producto) => {
+      const info = preciosVenta[item.id];
+      if (!info || info.origen === 'ninguno') {
+        return <span className="text-muted-foreground text-xs">Sin precio</span>;
+      }
+      return (
+        <div className="leading-tight">
+          <span className="font-medium">
+            ${info.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <div className="text-[10px] text-muted-foreground">{origenLabel[info.origen]}</div>
+        </div>
+      );
+    },
+  };
+
 
   const columnsActivosFull = [
     { key: 'codigo_articulo', header: 'Código' },
