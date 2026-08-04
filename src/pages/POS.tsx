@@ -677,7 +677,9 @@ export default function POS() {
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
     const subtotalBruto = cantidad * precio;
-    return subtotalBruto * (1 - descuentoPorcentaje / 100);
+    // Redondeo a centavos: sin esto los ítems por kg dejan milésimas ocultas
+    // que la UI muestra redondeadas pero rompen la validación de "suma = total".
+    return Math.round(subtotalBruto * (1 - descuentoPorcentaje / 100) * 100) / 100;
   };
 
   const updateCantidadDirecta = (itemId: string, nuevaCantidad: number) => {
@@ -876,8 +878,8 @@ export default function POS() {
   const subtotalConDescuentosProductos = useMemo(() => cart.reduce((sum, item) => sum + item.subtotal, 0), [cart]);
   const montoDescuentoGlobal = useMemo(() => subtotalConDescuentosProductos * (descuentoGlobal / 100), [subtotalConDescuentosProductos, descuentoGlobal]);
   const totalDescuentos = useMemo(() => totalDescuentosProductos + montoDescuentoGlobal, [totalDescuentosProductos, montoDescuentoGlobal]);
-  const total = useMemo(() => subtotalConDescuentosProductos - montoDescuentoGlobal, [subtotalConDescuentosProductos, montoDescuentoGlobal]);
-  const totalPagado = useMemo(() => pagos.reduce((sum, p) => sum + p.monto, 0), [pagos]);
+  const total = useMemo(() => Math.round((subtotalConDescuentosProductos - montoDescuentoGlobal) * 100) / 100, [subtotalConDescuentosProductos, montoDescuentoGlobal]);
+  const totalPagado = useMemo(() => Math.round(pagos.reduce((sum, p) => sum + p.monto, 0) * 100) / 100, [pagos]);
   // Recargo por cuotas: se traslada al cliente. Suma de (monto - monto/coef) de pagos con tarjeta con coeficiente > 1.
   const recargoTarjeta = useMemo(() => pagos.reduce((sum, p) => {
     if (p.tarjeta_id && p.coeficiente && p.coeficiente > 1) {
@@ -962,13 +964,16 @@ export default function POS() {
     if (!fpTransf) return toast.error('No se encontró la forma de pago Transferencia');
 
     const existing = pagos.find(p => p.forma_pago_id === fpTransf.id);
-    const pendienteSinTransf = totalConRecargo - totalPagado + (existing?.monto || 0);
+    const pendienteSinTransf = r2(totalConRecargo - totalPagado + (existing?.monto || 0));
     if (importeNum > pendienteSinTransf + 0.009) {
       return toast.error(`El importe excede el pendiente ($${pendienteSinTransf.toLocaleString('es-AR', { minimumFractionDigits: 2 })})`);
     }
 
     // Agregar o actualizar el pago de transferencia con el importe ingresado
-    const importeR = r2(importeNum);
+    // Si el importe queda a menos de un centavo del pendiente, lo ajustamos al
+    // pendiente exacto para que la validación "suma = total" no se trabe.
+    let importeR = r2(importeNum);
+    if (Math.abs(importeR - pendienteSinTransf) <= 0.05) importeR = pendienteSinTransf;
     setPagos(prev => {
       const idx = prev.findIndex(p => p.forma_pago_id === fpTransf.id);
       if (idx >= 0) {
@@ -979,7 +984,7 @@ export default function POS() {
       return [...prev, { forma_pago_id: fpTransf.id, monto: importeR }];
     });
 
-    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
+    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeR.toFixed(2) });
     setTransferenciaDialogOpen(false);
   };
 
