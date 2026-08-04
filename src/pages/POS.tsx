@@ -677,7 +677,9 @@ export default function POS() {
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
     const subtotalBruto = cantidad * precio;
-    return subtotalBruto * (1 - descuentoPorcentaje / 100);
+    // Redondeo a centavos: sin esto los ítems por kg dejan milésimas ocultas
+    // que la UI muestra redondeadas pero rompen la validación de "suma = total".
+    return Math.round(subtotalBruto * (1 - descuentoPorcentaje / 100) * 100) / 100;
   };
 
   const updateCantidadDirecta = (itemId: string, nuevaCantidad: number) => {
