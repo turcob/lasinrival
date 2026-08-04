@@ -984,7 +984,7 @@ export default function POS() {
       return [...prev, { forma_pago_id: fpTransf.id, monto: importeR }];
     });
 
-    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeNum.toFixed(2) });
+    setTransferenciaData({ ...transferenciaData, cuil: cuilLimpio, importe: importeR.toFixed(2) });
     setTransferenciaDialogOpen(false);
   };
 
