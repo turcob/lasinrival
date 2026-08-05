@@ -771,15 +771,83 @@ export default function Productos() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoría</Label>
+                  <Select
+                    value={formData.categoria_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoria_id: value, subcategoria_id: '' })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subcategoria">Subcategoría</Label>
+                  <Select
+                    value={formData.subcategoria_id}
+                    onValueChange={handleSubcategoriaChange}
+                    disabled={!formData.categoria_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSubcategorias.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id}>
+                          {sub.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="codigo_articulo">Código *</Label>
                   <Input
                     id="codigo_articulo"
                     value={formData.codigo_articulo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, codigo_articulo: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setCodigoManual(true);
+                      setFormData({ ...formData, codigo_articulo: e.target.value });
+                    }}
                     required
                   />
+                  {!selectedProducto && (
+                    <p className="text-xs text-muted-foreground">
+                      {sugiriendoCodigo
+                        ? 'Calculando código sugerido...'
+                        : codigoSugerido
+                          ? (
+                            <>
+                              Sugerido: {codigoSugerido}
+                              {formData.codigo_articulo !== codigoSugerido && (
+                                <button
+                                  type="button"
+                                  className="ml-2 underline"
+                                  onClick={() => {
+                                    setFormData((prev) => ({ ...prev, codigo_articulo: codigoSugerido }));
+                                    setCodigoManual(false);
+                                  }}
+                                >
+                                  usar sugerido
+                                </button>
+                              )}
+                            </>
+                          )
+                          : 'Elegí categoría y subcategoría para sugerir un código.'}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="codigo_barra">Código de Barras</Label>
@@ -805,7 +873,7 @@ export default function Productos() {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="unidad_medida">Unidad de Medida</Label>
                   <Select
@@ -823,47 +891,6 @@ export default function Productos() {
                       <SelectItem value="LT">Litro</SelectItem>
                       <SelectItem value="MT">Metro</SelectItem>
                       <SelectItem value="CJ">Caja</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoría</Label>
-                  <Select
-                    value={formData.categoria_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, categoria_id: value, subcategoria_id: '' })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subcategoria">Subcategoría</Label>
-                  <Select
-                    value={formData.subcategoria_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, subcategoria_id: value })
-                    }
-                    disabled={!formData.categoria_id}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubcategorias.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id}>
-                          {sub.nombre}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
