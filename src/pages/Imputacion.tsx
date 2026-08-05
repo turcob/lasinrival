@@ -376,6 +376,40 @@ export default function Imputacion() {
     }
   };
 
+  const toLocalDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const setRangoHoy = () => {
+    const hoy = toLocalDateStr(new Date());
+    setFechaDesde(hoy);
+    setFechaHasta(hoy);
+  };
+
+  const setRangoAyer = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const ayer = toLocalDateStr(d);
+    setFechaDesde(ayer);
+    setFechaHasta(ayer);
+  };
+
+  const limpiarFiltros = () => {
+    setSearchTerm('');
+    setFechaDesde('');
+    setFechaHasta('');
+    setMontoMin('');
+    setMontoMax('');
+    setNumeroVenta('');
+    setTipoFiltro('todos');
+  };
+
+  const filtrosActivos =
+    !!fechaDesde || !!fechaHasta || !!montoMin || !!montoMax || !!numeroVenta || tipoFiltro !== 'todos' || !!searchTerm;
+
   const filteredMovimientos = movimientos.filter(m => {
     // Filtro por caja: solo transferencias con venta_id de esa caja
     if (ventaIdsCaja !== null) {
@@ -387,15 +421,37 @@ export default function Imputacion() {
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.numero_operacion?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (selectedTab === 'pendientes') {
-      return matchesSearch && m.estado_imputacion === 'pendiente';
-    } else if (selectedTab === 'confirmados') {
-      return matchesSearch && m.estado_imputacion === 'confirmado';
-    } else if (selectedTab === 'rechazados') {
-      return matchesSearch && m.estado_imputacion === 'rechazado';
+    if (!matchesSearch) return false;
+
+    // Fechas (usa la fecha del movimiento en horario local)
+    const fechaMov = (m.fecha || '').slice(0, 10);
+    if (fechaDesde && fechaMov < fechaDesde) return false;
+    if (fechaHasta && fechaMov > fechaHasta) return false;
+
+    // Monto
+    const min = parseFloat(montoMin);
+    const max = parseFloat(montoMax);
+    if (!isNaN(min) && Number(m.monto) < min) return false;
+    if (!isNaN(max) && Number(m.monto) > max) return false;
+
+    // Número de venta
+    if (numeroVenta.trim()) {
+      const nv = numeroVenta.trim().replace(/^0+/, '');
+      if (!m.venta_numero || !String(m.venta_numero).includes(nv)) return false;
     }
-    return matchesSearch;
+
+    // Tipo
+    if (tipoFiltro === 'cheque' && !esCheque(m)) return false;
+    if (tipoFiltro === 'transferencia' && !esTransferencia(m)) return false;
+
+    if (selectedTab === 'pendientes') {
+      return m.estado_imputacion === 'pendiente';
+    } else if (selectedTab === 'confirmados') {
+      return m.estado_imputacion === 'confirmado';
+    } else if (selectedTab === 'rechazados') {
+      return m.estado_imputacion === 'rechazado';
+    }
+    return true;
   });
 
   const fetchVentasPendientes = async (clienteId: string) => {
