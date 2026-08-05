@@ -1037,18 +1037,42 @@ export default function ListasPrecios() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Porcentaje *</Label>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={excepcionFormData.porcentaje}
-                            onChange={(e) => setExcepcionFormData({ ...excepcionFormData, porcentaje: parseFloat(e.target.value) || 0 })}
-                            required
-                          />
-                          <span>%</span>
-                        </div>
+                        <Label>Tipo de excepción *</Label>
+                        <Select
+                          value={excepcionFormData.modo}
+                          onValueChange={(v) => setExcepcionFormData({ ...excepcionFormData, modo: v as 'porcentaje' | 'fijo' })}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="porcentaje">Porcentaje sobre costo</SelectItem>
+                            <SelectItem value="fijo">Precio fijo (monto final)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {excepcionFormData.modo === 'porcentaje' ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={excepcionFormData.porcentaje}
+                              onChange={(e) => setExcepcionFormData({ ...excepcionFormData, porcentaje: parseFloat(e.target.value) || 0 })}
+                              required
+                            />
+                            <span>%</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span>$</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={excepcionFormData.precio_fijo}
+                              onChange={(e) => setExcepcionFormData({ ...excepcionFormData, precio_fijo: parseFloat(e.target.value) || 0 })}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Descripción</Label>
@@ -1081,7 +1105,10 @@ export default function ListasPrecios() {
                     </div>
                     <div className="flex justify-end gap-3">
                       <Button type="button" variant="outline" onClick={() => setExcepcionDialogOpen(false)}>Cancelar</Button>
-                      <Button type="submit" disabled={!excepcionFormData.producto_id}>
+                      <Button
+                        type="submit"
+                        disabled={!excepcionFormData.producto_id || (excepcionFormData.modo === 'fijo' && excepcionFormData.precio_fijo <= 0)}
+                      >
                         {selectedExcepcion ? 'Guardar' : 'Crear'}
                       </Button>
                     </div>
@@ -1100,7 +1127,7 @@ export default function ListasPrecios() {
                     <TableRow>
                       <TableHead>Producto</TableHead>
                       <TableHead>Lista</TableHead>
-                      <TableHead className="text-center">Porcentaje</TableHead>
+                      <TableHead className="text-center">Valor</TableHead>
                       <TableHead>Vigencia</TableHead>
                       <TableHead>Descripción</TableHead>
                       <TableHead className="w-[100px]">Acciones</TableHead>
@@ -1125,7 +1152,15 @@ export default function ListasPrecios() {
                             : <Badge variant="outline">Todas las listas</Badge>
                           }
                         </TableCell>
-                        <TableCell className="text-center font-medium">{exc.porcentaje}%</TableCell>
+                        <TableCell className="text-center font-medium">
+                          {exc.precio_fijo != null ? (
+                            <Badge variant="secondary">
+                              ${Number(exc.precio_fijo).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </Badge>
+                          ) : (
+                            <>{exc.porcentaje}%</>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-xs">
                             <CalendarDays className="h-3 w-3 text-muted-foreground" />
