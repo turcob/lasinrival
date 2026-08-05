@@ -619,6 +619,13 @@ export default function POS() {
     return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
   };
 
+  // Recalcula el precio unitario según el tramo por cantidad (si no hay tramos, no cambia nada)
+  const precioParaCantidad = (item: CartItem, cantidad: number): number => {
+    if (!item.producto || item.es_temporal) return item.precio;
+    const p = getProductoPrice(item.producto, cantidad);
+    return p > 0 ? p : item.precio;
+  };
+
   const addToCart = (producto: Producto) => {
     const precio = getProductoPrice(producto);
 
@@ -641,7 +648,11 @@ export default function POS() {
         }
         return prev.map((item) =>
           item.id === existing.id
-            ? { ...item, cantidad: item.cantidad + 1, subtotal: calcSubtotal(item.cantidad + 1, item.precio, item.descuento_porcentaje) }
+            ? (() => {
+                const nuevaCantidad = item.cantidad + 1;
+                const nuevoPrecio = precioParaCantidad(item, nuevaCantidad);
+                return { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) };
+              })()
             : item
         );
       }
@@ -706,14 +717,16 @@ export default function POS() {
       const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
       if (existing) {
         const nuevaCantidad = existing.cantidad + cantidad;
+        const nuevoPrecio = precioParaCantidad(existing, nuevaCantidad);
         return prev.map((item) =>
           item.id === existing.id
-            ? { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) }
+            ? { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) }
             : item
         );
       }
       const newId = crypto.randomUUID();
-      return [...prev, { id: newId, producto, cantidad, precio, subtotal: calcSubtotal(cantidad, precio, 0), descuento_porcentaje: 0 }];
+      const precioEscalado = getProductoPrice(producto, cantidad) || precio;
+      return [...prev, { id: newId, producto, cantidad, precio: precioEscalado, subtotal: calcSubtotal(cantidad, precioEscalado, 0), descuento_porcentaje: 0 }];
     });
     
   };
@@ -733,7 +746,8 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === itemId) {
-          return { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) };
+          const nuevoPrecio = precioParaCantidad(item, nuevaCantidad);
+          return { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) };
         }
         return item;
       })
@@ -902,7 +916,8 @@ export default function POS() {
           if (item.id === itemId) {
             const newCantidad = item.cantidad + delta;
             if (newCantidad <= 0) return null;
-            return { ...item, cantidad: newCantidad, subtotal: calcSubtotal(newCantidad, item.precio, item.descuento_porcentaje) };
+            const nuevoPrecio = precioParaCantidad(item, newCantidad);
+            return { ...item, cantidad: newCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(newCantidad, nuevoPrecio, item.descuento_porcentaje) };
           }
           return item;
         })
