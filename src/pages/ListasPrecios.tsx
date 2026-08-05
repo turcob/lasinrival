@@ -157,6 +157,57 @@ export default function ListasPrecios() {
     fetchData();
   }, []);
 
+  // Revisión informativa de coherencia entre productos caja y sus unidades
+  const revisionCoherencia = useMemo(() => {
+    if (!listaCoherencia) return [] as any[];
+    return productos
+      .filter((c) => c.empaque_de_producto_id && c.unidades_por_empaque)
+      .map((caja) => {
+        const unidad = productos.find((u) => u.id === caja.empaque_de_producto_id);
+        if (!unidad) return null;
+        const precioCaja = obtenerPrecioVentaProducto(
+          {
+            id: caja.id,
+            precio_costo: caja.precio_costo || 0,
+            marca_id: caja.marca_id ?? null,
+            tipo_producto_id: caja.tipo_producto_id ?? null,
+          },
+          listaCoherencia,
+          porcentajes as unknown as PorcentajeMatriz[],
+          excepciones as unknown as ExcepcionProducto[],
+        ).precioVenta;
+        const precioUnidadTramo = obtenerPrecioVentaPorCantidad(
+          {
+            id: unidad.id,
+            precio_costo: unidad.precio_costo || 0,
+            marca_id: unidad.marca_id ?? null,
+            tipo_producto_id: unidad.tipo_producto_id ?? null,
+          },
+          listaCoherencia,
+          porcentajes as unknown as PorcentajeMatriz[],
+          excepciones as unknown as ExcepcionProducto[],
+          escalas,
+          Number(caja.unidades_por_empaque),
+        ).precioVenta;
+        const r = calcularCoherenciaEmpaque(
+          precioCaja,
+          Number(caja.unidades_por_empaque),
+          precioUnidadTramo,
+          toleranciaEmpaque,
+        );
+        return {
+          cajaId: caja.id,
+          cajaCodigo: caja.codigo_articulo,
+          cajaDescripcion: caja.descripcion,
+          unidadDescripcion: `${unidad.codigo_articulo} — ${unidad.descripcion}`,
+          unidades: Number(caja.unidades_por_empaque),
+          ...r,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => Number(a.ok) - Number(b.ok)) as any[];
+  }, [productos, escalas, porcentajes, excepciones, listaCoherencia, toleranciaEmpaque]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
