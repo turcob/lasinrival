@@ -694,7 +694,73 @@ export default function ListasPrecios() {
         <TabsList>
           <TabsTrigger value="matriz">Matriz de Precios</TabsTrigger>
           <TabsTrigger value="excepciones">Excepciones por Producto</TabsTrigger>
+          <TabsTrigger value="coherencia">Coherencia Caja / Unidad</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="coherencia">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Revisión de precios caja vs. unidad</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-2 min-w-[220px]">
+                  <Label>Lista de precios</Label>
+                  <Select value={listaCoherencia} onValueChange={setListaCoherencia}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar lista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listas.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>{l.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tolerancia configurada: {toleranciaEmpaque}%. Los avisos son informativos y no bloquean ventas.
+                </p>
+              </div>
+
+              {revisionCoherencia.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4" />
+                  No hay productos con equivalencia de empaque configurada para comparar.
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[520px]">
+                  <div className="divide-y rounded-md border">
+                    {revisionCoherencia.map((r) => (
+                      <div key={r.cajaId} className="flex items-start justify-between gap-4 p-3 text-sm">
+                        <div>
+                          <div className="font-medium">
+                            {r.cajaCodigo} — {r.cajaDescripcion}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Equivale a {r.unidadDescripcion} · x{r.unidades} unidades
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Caja por unidad ${r.precioCajaUnitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })} · Equivalente por unidad ${r.precioEquivalenteUnidad.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        {r.ok ? (
+                          <Badge variant="secondary">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Coherente
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" title={r.mensaje}>
+                            <AlertTriangle className="h-3 w-3 mr-1" /> {r.diferenciaPorcentaje > 0 ? '+' : ''}
+                            {r.diferenciaPorcentaje}%
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="matriz">
           {/* Info card */}
