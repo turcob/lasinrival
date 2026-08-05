@@ -108,6 +108,14 @@ export default function Imputacion() {
   const [importarBancoOpen, setImportarBancoOpen] = useState(false);
   const [ventaIdsCaja, setVentaIdsCaja] = useState<Set<string> | null>(null);
   const cajaFiltroId = searchParams.get('caja');
+
+  // Filtros avanzados
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [montoMin, setMontoMin] = useState('');
+  const [montoMax, setMontoMax] = useState('');
+  const [numeroVenta, setNumeroVenta] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('todos');
   useEffect(() => {
     fetchMovimientos();
   }, []);
