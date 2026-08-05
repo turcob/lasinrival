@@ -739,14 +739,6 @@ export default function Imputacion() {
 
   const pendientesCount = movimientos.filter(m => m.estado_imputacion === 'pendiente').length;
 
-  const esCheque = (mov: MovimientoPendiente) => {
-    return mov.forma_pago_nombre?.toLowerCase().includes('cheque') && mov.cheque;
-  };
-
-  const esTransferencia = (mov: MovimientoPendiente) => {
-    return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
-  };
-
   const [uploadingTransfId, setUploadingTransfId] = useState<string | null>(null);
   const [detalleTransfOpen, setDetalleTransfOpen] = useState(false);
   const [detalleTransfMov, setDetalleTransfMov] = useState<MovimientoPendiente | null>(null);
