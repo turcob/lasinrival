@@ -541,6 +541,26 @@ export default function POS() {
     ).length;
   }, [productos, searchTerm]);
 
+  // Tramo por cantidad vigente para el producto en la lista activa
+  const getEscalaAplicable = (productoId: string, cantidad: number) => {
+    if (!selectedLista) return null;
+    const hoy = new Date().toISOString().split('T')[0];
+    const candidatos = escalas
+      .filter((e) => {
+        if (e.producto_id !== productoId) return false;
+        if (e.lista_precio_id !== null && e.lista_precio_id !== selectedLista.id) return false;
+        const inicioOk = !e.fecha_inicio || e.fecha_inicio <= hoy;
+        const finOk = !e.fecha_fin || e.fecha_fin >= hoy;
+        return inicioOk && finOk && cantidad >= e.cantidad_desde;
+      })
+      .sort(
+        (a, b) =>
+          b.cantidad_desde - a.cantidad_desde ||
+          (a.lista_precio_id === null ? 1 : 0) - (b.lista_precio_id === null ? 1 : 0),
+      );
+    return candidatos[0] || null;
+  };
+
   const getProductoPrice = (producto: Producto, cantidad = 1): number => {
     if (!selectedLista) return 0;
     const costo = producto.precio_costo || 0;
