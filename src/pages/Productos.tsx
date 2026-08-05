@@ -134,6 +134,7 @@ export default function Productos() {
   const [codigoSugerido, setCodigoSugerido] = useState<string>('');
   const [codigoManual, setCodigoManual] = useState(false);
   const [sugiriendoCodigo, setSugiriendoCodigo] = useState(false);
+  const [empaqueSearch, setEmpaqueSearch] = useState('');
 
   const [formData, setFormData] = useState({
     codigo_articulo: '',
