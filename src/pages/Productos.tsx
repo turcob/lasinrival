@@ -403,6 +403,51 @@ export default function Productos() {
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
   );
 
+  // Sugerencia de código: código de grupo de la subcategoría + 3 dígitos secuenciales
+  const calcularSugerencia = async (subcategoriaId: string): Promise<string> => {
+    const sub = subcategorias.find((s) => s.id === subcategoriaId);
+    const grupo = (sub?.codigo_grupo || '').trim();
+    if (!grupo) return '';
+
+    const { data, error } = await supabase
+      .from('productos')
+      .select('codigo_articulo')
+      .like('codigo_articulo', `${grupo}%`);
+
+    if (error) return '';
+
+    const existentes = new Set((data || []).map((p) => (p.codigo_articulo || '').trim()));
+    let maxSeq = 0;
+    existentes.forEach((cod) => {
+      const sufijo = cod.slice(grupo.length);
+      if (/^\d+$/.test(sufijo)) {
+        const n = parseInt(sufijo, 10);
+        if (n > maxSeq) maxSeq = n;
+      }
+    });
+
+    let next = maxSeq + 1;
+    let candidato = `${grupo}${String(next).padStart(3, '0')}`;
+    while (existentes.has(candidato) && next < 100000) {
+      next += 1;
+      candidato = `${grupo}${String(next).padStart(3, '0')}`;
+    }
+    return candidato;
+  };
+
+  const handleSubcategoriaChange = async (value: string) => {
+    setFormData((prev) => ({ ...prev, subcategoria_id: value }));
+    if (selectedProducto) return;
+
+    setSugiriendoCodigo(true);
+    const sugerido = await calcularSugerencia(value);
+    setSugiriendoCodigo(false);
+    setCodigoSugerido(sugerido);
+    if (sugerido && !codigoManual) {
+      setFormData((prev) => ({ ...prev, subcategoria_id: value, codigo_articulo: sugerido }));
+    }
+  };
+
   const filteredSubcategoriasForFilter = subcategorias.filter(
     (sub) => !categoriaFilter || categoriaFilter === 'all' || sub.categoria_id === categoriaFilter
   );
