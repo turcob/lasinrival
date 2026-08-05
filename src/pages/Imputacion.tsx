@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -108,6 +109,14 @@ export default function Imputacion() {
   const [importarBancoOpen, setImportarBancoOpen] = useState(false);
   const [ventaIdsCaja, setVentaIdsCaja] = useState<Set<string> | null>(null);
   const cajaFiltroId = searchParams.get('caja');
+
+  // Filtros avanzados
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [montoMin, setMontoMin] = useState('');
+  const [montoMax, setMontoMax] = useState('');
+  const [numeroVenta, setNumeroVenta] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('todos');
   useEffect(() => {
     fetchMovimientos();
   }, []);
@@ -368,6 +377,48 @@ export default function Imputacion() {
     }
   };
 
+  const esCheque = (mov: MovimientoPendiente) => {
+    return mov.forma_pago_nombre?.toLowerCase().includes('cheque') && mov.cheque;
+  };
+
+  const esTransferencia = (mov: MovimientoPendiente) => {
+    return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
+  };
+
+  const toLocalDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const setRangoHoy = () => {
+    const hoy = toLocalDateStr(new Date());
+    setFechaDesde(hoy);
+    setFechaHasta(hoy);
+  };
+
+  const setRangoAyer = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const ayer = toLocalDateStr(d);
+    setFechaDesde(ayer);
+    setFechaHasta(ayer);
+  };
+
+  const limpiarFiltros = () => {
+    setSearchTerm('');
+    setFechaDesde('');
+    setFechaHasta('');
+    setMontoMin('');
+    setMontoMax('');
+    setNumeroVenta('');
+    setTipoFiltro('todos');
+  };
+
+  const filtrosActivos =
+    !!fechaDesde || !!fechaHasta || !!montoMin || !!montoMax || !!numeroVenta || tipoFiltro !== 'todos' || !!searchTerm;
+
   const filteredMovimientos = movimientos.filter(m => {
     // Filtro por caja: solo transferencias con venta_id de esa caja
     if (ventaIdsCaja !== null) {
@@ -379,15 +430,37 @@ export default function Imputacion() {
       m.cheque?.numero_cheque?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.cheque?.banco?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.numero_operacion?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (selectedTab === 'pendientes') {
-      return matchesSearch && m.estado_imputacion === 'pendiente';
-    } else if (selectedTab === 'confirmados') {
-      return matchesSearch && m.estado_imputacion === 'confirmado';
-    } else if (selectedTab === 'rechazados') {
-      return matchesSearch && m.estado_imputacion === 'rechazado';
+    if (!matchesSearch) return false;
+
+    // Fechas (usa la fecha del movimiento en horario local)
+    const fechaMov = (m.fecha || '').slice(0, 10);
+    if (fechaDesde && fechaMov < fechaDesde) return false;
+    if (fechaHasta && fechaMov > fechaHasta) return false;
+
+    // Monto
+    const min = parseFloat(montoMin);
+    const max = parseFloat(montoMax);
+    if (!isNaN(min) && Number(m.monto) < min) return false;
+    if (!isNaN(max) && Number(m.monto) > max) return false;
+
+    // Número de venta
+    if (numeroVenta.trim()) {
+      const nv = numeroVenta.trim().replace(/^0+/, '');
+      if (!m.venta_numero || !String(m.venta_numero).includes(nv)) return false;
     }
-    return matchesSearch;
+
+    // Tipo
+    if (tipoFiltro === 'cheque' && !esCheque(m)) return false;
+    if (tipoFiltro === 'transferencia' && !esTransferencia(m)) return false;
+
+    if (selectedTab === 'pendientes') {
+      return m.estado_imputacion === 'pendiente';
+    } else if (selectedTab === 'confirmados') {
+      return m.estado_imputacion === 'confirmado';
+    } else if (selectedTab === 'rechazados') {
+      return m.estado_imputacion === 'rechazado';
+    }
+    return true;
   });
 
   const fetchVentasPendientes = async (clienteId: string) => {
@@ -666,14 +739,6 @@ export default function Imputacion() {
   };
 
   const pendientesCount = movimientos.filter(m => m.estado_imputacion === 'pendiente').length;
-
-  const esCheque = (mov: MovimientoPendiente) => {
-    return mov.forma_pago_nombre?.toLowerCase().includes('cheque') && mov.cheque;
-  };
-
-  const esTransferencia = (mov: MovimientoPendiente) => {
-    return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
-  };
 
   const [uploadingTransfId, setUploadingTransfId] = useState<string | null>(null);
   const [detalleTransfOpen, setDetalleTransfOpen] = useState(false);
@@ -1012,6 +1077,60 @@ export default function Imputacion() {
             Importar Extracto Bancario
           </Button>
         </div>
+
+        {/* Filtros avanzados */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-6">
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha desde</Label>
+                <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha hasta</Label>
+                <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Monto mínimo</Label>
+                <Input type="number" inputMode="decimal" placeholder="0" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Monto máximo</Label>
+                <Input type="number" inputMode="decimal" placeholder="Sin límite" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nº de venta</Label>
+                <Input placeholder="Ej: 7441" value={numeroVenta} onChange={(e) => setNumeroVenta(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="transferencia">Transferencias</SelectItem>
+                    <SelectItem value="cheque">Cheques</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={setRangoHoy}>Hoy</Button>
+              <Button variant="secondary" size="sm" onClick={setRangoAyer}>Ayer</Button>
+              {filtrosActivos && (
+                <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar filtros
+                </Button>
+              )}
+              <span className="ml-auto text-sm text-muted-foreground">
+                {filteredMovimientos.length} resultado{filteredMovimientos.length === 1 ? '' : 's'} · {formatCurrency(filteredMovimientos.reduce((s, m) => s + Number(m.monto || 0), 0))}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
