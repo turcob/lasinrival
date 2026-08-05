@@ -515,6 +515,7 @@ export default function Productos() {
   }, [productos, listaSeleccionada, porcentajes, excepciones]);
 
   const origenLabel: Record<string, string> = {
+    escala: 'Por cantidad',
     fijo: 'Precio fijo',
     excepcion: 'Excepción',
     marca: 'Por marca',
@@ -522,6 +523,70 @@ export default function Productos() {
     general: 'General',
     ninguno: 'Sin precio',
   };
+
+  // Cantidad de tramos por cantidad vigentes por producto (para la lista seleccionada)
+  const tramosPorProducto = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!listaSeleccionada) return map;
+    productos.forEach((p) => {
+      const t = escalasVigentes(p.id, listaSeleccionada, escalas);
+      if (t.length > 0) map[p.id] = t.length;
+    });
+    return map;
+  }, [productos, escalas, listaSeleccionada]);
+
+  // Coherencia caja vs. unidad (informativa)
+  const coherenciaPorProducto = useMemo(() => {
+    const map: Record<string, { ok: boolean; mensaje: string }> = {};
+    if (!listaSeleccionada) return map;
+    productos.forEach((caja) => {
+      if (!caja.empaque_de_producto_id || !caja.unidades_por_empaque) return;
+      const unidad = productos.find((u) => u.id === caja.empaque_de_producto_id);
+      if (!unidad) return;
+      const precioCaja = preciosVenta[caja.id]?.precio || 0;
+      if (!precioCaja) return;
+      const precioUnidadTramo = obtenerPrecioVentaPorCantidad(
+        {
+          id: unidad.id,
+          precio_costo: unidad.precio_costo || 0,
+          marca_id: unidad.marca_id,
+          tipo_producto_id: unidad.tipo_producto_id ?? null,
+        },
+        listaSeleccionada,
+        porcentajes,
+        excepciones,
+        escalas,
+        Number(caja.unidades_por_empaque),
+      ).precioVenta;
+      const r = calcularCoherenciaEmpaque(
+        precioCaja,
+        Number(caja.unidades_por_empaque),
+        precioUnidadTramo,
+        toleranciaEmpaque,
+      );
+      if (!r.ok) map[caja.id] = { ok: false, mensaje: r.mensaje };
+    });
+    return map;
+  }, [productos, preciosVenta, escalas, porcentajes, excepciones, listaSeleccionada, toleranciaEmpaque]);
+
+  const productosParaEscalas = useMemo(
+    () =>
+      productos.map((p) => ({
+        id: p.id,
+        codigo_articulo: p.codigo_articulo,
+        descripcion: p.descripcion,
+        precio_costo: p.precio_costo || 0,
+        marca_id: p.marca_id,
+        tipo_producto_id: p.tipo_producto_id ?? null,
+        unidades_por_empaque: p.unidades_por_empaque ?? null,
+        empaque_de_producto_id: p.empaque_de_producto_id ?? null,
+      })),
+    [productos],
+  );
+
+  const productosEscalasSeleccion = escalasProductoId
+    ? productosParaEscalas.filter((p) => p.id === escalasProductoId)
+    : productosParaEscalas.filter((p) => seleccionados.has(p.id));
 
   const toggleSeleccion = (id: string) => {
     setSeleccionados((prev) => {
