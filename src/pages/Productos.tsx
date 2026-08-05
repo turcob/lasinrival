@@ -1085,6 +1085,60 @@ export default function Productos() {
                 <Label htmlFor="activo">Producto activo</Label>
               </div>
 
+              <div className="space-y-3 rounded-lg border p-3">
+                <div>
+                  <Label>Equivalencia de empaque (opcional)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Si este producto es una caja/pack, indicá a qué producto unidad equivale y cuántas
+                    unidades trae. Sirve para avisar si el precio de la caja no coincide con el precio por
+                    cantidad de la unidad.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="empaque_de">Producto unidad equivalente</Label>
+                    <Select
+                      value={formData.empaque_de_producto_id || 'ninguno'}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          empaque_de_producto_id: value === 'ninguno' ? '' : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="empaque_de">
+                        <SelectValue placeholder="Sin equivalencia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ninguno">Sin equivalencia</SelectItem>
+                        {productos
+                          .filter((p) => p.activo && p.id !== selectedProducto?.id)
+                          .slice(0, 300)
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.codigo_articulo} — {p.descripcion}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unidades_por_empaque">Unidades por empaque</Label>
+                    <Input
+                      id="unidades_por_empaque"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.unidades_por_empaque}
+                      onChange={(e) =>
+                        setFormData({ ...formData, unidades_por_empaque: e.target.value })
+                      }
+                      placeholder="Ej: 12"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
@@ -1179,6 +1233,17 @@ export default function Productos() {
             <Button size="sm" onClick={() => setFijarPrecioOpen(true)}>
               Fijar precio de venta
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEscalasProductoId(null);
+                setEscalasOpen(true);
+              }}
+            >
+              <Layers className="mr-2 h-4 w-4" />
+              Precios por cantidad
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Set())}>
               Limpiar selección
             </Button>
@@ -1246,6 +1311,22 @@ export default function Productos() {
         open={importarFriosOpen}
         onOpenChange={setImportarFriosOpen}
         onImportComplete={fetchData}
+      />
+
+      <EscalasCantidadDialog
+        open={escalasOpen}
+        onOpenChange={(v) => {
+          setEscalasOpen(v);
+          if (!v) setEscalasProductoId(null);
+        }}
+        productos={productosEscalasSeleccion}
+        productosTodos={productosParaEscalas}
+        listas={listas}
+        porcentajes={porcentajes}
+        excepciones={excepciones}
+        listaIdInicial={listaSeleccionada}
+        toleranciaPorcentaje={toleranciaEmpaque}
+        onSaved={fetchData}
       />
 
       <ImprimirPreciosDialog
