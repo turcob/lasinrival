@@ -99,6 +99,7 @@ interface Excepcion {
   lista_precio_id: string | null;
   producto_id: string;
   porcentaje: number;
+  precio_fijo?: number | null;
   descripcion: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
@@ -146,7 +147,7 @@ export default function ListasPrecios() {
   // Form data
   const [listaFormData, setListaFormData] = useState({ nombre: '', codigo: '', orden: 0, activo: true, destino: 'sin_rival' });
   const [columnaFormData, setColumnaFormData] = useState<{ tipo: 'marca' | 'tipo_producto', id: string }>({ tipo: 'marca', id: '' });
-  const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
+  const [excepcionFormData, setExcepcionFormData] = useState({ producto_id: '', lista_precio_id: '', modo: 'porcentaje' as 'porcentaje' | 'fijo', porcentaje: 0, precio_fijo: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
   const [productoSearch, setProductoSearch] = useState('');
   
   // Matriz de porcentajes editables (temporal antes de guardar)
@@ -578,10 +579,12 @@ export default function ListasPrecios() {
     e.preventDefault();
     
     try {
+      const esFijo = excepcionFormData.modo === 'fijo';
       const dataToSave = {
         producto_id: excepcionFormData.producto_id,
         lista_precio_id: excepcionFormData.lista_precio_id || null,
-        porcentaje: excepcionFormData.porcentaje,
+        porcentaje: esFijo ? 0 : excepcionFormData.porcentaje,
+        precio_fijo: esFijo ? excepcionFormData.precio_fijo : null,
         descripcion: excepcionFormData.descripcion || null,
         fecha_inicio: excepcionFormData.fecha_inicio || null,
         fecha_fin: excepcionFormData.fecha_fin || null,
@@ -630,7 +633,9 @@ export default function ListasPrecios() {
     setExcepcionFormData({
       producto_id: exc.producto_id,
       lista_precio_id: exc.lista_precio_id || '',
+      modo: exc.precio_fijo != null ? 'fijo' : 'porcentaje',
       porcentaje: exc.porcentaje,
+      precio_fijo: exc.precio_fijo ?? 0,
       descripcion: exc.descripcion || '',
       fecha_inicio: exc.fecha_inicio || '',
       fecha_fin: exc.fecha_fin || '',
@@ -640,7 +645,7 @@ export default function ListasPrecios() {
 
   const resetExcepcionForm = () => {
     setSelectedExcepcion(null);
-    setExcepcionFormData({ producto_id: '', lista_precio_id: '', porcentaje: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
+    setExcepcionFormData({ producto_id: '', lista_precio_id: '', modo: 'porcentaje', porcentaje: 0, precio_fijo: 0, descripcion: '', fecha_inicio: '', fecha_fin: '' });
     setProductoSearch('');
   };
 
@@ -1032,18 +1037,42 @@ export default function ListasPrecios() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Porcentaje *</Label>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={excepcionFormData.porcentaje}
-                            onChange={(e) => setExcepcionFormData({ ...excepcionFormData, porcentaje: parseFloat(e.target.value) || 0 })}
-                            required
-                          />
-                          <span>%</span>
-                        </div>
+                        <Label>Tipo de excepción *</Label>
+                        <Select
+                          value={excepcionFormData.modo}
+                          onValueChange={(v) => setExcepcionFormData({ ...excepcionFormData, modo: v as 'porcentaje' | 'fijo' })}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="porcentaje">Porcentaje sobre costo</SelectItem>
+                            <SelectItem value="fijo">Precio fijo (monto final)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {excepcionFormData.modo === 'porcentaje' ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={excepcionFormData.porcentaje}
+                              onChange={(e) => setExcepcionFormData({ ...excepcionFormData, porcentaje: parseFloat(e.target.value) || 0 })}
+                              required
+                            />
+                            <span>%</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span>$</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={excepcionFormData.precio_fijo}
+                              onChange={(e) => setExcepcionFormData({ ...excepcionFormData, precio_fijo: parseFloat(e.target.value) || 0 })}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Descripción</Label>
@@ -1076,7 +1105,10 @@ export default function ListasPrecios() {
                     </div>
                     <div className="flex justify-end gap-3">
                       <Button type="button" variant="outline" onClick={() => setExcepcionDialogOpen(false)}>Cancelar</Button>
-                      <Button type="submit" disabled={!excepcionFormData.producto_id}>
+                      <Button
+                        type="submit"
+                        disabled={!excepcionFormData.producto_id || (excepcionFormData.modo === 'fijo' && excepcionFormData.precio_fijo <= 0)}
+                      >
                         {selectedExcepcion ? 'Guardar' : 'Crear'}
                       </Button>
                     </div>
@@ -1095,7 +1127,7 @@ export default function ListasPrecios() {
                     <TableRow>
                       <TableHead>Producto</TableHead>
                       <TableHead>Lista</TableHead>
-                      <TableHead className="text-center">Porcentaje</TableHead>
+                      <TableHead className="text-center">Valor</TableHead>
                       <TableHead>Vigencia</TableHead>
                       <TableHead>Descripción</TableHead>
                       <TableHead className="w-[100px]">Acciones</TableHead>
@@ -1120,7 +1152,15 @@ export default function ListasPrecios() {
                             : <Badge variant="outline">Todas las listas</Badge>
                           }
                         </TableCell>
-                        <TableCell className="text-center font-medium">{exc.porcentaje}%</TableCell>
+                        <TableCell className="text-center font-medium">
+                          {exc.precio_fijo != null ? (
+                            <Badge variant="secondary">
+                              ${Number(exc.precio_fijo).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </Badge>
+                          ) : (
+                            <>{exc.porcentaje}%</>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-xs">
                             <CalendarDays className="h-3 w-3 text-muted-foreground" />
