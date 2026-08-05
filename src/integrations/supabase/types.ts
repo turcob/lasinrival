@@ -3335,6 +3335,7 @@ export type Database = {
           subcategoria_id: string | null
           tipo_producto_id: string | null
           unidad_medida: string | null
+          unidades_por_empaque: number | null
           updated_at: string | null
         }
         Insert: {
@@ -3357,6 +3358,7 @@ export type Database = {
           subcategoria_id?: string | null
           tipo_producto_id?: string | null
           unidad_medida?: string | null
+          unidades_por_empaque?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -3379,6 +3381,7 @@ export type Database = {
           subcategoria_id?: string | null
           tipo_producto_id?: string | null
           unidad_medida?: string | null
+          unidades_por_empaque?: number | null
           updated_at?: string | null
         }
         Relationships: [
