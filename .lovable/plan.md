@@ -48,3 +48,23 @@ En la ficha del producto caja (el que tiene su propio codigo de barra), un bloqu
 - Nuevo helper `calcularCoherenciaEmpaque(unidad, caja, listaId, ...)` que devuelve precios comparados, diferencia y si excede tolerancia.
 - UI: `src/components/productos/EscalasCantidadDialog.tsx` (tramos, individual y en lote), bloque de equivalencia + coherencia en el formulario de `src/pages/Productos.tsx`, panel de revision en `src/pages/ListasPrecios.tsx`.
 - Consumidores a actualizar para pasar cantidad y cargar escalas: `src/pages/POS.tsx`, `src/components/pos/ProductSearchModal.tsx`, `NuevoPedidoDialog`, `EditarPedidoDialog`, `PrepararPedidoDialog`, `DetalleListaPrecioDialog`, `ImprimirPreciosDialog` (etiquetas siguen usando el tramo desde 1).
+
+## Compatibilidad con produccion (sin romper nada)
+El sistema esta en produccion, por lo que el cambio se hace **aditivo** y con comportamiento por defecto identico al actual:
+
+- **Base de datos**: solo se agregan objetos nuevos (tabla `lista_precio_escalas`, columna de vinculo caja/unidad en `productos`, columna de tolerancia en configuracion). No se modifica ni renombra ninguna columna existente, no se toca `lista_precio_excepciones` ni ninguna RPC de ventas (`pos_registrar_venta`, `pos_actualizar_pedido_estado`, `get_ventas_lista`).
+- **Sin escalas cargadas = precios actuales**: mientras no exista ningun tramo, el calculo cae exactamente en la logica de hoy (excepcion > marca > tipo > general). Al no cargar datos, ningun precio cambia.
+- **Firma vieja intacta**: `obtenerPrecioVentaProducto` se mantiene con la misma firma y resultado (equivale a cantidad = 1), asi los consumidores que no se toquen siguen funcionando igual (`DetalleListaPrecioDialog`, `ImprimirPreciosDialog`, `ExcelImporterDesactivados`, `FijarPrecioVentaDialog`).
+- **Ventas historicas**: el precio se sigue guardando en `venta_detalles.precio_unitario`, por lo que ventas, pedidos, remitos, facturas AFIP y notas de credito ya emitidos no se recalculan nunca.
+- **Precio manual gana**: si el operador escribio un precio en el renglon, el tramo no lo pisa (se marca "manual").
+- **Alertas no bloqueantes**: los avisos de coherencia caja/unidad son informativos; no impiden vender, facturar ni guardar productos.
+- **Permisos**: la tabla nueva usa las mismas politicas RLS y GRANTs que `lista_precio_excepciones`, sin ampliar accesos.
+
+## Orden de aplicacion
+1. Migracion aditiva (tabla + columnas + RLS/GRANTs).
+2. `precioUtils.ts`: nueva funcion con cantidad y helper de coherencia, manteniendo la firma actual.
+3. UI de escalas en Productos (individual y en lote) + bloque de equivalencia caja/unidad.
+4. POS y pedidos: pasar la cantidad al calculo y mostrar el badge de tramo.
+5. Panel de revision de coherencia en Listas de Precios.
+
+Verificacion antes de cerrar: con la tabla de escalas vacia, POS, pedidos, etiquetas y detalle de lista deben mostrar exactamente los mismos precios que hoy.
