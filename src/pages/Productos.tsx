@@ -1098,30 +1098,77 @@ export default function Productos() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="empaque_de">Producto unidad equivalente</Label>
-                    <Select
-                      value={formData.empaque_de_producto_id || 'ninguno'}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          empaque_de_producto_id: value === 'ninguno' ? '' : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger id="empaque_de">
-                        <SelectValue placeholder="Sin equivalencia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ninguno">Sin equivalencia</SelectItem>
-                        {productos
-                          .filter((p) => p.activo && p.id !== selectedProducto?.id)
-                          .slice(0, 300)
-                          .map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.codigo_articulo} — {p.descripcion}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    {formData.empaque_de_producto_id ? (
+                      <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                        <span className="truncate">
+                          {(() => {
+                            const p = productos.find(
+                              (x) => x.id === formData.empaque_de_producto_id,
+                            );
+                            return p ? `${p.codigo_articulo} — ${p.descripcion}` : 'Producto';
+                          })()}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFormData({ ...formData, empaque_de_producto_id: '' });
+                            setEmpaqueSearch('');
+                          }}
+                        >
+                          Quitar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Input
+                          id="empaque_de"
+                          autoComplete="off"
+                          placeholder="Buscar por código, código de barra o descripción..."
+                          value={empaqueSearch}
+                          onChange={(e) => setEmpaqueSearch(e.target.value)}
+                        />
+                        {empaqueSearch.trim().length >= 2 && (
+                          <div className="max-h-48 overflow-y-auto rounded-md border">
+                            {(() => {
+                              const term = empaqueSearch.trim().toLowerCase();
+                              const results = productos
+                                .filter(
+                                  (p) =>
+                                    p.activo &&
+                                    p.id !== selectedProducto?.id &&
+                                    ((p.codigo_articulo || '').toLowerCase().includes(term) ||
+                                      (p.descripcion || '').toLowerCase().includes(term) ||
+                                      (p.codigo_barra || '').toLowerCase().includes(term)),
+                                )
+                                .slice(0, 30);
+                              if (results.length === 0) {
+                                return (
+                                  <p className="p-2 text-xs text-muted-foreground">
+                                    Sin resultados
+                                  </p>
+                                );
+                              }
+                              return results.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  className="block w-full px-2 py-1.5 text-left text-sm hover:bg-accent"
+                                  onClick={() => {
+                                    setFormData({ ...formData, empaque_de_producto_id: p.id });
+                                    setEmpaqueSearch('');
+                                  }}
+                                >
+                                  <span className="font-mono text-xs">{p.codigo_articulo}</span>{' '}
+                                  {p.descripcion}
+                                </button>
+                              ));
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unidades_por_empaque">Unidades por empaque</Label>
