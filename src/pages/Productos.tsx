@@ -85,6 +85,7 @@ interface Subcategoria {
   id: string;
   nombre: string;
   categoria_id: string;
+  codigo_grupo?: string | null;
 }
 
 interface Marca {
@@ -118,6 +119,9 @@ export default function Productos() {
   );
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [fijarPrecioOpen, setFijarPrecioOpen] = useState(false);
+  const [codigoSugerido, setCodigoSugerido] = useState<string>('');
+  const [codigoManual, setCodigoManual] = useState(false);
+  const [sugiriendoCodigo, setSugiriendoCodigo] = useState(false);
 
   const [formData, setFormData] = useState({
     codigo_articulo: '',
@@ -167,7 +171,7 @@ export default function Productos() {
       const [productosData, categoriasRes, subcategoriasRes, marcasRes] = await Promise.all([
         fetchAllProductos(),
         supabase.from('categorias').select('id, nombre').eq('activo', true).order('nombre'),
-        supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
+        supabase.from('subcategorias').select('id, nombre, categoria_id, codigo_grupo').eq('activo', true).order('nombre'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
@@ -332,6 +336,8 @@ export default function Productos() {
 
   const openEditDialog = (producto: Producto) => {
     setSelectedProducto(producto);
+    setCodigoSugerido('');
+    setCodigoManual(true);
     setFormData({
       codigo_articulo: producto.codigo_articulo,
       descripcion: producto.descripcion,
@@ -350,6 +356,8 @@ export default function Productos() {
 
   const resetForm = () => {
     setSelectedProducto(null);
+    setCodigoSugerido('');
+    setCodigoManual(false);
     setFormData({
       codigo_articulo: '',
       descripcion: '',
@@ -394,6 +402,51 @@ export default function Productos() {
   const filteredSubcategorias = subcategorias.filter(
     (sub) => !formData.categoria_id || sub.categoria_id === formData.categoria_id
   );
+
+  // Sugerencia de código: código de grupo de la subcategoría + 3 dígitos secuenciales
+  const calcularSugerencia = async (subcategoriaId: string): Promise<string> => {
+    const sub = subcategorias.find((s) => s.id === subcategoriaId);
+    const grupo = (sub?.codigo_grupo || '').trim();
+    if (!grupo) return '';
+
+    const { data, error } = await supabase
+      .from('productos')
+      .select('codigo_articulo')
+      .like('codigo_articulo', `${grupo}%`);
+
+    if (error) return '';
+
+    const existentes = new Set((data || []).map((p) => (p.codigo_articulo || '').trim()));
+    let maxSeq = 0;
+    existentes.forEach((cod) => {
+      const sufijo = cod.slice(grupo.length);
+      if (/^\d+$/.test(sufijo)) {
+        const n = parseInt(sufijo, 10);
+        if (n > maxSeq) maxSeq = n;
+      }
+    });
+
+    let next = maxSeq + 1;
+    let candidato = `${grupo}${String(next).padStart(3, '0')}`;
+    while (existentes.has(candidato) && next < 100000) {
+      next += 1;
+      candidato = `${grupo}${String(next).padStart(3, '0')}`;
+    }
+    return candidato;
+  };
+
+  const handleSubcategoriaChange = async (value: string) => {
+    setFormData((prev) => ({ ...prev, subcategoria_id: value }));
+    if (selectedProducto) return;
+
+    setSugiriendoCodigo(true);
+    const sugerido = await calcularSugerencia(value);
+    setSugiriendoCodigo(false);
+    setCodigoSugerido(sugerido);
+    if (sugerido && !codigoManual) {
+      setFormData((prev) => ({ ...prev, subcategoria_id: value, codigo_articulo: sugerido }));
+    }
+  };
 
   const filteredSubcategoriasForFilter = subcategorias.filter(
     (sub) => !categoriaFilter || categoriaFilter === 'all' || sub.categoria_id === categoriaFilter
@@ -718,15 +771,83 @@ export default function Productos() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoría</Label>
+                  <Select
+                    value={formData.categoria_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoria_id: value, subcategoria_id: '' })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subcategoria">Subcategoría</Label>
+                  <Select
+                    value={formData.subcategoria_id}
+                    onValueChange={handleSubcategoriaChange}
+                    disabled={!formData.categoria_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSubcategorias.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id}>
+                          {sub.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="codigo_articulo">Código *</Label>
                   <Input
                     id="codigo_articulo"
                     value={formData.codigo_articulo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, codigo_articulo: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setCodigoManual(true);
+                      setFormData({ ...formData, codigo_articulo: e.target.value });
+                    }}
                     required
                   />
+                  {!selectedProducto && (
+                    <p className="text-xs text-muted-foreground">
+                      {sugiriendoCodigo
+                        ? 'Calculando código sugerido...'
+                        : codigoSugerido
+                          ? (
+                            <>
+                              Sugerido: {codigoSugerido}
+                              {formData.codigo_articulo !== codigoSugerido && (
+                                <button
+                                  type="button"
+                                  className="ml-2 underline"
+                                  onClick={() => {
+                                    setFormData((prev) => ({ ...prev, codigo_articulo: codigoSugerido }));
+                                    setCodigoManual(false);
+                                  }}
+                                >
+                                  usar sugerido
+                                </button>
+                              )}
+                            </>
+                          )
+                          : 'Elegí categoría y subcategoría para sugerir un código.'}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="codigo_barra">Código de Barras</Label>
@@ -752,7 +873,7 @@ export default function Productos() {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="unidad_medida">Unidad de Medida</Label>
                   <Select
@@ -770,47 +891,6 @@ export default function Productos() {
                       <SelectItem value="LT">Litro</SelectItem>
                       <SelectItem value="MT">Metro</SelectItem>
                       <SelectItem value="CJ">Caja</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoría</Label>
-                  <Select
-                    value={formData.categoria_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, categoria_id: value, subcategoria_id: '' })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subcategoria">Subcategoría</Label>
-                  <Select
-                    value={formData.subcategoria_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, subcategoria_id: value })
-                    }
-                    disabled={!formData.categoria_id}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubcategorias.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id}>
-                          {sub.nombre}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
