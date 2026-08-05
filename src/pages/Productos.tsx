@@ -5,7 +5,8 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer, Barcode } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer, Barcode, Layers, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import * as XLSX from 'xlsx';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
@@ -14,12 +15,17 @@ import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog'
 import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
 import { CargaCodigosBarraDialog } from '@/components/productos/CargaCodigosBarraDialog';
 import { FijarPrecioVentaDialog } from '@/components/productos/FijarPrecioVentaDialog';
+import { EscalasCantidadDialog } from '@/components/productos/EscalasCantidadDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   obtenerPrecioVentaProducto,
+  escalasVigentes,
+  obtenerPrecioVentaPorCantidad,
+  calcularCoherenciaEmpaque,
   type ListaPrecio,
   type PorcentajeMatriz,
   type ExcepcionProducto,
+  type EscalaCantidad,
 } from '@/lib/precioUtils';
 import {
   Dialog,
@@ -70,6 +76,8 @@ interface Producto {
   precio_costo: number;
   desactivado_por: string | null;
   fecha_desactivacion: string | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
   marcas?: { nombre: string } | null;
