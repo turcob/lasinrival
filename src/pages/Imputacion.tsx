@@ -1077,6 +1077,60 @@ export default function Imputacion() {
           </Button>
         </div>
 
+        {/* Filtros avanzados */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-6">
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha desde</Label>
+                <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Fecha hasta</Label>
+                <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Monto mínimo</Label>
+                <Input type="number" inputMode="decimal" placeholder="0" value={montoMin} onChange={(e) => setMontoMin(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Monto máximo</Label>
+                <Input type="number" inputMode="decimal" placeholder="Sin límite" value={montoMax} onChange={(e) => setMontoMax(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nº de venta</Label>
+                <Input placeholder="Ej: 7441" value={numeroVenta} onChange={(e) => setNumeroVenta(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="transferencia">Transferencias</SelectItem>
+                    <SelectItem value="cheque">Cheques</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={setRangoHoy}>Hoy</Button>
+              <Button variant="secondary" size="sm" onClick={setRangoAyer}>Ayer</Button>
+              {filtrosActivos && (
+                <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+                  <X className="h-4 w-4 mr-1" />
+                  Limpiar filtros
+                </Button>
+              )}
+              <span className="ml-auto text-sm text-muted-foreground">
+                {filteredMovimientos.length} resultado{filteredMovimientos.length === 1 ? '' : 's'} · {formatCurrency(filteredMovimientos.reduce((s, m) => s + Number(m.monto || 0), 0))}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
           <TabsList>
