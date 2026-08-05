@@ -2837,6 +2837,9 @@ export default function POS() {
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
                       const maxDescuento = getDescuentoMaximo();
+                      const escalaItem = item.producto && !item.es_temporal
+                        ? getEscalaAplicable(item.producto.id, item.cantidad)
+                        : null;
                       
                       return (
                         <div
@@ -2854,6 +2857,12 @@ export default function POS() {
                                 <Badge variant="outline" className="text-xs shrink-0">
                                   <Scale className="h-3 w-3 mr-1" />
                                   KG
+                                </Badge>
+                              )}
+                              {escalaItem && (
+                                <Badge variant="secondary" className="text-xs shrink-0">
+                                  x{escalaItem.cantidad_desde}
+                                  {escalaItem.descripcion ? ` · ${escalaItem.descripcion}` : ''}
                                 </Badge>
                               )}
                             </div>
