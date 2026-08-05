@@ -336,6 +336,8 @@ export default function Productos() {
 
   const openEditDialog = (producto: Producto) => {
     setSelectedProducto(producto);
+    setCodigoSugerido('');
+    setCodigoManual(true);
     setFormData({
       codigo_articulo: producto.codigo_articulo,
       descripcion: producto.descripcion,
@@ -354,6 +356,8 @@ export default function Productos() {
 
   const resetForm = () => {
     setSelectedProducto(null);
+    setCodigoSugerido('');
+    setCodigoManual(false);
     setFormData({
       codigo_articulo: '',
       descripcion: '',
