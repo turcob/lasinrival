@@ -3,7 +3,15 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+  obtenerPrecioVentaProducto,
+  obtenerPrecioVentaPorCantidad,
+  calcularCoherenciaEmpaque,
+  type EscalaCantidad,
+  type PorcentajeMatriz,
+  type ExcepcionProducto,
+} from '@/lib/precioUtils';
 import {
   Dialog,
   DialogContent,
@@ -63,6 +71,9 @@ interface Producto {
   descripcion: string;
   marca_id?: string | null;
   tipo_producto_id?: string | null;
+  precio_costo?: number | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
 }
 
 interface ListaPrecio {
@@ -109,6 +120,9 @@ export default function ListasPrecios() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [porcentajes, setPorcentajes] = useState<Porcentaje[]>([]);
   const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
+  const [escalas, setEscalas] = useState<EscalaCantidad[]>([]);
+  const [toleranciaEmpaque, setToleranciaEmpaque] = useState(1);
+  const [listaCoherencia, setListaCoherencia] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -146,13 +160,15 @@ export default function ListasPrecios() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [listasRes, marcasRes, tiposRes, porcentajesRes, excepcionesRes, productosRes] = await Promise.all([
+      const [listasRes, marcasRes, tiposRes, porcentajesRes, excepcionesRes, productosRes, escalasRes, configRes] = await Promise.all([
         supabase.from('listas_precios').select('*').order('orden'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('tipos_producto').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('*, producto:productos(id, codigo_articulo, descripcion, marca_id, tipo_producto_id)'),
-        supabase.from('productos').select('id, codigo_articulo, descripcion, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('productos').select('id, codigo_articulo, descripcion, marca_id, tipo_producto_id, precio_costo, unidades_por_empaque, empaque_de_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
+        supabase.from('configuracion_comercio').select('tolerancia_precio_empaque').maybeSingle(),
       ]);
 
       if (listasRes.error) throw listasRes.error;
@@ -166,6 +182,11 @@ export default function ListasPrecios() {
       setPorcentajes(porcentajesData);
       setExcepciones((excepcionesRes.data || []) as Excepcion[]);
       setProductos(productosRes.data || []);
+      setEscalas(((escalasRes.data || []) as unknown) as EscalaCantidad[]);
+      if (configRes.data?.tolerancia_precio_empaque != null) {
+        setToleranciaEmpaque(Number(configRes.data.tolerancia_precio_empaque));
+      }
+      setListaCoherencia((prev) => prev || listasData[0]?.id || '');
       
       // Construir columnas desde los porcentajes existentes
       const columnas: ColumnaMatriz[] = [
