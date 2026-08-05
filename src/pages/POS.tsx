@@ -2683,6 +2683,7 @@ export default function POS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     ref={searchInputRef}
+                    tabIndex={1}
                     className="pl-10"
                     placeholder="Buscar producto por código o descripción..."
                     value={searchTerm}
