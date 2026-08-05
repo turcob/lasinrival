@@ -187,6 +187,17 @@ export default function POS() {
   const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
   const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [escalas, setEscalas] = useState<{
+    id: string;
+    lista_precio_id: string | null;
+    producto_id: string;
+    cantidad_desde: number;
+    precio_unitario: number | null;
+    porcentaje: number | null;
+    descripcion?: string | null;
+    fecha_inicio?: string | null;
+    fecha_fin?: string | null;
+  }[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
@@ -453,7 +464,7 @@ export default function POS() {
         }
         return { data: acc, error: null };
       };
-      const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
+      const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, escalasRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         fetchAllProductos(),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
@@ -461,6 +472,7 @@ export default function POS() {
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).neq('destino', 'paladini').order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje, precio_fijo'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
         supabase.from('tarjetas').select('*').eq('activo', true).order('tipo').order('nombre'),
         supabase.from('tarjeta_cuotas').select('*').eq('activo', true).order('cuotas'),
@@ -476,6 +488,7 @@ export default function POS() {
       if (descuentosRes.data) setConfigDescuentos(descuentosRes.data);
       if (porcentajesRes.data) setMatrizPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
       if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
+      if (escalasRes.data) setEscalas(escalasRes.data as any);
       if (listasRes.data) {
         setListasPrecios(listasRes.data);
         if (listasRes.data.length > 0 && !selectedLista) {
@@ -528,10 +541,20 @@ export default function POS() {
     ).length;
   }, [productos, searchTerm]);
 
-  const getProductoPrice = (producto: Producto): number => {
+  const getProductoPrice = (producto: Producto, cantidad = 1): number => {
     if (!selectedLista) return 0;
     const costo = producto.precio_costo || 0;
-    
+
+    // Tramo por cantidad (si existe uno aplicable, tiene prioridad)
+    const escala = getEscalaAplicable(producto.id, cantidad);
+    if (escala) {
+      const precio =
+        escala.precio_unitario !== null && escala.precio_unitario !== undefined
+          ? Number(escala.precio_unitario)
+          : costo * (1 + Number(escala.porcentaje ?? 0) / 100);
+      return Math.round(precio * 100) / 100;
+    }
+
     const excepcion = excepciones.find(e => 
       e.producto_id === producto.id && 
       (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null)
