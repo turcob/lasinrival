@@ -648,6 +648,19 @@ export default function Productos() {
             ${info.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           <div className="text-[10px] text-muted-foreground">{origenLabel[info.origen]}</div>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            {tramosPorProducto[item.id] && (
+              <Badge variant="secondary" className="text-[10px]">
+                {tramosPorProducto[item.id]} tramo{tramosPorProducto[item.id] > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {coherenciaPorProducto[item.id] && (
+              <Badge variant="destructive" className="text-[10px]" title={coherenciaPorProducto[item.id].mensaje}>
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Precio incoherente
+              </Badge>
+            )}
+          </div>
         </div>
       );
     },
@@ -698,6 +711,17 @@ export default function Productos() {
       header: 'Acciones',
       render: (item: Producto) => (
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Precios por cantidad"
+            onClick={() => {
+              setEscalasProductoId(item.id);
+              setEscalasOpen(true);
+            }}
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
             <Edit2 className="h-4 w-4" />
           </Button>
