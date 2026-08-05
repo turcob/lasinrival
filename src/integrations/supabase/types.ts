@@ -1128,6 +1128,7 @@ export type Database = {
           razon_social: string
           telefono: string | null
           texto_login_footer: string | null
+          tolerancia_precio_empaque: number
           updated_at: string
         }
         Insert: {
@@ -1152,6 +1153,7 @@ export type Database = {
           razon_social: string
           telefono?: string | null
           texto_login_footer?: string | null
+          tolerancia_precio_empaque?: number
           updated_at?: string
         }
         Update: {
@@ -1176,6 +1178,7 @@ export type Database = {
           razon_social?: string
           telefono?: string | null
           texto_login_footer?: string | null
+          tolerancia_precio_empaque?: number
           updated_at?: string
         }
         Relationships: []
@@ -2170,6 +2173,84 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vehiculos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      lista_precio_escalas: {
+        Row: {
+          cantidad_desde: number
+          created_at: string
+          descripcion: string | null
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          lista_precio_id: string | null
+          porcentaje: number | null
+          precio_unitario: number | null
+          producto_id: string
+          updated_at: string
+        }
+        Insert: {
+          cantidad_desde: number
+          created_at?: string
+          descripcion?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          porcentaje?: number | null
+          precio_unitario?: number | null
+          producto_id: string
+          updated_at?: string
+        }
+        Update: {
+          cantidad_desde?: number
+          created_at?: string
+          descripcion?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          lista_precio_id?: string | null
+          porcentaje?: number | null
+          precio_unitario?: number | null
+          producto_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lista_precio_escalas_lista_precio_id_fkey"
+            columns: ["lista_precio_id"]
+            isOneToOne: false
+            referencedRelation: "listas_precios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lista_precio_escalas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lista_precio_escalas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "lista_precio_escalas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "lista_precio_escalas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
         ]
       }
@@ -3243,6 +3324,7 @@ export type Database = {
           created_at: string | null
           desactivado_por: string | null
           descripcion: string
+          empaque_de_producto_id: string | null
           es_frio: boolean
           fecha_desactivacion: string | null
           id: string
@@ -3264,6 +3346,7 @@ export type Database = {
           created_at?: string | null
           desactivado_por?: string | null
           descripcion: string
+          empaque_de_producto_id?: string | null
           es_frio?: boolean
           fecha_desactivacion?: string | null
           id?: string
@@ -3285,6 +3368,7 @@ export type Database = {
           created_at?: string | null
           desactivado_por?: string | null
           descripcion?: string
+          empaque_de_producto_id?: string | null
           es_frio?: boolean
           fecha_desactivacion?: string | null
           id?: string
@@ -3304,6 +3388,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "categorias"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_empaque_de_producto_id_fkey"
+            columns: ["empaque_de_producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_empaque_de_producto_id_fkey"
+            columns: ["empaque_de_producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_producto"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "productos_empaque_de_producto_id_fkey"
+            columns: ["empaque_de_producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quiebre_probable"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "productos_empaque_de_producto_id_fkey"
+            columns: ["empaque_de_producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_stock_actual"
+            referencedColumns: ["producto_id"]
           },
           {
             foreignKeyName: "productos_marca_id_fkey"
