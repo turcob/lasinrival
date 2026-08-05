@@ -5,7 +5,8 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer, Barcode } from 'lucide-react';
+import { Plus, Edit2, Trash2, RotateCcw, TrendingUp, Snowflake, Download, Printer, Barcode, Layers, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import * as XLSX from 'xlsx';
 import { ExcelImporter } from '@/components/shared/ExcelImporter';
 import { ExcelImporterDesactivados } from '@/components/shared/ExcelImporterDesactivados';
@@ -14,12 +15,17 @@ import { ImportarFriosDialog } from '@/components/productos/ImportarFriosDialog'
 import { ImprimirPreciosDialog } from '@/components/productos/ImprimirPreciosDialog';
 import { CargaCodigosBarraDialog } from '@/components/productos/CargaCodigosBarraDialog';
 import { FijarPrecioVentaDialog } from '@/components/productos/FijarPrecioVentaDialog';
+import { EscalasCantidadDialog } from '@/components/productos/EscalasCantidadDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   obtenerPrecioVentaProducto,
+  escalasVigentes,
+  obtenerPrecioVentaPorCantidad,
+  calcularCoherenciaEmpaque,
   type ListaPrecio,
   type PorcentajeMatriz,
   type ExcepcionProducto,
+  type EscalaCantidad,
 } from '@/lib/precioUtils';
 import {
   Dialog,
@@ -70,6 +76,8 @@ interface Producto {
   precio_costo: number;
   desactivado_por: string | null;
   fecha_desactivacion: string | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
   marcas?: { nombre: string } | null;
@@ -114,6 +122,10 @@ export default function Productos() {
   const [listas, setListas] = useState<ListaPrecio[]>([]);
   const [porcentajes, setPorcentajes] = useState<PorcentajeMatriz[]>([]);
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [escalas, setEscalas] = useState<EscalaCantidad[]>([]);
+  const [toleranciaEmpaque, setToleranciaEmpaque] = useState<number>(1);
+  const [escalasOpen, setEscalasOpen] = useState(false);
+  const [escalasProductoId, setEscalasProductoId] = useState<string | null>(null);
   const [listaSeleccionada, setListaSeleccionada] = useState<string>(
     () => localStorage.getItem('productos_lista_precio') || '',
   );
@@ -135,6 +147,8 @@ export default function Productos() {
     stock_actual: 0,
     stock_minimo: 0,
     precio_costo: 0,
+    empaque_de_producto_id: '',
+    unidades_por_empaque: '',
   });
 
   useEffect(() => {
@@ -175,10 +189,12 @@ export default function Productos() {
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
-      const [listasRes, porcentajesRes, excepcionesRes] = await Promise.all([
+      const [listasRes, porcentajesRes, excepcionesRes, escalasRes, configRes] = await Promise.all([
         supabase.from('listas_precios').select('*').eq('activo', true).order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('*'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
+        supabase.from('configuracion_comercio').select('tolerancia_precio_empaque').maybeSingle(),
       ]);
 
       if (listasRes.data) {
@@ -189,6 +205,10 @@ export default function Productos() {
       }
       if (porcentajesRes.data) setPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
       if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
+      if (escalasRes.data) setEscalas(escalasRes.data as unknown as EscalaCantidad[]);
+      if (configRes.data?.tolerancia_precio_empaque != null) {
+        setToleranciaEmpaque(Number(configRes.data.tolerancia_precio_empaque));
+      }
 
       if (productosData && productosData.length > 0) {
         // Obtener IDs únicos de usuarios que desactivaron productos
@@ -253,6 +273,10 @@ export default function Productos() {
         stock_actual: formData.stock_actual,
         stock_minimo: formData.stock_minimo,
         precio_costo: formData.precio_costo,
+        empaque_de_producto_id: formData.empaque_de_producto_id || null,
+        unidades_por_empaque: formData.unidades_por_empaque
+          ? Number(formData.unidades_por_empaque)
+          : null,
       };
 
       // Si se está desactivando el producto, registrar quién y cuándo
@@ -350,6 +374,9 @@ export default function Productos() {
       stock_actual: producto.stock_actual,
       stock_minimo: producto.stock_minimo,
       precio_costo: producto.precio_costo || 0,
+      empaque_de_producto_id: producto.empaque_de_producto_id || '',
+      unidades_por_empaque:
+        producto.unidades_por_empaque != null ? String(producto.unidades_por_empaque) : '',
     });
     setDialogOpen(true);
   };
@@ -370,6 +397,8 @@ export default function Productos() {
       stock_actual: 0,
       stock_minimo: 0,
       precio_costo: 0,
+      empaque_de_producto_id: '',
+      unidades_por_empaque: '',
     });
   };
   
@@ -486,6 +515,7 @@ export default function Productos() {
   }, [productos, listaSeleccionada, porcentajes, excepciones]);
 
   const origenLabel: Record<string, string> = {
+    escala: 'Por cantidad',
     fijo: 'Precio fijo',
     excepcion: 'Excepción',
     marca: 'Por marca',
@@ -493,6 +523,70 @@ export default function Productos() {
     general: 'General',
     ninguno: 'Sin precio',
   };
+
+  // Cantidad de tramos por cantidad vigentes por producto (para la lista seleccionada)
+  const tramosPorProducto = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!listaSeleccionada) return map;
+    productos.forEach((p) => {
+      const t = escalasVigentes(p.id, listaSeleccionada, escalas);
+      if (t.length > 0) map[p.id] = t.length;
+    });
+    return map;
+  }, [productos, escalas, listaSeleccionada]);
+
+  // Coherencia caja vs. unidad (informativa)
+  const coherenciaPorProducto = useMemo(() => {
+    const map: Record<string, { ok: boolean; mensaje: string }> = {};
+    if (!listaSeleccionada) return map;
+    productos.forEach((caja) => {
+      if (!caja.empaque_de_producto_id || !caja.unidades_por_empaque) return;
+      const unidad = productos.find((u) => u.id === caja.empaque_de_producto_id);
+      if (!unidad) return;
+      const precioCaja = preciosVenta[caja.id]?.precio || 0;
+      if (!precioCaja) return;
+      const precioUnidadTramo = obtenerPrecioVentaPorCantidad(
+        {
+          id: unidad.id,
+          precio_costo: unidad.precio_costo || 0,
+          marca_id: unidad.marca_id,
+          tipo_producto_id: unidad.tipo_producto_id ?? null,
+        },
+        listaSeleccionada,
+        porcentajes,
+        excepciones,
+        escalas,
+        Number(caja.unidades_por_empaque),
+      ).precioVenta;
+      const r = calcularCoherenciaEmpaque(
+        precioCaja,
+        Number(caja.unidades_por_empaque),
+        precioUnidadTramo,
+        toleranciaEmpaque,
+      );
+      if (!r.ok) map[caja.id] = { ok: false, mensaje: r.mensaje };
+    });
+    return map;
+  }, [productos, preciosVenta, escalas, porcentajes, excepciones, listaSeleccionada, toleranciaEmpaque]);
+
+  const productosParaEscalas = useMemo(
+    () =>
+      productos.map((p) => ({
+        id: p.id,
+        codigo_articulo: p.codigo_articulo,
+        descripcion: p.descripcion,
+        precio_costo: p.precio_costo || 0,
+        marca_id: p.marca_id,
+        tipo_producto_id: p.tipo_producto_id ?? null,
+        unidades_por_empaque: p.unidades_por_empaque ?? null,
+        empaque_de_producto_id: p.empaque_de_producto_id ?? null,
+      })),
+    [productos],
+  );
+
+  const productosEscalasSeleccion = escalasProductoId
+    ? productosParaEscalas.filter((p) => p.id === escalasProductoId)
+    : productosParaEscalas.filter((p) => seleccionados.has(p.id));
 
   const toggleSeleccion = (id: string) => {
     setSeleccionados((prev) => {
@@ -554,6 +648,19 @@ export default function Productos() {
             ${info.precio.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           <div className="text-[10px] text-muted-foreground">{origenLabel[info.origen]}</div>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            {tramosPorProducto[item.id] && (
+              <Badge variant="secondary" className="text-[10px]">
+                {tramosPorProducto[item.id]} tramo{tramosPorProducto[item.id] > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {coherenciaPorProducto[item.id] && (
+              <Badge variant="destructive" className="text-[10px]" title={coherenciaPorProducto[item.id].mensaje}>
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Precio incoherente
+              </Badge>
+            )}
+          </div>
         </div>
       );
     },
@@ -604,6 +711,17 @@ export default function Productos() {
       header: 'Acciones',
       render: (item: Producto) => (
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Precios por cantidad"
+            onClick={() => {
+              setEscalasProductoId(item.id);
+              setEscalasOpen(true);
+            }}
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => openEditDialog(item)}>
             <Edit2 className="h-4 w-4" />
           </Button>
@@ -967,6 +1085,60 @@ export default function Productos() {
                 <Label htmlFor="activo">Producto activo</Label>
               </div>
 
+              <div className="space-y-3 rounded-lg border p-3">
+                <div>
+                  <Label>Equivalencia de empaque (opcional)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Si este producto es una caja/pack, indicá a qué producto unidad equivale y cuántas
+                    unidades trae. Sirve para avisar si el precio de la caja no coincide con el precio por
+                    cantidad de la unidad.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="empaque_de">Producto unidad equivalente</Label>
+                    <Select
+                      value={formData.empaque_de_producto_id || 'ninguno'}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          empaque_de_producto_id: value === 'ninguno' ? '' : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="empaque_de">
+                        <SelectValue placeholder="Sin equivalencia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ninguno">Sin equivalencia</SelectItem>
+                        {productos
+                          .filter((p) => p.activo && p.id !== selectedProducto?.id)
+                          .slice(0, 300)
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.codigo_articulo} — {p.descripcion}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unidades_por_empaque">Unidades por empaque</Label>
+                    <Input
+                      id="unidades_por_empaque"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.unidades_por_empaque}
+                      onChange={(e) =>
+                        setFormData({ ...formData, unidades_por_empaque: e.target.value })
+                      }
+                      placeholder="Ej: 12"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
@@ -1061,6 +1233,17 @@ export default function Productos() {
             <Button size="sm" onClick={() => setFijarPrecioOpen(true)}>
               Fijar precio de venta
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEscalasProductoId(null);
+                setEscalasOpen(true);
+              }}
+            >
+              <Layers className="mr-2 h-4 w-4" />
+              Precios por cantidad
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Set())}>
               Limpiar selección
             </Button>
@@ -1128,6 +1311,22 @@ export default function Productos() {
         open={importarFriosOpen}
         onOpenChange={setImportarFriosOpen}
         onImportComplete={fetchData}
+      />
+
+      <EscalasCantidadDialog
+        open={escalasOpen}
+        onOpenChange={(v) => {
+          setEscalasOpen(v);
+          if (!v) setEscalasProductoId(null);
+        }}
+        productos={productosEscalasSeleccion}
+        productosTodos={productosParaEscalas}
+        listas={listas}
+        porcentajes={porcentajes}
+        excepciones={excepciones}
+        listaIdInicial={listaSeleccionada}
+        toleranciaPorcentaje={toleranciaEmpaque}
+        onSaved={fetchData}
       />
 
       <ImprimirPreciosDialog

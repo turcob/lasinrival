@@ -36,6 +36,19 @@ export interface ProductoParaCalculo {
   tipo_producto_id: string | null;
 }
 
+/** Tramo de precio por cantidad. Si no hay tramos, el cálculo es idéntico al histórico. */
+export interface EscalaCantidad {
+  id: string;
+  lista_precio_id: string | null; // null = aplica a todas las listas
+  producto_id: string;
+  cantidad_desde: number;
+  precio_unitario: number | null;
+  porcentaje: number | null;
+  descripcion?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+}
+
 /**
  * Calcula el porcentaje de ganancia para un producto en una lista específica
  * Jerarquía de prioridad:
@@ -160,5 +173,117 @@ export function obtenerPrecioVentaProducto(
     porcentaje: resultado.porcentaje, 
     origen: resultado.origen,
     descripcion: resultado.descripcion
+  };
+}
+
+/** Devuelve los tramos vigentes de un producto para una lista, ordenados por cantidad_desde asc. */
+export function escalasVigentes(
+  productoId: string,
+  listaId: string | null,
+  escalas: EscalaCantidad[],
+): EscalaCantidad[] {
+  const hoy = new Date().toISOString().split('T')[0];
+  return escalas
+    .filter((e) => {
+      if (e.producto_id !== productoId) return false;
+      if (e.lista_precio_id !== null && e.lista_precio_id !== listaId) return false;
+      const inicioOk = !e.fecha_inicio || e.fecha_inicio <= hoy;
+      const finOk = !e.fecha_fin || e.fecha_fin >= hoy;
+      return inicioOk && finOk;
+    })
+    // La escala específica de la lista gana sobre la global cuando comparten cantidad_desde
+    .sort((a, b) =>
+      a.cantidad_desde - b.cantidad_desde ||
+      (a.lista_precio_id === null ? 1 : 0) - (b.lista_precio_id === null ? 1 : 0),
+    )
+    .filter((e, i, arr) => arr.findIndex((x) => x.cantidad_desde === e.cantidad_desde) === i);
+}
+
+/**
+ * Precio unitario considerando tramos por cantidad.
+ * Sin tramos aplicables devuelve exactamente el precio base (compatibilidad total).
+ */
+export function obtenerPrecioVentaPorCantidad(
+  producto: ProductoParaCalculo,
+  listaId: string,
+  matrizPorcentajes: PorcentajeMatriz[],
+  excepciones: ExcepcionProducto[],
+  escalas: EscalaCantidad[],
+  cantidad: number,
+): {
+  precioVenta: number;
+  precioBase: number;
+  origen: string;
+  descripcion: string;
+  escalaAplicada: EscalaCantidad | null;
+} {
+  const base = obtenerPrecioVentaProducto(producto, listaId, matrizPorcentajes, excepciones);
+  const tramos = escalasVigentes(producto.id, listaId, escalas);
+  const aplicable = [...tramos]
+    .filter((e) => cantidad >= e.cantidad_desde)
+    .sort((a, b) => b.cantidad_desde - a.cantidad_desde)[0];
+
+  if (!aplicable) {
+    return {
+      precioVenta: base.precioVenta,
+      precioBase: base.precioVenta,
+      origen: base.origen,
+      descripcion: base.descripcion,
+      escalaAplicada: null,
+    };
+  }
+
+  const precio =
+    aplicable.precio_unitario !== null && aplicable.precio_unitario !== undefined
+      ? Number(aplicable.precio_unitario)
+      : calcularPrecioVenta(producto.precio_costo, Number(aplicable.porcentaje ?? 0));
+
+  return {
+    precioVenta: Math.round(precio * 100) / 100,
+    precioBase: base.precioVenta,
+    origen: 'escala',
+    descripcion: aplicable.descripcion || `Desde ${aplicable.cantidad_desde} u.`,
+    escalaAplicada: aplicable,
+  };
+}
+
+export interface CoherenciaEmpaque {
+  ok: boolean;
+  precioCajaUnitario: number;
+  precioEquivalenteUnidad: number;
+  diferenciaPorcentaje: number;
+  mensaje: string;
+}
+
+/**
+ * Compara el precio unitario del producto caja contra el tramo equivalente del producto unidad.
+ * Informativo: nunca bloquea la venta.
+ */
+export function calcularCoherenciaEmpaque(
+  precioCajaTotal: number,
+  unidadesPorCaja: number,
+  precioUnidadEnTramo: number,
+  toleranciaPorcentaje = 1,
+): CoherenciaEmpaque {
+  if (!unidadesPorCaja || unidadesPorCaja <= 0 || !precioUnidadEnTramo) {
+    return {
+      ok: true,
+      precioCajaUnitario: 0,
+      precioEquivalenteUnidad: 0,
+      diferenciaPorcentaje: 0,
+      mensaje: 'Sin datos suficientes para comparar',
+    };
+  }
+  const cajaUnitario = precioCajaTotal / unidadesPorCaja;
+  const dif = ((cajaUnitario - precioUnidadEnTramo) / precioUnidadEnTramo) * 100;
+  const ok = Math.abs(dif) <= toleranciaPorcentaje;
+  return {
+    ok,
+    precioCajaUnitario: Math.round(cajaUnitario * 100) / 100,
+    precioEquivalenteUnidad: Math.round(precioUnidadEnTramo * 100) / 100,
+    diferenciaPorcentaje: Math.round(dif * 100) / 100,
+    mensaje: ok
+      ? 'Precios coherentes'
+      : `La caja queda ${dif > 0 ? 'más cara' : 'más barata'} ${Math.abs(Math.round(dif * 100) / 100)}% que el equivalente por unidad`,
   };
 }

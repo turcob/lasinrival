@@ -77,6 +77,8 @@ interface Producto {
   marca_id?: string | null;
   tipo_producto_id?: string | null;
   codigo_barra?: string | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
 }
 
 interface ListaPrecio {
@@ -187,6 +189,17 @@ export default function POS() {
   const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
   const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [escalas, setEscalas] = useState<{
+    id: string;
+    lista_precio_id: string | null;
+    producto_id: string;
+    cantidad_desde: number;
+    precio_unitario: number | null;
+    porcentaje: number | null;
+    descripcion?: string | null;
+    fecha_inicio?: string | null;
+    fecha_fin?: string | null;
+  }[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
@@ -442,7 +455,7 @@ export default function POS() {
         while (true) {
           const { data, error } = await supabase
             .from('productos')
-            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra')
+            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id')
             .eq('activo', true)
             .order('descripcion')
             .range(from, from + PAGE - 1);
@@ -453,7 +466,7 @@ export default function POS() {
         }
         return { data: acc, error: null };
       };
-      const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
+      const [productosRes, clientesRes, empleadosRes, formasPagoRes, listasRes, porcentajesRes, excepcionesRes, escalasRes, cajasRes, tarjetasRes, cuotasRes, descuentosRes] = await Promise.all([
         fetchAllProductos(),
         supabase.from('clientes').select('id, nombre, dni_cuit, condicion_iva, lista_precio_id, permite_cuenta_corriente').eq('activo', true).order('nombre'),
         supabase.from('empleados').select('id, nombre, dni, activo').eq('activo', true).order('nombre'),
@@ -461,6 +474,7 @@ export default function POS() {
         supabase.from('listas_precios').select('id, nombre, codigo, orden, activo').eq('activo', true).neq('destino', 'paladini').order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('id, lista_precio_id, producto_id, porcentaje, precio_fijo'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
         supabase.from('cajas').select('id').eq('usuario_id', user.id).eq('estado', 'abierta').maybeSingle(),
         supabase.from('tarjetas').select('*').eq('activo', true).order('tipo').order('nombre'),
         supabase.from('tarjeta_cuotas').select('*').eq('activo', true).order('cuotas'),
@@ -476,6 +490,7 @@ export default function POS() {
       if (descuentosRes.data) setConfigDescuentos(descuentosRes.data);
       if (porcentajesRes.data) setMatrizPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
       if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
+      if (escalasRes.data) setEscalas(escalasRes.data as any);
       if (listasRes.data) {
         setListasPrecios(listasRes.data);
         if (listasRes.data.length > 0 && !selectedLista) {
@@ -528,10 +543,40 @@ export default function POS() {
     ).length;
   }, [productos, searchTerm]);
 
-  const getProductoPrice = (producto: Producto): number => {
+  // Tramo por cantidad vigente para el producto en la lista activa
+  const getEscalaAplicable = (productoId: string, cantidad: number) => {
+    if (!selectedLista) return null;
+    const hoy = new Date().toISOString().split('T')[0];
+    const candidatos = escalas
+      .filter((e) => {
+        if (e.producto_id !== productoId) return false;
+        if (e.lista_precio_id !== null && e.lista_precio_id !== selectedLista.id) return false;
+        const inicioOk = !e.fecha_inicio || e.fecha_inicio <= hoy;
+        const finOk = !e.fecha_fin || e.fecha_fin >= hoy;
+        return inicioOk && finOk && cantidad >= e.cantidad_desde;
+      })
+      .sort(
+        (a, b) =>
+          b.cantidad_desde - a.cantidad_desde ||
+          (a.lista_precio_id === null ? 1 : 0) - (b.lista_precio_id === null ? 1 : 0),
+      );
+    return candidatos[0] || null;
+  };
+
+  const getProductoPrice = (producto: Producto, cantidad = 1): number => {
     if (!selectedLista) return 0;
     const costo = producto.precio_costo || 0;
-    
+
+    // Tramo por cantidad (si existe uno aplicable, tiene prioridad)
+    const escala = getEscalaAplicable(producto.id, cantidad);
+    if (escala) {
+      const precio =
+        escala.precio_unitario !== null && escala.precio_unitario !== undefined
+          ? Number(escala.precio_unitario)
+          : costo * (1 + Number(escala.porcentaje ?? 0) / 100);
+      return Math.round(precio * 100) / 100;
+    }
+
     const excepcion = excepciones.find(e => 
       e.producto_id === producto.id && 
       (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null)
@@ -576,6 +621,13 @@ export default function POS() {
     return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
   };
 
+  // Recalcula el precio unitario según el tramo por cantidad (si no hay tramos, no cambia nada)
+  const precioParaCantidad = (item: CartItem, cantidad: number): number => {
+    if (!item.producto || item.es_temporal) return item.precio;
+    const p = getProductoPrice(item.producto, cantidad);
+    return p > 0 ? p : item.precio;
+  };
+
   const addToCart = (producto: Producto) => {
     const precio = getProductoPrice(producto);
 
@@ -598,7 +650,11 @@ export default function POS() {
         }
         return prev.map((item) =>
           item.id === existing.id
-            ? { ...item, cantidad: item.cantidad + 1, subtotal: calcSubtotal(item.cantidad + 1, item.precio, item.descuento_porcentaje) }
+            ? (() => {
+                const nuevaCantidad = item.cantidad + 1;
+                const nuevoPrecio = precioParaCantidad(item, nuevaCantidad);
+                return { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) };
+              })()
             : item
         );
       }
@@ -663,14 +719,16 @@ export default function POS() {
       const existing = prev.find((item) => item.producto?.id === producto.id && !item.es_temporal);
       if (existing) {
         const nuevaCantidad = existing.cantidad + cantidad;
+        const nuevoPrecio = precioParaCantidad(existing, nuevaCantidad);
         return prev.map((item) =>
           item.id === existing.id
-            ? { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) }
+            ? { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) }
             : item
         );
       }
       const newId = crypto.randomUUID();
-      return [...prev, { id: newId, producto, cantidad, precio, subtotal: calcSubtotal(cantidad, precio, 0), descuento_porcentaje: 0 }];
+      const precioEscalado = getProductoPrice(producto, cantidad) || precio;
+      return [...prev, { id: newId, producto, cantidad, precio: precioEscalado, subtotal: calcSubtotal(cantidad, precioEscalado, 0), descuento_porcentaje: 0 }];
     });
     
   };
@@ -690,7 +748,8 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === itemId) {
-          return { ...item, cantidad: nuevaCantidad, subtotal: calcSubtotal(nuevaCantidad, item.precio, item.descuento_porcentaje) };
+          const nuevoPrecio = precioParaCantidad(item, nuevaCantidad);
+          return { ...item, cantidad: nuevaCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(nuevaCantidad, nuevoPrecio, item.descuento_porcentaje) };
         }
         return item;
       })
@@ -859,7 +918,8 @@ export default function POS() {
           if (item.id === itemId) {
             const newCantidad = item.cantidad + delta;
             if (newCantidad <= 0) return null;
-            return { ...item, cantidad: newCantidad, subtotal: calcSubtotal(newCantidad, item.precio, item.descuento_porcentaje) };
+            const nuevoPrecio = precioParaCantidad(item, newCantidad);
+            return { ...item, cantidad: newCantidad, precio: nuevoPrecio, subtotal: calcSubtotal(newCantidad, nuevoPrecio, item.descuento_porcentaje) };
           }
           return item;
         })
@@ -2779,6 +2839,18 @@ export default function POS() {
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
                       const maxDescuento = getDescuentoMaximo();
+                      const escalaItem = item.producto && !item.es_temporal
+                        ? getEscalaAplicable(item.producto.id, item.cantidad)
+                        : null;
+                      // ¿Existe un producto caja equivalente más conveniente para esta cantidad?
+                      const cajaEquivalente = item.producto && !item.es_temporal
+                        ? productos.find(
+                            (p) =>
+                              p.empaque_de_producto_id === item.producto!.id &&
+                              !!p.unidades_por_empaque &&
+                              item.cantidad >= Number(p.unidades_por_empaque),
+                          )
+                        : undefined;
                       
                       return (
                         <div
@@ -2796,6 +2868,21 @@ export default function POS() {
                                 <Badge variant="outline" className="text-xs shrink-0">
                                   <Scale className="h-3 w-3 mr-1" />
                                   KG
+                                </Badge>
+                              )}
+                              {escalaItem && (
+                                <Badge variant="secondary" className="text-xs shrink-0">
+                                  x{escalaItem.cantidad_desde}
+                                  {escalaItem.descripcion ? ` · ${escalaItem.descripcion}` : ''}
+                                </Badge>
+                              )}
+                              {cajaEquivalente && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs shrink-0"
+                                  title={`Existe el empaque ${cajaEquivalente.codigo_articulo} — ${cajaEquivalente.descripcion} (x${cajaEquivalente.unidades_por_empaque})`}
+                                >
+                                  Hay caja x{cajaEquivalente.unidades_por_empaque}
                                 </Badge>
                               )}
                             </div>

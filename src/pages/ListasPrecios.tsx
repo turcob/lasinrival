@@ -3,7 +3,15 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Info, Save, X, Search, Package, CalendarDays, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+  obtenerPrecioVentaProducto,
+  obtenerPrecioVentaPorCantidad,
+  calcularCoherenciaEmpaque,
+  type EscalaCantidad,
+  type PorcentajeMatriz,
+  type ExcepcionProducto,
+} from '@/lib/precioUtils';
 import {
   Dialog,
   DialogContent,
@@ -63,6 +71,9 @@ interface Producto {
   descripcion: string;
   marca_id?: string | null;
   tipo_producto_id?: string | null;
+  precio_costo?: number | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
 }
 
 interface ListaPrecio {
@@ -109,6 +120,9 @@ export default function ListasPrecios() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [porcentajes, setPorcentajes] = useState<Porcentaje[]>([]);
   const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
+  const [escalas, setEscalas] = useState<EscalaCantidad[]>([]);
+  const [toleranciaEmpaque, setToleranciaEmpaque] = useState(1);
+  const [listaCoherencia, setListaCoherencia] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -143,16 +157,69 @@ export default function ListasPrecios() {
     fetchData();
   }, []);
 
+  // Revisión informativa de coherencia entre productos caja y sus unidades
+  const revisionCoherencia = useMemo(() => {
+    if (!listaCoherencia) return [] as any[];
+    return productos
+      .filter((c) => c.empaque_de_producto_id && c.unidades_por_empaque)
+      .map((caja) => {
+        const unidad = productos.find((u) => u.id === caja.empaque_de_producto_id);
+        if (!unidad) return null;
+        const precioCaja = obtenerPrecioVentaProducto(
+          {
+            id: caja.id,
+            precio_costo: caja.precio_costo || 0,
+            marca_id: caja.marca_id ?? null,
+            tipo_producto_id: caja.tipo_producto_id ?? null,
+          },
+          listaCoherencia,
+          porcentajes as unknown as PorcentajeMatriz[],
+          excepciones as unknown as ExcepcionProducto[],
+        ).precioVenta;
+        const precioUnidadTramo = obtenerPrecioVentaPorCantidad(
+          {
+            id: unidad.id,
+            precio_costo: unidad.precio_costo || 0,
+            marca_id: unidad.marca_id ?? null,
+            tipo_producto_id: unidad.tipo_producto_id ?? null,
+          },
+          listaCoherencia,
+          porcentajes as unknown as PorcentajeMatriz[],
+          excepciones as unknown as ExcepcionProducto[],
+          escalas,
+          Number(caja.unidades_por_empaque),
+        ).precioVenta;
+        const r = calcularCoherenciaEmpaque(
+          precioCaja,
+          Number(caja.unidades_por_empaque),
+          precioUnidadTramo,
+          toleranciaEmpaque,
+        );
+        return {
+          cajaId: caja.id,
+          cajaCodigo: caja.codigo_articulo,
+          cajaDescripcion: caja.descripcion,
+          unidadDescripcion: `${unidad.codigo_articulo} — ${unidad.descripcion}`,
+          unidades: Number(caja.unidades_por_empaque),
+          ...r,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => Number(a.ok) - Number(b.ok)) as any[];
+  }, [productos, escalas, porcentajes, excepciones, listaCoherencia, toleranciaEmpaque]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [listasRes, marcasRes, tiposRes, porcentajesRes, excepcionesRes, productosRes] = await Promise.all([
+      const [listasRes, marcasRes, tiposRes, porcentajesRes, excepcionesRes, productosRes, escalasRes, configRes] = await Promise.all([
         supabase.from('listas_precios').select('*').order('orden'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('tipos_producto').select('id, nombre').eq('activo', true).order('nombre'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('*, producto:productos(id, codigo_articulo, descripcion, marca_id, tipo_producto_id)'),
-        supabase.from('productos').select('id, codigo_articulo, descripcion, marca_id, tipo_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('productos').select('id, codigo_articulo, descripcion, marca_id, tipo_producto_id, precio_costo, unidades_por_empaque, empaque_de_producto_id').eq('activo', true).order('descripcion'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
+        supabase.from('configuracion_comercio').select('tolerancia_precio_empaque').maybeSingle(),
       ]);
 
       if (listasRes.error) throw listasRes.error;
@@ -166,6 +233,11 @@ export default function ListasPrecios() {
       setPorcentajes(porcentajesData);
       setExcepciones((excepcionesRes.data || []) as Excepcion[]);
       setProductos(productosRes.data || []);
+      setEscalas(((escalasRes.data || []) as unknown) as EscalaCantidad[]);
+      if (configRes.data?.tolerancia_precio_empaque != null) {
+        setToleranciaEmpaque(Number(configRes.data.tolerancia_precio_empaque));
+      }
+      setListaCoherencia((prev) => prev || listasData[0]?.id || '');
       
       // Construir columnas desde los porcentajes existentes
       const columnas: ColumnaMatriz[] = [
@@ -673,7 +745,73 @@ export default function ListasPrecios() {
         <TabsList>
           <TabsTrigger value="matriz">Matriz de Precios</TabsTrigger>
           <TabsTrigger value="excepciones">Excepciones por Producto</TabsTrigger>
+          <TabsTrigger value="coherencia">Coherencia Caja / Unidad</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="coherencia">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Revisión de precios caja vs. unidad</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-2 min-w-[220px]">
+                  <Label>Lista de precios</Label>
+                  <Select value={listaCoherencia} onValueChange={setListaCoherencia}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar lista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listas.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>{l.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tolerancia configurada: {toleranciaEmpaque}%. Los avisos son informativos y no bloquean ventas.
+                </p>
+              </div>
+
+              {revisionCoherencia.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4" />
+                  No hay productos con equivalencia de empaque configurada para comparar.
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[520px]">
+                  <div className="divide-y rounded-md border">
+                    {revisionCoherencia.map((r) => (
+                      <div key={r.cajaId} className="flex items-start justify-between gap-4 p-3 text-sm">
+                        <div>
+                          <div className="font-medium">
+                            {r.cajaCodigo} — {r.cajaDescripcion}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Equivale a {r.unidadDescripcion} · x{r.unidades} unidades
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Caja por unidad ${r.precioCajaUnitario.toLocaleString('es-AR', { minimumFractionDigits: 2 })} · Equivalente por unidad ${r.precioEquivalenteUnidad.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        {r.ok ? (
+                          <Badge variant="secondary">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Coherente
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" title={r.mensaje}>
+                            <AlertTriangle className="h-3 w-3 mr-1" /> {r.diferenciaPorcentaje > 0 ? '+' : ''}
+                            {r.diferenciaPorcentaje}%
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="matriz">
           {/* Info card */}
