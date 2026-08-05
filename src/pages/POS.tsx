@@ -77,6 +77,8 @@ interface Producto {
   marca_id?: string | null;
   tipo_producto_id?: string | null;
   codigo_barra?: string | null;
+  unidades_por_empaque?: number | null;
+  empaque_de_producto_id?: string | null;
 }
 
 interface ListaPrecio {
@@ -453,7 +455,7 @@ export default function POS() {
         while (true) {
           const { data, error } = await supabase
             .from('productos')
-            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra')
+            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id')
             .eq('activo', true)
             .order('descripcion')
             .range(from, from + PAGE - 1);
@@ -2840,6 +2842,15 @@ export default function POS() {
                       const escalaItem = item.producto && !item.es_temporal
                         ? getEscalaAplicable(item.producto.id, item.cantidad)
                         : null;
+                      // ¿Existe un producto caja equivalente más conveniente para esta cantidad?
+                      const cajaEquivalente = item.producto && !item.es_temporal
+                        ? productos.find(
+                            (p) =>
+                              p.empaque_de_producto_id === item.producto!.id &&
+                              !!p.unidades_por_empaque &&
+                              item.cantidad >= Number(p.unidades_por_empaque),
+                          )
+                        : undefined;
                       
                       return (
                         <div
@@ -2863,6 +2874,15 @@ export default function POS() {
                                 <Badge variant="secondary" className="text-xs shrink-0">
                                   x{escalaItem.cantidad_desde}
                                   {escalaItem.descripcion ? ` · ${escalaItem.descripcion}` : ''}
+                                </Badge>
+                              )}
+                              {cajaEquivalente && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs shrink-0"
+                                  title={`Existe el empaque ${cajaEquivalente.codigo_articulo} — ${cajaEquivalente.descripcion} (x${cajaEquivalente.unidades_por_empaque})`}
+                                >
+                                  Hay caja x{cajaEquivalente.unidades_por_empaque}
                                 </Badge>
                               )}
                             </div>
