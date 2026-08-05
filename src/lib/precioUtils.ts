@@ -36,6 +36,19 @@ export interface ProductoParaCalculo {
   tipo_producto_id: string | null;
 }
 
+/** Tramo de precio por cantidad. Si no hay tramos, el cálculo es idéntico al histórico. */
+export interface EscalaCantidad {
+  id: string;
+  lista_precio_id: string | null; // null = aplica a todas las listas
+  producto_id: string;
+  cantidad_desde: number;
+  precio_unitario: number | null;
+  porcentaje: number | null;
+  descripcion?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+}
+
 /**
  * Calcula el porcentaje de ganancia para un producto en una lista específica
  * Jerarquía de prioridad:
