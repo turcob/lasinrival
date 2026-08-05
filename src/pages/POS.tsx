@@ -2772,8 +2772,9 @@ export default function POS() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {cart.map((item) => {
+                    {cart.map((item, idx) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
+                      const esUltimoAgregado = idx === cart.length - 1;
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
@@ -2826,6 +2827,7 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode={esPorPeso ? "decimal" : "numeric"}
+                                tabIndex={esUltimoAgregado ? 2 : -1}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingCantidadItem === item.id ? cantidadInput : (esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) : item.cantidad.toString())}
                                 onFocus={() => {
@@ -2867,6 +2869,7 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode="decimal"
+                                tabIndex={esUltimoAgregado ? 3 : -1}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
                                 onFocus={() => {
