@@ -85,6 +85,7 @@ interface Subcategoria {
   id: string;
   nombre: string;
   categoria_id: string;
+  codigo_grupo?: string | null;
 }
 
 interface Marca {
@@ -118,6 +119,9 @@ export default function Productos() {
   );
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [fijarPrecioOpen, setFijarPrecioOpen] = useState(false);
+  const [codigoSugerido, setCodigoSugerido] = useState<string>('');
+  const [codigoManual, setCodigoManual] = useState(false);
+  const [sugiriendoCodigo, setSugiriendoCodigo] = useState(false);
 
   const [formData, setFormData] = useState({
     codigo_articulo: '',
@@ -167,7 +171,7 @@ export default function Productos() {
       const [productosData, categoriasRes, subcategoriasRes, marcasRes] = await Promise.all([
         fetchAllProductos(),
         supabase.from('categorias').select('id, nombre').eq('activo', true).order('nombre'),
-        supabase.from('subcategorias').select('id, nombre, categoria_id').eq('activo', true).order('nombre'),
+        supabase.from('subcategorias').select('id, nombre, categoria_id, codigo_grupo').eq('activo', true).order('nombre'),
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
