@@ -376,6 +376,14 @@ export default function Imputacion() {
     }
   };
 
+  const esCheque = (mov: MovimientoPendiente) => {
+    return mov.forma_pago_nombre?.toLowerCase().includes('cheque') && mov.cheque;
+  };
+
+  const esTransferencia = (mov: MovimientoPendiente) => {
+    return mov.forma_pago_nombre?.toLowerCase().includes('transferencia');
+  };
+
   const toLocalDateStr = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
