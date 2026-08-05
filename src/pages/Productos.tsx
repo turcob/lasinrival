@@ -122,6 +122,10 @@ export default function Productos() {
   const [listas, setListas] = useState<ListaPrecio[]>([]);
   const [porcentajes, setPorcentajes] = useState<PorcentajeMatriz[]>([]);
   const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
+  const [escalas, setEscalas] = useState<EscalaCantidad[]>([]);
+  const [toleranciaEmpaque, setToleranciaEmpaque] = useState<number>(1);
+  const [escalasOpen, setEscalasOpen] = useState(false);
+  const [escalasProductoId, setEscalasProductoId] = useState<string | null>(null);
   const [listaSeleccionada, setListaSeleccionada] = useState<string>(
     () => localStorage.getItem('productos_lista_precio') || '',
   );
@@ -143,6 +147,8 @@ export default function Productos() {
     stock_actual: 0,
     stock_minimo: 0,
     precio_costo: 0,
+    empaque_de_producto_id: '',
+    unidades_por_empaque: '',
   });
 
   useEffect(() => {
@@ -183,10 +189,12 @@ export default function Productos() {
         supabase.from('marcas').select('id, nombre').eq('activo', true).order('nombre'),
       ]);
 
-      const [listasRes, porcentajesRes, excepcionesRes] = await Promise.all([
+      const [listasRes, porcentajesRes, excepcionesRes, escalasRes, configRes] = await Promise.all([
         supabase.from('listas_precios').select('*').eq('activo', true).order('orden'),
         supabase.from('lista_precio_porcentajes').select('*'),
         supabase.from('lista_precio_excepciones').select('*'),
+        supabase.from('lista_precio_escalas').select('*').order('cantidad_desde'),
+        supabase.from('configuracion_comercio').select('tolerancia_precio_empaque').maybeSingle(),
       ]);
 
       if (listasRes.data) {
@@ -197,6 +205,10 @@ export default function Productos() {
       }
       if (porcentajesRes.data) setPorcentajes(porcentajesRes.data as PorcentajeMatriz[]);
       if (excepcionesRes.data) setExcepciones(excepcionesRes.data as ExcepcionProducto[]);
+      if (escalasRes.data) setEscalas(escalasRes.data as unknown as EscalaCantidad[]);
+      if (configRes.data?.tolerancia_precio_empaque != null) {
+        setToleranciaEmpaque(Number(configRes.data.tolerancia_precio_empaque));
+      }
 
       if (productosData && productosData.length > 0) {
         // Obtener IDs únicos de usuarios que desactivaron productos
@@ -261,6 +273,10 @@ export default function Productos() {
         stock_actual: formData.stock_actual,
         stock_minimo: formData.stock_minimo,
         precio_costo: formData.precio_costo,
+        empaque_de_producto_id: formData.empaque_de_producto_id || null,
+        unidades_por_empaque: formData.unidades_por_empaque
+          ? Number(formData.unidades_por_empaque)
+          : null,
       };
 
       // Si se está desactivando el producto, registrar quién y cuándo
@@ -358,6 +374,9 @@ export default function Productos() {
       stock_actual: producto.stock_actual,
       stock_minimo: producto.stock_minimo,
       precio_costo: producto.precio_costo || 0,
+      empaque_de_producto_id: producto.empaque_de_producto_id || '',
+      unidades_por_empaque:
+        producto.unidades_por_empaque != null ? String(producto.unidades_por_empaque) : '',
     });
     setDialogOpen(true);
   };
@@ -378,6 +397,8 @@ export default function Productos() {
       stock_actual: 0,
       stock_minimo: 0,
       precio_costo: 0,
+      empaque_de_producto_id: '',
+      unidades_por_empaque: '',
     });
   };
   
