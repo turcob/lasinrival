@@ -472,7 +472,7 @@ export default function POS() {
         while (true) {
           const { data, error } = await supabase
             .from('productos')
-            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id')
+            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id, plu_balanza')
             .eq('activo', true)
             .order('descripcion')
             .range(from, from + PAGE - 1);
