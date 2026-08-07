@@ -4903,7 +4903,10 @@ export default function POS() {
       {/* Modal de Búsqueda de Productos */}
       <ProductSearchModal
         open={productSearchModalOpen}
-        onOpenChange={setProductSearchModalOpen}
+        onOpenChange={(open) => {
+          setProductSearchModalOpen(open);
+          if (!open) focusBuscador();
+        }}
         productos={productos}
         getProductoPrice={getProductoPrice}
         onSelectProduct={handleProductSelectedFromModal}
@@ -4912,7 +4915,10 @@ export default function POS() {
       {/* Modal de Selección de Cantidad */}
       <ProductQuantityModal
         open={productQuantityModalOpen}
-        onOpenChange={setProductQuantityModalOpen}
+        onOpenChange={(open) => {
+          setProductQuantityModalOpen(open);
+          if (!open && !productSearchModalOpen) focusBuscador();
+        }}
         producto={selectedProductForQuantity}
         precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}
         onConfirm={handleConfirmProductQuantity}
