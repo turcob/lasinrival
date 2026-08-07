@@ -708,6 +708,44 @@ export default function POS() {
     );
   };
 
+  // Agregado desde etiqueta de balanza: el peso del código es definitivo, nunca se abre el diálogo de peso.
+  const agregarConPesoBalanza = (producto: Producto, pesoKg: number) => {
+    const precio = getProductoPrice(producto, pesoKg);
+    if (!precio || precio <= 0) {
+      toast.error('Este producto no tiene precio definido en la lista del cliente');
+      return;
+    }
+    const existing = cart.find((item) => item.producto?.id === producto.id && !item.es_temporal);
+    if (existing) {
+      updateCantidadDirecta(existing.id, existing.cantidad + pesoKg);
+    } else {
+      setCart((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          producto,
+          cantidad: pesoKg,
+          precio,
+          subtotal: calcSubtotal(pesoKg, precio, 0),
+          descuento_porcentaje: 0,
+        },
+      ]);
+    }
+    setSearchTerm('');
+    setShowAllResults(false);
+    focusBuscador();
+  };
+
+  const buscarPorCodigoExactoLegacy = (term: string): Producto[] => {
+    const code = term.trim().toLowerCase();
+    if (!code) return [];
+    return productos.filter(
+      (p) =>
+        (p.codigo_barra || '').trim().toLowerCase() === code ||
+        (p.codigo_articulo || '').trim().toLowerCase() === code
+    );
+  };
+
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
