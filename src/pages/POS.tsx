@@ -3822,7 +3822,15 @@ export default function POS() {
 
       {/* Payment Dialog */}
       <Dialog open={pagoDialogOpen} onOpenChange={setPagoDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && Math.abs(totalPagado - totalConRecargo) <= 0.009) {
+              e.preventDefault();
+              handleContinuarPago();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Forma de Pago</DialogTitle>
           </DialogHeader>
@@ -3838,18 +3846,37 @@ export default function POS() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              {formasPago.map((fp, i) => (
-                <Button
-                  key={fp.id}
-                  variant="outline"
-                  autoFocus={i === 0}
-                  onClick={() => addPago(fp.id)}
-                  disabled={totalPagado >= totalConRecargo}
-                >
-                  {fp.nombre}
-                </Button>
-              ))}
+            <div
+              className="grid grid-cols-2 gap-2"
+              onKeyDown={(e) => {
+                // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
+                if (/^[1-9]$/.test(e.key)) {
+                  const idx = Number(e.key) - 1;
+                  const fp = formasPago[idx];
+                  if (fp && totalPagado < totalConRecargo) {
+                    e.preventDefault();
+                    addPago(fp.id);
+                  }
+                }
+              }}
+            >
+              {formasPago.map((fp, i) => {
+                const hayEfectivo = formasPago.some((f) => f.nombre.toLowerCase().includes('efectivo'));
+                const esEfectivo = fp.nombre.toLowerCase().includes('efectivo');
+                const enfocar = hayEfectivo ? esEfectivo : i === 0;
+                return (
+                  <Button
+                    key={fp.id}
+                    variant={esEfectivo ? 'default' : 'outline'}
+                    autoFocus={enfocar}
+                    onClick={() => addPago(fp.id)}
+                    disabled={totalPagado >= totalConRecargo}
+                  >
+                    <span className="mr-1 text-xs opacity-70">{i + 1}</span>
+                    {fp.nombre}
+                  </Button>
+                );
+              })}
             </div>
 
             {pagos.length > 0 && (
@@ -3919,6 +3946,9 @@ export default function POS() {
                 Continuar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              1-9 elegir medio · Enter continuar · Esc cancelar
+            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -4341,6 +4371,12 @@ export default function POS() {
                 type="text"
                 value={efectivoEntregado}
                 onChange={(e) => setEfectivoEntregado(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddPagoEfectivo();
+                  }
+                }}
                 placeholder="0.00"
                 autoFocus
               />
