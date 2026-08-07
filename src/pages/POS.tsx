@@ -674,6 +674,10 @@ export default function POS() {
     });
     setSearchTerm('');
     setShowAllResults(false);
+    // Volver al buscador para seguir escaneando (salvo que se abra el diálogo de peso)
+    if (!(isProductoPorPeso(producto) && !skipPesoPrompt)) {
+      focusBuscador();
+    }
   };
 
   // Búsqueda por código exacto (lector de código de barras HID: código + Enter)
