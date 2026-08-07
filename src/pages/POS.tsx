@@ -736,16 +736,6 @@ export default function POS() {
     focusBuscador();
   };
 
-  const buscarPorCodigoExactoLegacy = (term: string): Producto[] => {
-    const code = term.trim().toLowerCase();
-    if (!code) return [];
-    return productos.filter(
-      (p) =>
-        (p.codigo_barra || '').trim().toLowerCase() === code ||
-        (p.codigo_articulo || '').trim().toLowerCase() === code
-    );
-  };
-
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
