@@ -3969,7 +3969,17 @@ export default function POS() {
             <DialogTitle>Datos de la Transferencia</DialogTitle>
           </DialogHeader>
           {transferenciaData && (
-            <div className="space-y-3">
+            <div
+              className="space-y-3"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  const target = e.target as HTMLElement;
+                  if (target instanceof HTMLInputElement && target.type === 'file') return;
+                  e.preventDefault();
+                  handleConfirmarTransferencia();
+                }
+              }}
+            >
               <div className="text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-md p-2">
                 Solo <b>fecha</b> e <b>importe</b> son obligatorios. Podés dejar CUIL, titular, número de operación y foto vacíos y completarlos después desde el celular en <b>/subir-fotos</b> (o desde Imputación con ayuda de IA).
               </div>
@@ -4028,10 +4038,13 @@ export default function POS() {
                 <Button variant="outline" onClick={() => { setTransferenciaDialogOpen(false); setTransferenciaData(null); }}>
                   Cancelar
                 </Button>
-                <Button onClick={handleConfirmarTransferencia}>
+                <Button autoFocus onClick={handleConfirmarTransferencia}>
                   Confirmar y agregar
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Enter confirma · Tab navega campos · Esc cancela
+              </p>
             </div>
           )}
         </DialogContent>
