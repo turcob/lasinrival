@@ -3138,10 +3138,12 @@ export default function POS() {
                                     }
                                     setEditingDescuentoItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                   if (e.key === 'Escape') {
                                     setEditingDescuentoItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                 }}
                               />
