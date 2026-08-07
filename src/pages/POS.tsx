@@ -3026,6 +3026,7 @@ export default function POS() {
                             <Button
                               size="icon"
                               variant="ghost"
+                              tabIndex={-1}
                               className="h-6 w-6 text-destructive shrink-0 ml-2"
                               onClick={() => removeFromCart(item.id)}
                             >
@@ -3051,7 +3052,10 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode={esPorPeso ? "decimal" : "numeric"}
-                                tabIndex={esUltimoAgregado ? 2 : -1}
+                                ref={(el) => {
+                                  if (el) cantidadInputRefs.current.set(item.id, el);
+                                  else cantidadInputRefs.current.delete(item.id);
+                                }}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingCantidadItem === item.id ? cantidadInput : (esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) : item.cantidad.toString())}
                                 onFocus={() => {
@@ -3078,10 +3082,28 @@ export default function POS() {
                                     }
                                     setEditingCantidadItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                   if (e.key === 'Escape') {
                                     setEditingCantidadItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
+                                  }
+                                  if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    moverFocoCantidad(item.id, -1);
+                                  }
+                                  if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    moverFocoCantidad(item.id, 1);
+                                  }
+                                  if (e.key === 'Delete' && e.shiftKey) {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    removeFromCart(item.id);
+                                    focusBuscador();
                                   }
                                 }}
                               />
@@ -3093,7 +3115,6 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                tabIndex={esUltimoAgregado ? 3 : -1}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
                                 onFocus={() => {
