@@ -3822,7 +3822,15 @@ export default function POS() {
 
       {/* Payment Dialog */}
       <Dialog open={pagoDialogOpen} onOpenChange={setPagoDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && Math.abs(totalPagado - totalConRecargo) <= 0.009) {
+              e.preventDefault();
+              handleContinuarPago();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Forma de Pago</DialogTitle>
           </DialogHeader>
@@ -3938,6 +3946,9 @@ export default function POS() {
                 Continuar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              1-9 elegir medio · Enter continuar · Esc cancelar
+            </p>
           </div>
         </DialogContent>
       </Dialog>
