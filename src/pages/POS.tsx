@@ -3736,6 +3736,7 @@ export default function POS() {
         if (!open) {
           setEmpleadoSearchTerm('');
           setEmpleadoSearchResults([]);
+          focusBuscador();
         }
       }}>
         <DialogContent>
