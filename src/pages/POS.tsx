@@ -3838,10 +3838,11 @@ export default function POS() {
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              {formasPago.map((fp) => (
+              {formasPago.map((fp, i) => (
                 <Button
                   key={fp.id}
                   variant="outline"
+                  autoFocus={i === 0}
                   onClick={() => addPago(fp.id)}
                   disabled={totalPagado >= totalConRecargo}
                 >
