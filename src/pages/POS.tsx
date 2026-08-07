@@ -756,10 +756,18 @@ export default function POS() {
   };
 
   // Handler para selección de producto desde el modal de búsqueda
-  const handleProductSelectedFromModal = (producto: Producto) => {
+  const handleProductSelectedFromModal = (
+    producto: Producto,
+    options?: { cantidad?: number }
+  ) => {
     const precioCalc = getProductoPrice(producto);
     if (!precioCalc || precioCalc <= 0) {
       toast.error('Este producto no tiene precio definido en la lista del cliente');
+      return;
+    }
+    // Etiqueta de balanza: el peso ya viene en el código, no se pide cantidad.
+    if (options?.cantidad != null) {
+      handleConfirmProductQuantity(producto, options.cantidad);
       return;
     }
     setSelectedProductForQuantity(producto);
