@@ -79,6 +79,21 @@ interface Producto {
   codigo_barra?: string | null;
   unidades_por_empaque?: number | null;
   empaque_de_producto_id?: string | null;
+  plu_balanza?: number | null;
+}
+
+// Etiquetas de balanza Kretz: EAN-13 de peso variable, formato 2 + PLU(5) + gramos(6) + check.
+// Devuelve {plu, pesoKg} si es un código de balanza válido, o null.
+function parseCodigoBalanza(raw: string): { plu: number; pesoKg: number } | null {
+  const s = raw.trim();
+  if (!/^2\d{12}$/.test(s)) return null;
+  const d = s.split('').map(Number);
+  const sum = d.slice(0, 12).reduce((acc, n, i) => acc + n * (i % 2 === 0 ? 1 : 3), 0);
+  if ((10 - (sum % 10)) % 10 !== d[12]) return null; // lectura corrupta → término normal
+  const plu = parseInt(s.slice(1, 6), 10);
+  const pesoKg = parseInt(s.slice(6, 12), 10) / 1000;
+  if (pesoKg <= 0) return null;
+  return { plu, pesoKg };
 }
 
 interface ListaPrecio {
@@ -457,7 +472,7 @@ export default function POS() {
         while (true) {
           const { data, error } = await supabase
             .from('productos')
-            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id')
+            .select('id, codigo_articulo, descripcion, stock_actual, unidad_medida, precio_costo, marca_id, tipo_producto_id, codigo_barra, unidades_por_empaque, empaque_de_producto_id, plu_balanza')
             .eq('activo', true)
             .order('descripcion')
             .range(from, from + PAGE - 1);
@@ -529,7 +544,8 @@ export default function POS() {
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     );
     return showAllResults ? results : results.slice(0, 8);
   }, [productos, searchTerm, showAllResults]);
@@ -541,7 +557,8 @@ export default function POS() {
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     ).length;
   }, [productos, searchTerm]);
 
@@ -691,11 +708,56 @@ export default function POS() {
     );
   };
 
+  // Agregado desde etiqueta de balanza: el peso del código es definitivo, nunca se abre el diálogo de peso.
+  const agregarConPesoBalanza = (producto: Producto, pesoKg: number) => {
+    const precio = getProductoPrice(producto, pesoKg);
+    if (!precio || precio <= 0) {
+      toast.error('Este producto no tiene precio definido en la lista del cliente');
+      return;
+    }
+    const existing = cart.find((item) => item.producto?.id === producto.id && !item.es_temporal);
+    if (existing) {
+      updateCantidadDirecta(existing.id, existing.cantidad + pesoKg);
+    } else {
+      setCart((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          producto,
+          cantidad: pesoKg,
+          precio,
+          subtotal: calcSubtotal(pesoKg, precio, 0),
+          descuento_porcentaje: 0,
+        },
+      ]);
+    }
+    setSearchTerm('');
+    setShowAllResults(false);
+    focusBuscador();
+  };
+
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const term = searchTerm.trim();
     if (!term) return;
+
+    // Etiqueta de balanza: PLU + peso ya impreso, no se pide peso a mano.
+    const balanza = parseCodigoBalanza(term);
+    if (balanza) {
+      const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
+      if (candidatos.length === 1) {
+        agregarConPesoBalanza(candidatos[0], balanza.pesoKg);
+      } else if (candidatos.length === 0) {
+        toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
+      } else {
+        setSearchTerm(String(balanza.plu));
+        setShowAllResults(true);
+        toast.warning(`PLU ${balanza.plu} duplicado — seleccioná el producto (el peso deberá cargarse manualmente)`);
+      }
+      return;
+    }
+
     const matches = buscarPorCodigoExacto(term);
     if (matches.length === 1) {
       addToCart(matches[0]);
