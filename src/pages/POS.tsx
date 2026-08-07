@@ -3648,6 +3648,7 @@ export default function POS() {
         if (!open) {
           setClienteSearchTerm('');
           setClienteSearchResults([]);
+          focusBuscador();
         }
       }}>
         <DialogContent>
@@ -3660,6 +3661,22 @@ export default function POS() {
               placeholder="Buscar por nombre o DNI/CUIT (mín. 2 caracteres)..."
               value={clienteSearchTerm}
               onChange={(e) => setClienteSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                if (!clienteSearchTerm) {
+                  setSelectedCliente(null);
+                  setClienteDialogOpen(false);
+                  return;
+                }
+                const primero = clienteSearchResults[0];
+                if (primero) {
+                  setSelectedCliente(primero);
+                  setClienteDialogOpen(false);
+                  setClienteSearchTerm('');
+                  setClienteSearchResults([]);
+                }
+              }}
               className="pl-9"
               autoFocus
             />
