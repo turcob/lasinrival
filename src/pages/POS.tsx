@@ -3838,18 +3838,35 @@ export default function POS() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              {formasPago.map((fp, i) => (
-                <Button
-                  key={fp.id}
-                  variant="outline"
-                  autoFocus={i === 0}
-                  onClick={() => addPago(fp.id)}
-                  disabled={totalPagado >= totalConRecargo}
-                >
-                  {fp.nombre}
-                </Button>
-              ))}
+            <div
+              className="grid grid-cols-2 gap-2"
+              onKeyDown={(e) => {
+                // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
+                if (/^[1-9]$/.test(e.key)) {
+                  const idx = Number(e.key) - 1;
+                  const fp = formasPago[idx];
+                  if (fp && totalPagado < totalConRecargo) {
+                    e.preventDefault();
+                    addPago(fp.id);
+                  }
+                }
+              }}
+            >
+              {formasPago.map((fp, i) => {
+                const esEfectivo = fp.nombre.toLowerCase().includes('efectivo');
+                return (
+                  <Button
+                    key={fp.id}
+                    variant={esEfectivo ? 'default' : 'outline'}
+                    autoFocus={esEfectivo}
+                    onClick={() => addPago(fp.id)}
+                    disabled={totalPagado >= totalConRecargo}
+                  >
+                    <span className="mr-1 text-xs opacity-70">{i + 1}</span>
+                    {fp.nombre}
+                  </Button>
+                );
+              })}
             </div>
 
             {pagos.length > 0 && (
