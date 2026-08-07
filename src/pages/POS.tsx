@@ -4371,6 +4371,12 @@ export default function POS() {
                 type="text"
                 value={efectivoEntregado}
                 onChange={(e) => setEfectivoEntregado(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddPagoEfectivo();
+                  }
+                }}
                 placeholder="0.00"
                 autoFocus
               />
