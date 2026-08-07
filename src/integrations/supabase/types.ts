@@ -3329,6 +3329,7 @@ export type Database = {
           fecha_desactivacion: string | null
           id: string
           marca_id: string | null
+          plu_balanza: number | null
           precio_costo: number
           stock_actual: number | null
           stock_minimo: number | null
@@ -3352,6 +3353,7 @@ export type Database = {
           fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
+          plu_balanza?: number | null
           precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
@@ -3375,6 +3377,7 @@ export type Database = {
           fecha_desactivacion?: string | null
           id?: string
           marca_id?: string | null
+          plu_balanza?: number | null
           precio_costo?: number
           stock_actual?: number | null
           stock_minimo?: number | null
