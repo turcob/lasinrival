@@ -2679,6 +2679,135 @@ export default function POS() {
     printWindow.document.close();
   }
 
+  // ===== Operación por teclado (venta directa) =====
+  const focusBuscador = () => {
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
+  };
+
+  const focusCantidadItem = (itemId: string) => {
+    setTimeout(() => {
+      const el = cantidadInputRefs.current.get(itemId);
+      el?.focus();
+      el?.select();
+    }, 0);
+  };
+
+  const moverFocoCantidad = (itemId: string, delta: number) => {
+    const idx = cart.findIndex((i) => i.id === itemId);
+    if (idx === -1) return;
+    const next = cart[idx + delta];
+    if (next) focusCantidadItem(next.id);
+    else if (delta < 0) focusBuscador();
+  };
+
+  // Acción del botón Cobrar / Cargar a CC (compartida con el atajo F9)
+  const ejecutarCobro = () => {
+    if (cart.length === 0 || !cajaAbierta || emitiendo) return;
+    if (isVentaEmpleado) {
+      if (!selectedEmpleado) {
+        toast.error('Seleccione un empleado para la venta');
+        return;
+      }
+      if (empleadoModalidadPago === 'cuenta_corriente') {
+        handleProcesarVentaEmpleado();
+      } else {
+        setPagos([]);
+        setPagoDialogOpen(true);
+      }
+    } else if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
+      setModoVentaCC('cliente');
+      handleOpenFacturaDialog();
+    } else {
+      setPagos([]);
+      setPagoDialogOpen(true);
+    }
+  };
+
+  // Foco inicial en el buscador al entrar a venta directa
+  useEffect(() => {
+    if (modoPos === 'directa' && !loading) focusBuscador();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoPos, loading]);
+
+  // Atajos globales de teclado (solo en venta directa)
+  useEffect(() => {
+    if (modoPos !== 'directa') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anyDialogOpen =
+        pagoDialogOpen ||
+        ticketDialogOpen ||
+        facturaDialogOpen ||
+        clienteDialogOpen ||
+        empleadoDialogOpen ||
+        pesoDialogOpen ||
+        productSearchModalOpen ||
+        productQuantityModalOpen ||
+        productoTemporalDialogOpen ||
+        transferenciaDialogOpen ||
+        montoGenericoDialogOpen ||
+        chequeDialogOpen ||
+        descuentoAuthModalOpen;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (!anyDialogOpen) focusBuscador();
+        return;
+      }
+      if (e.key === 'F3') {
+        e.preventDefault();
+        if (!anyDialogOpen) setProductSearchModalOpen(true);
+        return;
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (!anyDialogOpen) {
+          if (isVentaEmpleado) setEmpleadoDialogOpen(true);
+          else setClienteDialogOpen(true);
+        }
+        return;
+      }
+      if (e.key === 'F9') {
+        e.preventDefault();
+        if (!anyDialogOpen) ejecutarCobro();
+        return;
+      }
+      if (e.key === 'Escape' && !anyDialogOpen) {
+        const activo = document.activeElement as HTMLElement | null;
+        if (activo && activo !== searchInputRef.current) activo.blur?.();
+        focusBuscador();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modoPos,
+    cart,
+    cajaAbierta,
+    emitiendo,
+    isVentaEmpleado,
+    selectedEmpleado,
+    selectedCliente,
+    empleadoModalidadPago,
+    clienteModalidadPago,
+    pagoDialogOpen,
+    ticketDialogOpen,
+    facturaDialogOpen,
+    clienteDialogOpen,
+    empleadoDialogOpen,
+    pesoDialogOpen,
+    productSearchModalOpen,
+    productQuantityModalOpen,
+    productoTemporalDialogOpen,
+    transferenciaDialogOpen,
+    montoGenericoDialogOpen,
+    chequeDialogOpen,
+    descuentoAuthModalOpen,
+  ]);
+
   if (loading) {
     return (
       <MainLayout>
