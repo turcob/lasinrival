@@ -2842,6 +2842,7 @@ export default function POS() {
                   <Button
                     variant="outline"
                     size="sm"
+                    tabIndex={-1}
                     onClick={() => setProductoTemporalDialogOpen(true)}
                   >
                     <Package className="h-4 w-4 mr-1" />
@@ -2854,7 +2855,7 @@ export default function POS() {
                       setSelectedLista(lista || null);
                     }}
                   >
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-48" tabIndex={-1}>
                       <SelectValue placeholder="Lista de precios" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2874,7 +2875,6 @@ export default function POS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     ref={searchInputRef}
-                    tabIndex={1}
                     className="pl-10"
                     placeholder="Buscar producto por código o descripción..."
                     value={searchTerm}
@@ -2887,12 +2887,18 @@ export default function POS() {
                 </div>
                 <Button 
                   variant="default"
+                  tabIndex={-1}
                   onClick={() => setProductSearchModalOpen(true)}
                 >
                   <Search className="h-4 w-4 mr-2" />
                   Buscar
                 </Button>
               </div>
+              {modoPos === 'directa' && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
+                </p>
+              )}
               
               {/* Quick Search Results - mantener para búsqueda rápida inline */}
               {filteredProductos.length > 0 && searchTerm && (
