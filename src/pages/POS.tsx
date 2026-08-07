@@ -544,7 +544,8 @@ export default function POS() {
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     );
     return showAllResults ? results : results.slice(0, 8);
   }, [productos, searchTerm, showAllResults]);
@@ -556,7 +557,8 @@ export default function POS() {
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     ).length;
   }, [productos, searchTerm]);
 
