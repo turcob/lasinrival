@@ -3853,12 +3853,14 @@ export default function POS() {
               }}
             >
               {formasPago.map((fp, i) => {
+                const hayEfectivo = formasPago.some((f) => f.nombre.toLowerCase().includes('efectivo'));
                 const esEfectivo = fp.nombre.toLowerCase().includes('efectivo');
+                const enfocar = hayEfectivo ? esEfectivo : i === 0;
                 return (
                   <Button
                     key={fp.id}
                     variant={esEfectivo ? 'default' : 'outline'}
-                    autoFocus={esEfectivo}
+                    autoFocus={enfocar}
                     onClick={() => addPago(fp.id)}
                     disabled={totalPagado >= totalConRecargo}
                   >
