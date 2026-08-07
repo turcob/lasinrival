@@ -736,7 +736,6 @@ export default function POS() {
       const precioEscalado = getProductoPrice(producto, cantidad) || precio;
       return [...prev, { id: newId, producto, cantidad, precio: precioEscalado, subtotal: calcSubtotal(cantidad, precioEscalado, 0), descuento_porcentaje: 0 }];
     });
-    
   };
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
