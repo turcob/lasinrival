@@ -62,7 +62,8 @@ export function ProductSearchModal({
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     );
   }, [productos, searchTerm]);
 
