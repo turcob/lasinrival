@@ -2971,7 +2971,6 @@ export default function POS() {
                   <div className="space-y-2">
                     {cart.map((item, idx) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
-                      const esUltimoAgregado = idx === cart.length - 1;
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
