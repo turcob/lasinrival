@@ -852,6 +852,7 @@ export default function POS() {
     setPesoDialogOpen(false);
     setEditingPesoItem(null);
     setPesoInput('');
+    focusBuscador();
   };
 
   const handleGuardarCantidad = () => {
