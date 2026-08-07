@@ -210,6 +210,8 @@ export default function POS() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const cobrarBtnRef = useRef<HTMLButtonElement>(null);
+  const cantidadInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const [showAllResults, setShowAllResults] = useState(false);
   const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -672,6 +674,10 @@ export default function POS() {
     });
     setSearchTerm('');
     setShowAllResults(false);
+    // Volver al buscador para seguir escaneando (salvo que se abra el diálogo de peso)
+    if (!(isProductoPorPeso(producto) && !skipPesoPrompt)) {
+      focusBuscador();
+    }
   };
 
   // Búsqueda por código exacto (lector de código de barras HID: código + Enter)
@@ -730,7 +736,6 @@ export default function POS() {
       const precioEscalado = getProductoPrice(producto, cantidad) || precio;
       return [...prev, { id: newId, producto, cantidad, precio: precioEscalado, subtotal: calcSubtotal(cantidad, precioEscalado, 0), descuento_porcentaje: 0 }];
     });
-    
   };
 
   const calcSubtotal = (cantidad: number, precio: number, descuentoPorcentaje: number): number => {
@@ -850,6 +855,7 @@ export default function POS() {
     setPesoDialogOpen(false);
     setEditingPesoItem(null);
     setPesoInput('');
+    focusBuscador();
   };
 
   const handleGuardarCantidad = () => {
@@ -2677,6 +2683,135 @@ export default function POS() {
     printWindow.document.close();
   }
 
+  // ===== Operación por teclado (venta directa) =====
+  const focusBuscador = () => {
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
+  };
+
+  const focusCantidadItem = (itemId: string) => {
+    setTimeout(() => {
+      const el = cantidadInputRefs.current.get(itemId);
+      el?.focus();
+      el?.select();
+    }, 0);
+  };
+
+  const moverFocoCantidad = (itemId: string, delta: number) => {
+    const idx = cart.findIndex((i) => i.id === itemId);
+    if (idx === -1) return;
+    const next = cart[idx + delta];
+    if (next) focusCantidadItem(next.id);
+    else if (delta < 0) focusBuscador();
+  };
+
+  // Acción del botón Cobrar / Cargar a CC (compartida con el atajo F9)
+  const ejecutarCobro = () => {
+    if (cart.length === 0 || !cajaAbierta || emitiendo) return;
+    if (isVentaEmpleado) {
+      if (!selectedEmpleado) {
+        toast.error('Seleccione un empleado para la venta');
+        return;
+      }
+      if (empleadoModalidadPago === 'cuenta_corriente') {
+        handleProcesarVentaEmpleado();
+      } else {
+        setPagos([]);
+        setPagoDialogOpen(true);
+      }
+    } else if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
+      setModoVentaCC('cliente');
+      handleOpenFacturaDialog();
+    } else {
+      setPagos([]);
+      setPagoDialogOpen(true);
+    }
+  };
+
+  // Foco inicial en el buscador al entrar a venta directa
+  useEffect(() => {
+    if (modoPos === 'directa' && !loading) focusBuscador();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoPos, loading]);
+
+  // Atajos globales de teclado (solo en venta directa)
+  useEffect(() => {
+    if (modoPos !== 'directa') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anyDialogOpen =
+        pagoDialogOpen ||
+        ticketDialogOpen ||
+        facturaDialogOpen ||
+        clienteDialogOpen ||
+        empleadoDialogOpen ||
+        pesoDialogOpen ||
+        productSearchModalOpen ||
+        productQuantityModalOpen ||
+        productoTemporalDialogOpen ||
+        transferenciaDialogOpen ||
+        montoGenericoDialogOpen ||
+        chequeDialogOpen ||
+        descuentoAuthModalOpen;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (!anyDialogOpen) focusBuscador();
+        return;
+      }
+      if (e.key === 'F3') {
+        e.preventDefault();
+        if (!anyDialogOpen) setProductSearchModalOpen(true);
+        return;
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (!anyDialogOpen) {
+          if (isVentaEmpleado) setEmpleadoDialogOpen(true);
+          else setClienteDialogOpen(true);
+        }
+        return;
+      }
+      if (e.key === 'F9') {
+        e.preventDefault();
+        if (!anyDialogOpen) ejecutarCobro();
+        return;
+      }
+      if (e.key === 'Escape' && !anyDialogOpen) {
+        const activo = document.activeElement as HTMLElement | null;
+        if (activo && activo !== searchInputRef.current) activo.blur?.();
+        focusBuscador();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modoPos,
+    cart,
+    cajaAbierta,
+    emitiendo,
+    isVentaEmpleado,
+    selectedEmpleado,
+    selectedCliente,
+    empleadoModalidadPago,
+    clienteModalidadPago,
+    pagoDialogOpen,
+    ticketDialogOpen,
+    facturaDialogOpen,
+    clienteDialogOpen,
+    empleadoDialogOpen,
+    pesoDialogOpen,
+    productSearchModalOpen,
+    productQuantityModalOpen,
+    productoTemporalDialogOpen,
+    transferenciaDialogOpen,
+    montoGenericoDialogOpen,
+    chequeDialogOpen,
+    descuentoAuthModalOpen,
+  ]);
+
   if (loading) {
     return (
       <MainLayout>
@@ -2711,6 +2846,7 @@ export default function POS() {
                   <Button
                     variant="outline"
                     size="sm"
+                    tabIndex={-1}
                     onClick={() => setProductoTemporalDialogOpen(true)}
                   >
                     <Package className="h-4 w-4 mr-1" />
@@ -2723,7 +2859,7 @@ export default function POS() {
                       setSelectedLista(lista || null);
                     }}
                   >
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-48" tabIndex={-1}>
                       <SelectValue placeholder="Lista de precios" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2743,7 +2879,6 @@ export default function POS() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     ref={searchInputRef}
-                    tabIndex={1}
                     className="pl-10"
                     placeholder="Buscar producto por código o descripción..."
                     value={searchTerm}
@@ -2756,12 +2891,18 @@ export default function POS() {
                 </div>
                 <Button 
                   variant="default"
+                  tabIndex={-1}
                   onClick={() => setProductSearchModalOpen(true)}
                 >
                   <Search className="h-4 w-4 mr-2" />
                   Buscar
                 </Button>
               </div>
+              {modoPos === 'directa' && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
+                </p>
+              )}
               
               {/* Quick Search Results - mantener para búsqueda rápida inline */}
               {filteredProductos.length > 0 && searchTerm && (
@@ -2816,7 +2957,7 @@ export default function POS() {
                   Carrito ({cart.length} items)
                 </CardTitle>
                 {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => { setCart([]); setDescuentoGlobal(0); }}>
+                  <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => { setCart([]); setDescuentoGlobal(0); }}>
                     Vaciar
                   </Button>
                 )}
@@ -2834,7 +2975,6 @@ export default function POS() {
                   <div className="space-y-2">
                     {cart.map((item, idx) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
-                      const esUltimoAgregado = idx === cart.length - 1;
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
                       const montoDescuento = totalSinDescuento * (item.descuento_porcentaje / 100);
@@ -2889,6 +3029,7 @@ export default function POS() {
                             <Button
                               size="icon"
                               variant="ghost"
+                              tabIndex={-1}
                               className="h-6 w-6 text-destructive shrink-0 ml-2"
                               onClick={() => removeFromCart(item.id)}
                             >
@@ -2914,7 +3055,10 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode={esPorPeso ? "decimal" : "numeric"}
-                                tabIndex={esUltimoAgregado ? 2 : -1}
+                                ref={(el) => {
+                                  if (el) cantidadInputRefs.current.set(item.id, el);
+                                  else cantidadInputRefs.current.delete(item.id);
+                                }}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingCantidadItem === item.id ? cantidadInput : (esPorPeso ? item.cantidad.toLocaleString('es-AR', { minimumFractionDigits: 3 }) : item.cantidad.toString())}
                                 onFocus={() => {
@@ -2941,10 +3085,28 @@ export default function POS() {
                                     }
                                     setEditingCantidadItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                   if (e.key === 'Escape') {
                                     setEditingCantidadItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
+                                  }
+                                  if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    moverFocoCantidad(item.id, -1);
+                                  }
+                                  if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    moverFocoCantidad(item.id, 1);
+                                  }
+                                  if (e.key === 'Delete' && e.shiftKey) {
+                                    e.preventDefault();
+                                    setEditingCantidadItem(null);
+                                    removeFromCart(item.id);
+                                    focusBuscador();
                                   }
                                 }}
                               />
@@ -2956,7 +3118,6 @@ export default function POS() {
                               <Input
                                 type="text"
                                 inputMode="decimal"
-                                tabIndex={esUltimoAgregado ? 3 : -1}
                                 className="h-6 w-full text-center text-xs p-1 text-foreground"
                                 value={editingDescuentoItem === item.id ? descuentoInput : item.descuento_porcentaje.toString()}
                                 onFocus={() => {
@@ -2981,10 +3142,12 @@ export default function POS() {
                                     }
                                     setEditingDescuentoItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                   if (e.key === 'Escape') {
                                     setEditingDescuentoItem(null);
                                     (e.target as HTMLInputElement).blur();
+                                    focusBuscador();
                                   }
                                 }}
                               />
@@ -3232,10 +3395,12 @@ export default function POS() {
                           }
                           setEditingDescuentoGlobal(false);
                           (e.target as HTMLInputElement).blur();
+                          setTimeout(() => cobrarBtnRef.current?.focus(), 0);
                         }
                         if (e.key === 'Escape') {
                           setEditingDescuentoGlobal(false);
                           (e.target as HTMLInputElement).blur();
+                          focusBuscador();
                         }
                       }}
                     />
@@ -3262,33 +3427,11 @@ export default function POS() {
           {/* Payment Button */}
           <div className="space-y-2">
             <Button
+              ref={cobrarBtnRef}
               size="lg"
               className="w-full"
               disabled={cart.length === 0 || !cajaAbierta || (isVentaEmpleado && !selectedEmpleado) || (!isVentaEmpleado && selectedCliente && clienteModalidadPago === 'cuenta_corriente' && !selectedCliente) || emitiendo}
-              onClick={() => {
-                if (isVentaEmpleado) {
-                  if (!selectedEmpleado) {
-                    toast.error('Seleccione un empleado para la venta');
-                    return;
-                  }
-                  if (empleadoModalidadPago === 'cuenta_corriente') {
-                    // Procesar directo a cuenta corriente
-                    handleProcesarVentaEmpleado();
-                  } else {
-                    // Pago directo: abrir diálogo de pagos normal
-                    setPagos([]);
-                    setPagoDialogOpen(true);
-                  }
-                } else if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
-                  // Cliente con cuenta corriente: ofrecer facturación AFIP
-                  setModoVentaCC('cliente');
-                  handleOpenFacturaDialog();
-                } else {
-                  // Flujo normal de pago
-                  setPagos([]);
-                  setPagoDialogOpen(true);
-                }
-              }}
+              onClick={ejecutarCobro}
             >
               {isVentaEmpleado ? (
                 empleadoModalidadPago === 'cuenta_corriente' ? (
@@ -3505,6 +3648,7 @@ export default function POS() {
         if (!open) {
           setClienteSearchTerm('');
           setClienteSearchResults([]);
+          focusBuscador();
         }
       }}>
         <DialogContent>
@@ -3517,6 +3661,22 @@ export default function POS() {
               placeholder="Buscar por nombre o DNI/CUIT (mín. 2 caracteres)..."
               value={clienteSearchTerm}
               onChange={(e) => setClienteSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                if (!clienteSearchTerm) {
+                  setSelectedCliente(null);
+                  setClienteDialogOpen(false);
+                  return;
+                }
+                const primero = clienteSearchResults[0];
+                if (primero) {
+                  setSelectedCliente(primero);
+                  setClienteDialogOpen(false);
+                  setClienteSearchTerm('');
+                  setClienteSearchResults([]);
+                }
+              }}
               className="pl-9"
               autoFocus
             />
@@ -3576,6 +3736,7 @@ export default function POS() {
         if (!open) {
           setEmpleadoSearchTerm('');
           setEmpleadoSearchResults([]);
+          focusBuscador();
         }
       }}>
         <DialogContent>
@@ -3678,10 +3839,11 @@ export default function POS() {
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              {formasPago.map((fp) => (
+              {formasPago.map((fp, i) => (
                 <Button
                   key={fp.id}
                   variant="outline"
+                  autoFocus={i === 0}
                   onClick={() => addPago(fp.id)}
                   disabled={totalPagado >= totalConRecargo}
                 >
@@ -4760,7 +4922,10 @@ export default function POS() {
       {/* Modal de Búsqueda de Productos */}
       <ProductSearchModal
         open={productSearchModalOpen}
-        onOpenChange={setProductSearchModalOpen}
+        onOpenChange={(open) => {
+          setProductSearchModalOpen(open);
+          if (!open) focusBuscador();
+        }}
         productos={productos}
         getProductoPrice={getProductoPrice}
         onSelectProduct={handleProductSelectedFromModal}
@@ -4769,7 +4934,10 @@ export default function POS() {
       {/* Modal de Selección de Cantidad */}
       <ProductQuantityModal
         open={productQuantityModalOpen}
-        onOpenChange={setProductQuantityModalOpen}
+        onOpenChange={(open) => {
+          setProductQuantityModalOpen(open);
+          if (!open && !productSearchModalOpen) focusBuscador();
+        }}
         producto={selectedProductForQuantity}
         precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}
         onConfirm={handleConfirmProductQuantity}
