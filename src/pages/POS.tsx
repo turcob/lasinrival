@@ -711,6 +711,23 @@ export default function POS() {
     e.preventDefault();
     const term = searchTerm.trim();
     if (!term) return;
+
+    // Etiqueta de balanza: PLU + peso ya impreso, no se pide peso a mano.
+    const balanza = parseCodigoBalanza(term);
+    if (balanza) {
+      const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
+      if (candidatos.length === 1) {
+        agregarConPesoBalanza(candidatos[0], balanza.pesoKg);
+      } else if (candidatos.length === 0) {
+        toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
+      } else {
+        setSearchTerm(String(balanza.plu));
+        setShowAllResults(true);
+        toast.warning(`PLU ${balanza.plu} duplicado — seleccioná el producto (el peso deberá cargarse manualmente)`);
+      }
+      return;
+    }
+
     const matches = buscarPorCodigoExacto(term);
     if (matches.length === 1) {
       addToCart(matches[0]);
