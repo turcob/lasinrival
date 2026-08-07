@@ -2953,7 +2953,7 @@ export default function POS() {
                   Carrito ({cart.length} items)
                 </CardTitle>
                 {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => { setCart([]); setDescuentoGlobal(0); }}>
+                  <Button variant="ghost" size="sm" tabIndex={-1} onClick={() => { setCart([]); setDescuentoGlobal(0); }}>
                     Vaciar
                   </Button>
                 )}
@@ -3391,10 +3391,12 @@ export default function POS() {
                           }
                           setEditingDescuentoGlobal(false);
                           (e.target as HTMLInputElement).blur();
+                          setTimeout(() => cobrarBtnRef.current?.focus(), 0);
                         }
                         if (e.key === 'Escape') {
                           setEditingDescuentoGlobal(false);
                           (e.target as HTMLInputElement).blur();
+                          focusBuscador();
                         }
                       }}
                     />
@@ -3421,33 +3423,11 @@ export default function POS() {
           {/* Payment Button */}
           <div className="space-y-2">
             <Button
+              ref={cobrarBtnRef}
               size="lg"
               className="w-full"
               disabled={cart.length === 0 || !cajaAbierta || (isVentaEmpleado && !selectedEmpleado) || (!isVentaEmpleado && selectedCliente && clienteModalidadPago === 'cuenta_corriente' && !selectedCliente) || emitiendo}
-              onClick={() => {
-                if (isVentaEmpleado) {
-                  if (!selectedEmpleado) {
-                    toast.error('Seleccione un empleado para la venta');
-                    return;
-                  }
-                  if (empleadoModalidadPago === 'cuenta_corriente') {
-                    // Procesar directo a cuenta corriente
-                    handleProcesarVentaEmpleado();
-                  } else {
-                    // Pago directo: abrir diálogo de pagos normal
-                    setPagos([]);
-                    setPagoDialogOpen(true);
-                  }
-                } else if (selectedCliente && clienteModalidadPago === 'cuenta_corriente') {
-                  // Cliente con cuenta corriente: ofrecer facturación AFIP
-                  setModoVentaCC('cliente');
-                  handleOpenFacturaDialog();
-                } else {
-                  // Flujo normal de pago
-                  setPagos([]);
-                  setPagoDialogOpen(true);
-                }
-              }}
+              onClick={ejecutarCobro}
             >
               {isVentaEmpleado ? (
                 empleadoModalidadPago === 'cuenta_corriente' ? (
