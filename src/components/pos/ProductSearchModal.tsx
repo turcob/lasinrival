@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { parseCodigoBalanza } from '@/lib/codigoBalanza';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ interface Producto {
   marca_id?: string | null;
   tipo_producto_id?: string | null;
   codigo_barra?: string | null;
+  plu_balanza?: number | null;
 }
 
 interface ProductSearchModalProps {
@@ -39,7 +41,7 @@ interface ProductSearchModalProps {
   onOpenChange: (open: boolean) => void;
   productos: Producto[];
   getProductoPrice: (producto: Producto) => number;
-  onSelectProduct: (producto: Producto) => void;
+  onSelectProduct: (producto: Producto, options?: { cantidad?: number }) => void;
 }
 
 export function ProductSearchModal({
@@ -60,7 +62,8 @@ export function ProductSearchModal({
       (p) =>
         p.codigo_articulo.toLowerCase().includes(term) ||
         p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term)
+        (p.codigo_barra || '').toLowerCase().includes(term) ||
+        (p.plu_balanza != null && String(p.plu_balanza) === term)
     );
   }, [productos, searchTerm]);
 
@@ -69,8 +72,8 @@ export function ProductSearchModal({
     return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
   };
 
-  const handleSelectProduct = (producto: Producto) => {
-    onSelectProduct(producto);
+  const handleSelectProduct = (producto: Producto, options?: { cantidad?: number }) => {
+    onSelectProduct(producto, options);
     // No cerramos el modal - el usuario puede seguir agregando productos
   };
 
@@ -82,8 +85,27 @@ export function ProductSearchModal({
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const code = searchTerm.trim().toLowerCase();
-    if (!code) return;
+    const raw = searchTerm.trim();
+    if (!raw) return;
+
+    // Etiqueta de balanza: PLU + peso impreso.
+    const balanza = parseCodigoBalanza(raw);
+    if (balanza) {
+      const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
+      if (candidatos.length === 1) {
+        handleSelectProduct(candidatos[0], { cantidad: balanza.pesoKg });
+        setSearchTerm('');
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      } else if (candidatos.length === 0) {
+        toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
+      } else {
+        setSearchTerm(String(balanza.plu));
+        toast.warning(`PLU ${balanza.plu} duplicado — seleccioná el producto (peso manual)`);
+      }
+      return;
+    }
+
+    const code = raw.toLowerCase();
     const matches = productos.filter(
       (p) =>
         (p.codigo_barra || '').trim().toLowerCase() === code ||
