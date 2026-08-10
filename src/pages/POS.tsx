@@ -66,7 +66,7 @@ import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModa
 import { PedidosMostradorPanel, type PedidoMostrador } from '@/components/pos/PedidosMostradorPanel';
 import { PrepararMostradorDialog } from '@/components/pos/PrepararMostradorDialog';
 import { imprimirPickingMostrador } from '@/lib/imprimirPickingMostrador';
-import { parseCodigoBalanza } from '@/lib/codigoBalanza';
+import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
 
 interface Producto {
   id: string;
@@ -280,6 +280,7 @@ export default function POS() {
 
   // === Flujo Mayorista: cobrar pedidos preparados (tabla `pedidos`) ===
   const flujoMayoristaActivo = !!(comercioConfig as any)?.pos_flujo_mayorista_activo;
+  const formatoBalanza = ((comercioConfig as any)?.formato_codigo_balanza ?? 'plu5_peso6') as FormatoCodigoBalanza;
   const [pedidosMayoristaDialogOpen, setPedidosMayoristaDialogOpen] = useState(false);
   const [pedidosMayorista, setPedidosMayorista] = useState<any[]>([]);
   const [loadingPedidosMayorista, setLoadingPedidosMayorista] = useState(false);
@@ -730,7 +731,7 @@ export default function POS() {
     if (!term) return;
 
     // Etiqueta de balanza: PLU + peso ya impreso, no se pide peso a mano.
-    const balanza = parseCodigoBalanza(term);
+    const balanza = parseCodigoBalanza(term, formatoBalanza);
     if (balanza) {
       const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
       if (candidatos.length === 1) {
@@ -5035,6 +5036,7 @@ export default function POS() {
         productos={productos}
         getProductoPrice={getProductoPrice}
         onSelectProduct={handleProductSelectedFromModal}
+        formatoCodigoBalanza={formatoBalanza}
       />
 
       {/* Modal de Selección de Cantidad */}

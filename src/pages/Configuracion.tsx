@@ -46,6 +46,7 @@ interface ConfiguracionComercio {
   facturas_adeudadas_bloqueo: number;
   bloqueo_automatico_activo: boolean;
   monto_adeudado_bloqueo: number;
+  formato_codigo_balanza: string;
 }
 
 const CONDICIONES_IVA = [
