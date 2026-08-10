@@ -2874,6 +2874,135 @@ export default function POS() {
     descuentoAuthModalOpen,
   ]);
 
+  // Foco / navegación dentro del diálogo de cobro
+  const focusFormaPago = (index: number) => {
+    const fp = formasPago[index];
+    if (!fp) return;
+    formaPagoBtnRefs.current.get(fp.id)?.focus();
+  };
+
+  const refocusPagoDialog = () => {
+    setTimeout(() => {
+      if (!pagoDialogOpen) return;
+      const preferida = formasPago.findIndex((f) => f.nombre.toLowerCase().includes('efectivo'));
+      focusFormaPago(preferida >= 0 ? preferida : 0);
+    }, 60);
+  };
+
+  const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
+    const idxActual = formasPago.findIndex(
+      (f) => formaPagoBtnRefs.current.get(f.id) === document.activeElement,
+    );
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusFormaPago(Math.min((idxActual < 0 ? -1 : idxActual) + 1, formasPago.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusFormaPago(Math.max((idxActual < 0 ? 1 : idxActual) - 1, 0));
+      return;
+    }
+    // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
+    if (/^[1-9]$/.test(e.key)) {
+      const idx = Number(e.key) - 1;
+      const fp = formasPago[idx];
+      if (fp && totalPagado < totalConRecargo) {
+        e.preventDefault();
+        addPago(fp.id);
+      }
+    }
+  };
+
+  // Atajos globales en pedidos de mostrador
+  useEffect(() => {
+    if (modoPos !== 'mostrador') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anyDialogOpen =
+        pagoDialogOpen ||
+        ticketDialogOpen ||
+        facturaDialogOpen ||
+        clienteDialogOpen ||
+        empleadoDialogOpen ||
+        pesoDialogOpen ||
+        productSearchModalOpen ||
+        productQuantityModalOpen ||
+        productoTemporalDialogOpen ||
+        transferenciaDialogOpen ||
+        montoGenericoDialogOpen ||
+        chequeDialogOpen ||
+        descuentoAuthModalOpen;
+      if (anyDialogOpen) return;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        focusBuscador();
+        return;
+      }
+      if (e.key === 'F3') {
+        e.preventDefault();
+        setProductSearchModalOpen(true);
+        return;
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (isVentaEmpleado) setEmpleadoDialogOpen(true);
+        else setClienteDialogOpen(true);
+        return;
+      }
+      if (e.key === 'F6') {
+        e.preventDefault();
+        pedidosPanelRef.current?.focusLista();
+        return;
+      }
+      if (e.key === 'F7') {
+        e.preventDefault();
+        pedidosPanelRef.current?.imprimirEnfocado();
+        return;
+      }
+      if (e.key === 'F8') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          if (editingPedidoId && editingPedidoEstado === 'en_preparacion') handleActualizarYReimprimir();
+          else if (!editingPedidoId || editingPedidoEstado === 'pedido') handleEnviarPreparacion();
+        }
+        return;
+      }
+      if (e.key === 'F9') {
+        e.preventDefault();
+        ejecutarCobro();
+        return;
+      }
+      if (e.key === 'Escape') {
+        const activo = document.activeElement as HTMLElement | null;
+        if (activo && activo !== searchInputRef.current) activo.blur?.();
+        focusBuscador();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modoPos,
+    cart,
+    editingPedidoId,
+    editingPedidoEstado,
+    isVentaEmpleado,
+    pagoDialogOpen,
+    ticketDialogOpen,
+    facturaDialogOpen,
+    clienteDialogOpen,
+    empleadoDialogOpen,
+    pesoDialogOpen,
+    productSearchModalOpen,
+    productQuantityModalOpen,
+    productoTemporalDialogOpen,
+    transferenciaDialogOpen,
+    montoGenericoDialogOpen,
+    chequeDialogOpen,
+    descuentoAuthModalOpen,
+  ]);
+
   if (loading) {
     return (
       <MainLayout>
