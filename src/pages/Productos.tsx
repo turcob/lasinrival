@@ -404,6 +404,7 @@ export default function Productos() {
       precio_costo: 0,
       empaque_de_producto_id: '',
       unidades_por_empaque: '',
+      plu_balanza: '',
     });
   };
   
