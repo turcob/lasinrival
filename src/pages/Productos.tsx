@@ -78,6 +78,7 @@ interface Producto {
   fecha_desactivacion: string | null;
   unidades_por_empaque?: number | null;
   empaque_de_producto_id?: string | null;
+  plu_balanza?: number | null;
   categorias?: { nombre: string } | null;
   subcategorias?: { nombre: string } | null;
   marcas?: { nombre: string } | null;
@@ -150,6 +151,7 @@ export default function Productos() {
     precio_costo: 0,
     empaque_de_producto_id: '',
     unidades_por_empaque: '',
+    plu_balanza: '',
   });
 
   useEffect(() => {
@@ -278,6 +280,7 @@ export default function Productos() {
         unidades_por_empaque: formData.unidades_por_empaque
           ? Number(formData.unidades_por_empaque)
           : null,
+        plu_balanza: formData.plu_balanza ? Number(formData.plu_balanza) : null,
       };
 
       // Si se está desactivando el producto, registrar quién y cuándo
@@ -378,6 +381,7 @@ export default function Productos() {
       empaque_de_producto_id: producto.empaque_de_producto_id || '',
       unidades_por_empaque:
         producto.unidades_por_empaque != null ? String(producto.unidades_por_empaque) : '',
+      plu_balanza: producto.plu_balanza != null ? String(producto.plu_balanza) : '',
     });
     setDialogOpen(true);
   };
@@ -978,6 +982,24 @@ export default function Productos() {
                     }
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plu_balanza">PLU de Balanza</Label>
+                <Input
+                  id="plu_balanza"
+                  type="number"
+                  min={1}
+                  max={99999}
+                  placeholder="Ej: 200"
+                  value={formData.plu_balanza}
+                  onChange={(e) =>
+                    setFormData({ ...formData, plu_balanza: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Código PLU cargado en la balanza (etiquetas de peso variable).
+                </p>
               </div>
 
               <div className="space-y-2">
