@@ -261,6 +261,8 @@ export default function POS() {
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
   const [confirmandoPreparado, setConfirmandoPreparado] = useState(false);
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
+  const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
+  const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
