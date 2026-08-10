@@ -1227,8 +1227,8 @@ export default function Ventas() {
 
       {/* Factura Dialog for Reprint */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Factura Electrónica
@@ -1237,6 +1237,7 @@ export default function Ventas() {
           
           {selectedVenta && selectedFactura && (
             <>
+            <div className="flex-1 overflow-y-auto px-6 pb-4">
               {/* Preview en formato Ticket Térmico 80mm */}
               <div
                 id="printable-invoice"
@@ -1326,8 +1327,10 @@ export default function Ventas() {
                   <p className="mt-2">¡Gracias por su compra!</p>
                 </div>
               </div>
+            </div>
 
-              <Button className="w-full mt-4" onClick={() => {
+            <div className="shrink-0 border-t bg-background px-6 py-4">
+              <Button className="w-full" onClick={() => {
                 imprimirTicketFactura({
                     comercio: comercioConfig,
                     fecha: selectedVenta.fecha,
@@ -1353,6 +1356,7 @@ export default function Ventas() {
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir Factura
               </Button>
+            </div>
             </>
           )}
         </DialogContent>
