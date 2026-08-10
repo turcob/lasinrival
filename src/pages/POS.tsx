@@ -63,7 +63,7 @@ import {
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
-import { PedidosMostradorPanel, type PedidoMostrador } from '@/components/pos/PedidosMostradorPanel';
+import { PedidosMostradorPanel, type PedidoMostrador, type PedidosMostradorPanelHandle } from '@/components/pos/PedidosMostradorPanel';
 import { PrepararMostradorDialog } from '@/components/pos/PrepararMostradorDialog';
 import { imprimirPickingMostrador } from '@/lib/imprimirPickingMostrador';
 import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
@@ -3033,7 +3033,7 @@ export default function POS() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {cart.map((item, idx) => {
+                    {[...cart].reverse().map((item, idx) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
