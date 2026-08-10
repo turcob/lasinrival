@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -56,6 +56,8 @@ export function ProductSearchModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const filteredProductos = useMemo(() => {
     if (!searchTerm) return productos;
@@ -74,6 +76,52 @@ export function ProductSearchModal({
     return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
   };
 
+  // Al cambiar el filtro o reabrir, se reinicia la selección de teclado
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchTerm, open]);
+
+  const focusCard = (index: number) => {
+    const prod = filteredProductos[index];
+    if (!prod) return;
+    setActiveIndex(index);
+    const el = cardRefs.current.get(prod.id);
+    el?.focus();
+    el?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const focusBuscadorModal = () => {
+    setActiveIndex(-1);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
+  };
+
+  const handleListKeyDown = (e: React.KeyboardEvent, index: number, producto: Producto) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      focusCard(Math.min(index + 1, filteredProductos.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (index === 0) focusBuscadorModal();
+      else focusCard(index - 1);
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSelectProduct(producto);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      focusBuscadorModal();
+    }
+  };
+
   const handleSelectProduct = (producto: Producto, options?: { cantidad?: number }) => {
     onSelectProduct(producto, options);
     // No cerramos el modal - el usuario puede seguir agregando productos
@@ -85,6 +133,11 @@ export function ProductSearchModal({
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusCard(0);
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const raw = searchTerm.trim();
@@ -97,7 +150,7 @@ export function ProductSearchModal({
       if (candidatos.length === 1) {
         handleSelectProduct(candidatos[0], { cantidad: balanza.pesoKg });
         setSearchTerm('');
-        setTimeout(() => searchInputRef.current?.focus(), 0);
+        focusBuscadorModal();
       } else if (candidatos.length === 0) {
         toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
       } else {
@@ -116,7 +169,7 @@ export function ProductSearchModal({
     if (matches.length === 1) {
       handleSelectProduct(matches[0]);
       setSearchTerm('');
-      setTimeout(() => searchInputRef.current?.focus(), 0);
+      focusBuscadorModal();
     } else if (matches.length === 0) {
       toast.error('Producto no encontrado');
     }
@@ -149,25 +202,35 @@ export function ProductSearchModal({
             />
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            {filteredProductos.length} productos encontrados
+            {filteredProductos.length} productos encontrados · <b>↓</b> ir a la lista · <b>←/→ ↑/↓</b> navegar · <b>Enter</b> agregar · <b>Esc</b> volver al buscador
           </p>
         </DialogHeader>
 
         <ScrollArea className="flex-1 p-6">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredProductos.map((producto) => {
+            {filteredProductos.map((producto, index) => {
               const precio = getProductoPrice(producto);
               const esPorPeso = isProductoPorPeso(producto);
 
               return (
                 <div
                   key={producto.id}
-                  className="border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col relative group"
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(producto.id, el);
+                    else cardRefs.current.delete(producto.id);
+                  }}
+                  role="button"
+                  tabIndex={index === activeIndex ? 0 : -1}
+                  onKeyDown={(e) => handleListKeyDown(e, index, producto)}
+                  className={`border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col relative group outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    index === activeIndex ? 'bg-accent border-primary ring-2 ring-ring' : ''
+                  }`}
                   onClick={() => handleSelectProduct(producto)}
                 >
                   <Button
                     variant="ghost"
                     size="icon"
+                    tabIndex={-1}
                     className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     onClick={(e) => {
                       e.stopPropagation();
