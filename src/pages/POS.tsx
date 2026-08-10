@@ -1528,7 +1528,7 @@ export default function POS() {
       // Mostrar ticket
       setTicketDialogOpen(true);
 
-      fetchData();
+      fetchData({ silent: true });
     } catch (error) {
       console.error('Error al procesar venta a empleado:', error);
       toast.error('Error al procesar la venta');
@@ -1733,7 +1733,7 @@ export default function POS() {
       // Mostrar ticket
       setTicketDialogOpen(true);
 
-      fetchData();
+      fetchData({ silent: true });
     } catch (error) {
       console.error('Error al procesar venta a cliente CC:', error);
       toast.error('Error al procesar la venta');
@@ -1999,7 +1999,7 @@ export default function POS() {
       setTicketDialogOpen(true);
       setTransferenciaData(null);
       
-      fetchData();
+      fetchData({ silent: true });
       bumpPedidosPanel();
       setEditingPedidoEstado(null);
     } catch (error) {
