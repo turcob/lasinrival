@@ -184,38 +184,60 @@ const CONDICIONES_IVA = [
   { value: 6, label: "Responsable Monotributo" },
 ];
 
+// Caché a nivel de módulo: mantiene los catálogos entre visitas a /pos para no
+// volver a mostrar la pantalla de carga completa al reingresar.
+type PosEscala = {
+  id: string;
+  lista_precio_id: string | null;
+  producto_id: string;
+  cantidad_desde: number;
+  precio_unitario: number | null;
+  porcentaje: number | null;
+  descripcion?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+};
+
+interface PosDataCache {
+  productos: Producto[];
+  listasPrecios: ListaPrecio[];
+  matrizPorcentajes: PorcentajeMatriz[];
+  excepciones: ExcepcionProducto[];
+  escalas: PosEscala[];
+  clientes: Cliente[];
+  empleados: Empleado[];
+  formasPago: FormaPago[];
+  tarjetas: Tarjeta[];
+  tarjetaCuotas: TarjetaCuota[];
+  configDescuentos: { role: string; descuento_maximo_global: number }[];
+}
+
+let posDataCache: PosDataCache | null = null;
+
 export default function POS() {
   const { user, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
-  const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
-  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
-  const [escalas, setEscalas] = useState<{
-    id: string;
-    lista_precio_id: string | null;
-    producto_id: string;
-    cantidad_desde: number;
-    precio_unitario: number | null;
-    porcentaje: number | null;
-    descripcion?: string | null;
-    fecha_inicio?: string | null;
-    fecha_fin?: string | null;
-  }[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
-  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
-  const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>([]);
-  const [configDescuentos, setConfigDescuentos] = useState<{role: string; descuento_maximo_global: number}[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [productos, setProductos] = useState<Producto[]>(posDataCache?.productos ?? []);
+  const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>(posDataCache?.listasPrecios ?? []);
+  const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>(posDataCache?.matrizPorcentajes ?? []);
+  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>(posDataCache?.excepciones ?? []);
+  const [escalas, setEscalas] = useState<PosEscala[]>(posDataCache?.escalas ?? []);
+  const [clientes, setClientes] = useState<Cliente[]>(posDataCache?.clientes ?? []);
+  const [empleados, setEmpleados] = useState<Empleado[]>(posDataCache?.empleados ?? []);
+  const [formasPago, setFormasPago] = useState<FormaPago[]>(posDataCache?.formasPago ?? []);
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>(posDataCache?.tarjetas ?? []);
+  const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>(posDataCache?.tarjetaCuotas ?? []);
+  const [configDescuentos, setConfigDescuentos] = useState<{role: string; descuento_maximo_global: number}[]>(
+    posDataCache?.configDescuentos ?? [],
+  );
+  const [loading, setLoading] = useState(posDataCache === null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cobrarBtnRef = useRef<HTMLButtonElement>(null);
   const cantidadInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const [showAllResults, setShowAllResults] = useState(false);
-  const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
+  const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(posDataCache?.listasPrecios?.[0] ?? null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
@@ -380,7 +402,10 @@ export default function POS() {
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
-    fetchData();
+    // Si ya tenemos datos en caché de una visita anterior, se refresca en
+    // segundo plano para no volver a mostrar la pantalla de carga completa.
+    fetchData({ silent: posDataCache !== null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Server-side search for clients with debounce
@@ -450,9 +475,9 @@ export default function POS() {
     return () => clearTimeout(timer);
   }, [empleadoSearchTerm]);
 
-  const fetchData = async () => {
+  const fetchData = async (opts?: { silent?: boolean }) => {
     if (!user) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       // Traer TODOS los productos activos paginando (evita el límite de 1000 filas)
       const fetchAllProductos = async () => {
@@ -504,12 +529,25 @@ export default function POS() {
           setSelectedLista(listasRes.data[0]);
         }
       }
+      posDataCache = {
+        productos: (productosRes.data || []) as Producto[],
+        listasPrecios: (listasRes.data || []) as ListaPrecio[],
+        matrizPorcentajes: (porcentajesRes.data || []) as PorcentajeMatriz[],
+        excepciones: (excepcionesRes.data || []) as ExcepcionProducto[],
+        escalas: (escalasRes.data || []) as PosEscala[],
+        clientes: (clientesRes.data || []) as Cliente[],
+        empleados: (empleadosRes.data || []) as Empleado[],
+        formasPago: (formasPagoRes.data || []) as FormaPago[],
+        tarjetas: (tarjetasRes.data || []) as Tarjeta[],
+        tarjetaCuotas: (cuotasRes.data || []) as TarjetaCuota[],
+        configDescuentos: (descuentosRes.data || []) as { role: string; descuento_maximo_global: number }[],
+      };
       setCajaAbierta(!!cajasRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Error al cargar los datos');
+      if (!opts?.silent) toast.error('Error al cargar los datos');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
@@ -1490,7 +1528,7 @@ export default function POS() {
       // Mostrar ticket
       setTicketDialogOpen(true);
 
-      fetchData();
+      fetchData({ silent: true });
     } catch (error) {
       console.error('Error al procesar venta a empleado:', error);
       toast.error('Error al procesar la venta');
@@ -1695,7 +1733,7 @@ export default function POS() {
       // Mostrar ticket
       setTicketDialogOpen(true);
 
-      fetchData();
+      fetchData({ silent: true });
     } catch (error) {
       console.error('Error al procesar venta a cliente CC:', error);
       toast.error('Error al procesar la venta');
@@ -1961,7 +1999,7 @@ export default function POS() {
       setTicketDialogOpen(true);
       setTransferenciaData(null);
       
-      fetchData();
+      fetchData({ silent: true });
       bumpPedidosPanel();
       setEditingPedidoEstado(null);
     } catch (error) {
