@@ -63,7 +63,7 @@ import {
 import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
-import { PedidosMostradorPanel, type PedidoMostrador } from '@/components/pos/PedidosMostradorPanel';
+import { PedidosMostradorPanel, type PedidoMostrador, type PedidosMostradorPanelHandle } from '@/components/pos/PedidosMostradorPanel';
 import { PrepararMostradorDialog } from '@/components/pos/PrepararMostradorDialog';
 import { imprimirPickingMostrador } from '@/lib/imprimirPickingMostrador';
 import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
@@ -261,6 +261,8 @@ export default function POS() {
   const [enviandoPreparacion, setEnviandoPreparacion] = useState(false);
   const [confirmandoPreparado, setConfirmandoPreparado] = useState(false);
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
+  const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
+  const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
@@ -2758,9 +2760,11 @@ export default function POS() {
   };
 
   const moverFocoCantidad = (itemId: string, delta: number) => {
+    // El carrito se muestra en orden inverso (último cargado arriba):
+    // el movimiento visual hacia abajo avanza hacia índices menores del array.
     const idx = cart.findIndex((i) => i.id === itemId);
     if (idx === -1) return;
-    const next = cart[idx + delta];
+    const next = cart[idx - delta];
     if (next) focusCantidadItem(next.id);
     else if (delta < 0) focusBuscador();
   };
@@ -2790,7 +2794,7 @@ export default function POS() {
 
   // Foco inicial en el buscador al entrar a venta directa
   useEffect(() => {
-    if (modoPos === 'directa' && !loading) focusBuscador();
+    if (!loading) focusBuscador();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modoPos, loading]);
 
@@ -2855,6 +2859,135 @@ export default function POS() {
     selectedCliente,
     empleadoModalidadPago,
     clienteModalidadPago,
+    pagoDialogOpen,
+    ticketDialogOpen,
+    facturaDialogOpen,
+    clienteDialogOpen,
+    empleadoDialogOpen,
+    pesoDialogOpen,
+    productSearchModalOpen,
+    productQuantityModalOpen,
+    productoTemporalDialogOpen,
+    transferenciaDialogOpen,
+    montoGenericoDialogOpen,
+    chequeDialogOpen,
+    descuentoAuthModalOpen,
+  ]);
+
+  // Foco / navegación dentro del diálogo de cobro
+  const focusFormaPago = (index: number) => {
+    const fp = formasPago[index];
+    if (!fp) return;
+    formaPagoBtnRefs.current.get(fp.id)?.focus();
+  };
+
+  const refocusPagoDialog = () => {
+    setTimeout(() => {
+      if (!pagoDialogOpen) return;
+      const preferida = formasPago.findIndex((f) => f.nombre.toLowerCase().includes('efectivo'));
+      focusFormaPago(preferida >= 0 ? preferida : 0);
+    }, 60);
+  };
+
+  const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
+    const idxActual = formasPago.findIndex(
+      (f) => formaPagoBtnRefs.current.get(f.id) === document.activeElement,
+    );
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusFormaPago(Math.min((idxActual < 0 ? -1 : idxActual) + 1, formasPago.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusFormaPago(Math.max((idxActual < 0 ? 1 : idxActual) - 1, 0));
+      return;
+    }
+    // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
+    if (/^[1-9]$/.test(e.key)) {
+      const idx = Number(e.key) - 1;
+      const fp = formasPago[idx];
+      if (fp && totalPagado < totalConRecargo) {
+        e.preventDefault();
+        addPago(fp.id);
+      }
+    }
+  };
+
+  // Atajos globales en pedidos de mostrador
+  useEffect(() => {
+    if (modoPos !== 'mostrador') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anyDialogOpen =
+        pagoDialogOpen ||
+        ticketDialogOpen ||
+        facturaDialogOpen ||
+        clienteDialogOpen ||
+        empleadoDialogOpen ||
+        pesoDialogOpen ||
+        productSearchModalOpen ||
+        productQuantityModalOpen ||
+        productoTemporalDialogOpen ||
+        transferenciaDialogOpen ||
+        montoGenericoDialogOpen ||
+        chequeDialogOpen ||
+        descuentoAuthModalOpen;
+      if (anyDialogOpen) return;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        focusBuscador();
+        return;
+      }
+      if (e.key === 'F3') {
+        e.preventDefault();
+        setProductSearchModalOpen(true);
+        return;
+      }
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (isVentaEmpleado) setEmpleadoDialogOpen(true);
+        else setClienteDialogOpen(true);
+        return;
+      }
+      if (e.key === 'F6') {
+        e.preventDefault();
+        pedidosPanelRef.current?.focusLista();
+        return;
+      }
+      if (e.key === 'F7') {
+        e.preventDefault();
+        pedidosPanelRef.current?.imprimirEnfocado();
+        return;
+      }
+      if (e.key === 'F8') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          if (editingPedidoId && editingPedidoEstado === 'en_preparacion') handleActualizarYReimprimir();
+          else if (!editingPedidoId || editingPedidoEstado === 'pedido') handleEnviarPreparacion();
+        }
+        return;
+      }
+      if (e.key === 'F9') {
+        e.preventDefault();
+        ejecutarCobro();
+        return;
+      }
+      if (e.key === 'Escape') {
+        const activo = document.activeElement as HTMLElement | null;
+        if (activo && activo !== searchInputRef.current) activo.blur?.();
+        focusBuscador();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    modoPos,
+    cart,
+    editingPedidoId,
+    editingPedidoEstado,
+    isVentaEmpleado,
     pagoDialogOpen,
     ticketDialogOpen,
     facturaDialogOpen,
@@ -2956,11 +3089,17 @@ export default function POS() {
                   Buscar
                 </Button>
               </div>
-              {modoPos === 'directa' && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
-                </p>
-              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                {modoPos === 'directa' ? (
+                  <>
+                    Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
+                  </>
+                ) : (
+                  <>
+                    Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F6</b> lista de pedidos · <b>F7</b> imprimir picking · <b>F8</b> enviar a preparar · <b>F9</b> cobrar · <b>Esc</b> volver al buscador
+                  </>
+                )}
+              </p>
               
               {/* Quick Search Results - mantener para búsqueda rápida inline */}
               {filteredProductos.length > 0 && searchTerm && (
@@ -3031,7 +3170,7 @@ export default function POS() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {cart.map((item, idx) => {
+                    {[...cart].reverse().map((item, idx) => {
                       const esPorPeso = item.producto && isProductoPorPeso(item.producto);
                       const nombreProducto = item.es_temporal ? item.nombre_temporal : item.producto?.descripcion;
                       const totalSinDescuento = item.cantidad * item.precio;
@@ -3611,6 +3750,7 @@ export default function POS() {
             {modoPos === 'mostrador' && (
               <div className="h-[420px] shrink-0">
                 <PedidosMostradorPanel
+                  ref={pedidosPanelRef}
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
                   onSeleccionar={(p) => handleCargarPedido(p)}
@@ -3904,20 +4044,7 @@ export default function POS() {
               </div>
             )}
 
-            <div
-              className="grid grid-cols-2 gap-2"
-              onKeyDown={(e) => {
-                // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
-                if (/^[1-9]$/.test(e.key)) {
-                  const idx = Number(e.key) - 1;
-                  const fp = formasPago[idx];
-                  if (fp && totalPagado < totalConRecargo) {
-                    e.preventDefault();
-                    addPago(fp.id);
-                  }
-                }
-              }}
-            >
+            <div className="grid grid-cols-2 gap-2" onKeyDown={handleFormasPagoKeyDown}>
               {formasPago.map((fp, i) => {
                 const hayEfectivo = formasPago.some((f) => f.nombre.toLowerCase().includes('efectivo'));
                 const esEfectivo = fp.nombre.toLowerCase().includes('efectivo');
@@ -3925,6 +4052,10 @@ export default function POS() {
                 return (
                   <Button
                     key={fp.id}
+                    ref={(el) => {
+                      if (el) formaPagoBtnRefs.current.set(fp.id, el);
+                      else formaPagoBtnRefs.current.delete(fp.id);
+                    }}
                     variant={esEfectivo ? 'default' : 'outline'}
                     autoFocus={enfocar}
                     onClick={() => addPago(fp.id)}
@@ -4005,7 +4136,7 @@ export default function POS() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              1-9 elegir medio · Enter continuar · Esc cancelar
+              1-9 elegir medio · ←→↑↓ navegar medios · Enter continuar · Esc cancelar
             </p>
           </div>
         </DialogContent>
@@ -4020,6 +4151,7 @@ export default function POS() {
           const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
           const tieneTransfPago = fpTransf ? pagos.some(p => p.forma_pago_id === fpTransf.id) : false;
           if (!tieneTransfPago) setTransferenciaData(null);
+          refocusPagoDialog();
         }
       }}>
         <DialogContent className="max-w-md">
@@ -4111,7 +4243,10 @@ export default function POS() {
       {/* Importe genérico para otros medios de pago */}
       <Dialog open={montoGenericoDialogOpen} onOpenChange={(open) => {
         setMontoGenericoDialogOpen(open);
-        if (!open) setMontoGenericoData(null);
+        if (!open) {
+          setMontoGenericoData(null);
+          refocusPagoDialog();
+        }
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -4179,6 +4314,7 @@ export default function POS() {
           setChequeData(null);
           setChequeFormaPagoId(null);
         }
+        if (!open) refocusPagoDialog();
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -4295,7 +4431,10 @@ export default function POS() {
       </Dialog>
 
       {/* Tarjeta Dialog */}
-      <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
+      <Dialog open={tarjetaDialogOpen} onOpenChange={(open) => {
+        setTarjetaDialogOpen(open);
+        if (!open) refocusPagoDialog();
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
