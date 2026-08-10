@@ -4144,6 +4144,7 @@ export default function POS() {
           const fpTransf = formasPago.find(fp => fp.nombre.toLowerCase().includes('transfer'));
           const tieneTransfPago = fpTransf ? pagos.some(p => p.forma_pago_id === fpTransf.id) : false;
           if (!tieneTransfPago) setTransferenciaData(null);
+          refocusPagoDialog();
         }
       }}>
         <DialogContent className="max-w-md">
@@ -4235,7 +4236,10 @@ export default function POS() {
       {/* Importe genérico para otros medios de pago */}
       <Dialog open={montoGenericoDialogOpen} onOpenChange={(open) => {
         setMontoGenericoDialogOpen(open);
-        if (!open) setMontoGenericoData(null);
+        if (!open) {
+          setMontoGenericoData(null);
+          refocusPagoDialog();
+        }
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
