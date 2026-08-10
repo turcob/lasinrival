@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,11 @@ interface Props {
   onImprimirYPreparar?: (pedido: PedidoMostrador) => Promise<void> | void;
 }
 
+export interface PedidosMostradorPanelHandle {
+  focusLista: () => void;
+  imprimirEnfocado: () => void;
+}
+
 const ESTADO_META: Record<PedidoMostradorEstado, { label: string; badgeClass: string; icon: any; orden: number }> = {
   pedido: {
     label: 'Borrador',
@@ -52,17 +57,22 @@ const ESTADO_META: Record<PedidoMostradorEstado, { label: string; badgeClass: st
   },
 };
 
-export function PedidosMostradorPanel({
-  activoId,
-  refreshKey,
-  onSeleccionar,
-  onImprimirPicking,
-  onEliminar,
-  onNuevoPedido,
-  onImprimirYPreparar,
-}: Props) {
+export const PedidosMostradorPanel = forwardRef<PedidosMostradorPanelHandle, Props>(function PedidosMostradorPanel(
+  {
+    activoId,
+    refreshKey,
+    onSeleccionar,
+    onImprimirPicking,
+    onEliminar,
+    onNuevoPedido,
+    onImprimirYPreparar,
+  },
+  ref,
+) {
   const [pedidos, setPedidos] = useState<PedidoMostrador[]>([]);
   const [loading, setLoading] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const fetchPedidos = async () => {
     setLoading(true);
@@ -117,6 +127,74 @@ export function PedidosMostradorPanel({
     preparado: pedidos.filter((p) => p.estado === 'preparado').length,
   };
 
+  const pedidosOrdenados = useMemo(
+    () =>
+      pedidos
+        .slice()
+        .sort(
+          (a, b) =>
+            ESTADO_META[b.estado].orden - ESTADO_META[a.estado].orden ||
+            new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+        ),
+    [pedidos],
+  );
+
+  const focusItem = (index: number) => {
+    const p = pedidosOrdenados[index];
+    if (!p) return;
+    setFocusedIndex(index);
+    const el = itemRefs.current.get(p.id);
+    el?.focus();
+    el?.scrollIntoView({ block: 'nearest' });
+  };
+
+  useImperativeHandle(ref, () => ({
+    focusLista: () => {
+      const idx = Math.min(Math.max(focusedIndex, 0), Math.max(pedidosOrdenados.length - 1, 0));
+      focusItem(idx);
+    },
+    imprimirEnfocado: () => {
+      const p = pedidosOrdenados[focusedIndex];
+      if (!p) return;
+      if (p.estado === 'pedido' && onImprimirYPreparar) onImprimirYPreparar(p);
+      else onImprimirPicking(p);
+    },
+  }));
+
+  const eliminarPedido = async (id: string) => {
+    if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return;
+    await onEliminar(id);
+    fetchPedidos();
+  };
+
+  const handleItemKeyDown = (e: React.KeyboardEvent, index: number, p: PedidoMostrador) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusItem(Math.min(index + 1, pedidosOrdenados.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusItem(Math.max(index - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSeleccionar(p);
+      return;
+    }
+    if (e.key === 'p' || e.key === 'P') {
+      e.preventDefault();
+      if (p.estado === 'pedido' && onImprimirYPreparar) onImprimirYPreparar(p);
+      else onImprimirPicking(p);
+      return;
+    }
+    if (e.key === 'Delete' && e.shiftKey) {
+      e.preventDefault();
+      eliminarPedido(p.id);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full border rounded-lg bg-card overflow-hidden">
       <div className="p-3 border-b bg-muted/30 shrink-0 space-y-2">
@@ -137,6 +215,9 @@ export function PedidosMostradorPanel({
             {porEstado.preparado} listo{porEstado.preparado === 1 ? '' : 's'}
           </Badge>
         )}
+        <p className="text-[10px] text-muted-foreground">
+          <b>F6</b> lista · <b>↑/↓</b> mover · <b>Enter</b> abrir · <b>P</b> imprimir · <b>Shift+Supr</b> eliminar
+        </p>
       </div>
       <div className="flex-1 min-h-0">
         {total === 0 && !loading ? (
@@ -146,13 +227,7 @@ export function PedidosMostradorPanel({
         ) : (
           <ScrollArea className="h-full">
             <div className="space-y-2 p-2">
-                  {pedidos
-                    .slice()
-                    .sort((a, b) =>
-                      ESTADO_META[b.estado].orden - ESTADO_META[a.estado].orden ||
-                      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
-                    )
-                    .map((p) => {
+                  {pedidosOrdenados.map((p, index) => {
                       const meta = ESTADO_META[p.estado];
                       const Icon = meta.icon;
                       const isActive = activoId === p.id;
@@ -168,16 +243,16 @@ export function PedidosMostradorPanel({
                       return (
                         <div
                           key={p.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => onSeleccionar(p)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              onSeleccionar(p);
-                            }
+                          ref={(el) => {
+                            if (el) itemRefs.current.set(p.id, el);
+                            else itemRefs.current.delete(p.id);
                           }}
-                          className={`border rounded p-2 text-xs transition cursor-pointer ${
+                          role="button"
+                          tabIndex={index === focusedIndex ? 0 : -1}
+                          onClick={() => onSeleccionar(p)}
+                          onFocus={() => setFocusedIndex(index)}
+                          onKeyDown={(e) => handleItemKeyDown(e, index, p)}
+                          className={`border rounded p-2 text-xs transition cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             isActive ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'
                           }`}
                         >
@@ -229,13 +304,12 @@ export function PedidosMostradorPanel({
                             <Button
                               size="sm"
                               variant="ghost"
+                              tabIndex={-1}
                               className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                               title="Eliminar pedido"
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return;
-                                await onEliminar(p.id);
-                                fetchPedidos();
+                                await eliminarPedido(p.id);
                               }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -250,4 +324,4 @@ export function PedidosMostradorPanel({
       </div>
     </div>
   );
-}
+});
