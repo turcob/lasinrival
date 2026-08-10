@@ -1116,6 +1116,7 @@ export type Database = {
           direccion: string
           email: string | null
           facturas_adeudadas_bloqueo: number
+          formato_codigo_balanza: string
           id: string
           inicio_actividades: string | null
           localidad: string | null
@@ -1141,6 +1142,7 @@ export type Database = {
           direccion: string
           email?: string | null
           facturas_adeudadas_bloqueo?: number
+          formato_codigo_balanza?: string
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
@@ -1166,6 +1168,7 @@ export type Database = {
           direccion?: string
           email?: string | null
           facturas_adeudadas_bloqueo?: number
+          formato_codigo_balanza?: string
           id?: string
           inicio_actividades?: string | null
           localidad?: string | null
