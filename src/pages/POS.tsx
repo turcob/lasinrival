@@ -237,7 +237,7 @@ export default function POS() {
   const cobrarBtnRef = useRef<HTMLButtonElement>(null);
   const cantidadInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const [showAllResults, setShowAllResults] = useState(false);
-  const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(null);
+  const [selectedLista, setSelectedLista] = useState<ListaPrecio | null>(posDataCache?.listasPrecios?.[0] ?? null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
@@ -529,12 +529,25 @@ export default function POS() {
           setSelectedLista(listasRes.data[0]);
         }
       }
+      posDataCache = {
+        productos: (productosRes.data || []) as Producto[],
+        listasPrecios: (listasRes.data || []) as ListaPrecio[],
+        matrizPorcentajes: (porcentajesRes.data || []) as PorcentajeMatriz[],
+        excepciones: (excepcionesRes.data || []) as ExcepcionProducto[],
+        escalas: (escalasRes.data || []) as PosEscala[],
+        clientes: (clientesRes.data || []) as Cliente[],
+        empleados: (empleadosRes.data || []) as Empleado[],
+        formasPago: (formasPagoRes.data || []) as FormaPago[],
+        tarjetas: (tarjetasRes.data || []) as Tarjeta[],
+        tarjetaCuotas: (cuotasRes.data || []) as TarjetaCuota[],
+        configDescuentos: (descuentosRes.data || []) as { role: string; descuento_maximo_global: number }[],
+      };
       setCajaAbierta(!!cajasRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Error al cargar los datos');
+      if (!opts?.silent) toast.error('Error al cargar los datos');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
