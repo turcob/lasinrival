@@ -4307,6 +4307,7 @@ export default function POS() {
           setChequeData(null);
           setChequeFormaPagoId(null);
         }
+        if (!open) refocusPagoDialog();
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -4423,7 +4424,10 @@ export default function POS() {
       </Dialog>
 
       {/* Tarjeta Dialog */}
-      <Dialog open={tarjetaDialogOpen} onOpenChange={setTarjetaDialogOpen}>
+      <Dialog open={tarjetaDialogOpen} onOpenChange={(open) => {
+        setTarjetaDialogOpen(open);
+        if (!open) refocusPagoDialog();
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
