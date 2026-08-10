@@ -380,7 +380,10 @@ export default function POS() {
   const isAdmin = hasRole('admin');
 
   useEffect(() => {
-    fetchData();
+    // Si ya tenemos datos en caché de una visita anterior, se refresca en
+    // segundo plano para no volver a mostrar la pantalla de carga completa.
+    fetchData({ silent: posDataCache !== null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Server-side search for clients with debounce
@@ -450,9 +453,9 @@ export default function POS() {
     return () => clearTimeout(timer);
   }, [empleadoSearchTerm]);
 
-  const fetchData = async () => {
+  const fetchData = async (opts?: { silent?: boolean }) => {
     if (!user) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       // Traer TODOS los productos activos paginando (evita el límite de 1000 filas)
       const fetchAllProductos = async () => {
