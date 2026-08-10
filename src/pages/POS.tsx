@@ -3089,11 +3089,17 @@ export default function POS() {
                   Buscar
                 </Button>
               </div>
-              {modoPos === 'directa' && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
-                </p>
-              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                {modoPos === 'directa' ? (
+                  <>
+                    Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F9</b> cobrar · <b>Enter</b> confirmar · <b>Esc</b> volver al buscador · <b>↑/↓</b> cambiar de ítem · <b>Shift+Supr</b> eliminar ítem
+                  </>
+                ) : (
+                  <>
+                    Teclado: <b>F2</b> buscar · <b>F3</b> catálogo · <b>F4</b> cliente · <b>F6</b> lista de pedidos · <b>F7</b> imprimir picking · <b>F8</b> enviar a preparar · <b>F9</b> cobrar · <b>Esc</b> volver al buscador
+                  </>
+                )}
+              </p>
               
               {/* Quick Search Results - mantener para búsqueda rápida inline */}
               {filteredProductos.length > 0 && searchTerm && (
@@ -3744,6 +3750,7 @@ export default function POS() {
             {modoPos === 'mostrador' && (
               <div className="h-[420px] shrink-0">
                 <PedidosMostradorPanel
+                  ref={pedidosPanelRef}
                   activoId={editingPedidoId}
                   refreshKey={pedidosPanelRefreshKey}
                   onSeleccionar={(p) => handleCargarPedido(p)}
