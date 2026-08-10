@@ -184,31 +184,53 @@ const CONDICIONES_IVA = [
   { value: 6, label: "Responsable Monotributo" },
 ];
 
+// Caché a nivel de módulo: mantiene los catálogos entre visitas a /pos para no
+// volver a mostrar la pantalla de carga completa al reingresar.
+type PosEscala = {
+  id: string;
+  lista_precio_id: string | null;
+  producto_id: string;
+  cantidad_desde: number;
+  precio_unitario: number | null;
+  porcentaje: number | null;
+  descripcion?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+};
+
+interface PosDataCache {
+  productos: Producto[];
+  listasPrecios: ListaPrecio[];
+  matrizPorcentajes: PorcentajeMatriz[];
+  excepciones: ExcepcionProducto[];
+  escalas: PosEscala[];
+  clientes: Cliente[];
+  empleados: Empleado[];
+  formasPago: FormaPago[];
+  tarjetas: Tarjeta[];
+  tarjetaCuotas: TarjetaCuota[];
+  configDescuentos: { role: string; descuento_maximo_global: number }[];
+}
+
+let posDataCache: PosDataCache | null = null;
+
 export default function POS() {
   const { user, hasRole } = useAuth();
   const { config: comercioConfig, formatCuit } = useConfiguracionComercio();
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>([]);
-  const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>([]);
-  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>([]);
-  const [escalas, setEscalas] = useState<{
-    id: string;
-    lista_precio_id: string | null;
-    producto_id: string;
-    cantidad_desde: number;
-    precio_unitario: number | null;
-    porcentaje: number | null;
-    descripcion?: string | null;
-    fecha_inicio?: string | null;
-    fecha_fin?: string | null;
-  }[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [formasPago, setFormasPago] = useState<FormaPago[]>([]);
-  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
-  const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>([]);
-  const [configDescuentos, setConfigDescuentos] = useState<{role: string; descuento_maximo_global: number}[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [productos, setProductos] = useState<Producto[]>(posDataCache?.productos ?? []);
+  const [listasPrecios, setListasPrecios] = useState<ListaPrecio[]>(posDataCache?.listasPrecios ?? []);
+  const [matrizPorcentajes, setMatrizPorcentajes] = useState<PorcentajeMatriz[]>(posDataCache?.matrizPorcentajes ?? []);
+  const [excepciones, setExcepciones] = useState<ExcepcionProducto[]>(posDataCache?.excepciones ?? []);
+  const [escalas, setEscalas] = useState<PosEscala[]>(posDataCache?.escalas ?? []);
+  const [clientes, setClientes] = useState<Cliente[]>(posDataCache?.clientes ?? []);
+  const [empleados, setEmpleados] = useState<Empleado[]>(posDataCache?.empleados ?? []);
+  const [formasPago, setFormasPago] = useState<FormaPago[]>(posDataCache?.formasPago ?? []);
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>(posDataCache?.tarjetas ?? []);
+  const [tarjetaCuotas, setTarjetaCuotas] = useState<TarjetaCuota[]>(posDataCache?.tarjetaCuotas ?? []);
+  const [configDescuentos, setConfigDescuentos] = useState<{role: string; descuento_maximo_global: number}[]>(
+    posDataCache?.configDescuentos ?? [],
+  );
+  const [loading, setLoading] = useState(posDataCache === null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
