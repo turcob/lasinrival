@@ -2758,9 +2758,11 @@ export default function POS() {
   };
 
   const moverFocoCantidad = (itemId: string, delta: number) => {
+    // El carrito se muestra en orden inverso (último cargado arriba):
+    // el movimiento visual hacia abajo avanza hacia índices menores del array.
     const idx = cart.findIndex((i) => i.id === itemId);
     if (idx === -1) return;
-    const next = cart[idx + delta];
+    const next = cart[idx - delta];
     if (next) focusCantidadItem(next.id);
     else if (delta < 0) focusBuscador();
   };
