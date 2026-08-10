@@ -408,6 +408,7 @@ export default function Productos() {
   };
   
   const exportarExcel = () => {
+
     if (productos.length === 0) {
       toast.error('No hay productos para exportar');
       return;
