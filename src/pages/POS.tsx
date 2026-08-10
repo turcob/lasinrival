@@ -2794,7 +2794,7 @@ export default function POS() {
 
   // Foco inicial en el buscador al entrar a venta directa
   useEffect(() => {
-    if (modoPos === 'directa' && !loading) focusBuscador();
+    if (!loading) focusBuscador();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modoPos, loading]);
 
@@ -4037,20 +4037,7 @@ export default function POS() {
               </div>
             )}
 
-            <div
-              className="grid grid-cols-2 gap-2"
-              onKeyDown={(e) => {
-                // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
-                if (/^[1-9]$/.test(e.key)) {
-                  const idx = Number(e.key) - 1;
-                  const fp = formasPago[idx];
-                  if (fp && totalPagado < totalConRecargo) {
-                    e.preventDefault();
-                    addPago(fp.id);
-                  }
-                }
-              }}
-            >
+            <div className="grid grid-cols-2 gap-2" onKeyDown={handleFormasPagoKeyDown}>
               {formasPago.map((fp, i) => {
                 const hayEfectivo = formasPago.some((f) => f.nombre.toLowerCase().includes('efectivo'));
                 const esEfectivo = fp.nombre.toLowerCase().includes('efectivo');
@@ -4058,6 +4045,10 @@ export default function POS() {
                 return (
                   <Button
                     key={fp.id}
+                    ref={(el) => {
+                      if (el) formaPagoBtnRefs.current.set(fp.id, el);
+                      else formaPagoBtnRefs.current.delete(fp.id);
+                    }}
                     variant={esEfectivo ? 'default' : 'outline'}
                     autoFocus={enfocar}
                     onClick={() => addPago(fp.id)}
@@ -4138,7 +4129,7 @@ export default function POS() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              1-9 elegir medio · Enter continuar · Esc cancelar
+              1-9 elegir medio · ←→↑↓ navegar medios · Enter continuar · Esc cancelar
             </p>
           </div>
         </DialogContent>
