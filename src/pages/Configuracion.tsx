@@ -46,6 +46,7 @@ interface ConfiguracionComercio {
   facturas_adeudadas_bloqueo: number;
   bloqueo_automatico_activo: boolean;
   monto_adeudado_bloqueo: number;
+  formato_codigo_balanza: string;
 }
 
 const CONDICIONES_IVA = [
@@ -100,6 +101,7 @@ const initialFormData: ConfiguracionComercio = {
   facturas_adeudadas_bloqueo: 3,
   bloqueo_automatico_activo: true,
   monto_adeudado_bloqueo: 0,
+  formato_codigo_balanza: 'plu5_peso6',
 };
 
 export default function Configuracion() {
@@ -147,6 +149,7 @@ export default function Configuracion() {
           facturas_adeudadas_bloqueo: (data as any).facturas_adeudadas_bloqueo ?? 3,
           bloqueo_automatico_activo: (data as any).bloqueo_automatico_activo ?? true,
           monto_adeudado_bloqueo: (data as any).monto_adeudado_bloqueo ?? 0,
+          formato_codigo_balanza: (data as any).formato_codigo_balanza || 'plu5_peso6',
         });
       }
     } catch (error) {
@@ -210,6 +213,7 @@ export default function Configuracion() {
         facturas_adeudadas_bloqueo: formData.facturas_adeudadas_bloqueo,
         bloqueo_automatico_activo: formData.bloqueo_automatico_activo,
         monto_adeudado_bloqueo: formData.monto_adeudado_bloqueo,
+        formato_codigo_balanza: formData.formato_codigo_balanza,
       };
 
       if (configId) {
@@ -325,6 +329,26 @@ export default function Configuracion() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="formato_codigo_balanza">Formato de código de balanza</Label>
+                <Select
+                  value={formData.formato_codigo_balanza}
+                  onValueChange={(value) => setFormData({ ...formData, formato_codigo_balanza: value })}
+                  disabled={!isAdmin}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plu5_peso6">PLU 5 dígitos + Peso 6 (estándar)</SelectItem>
+                    <SelectItem value="plu6_peso5">PLU 6 dígitos + Peso 5</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Debe coincidir con la configuración física de la balanza. Todas las balanzas deben usar el mismo formato.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

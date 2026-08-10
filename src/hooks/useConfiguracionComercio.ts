@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { FormatoCodigoBalanza } from '@/lib/codigoBalanza';
 
 interface ConfiguracionComercio {
   id: string;
@@ -18,6 +19,7 @@ interface ConfiguracionComercio {
   nombre_sistema: string | null;
   texto_login_footer: string | null;
   pos_flujo_mayorista_activo?: boolean | null;
+  formato_codigo_balanza?: FormatoCodigoBalanza | null;
 }
 
 export function useConfiguracionComercio() {

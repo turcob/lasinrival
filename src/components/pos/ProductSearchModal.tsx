@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { parseCodigoBalanza } from '@/lib/codigoBalanza';
+import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ interface ProductSearchModalProps {
   productos: Producto[];
   getProductoPrice: (producto: Producto) => number;
   onSelectProduct: (producto: Producto, options?: { cantidad?: number }) => void;
+  formatoCodigoBalanza?: FormatoCodigoBalanza;
 }
 
 export function ProductSearchModal({
@@ -50,6 +51,7 @@ export function ProductSearchModal({
   productos,
   getProductoPrice,
   onSelectProduct,
+  formatoCodigoBalanza = 'plu5_peso6',
 }: ProductSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
@@ -89,7 +91,7 @@ export function ProductSearchModal({
     if (!raw) return;
 
     // Etiqueta de balanza: PLU + peso impreso.
-    const balanza = parseCodigoBalanza(raw);
+    const balanza = parseCodigoBalanza(raw, formatoCodigoBalanza);
     if (balanza) {
       const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
       if (candidatos.length === 1) {
