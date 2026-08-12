@@ -60,7 +60,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
+import { ProductSearchModal, type ProductSearchModalHandle } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
 import { PedidosMostradorPanel, type PedidoMostrador, type PedidosMostradorPanelHandle } from '@/components/pos/PedidosMostradorPanel';
