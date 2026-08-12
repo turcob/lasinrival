@@ -288,6 +288,8 @@ export default function POS() {
   const continuarPagoBtnRef = useRef<HTMLButtonElement | null>(null);
   const pagoContentRef = useRef<HTMLDivElement | null>(null);
   const confirmarVentaBtnRef = useRef<HTMLButtonElement | null>(null);
+  const facturaSiBtnRef = useRef<HTMLButtonElement | null>(null);
+  const facturaNoBtnRef = useRef<HTMLButtonElement | null>(null);
   const facturaContentRef = useRef<HTMLDivElement | null>(null);
   const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
