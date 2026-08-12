@@ -2923,16 +2923,28 @@ export default function POS() {
   };
 
   const refocusPagoDialog = () => {
-    setTimeout(() => {
-      if (!pagoDialogOpen) return;
-      // Si el monto ya cubre el total, el foco va directo al botón Continuar
-      if (Math.abs(totalPagado - totalConRecargo) <= 0.009 && continuarPagoBtnRef.current) {
-        continuarPagoBtnRef.current.focus();
-        return;
-      }
-      const preferida = formasPago.findIndex((f) => f.nombre.toLowerCase().includes('efectivo'));
-      focusFormaPago(preferida >= 0 ? preferida : 0);
-    }, 60);
+    // Radix restaura el foco al desmontar el sub-diálogo (a veces al body),
+    // por eso reintentamos hasta que el foco quede dentro del diálogo de cobro.
+    let intentos = 0;
+    const intentar = () => {
+      intentos += 1;
+      const cubierto = Math.abs(totalPagado - totalConRecargo) <= 0.009;
+      const objetivo: HTMLElement | null | undefined = cubierto
+        ? continuarPagoBtnRef.current
+        : (() => {
+            const disponibles = formasPago.filter(
+              (f) => !formaPagoBtnRefs.current.get(f.id)?.disabled,
+            );
+            const preferida =
+              disponibles.find((f) => f.nombre.toLowerCase().includes('efectivo')) ??
+              disponibles[0];
+            return preferida ? formaPagoBtnRefs.current.get(preferida.id) : null;
+          })();
+      objetivo?.focus();
+      const ok = objetivo && document.activeElement === objetivo;
+      if (!ok && intentos < 8) setTimeout(intentar, 60);
+    };
+    setTimeout(intentar, 60);
   };
 
   // Cuando el total queda cubierto dentro del diálogo de cobro, enfocar "Continuar"
@@ -2952,17 +2964,27 @@ export default function POS() {
   }, [facturaDialogOpen]);
 
   const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
+    const activo = document.activeElement as HTMLElement | null;
+    if (activo && (activo.tagName === 'INPUT' || activo.tagName === 'TEXTAREA')) return;
     const idxActual = formasPago.findIndex(
       (f) => formaPagoBtnRefs.current.get(f.id) === document.activeElement,
     );
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
-      focusFormaPago(Math.min((idxActual < 0 ? -1 : idxActual) + 1, formasPago.length - 1));
+      if (idxActual < 0) {
+        refocusPagoDialog();
+        return;
+      }
+      focusFormaPago(Math.min(idxActual + 1, formasPago.length - 1));
       return;
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
-      focusFormaPago(Math.max((idxActual < 0 ? 1 : idxActual) - 1, 0));
+      if (idxActual < 0) {
+        refocusPagoDialog();
+        return;
+      }
+      focusFormaPago(Math.max(idxActual - 1, 0));
       return;
     }
     // Atajos numéricos: 1..9 selecciona la forma de pago correspondiente
@@ -4139,7 +4161,11 @@ export default function POS() {
             if (e.key === 'Enter' && Math.abs(totalPagado - totalConRecargo) <= 0.009) {
               e.preventDefault();
               handleContinuarPago();
+              return;
             }
+            // Navegación por teclado disponible aunque el foco se haya perdido
+            // (por ejemplo al cerrar un sub-diálogo tras un pago parcial)
+            handleFormasPagoKeyDown(e);
           }}
         >
           <DialogHeader>
