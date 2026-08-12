@@ -2994,7 +2994,7 @@ export default function POS() {
     if (!facturaDialogOpen) return;
     refocusFacturaDialog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facturaDialogOpen, emitirFactura, modoVentaCC, emitiendo]);
+  }, [facturaDialogOpen, modoVentaCC]);
 
   // Fallback global: si el foco se fue al body en el diálogo de confirmación,
   // cualquier tecla de navegación lo devuelve al botón de confirmar.
@@ -3004,7 +3004,7 @@ export default function POS() {
       const contenido = facturaContentRef.current;
       const activo = document.activeElement as HTMLElement | null;
       if (contenido && activo && contenido.contains(activo)) return;
-      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', ' '].includes(e.key)) {
+      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key)) {
         e.preventDefault();
         refocusFacturaDialog();
       }
