@@ -5223,7 +5223,15 @@ export default function POS() {
         open={productQuantityModalOpen}
         onOpenChange={(open) => {
           setProductQuantityModalOpen(open);
-          if (!open && !productSearchModalOpen) focusBuscador();
+          if (!open) {
+            // Si el catálogo sigue abierto, devolvemos el foco a su buscador
+            // para seguir navegando con flechas; si no, al buscador principal.
+            if (productSearchModalOpen) {
+              productSearchModalRef.current?.focusSearchInput();
+            } else {
+              focusBuscador();
+            }
+          }
         }}
         producto={selectedProductForQuantity}
         precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}
