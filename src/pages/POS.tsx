@@ -3042,6 +3042,54 @@ export default function POS() {
     descuentoAuthModalOpen,
   ]);
 
+  // Cambiar de pestaña con el teclado (F1 alterna, Ctrl/Alt + ←/→ mueve)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anyDialogOpen =
+        pagoDialogOpen ||
+        ticketDialogOpen ||
+        facturaDialogOpen ||
+        clienteDialogOpen ||
+        empleadoDialogOpen ||
+        pesoDialogOpen ||
+        productSearchModalOpen ||
+        productQuantityModalOpen ||
+        productoTemporalDialogOpen ||
+        transferenciaDialogOpen ||
+        montoGenericoDialogOpen ||
+        chequeDialogOpen ||
+        descuentoAuthModalOpen;
+      if (anyDialogOpen) return;
+
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setModoPos((prev) => (prev === 'directa' ? 'mostrador' : 'directa'));
+        return;
+      }
+      if ((e.ctrlKey || e.altKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        setModoPos(e.key === 'ArrowLeft' ? 'directa' : 'mostrador');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pagoDialogOpen,
+    ticketDialogOpen,
+    facturaDialogOpen,
+    clienteDialogOpen,
+    empleadoDialogOpen,
+    pesoDialogOpen,
+    productSearchModalOpen,
+    productQuantityModalOpen,
+    productoTemporalDialogOpen,
+    transferenciaDialogOpen,
+    montoGenericoDialogOpen,
+    chequeDialogOpen,
+    descuentoAuthModalOpen,
+  ]);
+
   if (loading) {
     return (
       <MainLayout>
@@ -3065,6 +3113,9 @@ export default function POS() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        <p className="text-[10px] text-muted-foreground -mt-2">
+          <b>F1</b> alternar pestaña · <b>Ctrl+←/→</b> ir a Venta directa / Pedidos mostrador
+        </p>
         <div className="flex-1 min-h-0 flex gap-4">
         {/* Left Panel - Product Search */}
         <div className="flex-1 flex flex-col">
