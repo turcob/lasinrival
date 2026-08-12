@@ -285,6 +285,7 @@ export default function POS() {
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
   const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
