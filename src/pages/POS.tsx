@@ -5206,6 +5206,7 @@ export default function POS() {
 
       {/* Modal de Búsqueda de Productos */}
       <ProductSearchModal
+        ref={productSearchModalRef}
         open={productSearchModalOpen}
         onOpenChange={(open) => {
           setProductSearchModalOpen(open);
