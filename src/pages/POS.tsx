@@ -5037,7 +5037,18 @@ export default function POS() {
 
       {/* Factura Dialog */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md max-h-[90vh] overflow-y-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !emitiendo) {
+              const target = e.target as HTMLElement;
+              // No interceptar Enter cuando se está usando un select abierto
+              if (target.getAttribute('role') === 'combobox' && target.getAttribute('aria-expanded') === 'true') return;
+              e.preventDefault();
+              modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -5051,6 +5062,7 @@ export default function POS() {
                 <div>
                   <p className="font-medium">Emitir Factura AFIP</p>
                   <p className="text-sm text-muted-foreground">Generar comprobante electrónico</p>
+                  <p className="text-xs text-muted-foreground">Barra espaciadora: activar / desactivar</p>
                 </div>
               </div>
               <Switch
@@ -5059,8 +5071,11 @@ export default function POS() {
               />
             </div>
 
-            {emitirFactura && (
-              <div className="space-y-4 p-4 border rounded-lg">
+            <div
+              aria-hidden={!emitirFactura}
+              className={`space-y-4 p-4 border rounded-lg ${emitirFactura ? '' : 'invisible pointer-events-none'}`}
+            >
+              <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Tipo Comprobante</Label>
