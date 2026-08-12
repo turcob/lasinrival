@@ -2925,10 +2925,31 @@ export default function POS() {
   const refocusPagoDialog = () => {
     setTimeout(() => {
       if (!pagoDialogOpen) return;
+      // Si el monto ya cubre el total, el foco va directo al botón Continuar
+      if (Math.abs(totalPagado - totalConRecargo) <= 0.009 && continuarPagoBtnRef.current) {
+        continuarPagoBtnRef.current.focus();
+        return;
+      }
       const preferida = formasPago.findIndex((f) => f.nombre.toLowerCase().includes('efectivo'));
       focusFormaPago(preferida >= 0 ? preferida : 0);
     }, 60);
   };
+
+  // Cuando el total queda cubierto dentro del diálogo de cobro, enfocar "Continuar"
+  useEffect(() => {
+    if (!pagoDialogOpen) return;
+    if (tarjetaDialogOpen || efectivoDialogOpen || transferenciaDialogOpen) return;
+    if (Math.abs(totalPagado - totalConRecargo) > 0.009) return;
+    const t = setTimeout(() => continuarPagoBtnRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, [pagoDialogOpen, totalPagado, totalConRecargo, tarjetaDialogOpen, efectivoDialogOpen, transferenciaDialogOpen]);
+
+  // Al abrir el diálogo de confirmación de venta, enfocar el botón de confirmar
+  useEffect(() => {
+    if (!facturaDialogOpen) return;
+    const t = setTimeout(() => confirmarVentaBtnRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, [facturaDialogOpen]);
 
   const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
     const idxActual = formasPago.findIndex(
