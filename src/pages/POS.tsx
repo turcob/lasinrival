@@ -4171,6 +4171,7 @@ export default function POS() {
       <Dialog open={pagoDialogOpen} onOpenChange={setPagoDialogOpen}>
         <DialogContent
           className="max-w-lg"
+          ref={pagoContentRef}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && Math.abs(totalPagado - totalConRecargo) <= 0.009) {
               e.preventDefault();
