@@ -5179,8 +5179,8 @@ export default function POS() {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              </>
+            </div>
 
             <Separator />
 
