@@ -60,7 +60,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ProductSearchModal } from '@/components/pos/ProductSearchModal';
+import { ProductSearchModal, type ProductSearchModalHandle } from '@/components/pos/ProductSearchModal';
 import { ProductQuantityModal } from '@/components/pos/ProductQuantityModal';
 import { SolicitarDescuentoModal } from '@/components/pos/SolicitarDescuentoModal';
 import { PedidosMostradorPanel, type PedidoMostrador, type PedidosMostradorPanelHandle } from '@/components/pos/PedidosMostradorPanel';
@@ -285,6 +285,7 @@ export default function POS() {
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
   const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
   const adaptarVentaParaPicking = (v: any) => ({
@@ -5205,6 +5206,7 @@ export default function POS() {
 
       {/* Modal de Búsqueda de Productos */}
       <ProductSearchModal
+        ref={productSearchModalRef}
         open={productSearchModalOpen}
         onOpenChange={(open) => {
           setProductSearchModalOpen(open);
@@ -5221,7 +5223,15 @@ export default function POS() {
         open={productQuantityModalOpen}
         onOpenChange={(open) => {
           setProductQuantityModalOpen(open);
-          if (!open && !productSearchModalOpen) focusBuscador();
+          if (!open) {
+            // Si el catálogo sigue abierto, devolvemos el foco a su buscador
+            // para seguir navegando con flechas; si no, al buscador principal.
+            if (productSearchModalOpen) {
+              productSearchModalRef.current?.focusSearchInput();
+            } else {
+              focusBuscador();
+            }
+          }
         }}
         producto={selectedProductForQuantity}
         precio={selectedProductForQuantity ? getProductoPrice(selectedProductForQuantity) : 0}

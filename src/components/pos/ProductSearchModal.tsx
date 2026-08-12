@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { toast } from 'sonner';
 import { parseCodigoBalanza, type FormatoCodigoBalanza } from '@/lib/codigoBalanza';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -45,303 +45,322 @@ interface ProductSearchModalProps {
   formatoCodigoBalanza?: FormatoCodigoBalanza;
 }
 
-export function ProductSearchModal({
-  open,
-  onOpenChange,
-  productos,
-  getProductoPrice,
-  onSelectProduct,
-  formatoCodigoBalanza = 'plu5_peso6',
-}: ProductSearchModalProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+export interface ProductSearchModalHandle {
+  focusSearchInput: () => void;
+  focusList: () => void;
+}
 
-  const filteredProductos = useMemo(() => {
-    if (!searchTerm) return productos;
-    const term = searchTerm.toLowerCase();
-    return productos.filter(
-      (p) =>
-        p.codigo_articulo.toLowerCase().includes(term) ||
-        p.descripcion.toLowerCase().includes(term) ||
-        (p.codigo_barra || '').toLowerCase().includes(term) ||
-        (p.plu_balanza != null && String(p.plu_balanza) === term)
-    );
-  }, [productos, searchTerm]);
+export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSearchModalProps>(
+  function ProductSearchModal(
+    {
+      open,
+      onOpenChange,
+      productos,
+      getProductoPrice,
+      onSelectProduct,
+      formatoCodigoBalanza = 'plu5_peso6',
+    }: ProductSearchModalProps,
+    ref
+  ) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const isProductoPorPeso = (producto: Producto) => {
-    const unidad = (producto.unidad_medida || '').toUpperCase().replace('.', '').trim();
-    return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
-  };
+    const filteredProductos = useMemo(() => {
+      if (!searchTerm) return productos;
+      const term = searchTerm.toLowerCase();
+      return productos.filter(
+        (p) =>
+          p.codigo_articulo.toLowerCase().includes(term) ||
+          p.descripcion.toLowerCase().includes(term) ||
+          (p.codigo_barra || '').toLowerCase().includes(term) ||
+          (p.plu_balanza != null && String(p.plu_balanza) === term)
+      );
+    }, [productos, searchTerm]);
 
-  // Al cambiar el filtro o reabrir, se reinicia la selección de teclado
-  useEffect(() => {
-    setActiveIndex(-1);
-  }, [searchTerm, open]);
+    const isProductoPorPeso = (producto: Producto) => {
+      const unidad = (producto.unidad_medida || '').toUpperCase().replace('.', '').trim();
+      return unidad === 'KG' || unidad === 'KILO' || unidad === 'KILOS';
+    };
 
-  const focusCard = (index: number) => {
-    const prod = filteredProductos[index];
-    if (!prod) return;
-    setActiveIndex(index);
-    const el = cardRefs.current.get(prod.id);
-    el?.focus();
-    el?.scrollIntoView({ block: 'nearest' });
-  };
+    // Al cambiar el filtro o reabrir, se reinicia la selección de teclado
+    useEffect(() => {
+      setActiveIndex(-1);
+    }, [searchTerm, open]);
 
-  const focusBuscadorModal = () => {
-    setActiveIndex(-1);
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    }, 0);
-  };
+    const focusCard = (index: number) => {
+      const prod = filteredProductos[index];
+      if (!prod) return;
+      setActiveIndex(index);
+      const el = cardRefs.current.get(prod.id);
+      el?.focus();
+      el?.scrollIntoView({ block: 'nearest' });
+    };
 
-  const handleListKeyDown = (e: React.KeyboardEvent, index: number, producto: Producto) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      focusCard(Math.min(index + 1, filteredProductos.length - 1));
-      return;
-    }
-    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      if (index === 0) focusBuscadorModal();
-      else focusCard(index - 1);
-      return;
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleSelectProduct(producto);
-      return;
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
+    const focusBuscadorModal = () => {
+      setActiveIndex(-1);
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }, 0);
+    };
+
+    useImperativeHandle(ref, () => ({
+      focusSearchInput: focusBuscadorModal,
+      focusList: () => {
+        if (filteredProductos.length > 0) focusCard(0);
+      },
+    }));
+
+    const handleListKeyDown = (e: React.KeyboardEvent, index: number, producto: Producto) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        focusCard(Math.min(index + 1, filteredProductos.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (index === 0) focusBuscadorModal();
+        else focusCard(index - 1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleSelectProduct(producto);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        focusBuscadorModal();
+      }
+    };
+
+    const handleSelectProduct = (producto: Producto, options?: { cantidad?: number }) => {
+      onSelectProduct(producto, options);
+      // Volvemos al buscador para que el operador siga navegando con flechas
+      // (si el padre abre otro modal, ese modal tomará el foco por encima).
       focusBuscadorModal();
-    }
-  };
+    };
 
-  const handleSelectProduct = (producto: Producto, options?: { cantidad?: number }) => {
-    onSelectProduct(producto, options);
-    // No cerramos el modal - el usuario puede seguir agregando productos
-  };
+    const handleClose = () => {
+      setSearchTerm('');
+      onOpenChange(false);
+    };
 
-  const handleClose = () => {
-    setSearchTerm('');
-    onOpenChange(false);
-  };
-
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') {
+    const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusCard(0);
+        return;
+      }
+      if (e.key !== 'Enter') return;
       e.preventDefault();
-      focusCard(0);
-      return;
-    }
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const raw = searchTerm.trim();
-    if (!raw) return;
+      const raw = searchTerm.trim();
+      if (!raw) return;
 
-    // Etiqueta de balanza: PLU + peso impreso.
-    const balanza = parseCodigoBalanza(raw, formatoCodigoBalanza);
-    if (balanza) {
-      const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
-      if (candidatos.length === 1) {
-        handleSelectProduct(candidatos[0], { cantidad: balanza.pesoKg });
+      // Etiqueta de balanza: PLU + peso impreso.
+      const balanza = parseCodigoBalanza(raw, formatoCodigoBalanza);
+      if (balanza) {
+        const candidatos = productos.filter((p) => p.plu_balanza === balanza.plu);
+        if (candidatos.length === 1) {
+          handleSelectProduct(candidatos[0], { cantidad: balanza.pesoKg });
+          setSearchTerm('');
+          focusBuscadorModal();
+        } else if (candidatos.length === 0) {
+          toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
+        } else {
+          setSearchTerm(String(balanza.plu));
+          toast.warning(`PLU ${balanza.plu} duplicado — seleccioná el producto (peso manual)`);
+        }
+        return;
+      }
+
+      const code = raw.toLowerCase();
+      const matches = productos.filter(
+        (p) =>
+          (p.codigo_barra || '').trim().toLowerCase() === code ||
+          (p.codigo_articulo || '').trim().toLowerCase() === code
+      );
+      if (matches.length === 1) {
+        handleSelectProduct(matches[0]);
         setSearchTerm('');
         focusBuscadorModal();
-      } else if (candidatos.length === 0) {
-        toast.error(`PLU de balanza ${balanza.plu} no asignado a ningún producto`);
-      } else {
-        setSearchTerm(String(balanza.plu));
-        toast.warning(`PLU ${balanza.plu} duplicado — seleccioná el producto (peso manual)`);
+      } else if (matches.length === 0) {
+        toast.error('Producto no encontrado');
       }
-      return;
-    }
+      // Más de 1 coincidencia: no agregar, dejar la lista filtrada visible
+    };
 
-    const code = raw.toLowerCase();
-    const matches = productos.filter(
-      (p) =>
-        (p.codigo_barra || '').trim().toLowerCase() === code ||
-        (p.codigo_articulo || '').trim().toLowerCase() === code
-    );
-    if (matches.length === 1) {
-      handleSelectProduct(matches[0]);
-      setSearchTerm('');
-      focusBuscadorModal();
-    } else if (matches.length === 0) {
-      toast.error('Producto no encontrado');
-    }
-    // Más de 1 coincidencia: no agregar, dejar la lista filtrada visible
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Buscar Productos
-            </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={searchInputRef}
-              className="pl-10"
-              placeholder="Buscar por código o descripción..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              autoFocus
-            />
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            {filteredProductos.length} productos encontrados · <b>↓</b> ir a la lista · <b>←/→ ↑/↓</b> navegar · <b>Enter</b> agregar · <b>Esc</b> volver al buscador
-          </p>
-        </DialogHeader>
-
-        <ScrollArea className="flex-1 p-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredProductos.map((producto, index) => {
-              const precio = getProductoPrice(producto);
-              const esPorPeso = isProductoPorPeso(producto);
-
-              return (
-                <div
-                  key={producto.id}
-                  ref={(el) => {
-                    if (el) cardRefs.current.set(producto.id, el);
-                    else cardRefs.current.delete(producto.id);
-                  }}
-                  role="button"
-                  tabIndex={index === activeIndex ? 0 : -1}
-                  onKeyDown={(e) => handleListKeyDown(e, index, producto)}
-                  className={`border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col relative group outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    index === activeIndex ? 'bg-accent border-primary ring-2 ring-ring' : ''
-                  }`}
-                  onClick={() => handleSelectProduct(producto)}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    tabIndex={-1}
-                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewingProduct(producto);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-start justify-between gap-1 mb-2 pr-6">
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {producto.codigo_articulo}
-                    </p>
-                    {esPorPeso && (
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        <Scale className="h-3 w-3 mr-1" />
-                        KG
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-medium text-sm line-clamp-2 flex-1 min-h-[2.5rem]">
-                    {producto.descripcion}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      Stock: {producto.stock_actual}
-                    </span>
-                    <span className="font-bold text-primary">
-                      ${precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {filteredProductos.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Search className="h-12 w-12 mb-4 opacity-50" />
-              <p className="text-lg font-medium">No se encontraron productos</p>
-              <p className="text-sm">Intente con otro término de búsqueda</p>
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Buscar Productos
+              </DialogTitle>
+              <Button variant="ghost" size="icon" onClick={handleClose} tabIndex={-1}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          )}
-        </ScrollArea>
+            <div className="relative mt-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                className="pl-10"
+                placeholder="Buscar por código o descripción..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                autoFocus
+              />
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {filteredProductos.length} productos encontrados · <b>↓</b> ir a la lista · <b>←/→ ↑/↓</b> navegar · <b>Enter</b> agregar · <b>Esc</b> volver al buscador
+            </p>
+          </DialogHeader>
 
-        <div className="border-t p-4 flex justify-end">
-          <Button onClick={handleClose}>
-            Cerrar y volver a la venta
-          </Button>
-        </div>
-      </DialogContent>
+          <ScrollArea className="flex-1 p-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredProductos.map((producto, index) => {
+                const precio = getProductoPrice(producto);
+                const esPorPeso = isProductoPorPeso(producto);
 
-      {/* Modal de detalle del producto */}
-      <AlertDialog open={!!viewingProduct} onOpenChange={() => setViewingProduct(null)}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Detalle del Producto
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="pt-4">
-                {viewingProduct && (
-                  <Table>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium text-foreground">Código</TableCell>
-                        <TableCell className="font-mono">{viewingProduct.codigo_articulo}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium text-foreground">Descripción</TableCell>
-                        <TableCell>{viewingProduct.descripcion}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium text-foreground">Precio de Venta</TableCell>
-                        <TableCell className="font-bold text-primary">
-                          ${getProductoPrice(viewingProduct).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium text-foreground">Stock Disponible</TableCell>
-                        <TableCell>
-                          <Badge variant={viewingProduct.stock_actual > 0 ? 'default' : 'destructive'}>
-                            {viewingProduct.stock_actual} {viewingProduct.unidad_medida || 'unidades'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium text-foreground">Unidad de Medida</TableCell>
-                        <TableCell>{viewingProduct.unidad_medida || 'Unidad'}</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                )}
+                return (
+                  <div
+                    key={producto.id}
+                    ref={(el) => {
+                      if (el) cardRefs.current.set(producto.id, el);
+                      else cardRefs.current.delete(producto.id);
+                    }}
+                    role="button"
+                    tabIndex={index === activeIndex ? 0 : -1}
+                    onKeyDown={(e) => handleListKeyDown(e, index, producto)}
+                    className={`border rounded-lg p-3 hover:bg-accent hover:border-primary cursor-pointer transition-colors flex flex-col relative group outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      index === activeIndex ? 'bg-accent border-primary ring-2 ring-ring' : ''
+                    }`}
+                    onClick={() => handleSelectProduct(producto)}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      tabIndex={-1}
+                      className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingProduct(producto);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-start justify-between gap-1 mb-2 pr-6">
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {producto.codigo_articulo}
+                      </p>
+                      {esPorPeso && (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          <Scale className="h-3 w-3 mr-1" />
+                          KG
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="font-medium text-sm line-clamp-2 flex-1 min-h-[2.5rem]">
+                      {producto.descripcion}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        Stock: {producto.stock_actual}
+                      </span>
+                      <span className="font-bold text-primary">
+                        ${precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {filteredProductos.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Search className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium">No se encontraron productos</p>
+                <p className="text-sm">Intente con otro término de búsqueda</p>
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-row gap-2 sm:justify-between">
-            <AlertDialogCancel>Cerrar</AlertDialogCancel>
-            <Button
-              onClick={() => {
-                if (viewingProduct) {
-                  handleSelectProduct(viewingProduct);
-                  setViewingProduct(null);
-                }
-              }}
-            >
-              Agregar al carrito
+            )}
+          </ScrollArea>
+
+          <div className="border-t p-4 flex justify-end">
+            <Button onClick={handleClose}>
+              Cerrar y volver a la venta
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Dialog>
-  );
-}
+          </div>
+        </DialogContent>
+
+        {/* Modal de detalle del producto */}
+        <AlertDialog open={!!viewingProduct} onOpenChange={() => setViewingProduct(null)}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Detalle del Producto
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="pt-4">
+                  {viewingProduct && (
+                    <Table>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="font-medium text-foreground">Código</TableCell>
+                          <TableCell className="font-mono">{viewingProduct.codigo_articulo}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium text-foreground">Descripción</TableCell>
+                          <TableCell>{viewingProduct.descripcion}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium text-foreground">Precio de Venta</TableCell>
+                          <TableCell className="font-bold text-primary">
+                            ${getProductoPrice(viewingProduct).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium text-foreground">Stock Disponible</TableCell>
+                          <TableCell>
+                            <Badge variant={viewingProduct.stock_actual > 0 ? 'default' : 'destructive'}>
+                              {viewingProduct.stock_actual} {viewingProduct.unidad_medida || 'unidades'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium text-foreground">Unidad de Medida</TableCell>
+                          <TableCell>{viewingProduct.unidad_medida || 'Unidad'}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row gap-2 sm:justify-between">
+              <AlertDialogCancel>Cerrar</AlertDialogCancel>
+              <Button
+                onClick={() => {
+                  if (viewingProduct) {
+                    handleSelectProduct(viewingProduct);
+                    setViewingProduct(null);
+                  }
+                }}
+              >
+                Agregar al carrito
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </Dialog>
+    );
+  }
+);
