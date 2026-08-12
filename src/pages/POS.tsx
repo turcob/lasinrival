@@ -4161,7 +4161,11 @@ export default function POS() {
             if (e.key === 'Enter' && Math.abs(totalPagado - totalConRecargo) <= 0.009) {
               e.preventDefault();
               handleContinuarPago();
+              return;
             }
+            // Navegación por teclado disponible aunque el foco se haya perdido
+            // (por ejemplo al cerrar un sub-diálogo tras un pago parcial)
+            handleFormasPagoKeyDown(e);
           }}
         >
           <DialogHeader>
