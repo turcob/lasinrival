@@ -288,6 +288,8 @@ export default function POS() {
   const continuarPagoBtnRef = useRef<HTMLButtonElement | null>(null);
   const pagoContentRef = useRef<HTMLDivElement | null>(null);
   const confirmarVentaBtnRef = useRef<HTMLButtonElement | null>(null);
+  const facturaSiBtnRef = useRef<HTMLButtonElement | null>(null);
+  const facturaNoBtnRef = useRef<HTMLButtonElement | null>(null);
   const facturaContentRef = useRef<HTMLDivElement | null>(null);
   const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
@@ -2994,7 +2996,7 @@ export default function POS() {
     if (!facturaDialogOpen) return;
     refocusFacturaDialog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facturaDialogOpen, emitirFactura, modoVentaCC, emitiendo]);
+  }, [facturaDialogOpen, modoVentaCC]);
 
   // Fallback global: si el foco se fue al body en el diálogo de confirmación,
   // cualquier tecla de navegación lo devuelve al botón de confirmar.
@@ -3004,7 +3006,7 @@ export default function POS() {
       const contenido = facturaContentRef.current;
       const activo = document.activeElement as HTMLElement | null;
       if (contenido && activo && contenido.contains(activo)) return;
-      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', ' '].includes(e.key)) {
+      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key)) {
         e.preventDefault();
         refocusFacturaDialog();
       }
@@ -5138,10 +5140,25 @@ export default function POS() {
           className="max-w-md max-h-[90vh] overflow-y-auto"
           ref={facturaContentRef}
           onKeyDown={(e) => {
+            const target = e.target as HTMLElement;
+            const enInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+            // La barra espaciadora activa botones en los navegadores: la anulamos
+            // para que nunca confirme la venta por accidente.
+            if (e.key === ' ' && !enInput) {
+              e.preventDefault();
+              return;
+            }
+            // F: alterna emitir factura (atajo claro, no interfiere con Enter)
+            if ((e.key === 'f' || e.key === 'F') && !enInput) {
+              e.preventDefault();
+              setEmitirFactura((prev) => !prev);
+              return;
+            }
             if (e.key === 'Enter' && !emitiendo) {
-              const target = e.target as HTMLElement;
               // No interceptar Enter cuando se está usando un select abierto
               if (target.getAttribute('role') === 'combobox' && target.getAttribute('aria-expanded') === 'true') return;
+              // Enter sobre los botones de facturación sólo cambia la opción
+              if (target === facturaSiBtnRef.current || target === facturaNoBtnRef.current) return;
               e.preventDefault();
               modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta();
             }
@@ -5154,19 +5171,50 @@ export default function POS() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div className="p-4 bg-muted rounded-lg space-y-3">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5" />
                 <div>
-                  <p className="font-medium">Emitir Factura AFIP</p>
-                  <p className="text-sm text-muted-foreground">Generar comprobante electrónico</p>
-                  <p className="text-xs text-muted-foreground">Barra espaciadora: activar / desactivar</p>
+                  <p className="font-medium">¿Emitir Factura AFIP?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Atajo: <span className="font-semibold">F</span> alterna · flechas ← → para elegir
+                  </p>
                 </div>
               </div>
-              <Switch
-                checked={emitirFactura}
-                onCheckedChange={setEmitirFactura}
-              />
+              <div
+                className="grid grid-cols-2 gap-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setEmitirFactura(false);
+                    facturaNoBtnRef.current?.focus({ preventScroll: true });
+                  }
+                  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setEmitirFactura(true);
+                    facturaSiBtnRef.current?.focus({ preventScroll: true });
+                  }
+                }}
+              >
+                <Button
+                  ref={facturaSiBtnRef}
+                  type="button"
+                  variant={emitirFactura ? 'default' : 'outline'}
+                  aria-pressed={emitirFactura}
+                  onClick={() => setEmitirFactura(true)}
+                >
+                  Sí, facturar
+                </Button>
+                <Button
+                  ref={facturaNoBtnRef}
+                  type="button"
+                  variant={!emitirFactura ? 'default' : 'outline'}
+                  aria-pressed={!emitirFactura}
+                  onClick={() => setEmitirFactura(false)}
+                >
+                  No facturar
+                </Button>
+              </div>
             </div>
 
             <div
@@ -5314,7 +5362,7 @@ export default function POS() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              Enter confirmar · Barra espaciadora cambia emitir factura (con el toggle enfocado) · Esc cancelar
+              Enter confirmar · F alterna facturar / no facturar · Esc cancelar
             </p>
           </div>
         </DialogContent>
