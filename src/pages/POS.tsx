@@ -2977,6 +2977,25 @@ export default function POS() {
     return () => clearTimeout(t);
   }, [facturaDialogOpen]);
 
+  // Fallback global: si el foco quedó fuera (body) tras un pago parcial,
+  // las teclas de navegación siguen funcionando y recuperan el foco.
+  useEffect(() => {
+    if (!pagoDialogOpen || subDialogoPagoAbierto) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const contenido = pagoContentRef.current;
+      const activo = document.activeElement as HTMLElement | null;
+      const dentro = !!(contenido && activo && contenido.contains(activo));
+      if (dentro) return;
+      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key)) {
+        e.preventDefault();
+        refocusPagoDialog();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagoDialogOpen, subDialogoPagoAbierto, totalPagado, totalConRecargo]);
+
   const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
     const activo = document.activeElement as HTMLElement | null;
     if (activo && (activo.tagName === 'INPUT' || activo.tagName === 'TEXTAREA')) return;
