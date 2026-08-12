@@ -5151,7 +5151,13 @@ export default function POS() {
             // F: alterna emitir factura (atajo claro, no interfiere con Enter)
             if ((e.key === 'f' || e.key === 'F') && !enInput) {
               e.preventDefault();
-              setEmitirFactura((prev) => !prev);
+              setEmitirFactura((prev) => {
+                const siguiente = !prev;
+                if (!siguiente) {
+                  requestAnimationFrame(() => confirmarVentaBtnRef.current?.focus({ preventScroll: true }));
+                }
+                return siguiente;
+              });
               return;
             }
             if (e.key === 'Enter' && !emitiendo) {
@@ -5192,7 +5198,7 @@ export default function POS() {
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
                     setEmitirFactura(false);
-                    facturaNoBtnRef.current?.focus({ preventScroll: true });
+                    requestAnimationFrame(() => confirmarVentaBtnRef.current?.focus({ preventScroll: true }));
                   }
                   if (e.key === 'ArrowLeft') {
                     e.preventDefault();
@@ -5215,7 +5221,10 @@ export default function POS() {
                   type="button"
                   variant={!emitirFactura ? 'default' : 'outline'}
                   aria-pressed={!emitirFactura}
-                  onClick={() => setEmitirFactura(false)}
+                  onClick={() => {
+                    setEmitirFactura(false);
+                    requestAnimationFrame(() => confirmarVentaBtnRef.current?.focus({ preventScroll: true }));
+                  }}
                 >
                   No facturar
                 </Button>
