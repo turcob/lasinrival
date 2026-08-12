@@ -285,6 +285,8 @@ export default function POS() {
   const [modoPos, setModoPos] = useState<'directa' | 'mostrador'>('directa');
   const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
   const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const continuarPagoBtnRef = useRef<HTMLButtonElement | null>(null);
+  const confirmarVentaBtnRef = useRef<HTMLButtonElement | null>(null);
   const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
@@ -2923,10 +2925,31 @@ export default function POS() {
   const refocusPagoDialog = () => {
     setTimeout(() => {
       if (!pagoDialogOpen) return;
+      // Si el monto ya cubre el total, el foco va directo al botón Continuar
+      if (Math.abs(totalPagado - totalConRecargo) <= 0.009 && continuarPagoBtnRef.current) {
+        continuarPagoBtnRef.current.focus();
+        return;
+      }
       const preferida = formasPago.findIndex((f) => f.nombre.toLowerCase().includes('efectivo'));
       focusFormaPago(preferida >= 0 ? preferida : 0);
     }, 60);
   };
+
+  // Cuando el total queda cubierto dentro del diálogo de cobro, enfocar "Continuar"
+  useEffect(() => {
+    if (!pagoDialogOpen) return;
+    if (tarjetaDialogOpen || efectivoDialogOpen || transferenciaDialogOpen) return;
+    if (Math.abs(totalPagado - totalConRecargo) > 0.009) return;
+    const t = setTimeout(() => continuarPagoBtnRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, [pagoDialogOpen, totalPagado, totalConRecargo, tarjetaDialogOpen, efectivoDialogOpen, transferenciaDialogOpen]);
+
+  // Al abrir el diálogo de confirmación de venta, enfocar el botón de confirmar
+  useEffect(() => {
+    if (!facturaDialogOpen) return;
+    const t = setTimeout(() => confirmarVentaBtnRef.current?.focus(), 80);
+    return () => clearTimeout(t);
+  }, [facturaDialogOpen]);
 
   const handleFormasPagoKeyDown = (e: React.KeyboardEvent) => {
     const idxActual = formasPago.findIndex(
@@ -4221,7 +4244,11 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - totalConRecargo) > 0.009}>
+              <Button
+                ref={continuarPagoBtnRef}
+                onClick={handleContinuarPago}
+                disabled={Math.abs(totalPagado - totalConRecargo) > 0.009}
+              >
                 Continuar
               </Button>
             </div>
@@ -5010,7 +5037,18 @@ export default function POS() {
 
       {/* Factura Dialog */}
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md max-h-[90vh] overflow-y-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !emitiendo) {
+              const target = e.target as HTMLElement;
+              // No interceptar Enter cuando se está usando un select abierto
+              if (target.getAttribute('role') === 'combobox' && target.getAttribute('aria-expanded') === 'true') return;
+              e.preventDefault();
+              modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -5024,6 +5062,7 @@ export default function POS() {
                 <div>
                   <p className="font-medium">Emitir Factura AFIP</p>
                   <p className="text-sm text-muted-foreground">Generar comprobante electrónico</p>
+                  <p className="text-xs text-muted-foreground">Barra espaciadora: activar / desactivar</p>
                 </div>
               </div>
               <Switch
@@ -5032,8 +5071,11 @@ export default function POS() {
               />
             </div>
 
-            {emitirFactura && (
-              <div className="space-y-4 p-4 border rounded-lg">
+            <div
+              aria-hidden={!emitirFactura}
+              className={`space-y-4 p-4 border rounded-lg ${emitirFactura ? '' : 'invisible pointer-events-none'}`}
+            >
+              <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Tipo Comprobante</Label>
@@ -5137,8 +5179,8 @@ export default function POS() {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              </>
+            </div>
 
             <Separator />
 
@@ -5165,10 +5207,17 @@ export default function POS() {
               <Button variant="outline" onClick={() => { setFacturaDialogOpen(false); setModoVentaCC(null); }}>
                 Cancelar
               </Button>
-              <Button onClick={() => modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta()} disabled={emitiendo}>
+              <Button
+                ref={confirmarVentaBtnRef}
+                onClick={() => modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta()}
+                disabled={emitiendo}
+              >
                 {emitiendo ? 'Procesando...' : emitirFactura ? 'Confirmar y Facturar' : 'Confirmar Venta'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Enter confirmar · Barra espaciadora cambia emitir factura (con el toggle enfocado) · Esc cancelar
+            </p>
           </div>
         </DialogContent>
       </Dialog>
