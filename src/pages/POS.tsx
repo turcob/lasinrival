@@ -288,6 +288,7 @@ export default function POS() {
   const continuarPagoBtnRef = useRef<HTMLButtonElement | null>(null);
   const pagoContentRef = useRef<HTMLDivElement | null>(null);
   const confirmarVentaBtnRef = useRef<HTMLButtonElement | null>(null);
+  const facturaContentRef = useRef<HTMLDivElement | null>(null);
   const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
 
@@ -2970,11 +2971,47 @@ export default function POS() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagoDialogOpen, subDialogoPagoAbierto, pagos.length, totalPagado, totalConRecargo]);
 
+  // Foco resiliente en el diálogo de confirmación de venta
+  const refocusFacturaDialog = () => {
+    let intentos = 0;
+    const intentar = () => {
+      intentos += 1;
+      const contenido = facturaContentRef.current;
+      const activo = document.activeElement as HTMLElement | null;
+      const dentro = !!(contenido && activo && contenido.contains(activo) && activo !== contenido);
+      if (dentro) return;
+      const objetivo = confirmarVentaBtnRef.current;
+      objetivo?.focus({ preventScroll: true });
+      if (document.activeElement !== objetivo && intentos < 25) {
+        requestAnimationFrame(() => setTimeout(intentar, 40));
+      }
+    };
+    requestAnimationFrame(intentar);
+  };
+
   // Al abrir el diálogo de confirmación de venta, enfocar el botón de confirmar
   useEffect(() => {
     if (!facturaDialogOpen) return;
-    const t = setTimeout(() => confirmarVentaBtnRef.current?.focus(), 80);
-    return () => clearTimeout(t);
+    refocusFacturaDialog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facturaDialogOpen, emitirFactura, modoVentaCC, emitiendo]);
+
+  // Fallback global: si el foco se fue al body en el diálogo de confirmación,
+  // cualquier tecla de navegación lo devuelve al botón de confirmar.
+  useEffect(() => {
+    if (!facturaDialogOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const contenido = facturaContentRef.current;
+      const activo = document.activeElement as HTMLElement | null;
+      if (contenido && activo && contenido.contains(activo)) return;
+      if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault();
+        refocusFacturaDialog();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facturaDialogOpen]);
 
   // Fallback global: si el foco quedó fuera (body) tras un pago parcial,
@@ -5099,6 +5136,7 @@ export default function POS() {
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
         <DialogContent
           className="max-w-md max-h-[90vh] overflow-y-auto"
+          ref={facturaContentRef}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !emitiendo) {
               const target = e.target as HTMLElement;
