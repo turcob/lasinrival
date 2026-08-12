@@ -286,6 +286,7 @@ export default function POS() {
   const pedidosPanelRef = useRef<PedidosMostradorPanelHandle>(null);
   const formaPagoBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const continuarPagoBtnRef = useRef<HTMLButtonElement | null>(null);
+  const pagoContentRef = useRef<HTMLDivElement | null>(null);
   const confirmarVentaBtnRef = useRef<HTMLButtonElement | null>(null);
   const productSearchModalRef = useRef<ProductSearchModalHandle>(null);
   const bumpPedidosPanel = () => setPedidosPanelRefreshKey((k) => k + 1);
