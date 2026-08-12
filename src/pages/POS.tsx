@@ -2923,39 +2923,52 @@ export default function POS() {
     formaPagoBtnRefs.current.get(fp.id)?.focus();
   };
 
+  // Objetivo de foco dentro del diálogo de cobro según el estado actual
+  const getObjetivoFocoPago = (): HTMLElement | null => {
+    const cubierto = Math.abs(totalPagado - totalConRecargo) <= 0.009;
+    if (cubierto) return continuarPagoBtnRef.current ?? null;
+    const disponibles = formasPago.filter(
+      (f) => !formaPagoBtnRefs.current.get(f.id)?.disabled,
+    );
+    const preferida =
+      disponibles.find((f) => f.nombre.toLowerCase().includes('efectivo')) ?? disponibles[0];
+    return (preferida ? formaPagoBtnRefs.current.get(preferida.id) : null) ?? null;
+  };
+
   const refocusPagoDialog = () => {
-    // Radix restaura el foco al desmontar el sub-diálogo (a veces al body),
-    // por eso reintentamos hasta que el foco quede dentro del diálogo de cobro.
+    // Radix restaura el foco al desmontar el sub-diálogo (a veces al body).
+    // Reintentamos con rAF + timers hasta que el foco quede dentro del diálogo.
     let intentos = 0;
     const intentar = () => {
       intentos += 1;
-      const cubierto = Math.abs(totalPagado - totalConRecargo) <= 0.009;
-      const objetivo: HTMLElement | null | undefined = cubierto
-        ? continuarPagoBtnRef.current
-        : (() => {
-            const disponibles = formasPago.filter(
-              (f) => !formaPagoBtnRefs.current.get(f.id)?.disabled,
-            );
-            const preferida =
-              disponibles.find((f) => f.nombre.toLowerCase().includes('efectivo')) ??
-              disponibles[0];
-            return preferida ? formaPagoBtnRefs.current.get(preferida.id) : null;
-          })();
-      objetivo?.focus();
+      const contenido = pagoContentRef.current;
+      const activo = document.activeElement as HTMLElement | null;
+      const dentro = !!(contenido && activo && contenido.contains(activo) && activo !== contenido);
+      if (dentro) return;
+      const objetivo = getObjetivoFocoPago();
+      objetivo?.focus({ preventScroll: true });
       const ok = objetivo && document.activeElement === objetivo;
-      if (!ok && intentos < 8) setTimeout(intentar, 60);
+      if (!ok && intentos < 25) {
+        requestAnimationFrame(() => setTimeout(intentar, 40));
+      }
     };
-    setTimeout(intentar, 60);
+    requestAnimationFrame(intentar);
   };
 
-  // Cuando el total queda cubierto dentro del diálogo de cobro, enfocar "Continuar"
+  const subDialogoPagoAbierto =
+    tarjetaDialogOpen ||
+    efectivoDialogOpen ||
+    transferenciaDialogOpen ||
+    chequeDialogOpen ||
+    montoGenericoDialogOpen;
+
+  // Restauración de foco declarativa: cada vez que el diálogo de cobro queda
+  // "solo" (sin sub-diálogos), aseguramos que el foco esté dentro de él.
   useEffect(() => {
-    if (!pagoDialogOpen) return;
-    if (tarjetaDialogOpen || efectivoDialogOpen || transferenciaDialogOpen) return;
-    if (Math.abs(totalPagado - totalConRecargo) > 0.009) return;
-    const t = setTimeout(() => continuarPagoBtnRef.current?.focus(), 80);
-    return () => clearTimeout(t);
-  }, [pagoDialogOpen, totalPagado, totalConRecargo, tarjetaDialogOpen, efectivoDialogOpen, transferenciaDialogOpen]);
+    if (!pagoDialogOpen || subDialogoPagoAbierto) return;
+    refocusPagoDialog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagoDialogOpen, subDialogoPagoAbierto, pagos.length, totalPagado, totalConRecargo]);
 
   // Al abrir el diálogo de confirmación de venta, enfocar el botón de confirmar
   useEffect(() => {
