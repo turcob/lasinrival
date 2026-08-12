@@ -5184,12 +5184,17 @@ export default function POS() {
               <div
                 className="grid grid-cols-2 gap-2"
                 onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    confirmarVentaBtnRef.current?.focus({ preventScroll: true });
+                    return;
+                  }
+                  if (e.key === 'ArrowRight') {
                     e.preventDefault();
                     setEmitirFactura(false);
                     facturaNoBtnRef.current?.focus({ preventScroll: true });
                   }
-                  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  if (e.key === 'ArrowLeft') {
                     e.preventDefault();
                     setEmitirFactura(true);
                     facturaSiBtnRef.current?.focus({ preventScroll: true });
@@ -5219,6 +5224,7 @@ export default function POS() {
 
             <div
               aria-hidden={!emitirFactura}
+              {...(!emitirFactura ? ({ inert: '' } as any) : {})}
               className={`space-y-4 p-4 border rounded-lg ${emitirFactura ? '' : 'invisible pointer-events-none'}`}
             >
               <>
@@ -5362,7 +5368,7 @@ export default function POS() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              Enter confirmar · F alterna facturar / no facturar · Esc cancelar
+              Enter confirmar · F alterna facturar / no facturar · ↓ ir a Confirmar · Esc cancelar
             </p>
           </div>
         </DialogContent>
