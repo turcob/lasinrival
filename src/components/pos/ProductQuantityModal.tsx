@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ export function ProductQuantityModal({
   onConfirm,
 }: ProductQuantityModalProps) {
   const [cantidad, setCantidad] = useState('1');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const isProductoPorPeso = (prod: Producto | null) => {
     if (!prod) return false;
@@ -45,6 +46,11 @@ export function ProductQuantityModal({
   useEffect(() => {
     if (open) {
       setCantidad(esPorPeso ? '1,000' : '1');
+      // Foco explícito en cantidad al abrir, con el texto seleccionado para reemplazar rápido.
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 0);
     }
   }, [open, esPorPeso]);
 
@@ -134,26 +140,29 @@ export function ProductQuantityModal({
                 type="button"
                 variant="outline"
                 size="icon"
+                tabIndex={-1}
                 onClick={handleDecrement}
               >
                 <Minus className="h-4 w-4" />
               </Button>
               <Input
                 id="cantidad"
+                ref={inputRef}
                 className="text-center text-lg font-medium"
                 value={cantidad}
                 onChange={(e) => setCantidad(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
+                    e.preventDefault();
                     handleConfirm();
                   }
                 }}
-                autoFocus
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
+                tabIndex={-1}
                 onClick={handleIncrement}
               >
                 <Plus className="h-4 w-4" />
@@ -170,12 +179,12 @@ export function ProductQuantityModal({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
           <Button onClick={handleConfirm}>
             <Plus className="h-4 w-4 mr-2" />
             Agregar al pedido
+          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
           </Button>
         </DialogFooter>
       </DialogContent>
