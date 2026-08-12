@@ -4244,7 +4244,11 @@ export default function POS() {
               <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleContinuarPago} disabled={Math.abs(totalPagado - totalConRecargo) > 0.009}>
+              <Button
+                ref={continuarPagoBtnRef}
+                onClick={handleContinuarPago}
+                disabled={Math.abs(totalPagado - totalConRecargo) > 0.009}
+              >
                 Continuar
               </Button>
             </div>
