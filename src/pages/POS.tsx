@@ -5207,10 +5207,17 @@ export default function POS() {
               <Button variant="outline" onClick={() => { setFacturaDialogOpen(false); setModoVentaCC(null); }}>
                 Cancelar
               </Button>
-              <Button onClick={() => modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta()} disabled={emitiendo}>
+              <Button
+                ref={confirmarVentaBtnRef}
+                onClick={() => modoVentaCC === 'cliente' ? handleProcesarVentaClienteCC() : handleProcesarVenta()}
+                disabled={emitiendo}
+              >
                 {emitiendo ? 'Procesando...' : emitirFactura ? 'Confirmar y Facturar' : 'Confirmar Venta'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Enter confirmar · Barra espaciadora cambia emitir factura (con el toggle enfocado) · Esc cancelar
+            </p>
           </div>
         </DialogContent>
       </Dialog>
