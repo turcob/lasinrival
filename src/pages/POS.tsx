@@ -5136,6 +5136,7 @@ export default function POS() {
       <Dialog open={facturaDialogOpen} onOpenChange={setFacturaDialogOpen}>
         <DialogContent
           className="max-w-md max-h-[90vh] overflow-y-auto"
+          ref={facturaContentRef}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !emitiendo) {
               const target = e.target as HTMLElement;
