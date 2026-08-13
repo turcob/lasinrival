@@ -5297,6 +5297,10 @@ export type Database = {
         }
         Returns: Json
       }
+      quitar_comprobante_transferencia: {
+        Args: { p_transferencia_id: string }
+        Returns: Json
+      }
       refacturar_hoja_ruta_producto: {
         Args: {
           p_hoja_ruta_id: string
