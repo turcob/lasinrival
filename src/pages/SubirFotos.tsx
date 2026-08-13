@@ -530,9 +530,12 @@ export default function SubirFotos() {
                 <FilaCard
                   key={f.transferencia.id}
                   fila={f}
+                  loading={uploadingId === f.transferencia.id || eliminandoId === f.transferencia.id}
                   analizando={analizandoId === f.transferencia.id}
                   conFoto
                   onVer={() => abrirPreview(f)}
+                  onReemplazar={() => handleReemplazarClick(f)}
+                  onEliminar={() => setConfirmEliminar(f)}
                 />
               ))
             )}
