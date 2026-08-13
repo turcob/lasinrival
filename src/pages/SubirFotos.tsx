@@ -8,7 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck, FileText, ExternalLink } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck, FileText, ExternalLink, Trash2, RotateCcw, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -102,8 +112,11 @@ export default function SubirFotos() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [rango, setRango] = useState<Rango>('1h');
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [confirmEliminar, setConfirmEliminar] = useState<FilaTransf | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFilaRef = useRef<FilaTransf | null>(null);
+  const reemplazoRef = useRef(false);
 
   const fetchData = async () => {
     if (!user) return;
@@ -205,6 +218,7 @@ export default function SubirFotos() {
 
   const handleSubirClick = async (fila: FilaTransf) => {
     pendingFilaRef.current = fila;
+    reemplazoRef.current = false;
     const nativa = await tomarFotoNativa();
     if (nativa) {
       await procesarUpload(fila, nativa);
@@ -215,11 +229,63 @@ export default function SubirFotos() {
     }
   };
 
+  const handleReemplazarClick = async (fila: FilaTransf) => {
+    pendingFilaRef.current = fila;
+    reemplazoRef.current = true;
+    const nativa = await tomarFotoNativa();
+    if (nativa) {
+      await procesarUpload(fila, nativa, true);
+      pendingFilaRef.current = null;
+      reemplazoRef.current = false;
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  // Quita el adjunto (RPC) y borra el archivo del storage.
+  const quitarComprobante = async (fila: FilaTransf): Promise<boolean> => {
+    const id = fila.transferencia.id;
+    setEliminandoId(id);
+    try {
+      const { data, error } = await supabase.rpc('quitar_comprobante_transferencia', {
+        p_transferencia_id: id,
+      });
+      if (error) {
+        toast.error(error.message || 'No se pudo quitar el comprobante');
+        return false;
+      }
+      const pathAnterior = (data as any)?.path_anterior as string | undefined;
+      if (pathAnterior) {
+        const { error: rmErr } = await supabase.storage
+          .from('comprobantes-cobros')
+          .remove([pathAnterior]);
+        if (rmErr) console.warn('[SubirFotos] no se pudo borrar el archivo', rmErr);
+      }
+      return true;
+    } catch (e: any) {
+      toast.error(e.message || 'Error inesperado');
+      return false;
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
+  const eliminarComprobante = async (fila: FilaTransf) => {
+    const ok = await quitarComprobante(fila);
+    if (!ok) return;
+    toast.success('Comprobante eliminado');
+    setPreviewFila(null);
+    setPreviewUrl(null);
+    await fetchData();
+  };
+
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     const fila = pendingFilaRef.current;
+    const esReemplazo = reemplazoRef.current;
     pendingFilaRef.current = null;
+    reemplazoRef.current = false;
     if (!file || !fila) return;
     const pdf = esPdf(file.name, file.type);
     if (!pdf && !file.type.startsWith('image/')) {
@@ -230,16 +296,21 @@ export default function SubirFotos() {
       toast.error(`El archivo supera los ${MAX_FILE_MB} MB`);
       return;
     }
-    await procesarUpload(fila, file);
+    await procesarUpload(fila, file, esReemplazo);
   };
 
-  const procesarUpload = async (fila: FilaTransf, file: File) => {
+  const procesarUpload = async (fila: FilaTransf, file: File, esReemplazo = false) => {
     const transferenciaId = fila.transferencia.id;
     setUploadingId(transferenciaId);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const path = `transferencias/${transferenciaId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
     try {
+      if (esReemplazo && fila.transferencia.foto_comprobante_path) {
+        const ok = await quitarComprobante(fila);
+        if (!ok) return;
+      }
+
       const { error: upErr } = await supabase.storage
         .from('comprobantes-cobros')
         .upload(path, file, {
@@ -265,7 +336,9 @@ export default function SubirFotos() {
         return;
       }
 
-      toast.success('Comprobante adjuntado');
+      toast.success(esReemplazo ? 'Comprobante reemplazado' : 'Comprobante adjuntado');
+      setPreviewFila(null);
+      setPreviewUrl(null);
       // Auto-OCR con IA para autocompletar datos sin intervención del usuario.
       // Si el modelo no puede leer el PDF, la transferencia queda adjuntada igual.
       analizarConIA(transferenciaId, file).catch((e) => {
@@ -457,9 +530,12 @@ export default function SubirFotos() {
                 <FilaCard
                   key={f.transferencia.id}
                   fila={f}
+                  loading={uploadingId === f.transferencia.id || eliminandoId === f.transferencia.id}
                   analizando={analizandoId === f.transferencia.id}
                   conFoto
                   onVer={() => abrirPreview(f)}
+                  onReemplazar={() => handleReemplazarClick(f)}
+                  onEliminar={() => setConfirmEliminar(f)}
                 />
               ))
             )}
@@ -563,9 +639,70 @@ export default function SubirFotos() {
                 <p className="text-sm text-muted-foreground">Sin imagen</p>
               )}
             </div>
+            {previewUrl && !esPdf(previewFila?.transferencia.foto_comprobante_nombre, null) && (
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 text-sm text-primary underline"
+              >
+                <ExternalLink className="h-4 w-4" /> Abrir en pestaña nueva
+              </a>
+            )}
+            {previewFila?.transferencia.foto_comprobante_path && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!!uploadingId || !!eliminandoId}
+                  onClick={() => previewFila && handleReemplazarClick(previewFila)}
+                >
+                  {uploadingId === previewFila.transferencia.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <><RotateCcw className="h-4 w-4 mr-2" /> Reemplazar</>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={!!uploadingId || !!eliminandoId}
+                  onClick={() => previewFila && setConfirmEliminar(previewFila)}
+                >
+                  {eliminandoId === previewFila.transferencia.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <><Trash2 className="h-4 w-4 mr-2" /> Eliminar</>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!confirmEliminar} onOpenChange={(o) => { if (!o) setConfirmEliminar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar el comprobante adjunto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La transferencia vuelve a quedar sin comprobante y podés subir otro archivo. El archivo actual se borra definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const f = confirmEliminar;
+                setConfirmEliminar(null);
+                if (f) await eliminarComprobante(f);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -580,6 +717,8 @@ interface FilaCardProps {
   onToggle?: () => void;
   onSubir?: () => void;
   onVer?: () => void;
+  onReemplazar?: () => void;
+  onEliminar?: () => void;
 }
 
 // Evita el corrimiento de un día: "2026-07-31" se parsea como fecha local, no UTC.
@@ -591,7 +730,7 @@ function parseFechaLocal(v?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer }: FilaCardProps) {
+function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer, onReemplazar, onEliminar }: FilaCardProps) {
   const { transferencia: t, venta, clienteNombre } = fila;
   const fecha = t.fecha_transferencia || venta?.fecha || t.created_at;
   const fechaDate = parseFechaLocal(fecha);
@@ -664,6 +803,25 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               <><Camera className="h-4 w-4 mr-2" /> Subir comprobante (foto o PDF)</>
             )}
           </Button>
+        )}
+        {conFoto && (onVer || onReemplazar || onEliminar) && (
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            {onVer && (
+              <Button variant="outline" size="sm" className="flex-1" onClick={onVer}>
+                <Eye className="h-4 w-4 mr-1" /> Ver
+              </Button>
+            )}
+            {onReemplazar && (
+              <Button variant="outline" size="sm" className="flex-1" onClick={onReemplazar} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RotateCcw className="h-4 w-4 mr-1" /> Reemplazar</>}
+              </Button>
+            )}
+            {onEliminar && (
+              <Button variant="outline" size="sm" className="text-destructive" onClick={onEliminar} disabled={loading}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
