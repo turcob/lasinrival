@@ -639,9 +639,70 @@ export default function SubirFotos() {
                 <p className="text-sm text-muted-foreground">Sin imagen</p>
               )}
             </div>
+            {previewUrl && !esPdf(previewFila?.transferencia.foto_comprobante_nombre, null) && (
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 text-sm text-primary underline"
+              >
+                <ExternalLink className="h-4 w-4" /> Abrir en pestaña nueva
+              </a>
+            )}
+            {previewFila?.transferencia.foto_comprobante_path && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!!uploadingId || !!eliminandoId}
+                  onClick={() => previewFila && handleReemplazarClick(previewFila)}
+                >
+                  {uploadingId === previewFila.transferencia.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <><RotateCcw className="h-4 w-4 mr-2" /> Reemplazar</>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={!!uploadingId || !!eliminandoId}
+                  onClick={() => previewFila && setConfirmEliminar(previewFila)}
+                >
+                  {eliminandoId === previewFila.transferencia.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <><Trash2 className="h-4 w-4 mr-2" /> Eliminar</>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!confirmEliminar} onOpenChange={(o) => { if (!o) setConfirmEliminar(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar el comprobante adjunto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La transferencia vuelve a quedar sin comprobante y podés subir otro archivo. El archivo actual se borra definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const f = confirmEliminar;
+                setConfirmEliminar(null);
+                if (f) await eliminarComprobante(f);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
