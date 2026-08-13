@@ -8,7 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck, FileText, ExternalLink } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, LogOut, RefreshCw, Camera, ImageIcon, CheckCircle2, Sparkles, AlertTriangle, ShieldCheck, FileText, ExternalLink, Trash2, RotateCcw, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -102,8 +112,11 @@ export default function SubirFotos() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [rango, setRango] = useState<Rango>('1h');
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [confirmEliminar, setConfirmEliminar] = useState<FilaTransf | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFilaRef = useRef<FilaTransf | null>(null);
+  const reemplazoRef = useRef(false);
 
   const fetchData = async () => {
     if (!user) return;
@@ -205,6 +218,7 @@ export default function SubirFotos() {
 
   const handleSubirClick = async (fila: FilaTransf) => {
     pendingFilaRef.current = fila;
+    reemplazoRef.current = false;
     const nativa = await tomarFotoNativa();
     if (nativa) {
       await procesarUpload(fila, nativa);
@@ -215,11 +229,63 @@ export default function SubirFotos() {
     }
   };
 
+  const handleReemplazarClick = async (fila: FilaTransf) => {
+    pendingFilaRef.current = fila;
+    reemplazoRef.current = true;
+    const nativa = await tomarFotoNativa();
+    if (nativa) {
+      await procesarUpload(fila, nativa, true);
+      pendingFilaRef.current = null;
+      reemplazoRef.current = false;
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  // Quita el adjunto (RPC) y borra el archivo del storage.
+  const quitarComprobante = async (fila: FilaTransf): Promise<boolean> => {
+    const id = fila.transferencia.id;
+    setEliminandoId(id);
+    try {
+      const { data, error } = await supabase.rpc('quitar_comprobante_transferencia', {
+        p_transferencia_id: id,
+      });
+      if (error) {
+        toast.error(error.message || 'No se pudo quitar el comprobante');
+        return false;
+      }
+      const pathAnterior = (data as any)?.path_anterior as string | undefined;
+      if (pathAnterior) {
+        const { error: rmErr } = await supabase.storage
+          .from('comprobantes-cobros')
+          .remove([pathAnterior]);
+        if (rmErr) console.warn('[SubirFotos] no se pudo borrar el archivo', rmErr);
+      }
+      return true;
+    } catch (e: any) {
+      toast.error(e.message || 'Error inesperado');
+      return false;
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
+  const eliminarComprobante = async (fila: FilaTransf) => {
+    const ok = await quitarComprobante(fila);
+    if (!ok) return;
+    toast.success('Comprobante eliminado');
+    setPreviewFila(null);
+    setPreviewUrl(null);
+    await fetchData();
+  };
+
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     const fila = pendingFilaRef.current;
+    const esReemplazo = reemplazoRef.current;
     pendingFilaRef.current = null;
+    reemplazoRef.current = false;
     if (!file || !fila) return;
     const pdf = esPdf(file.name, file.type);
     if (!pdf && !file.type.startsWith('image/')) {
@@ -230,16 +296,21 @@ export default function SubirFotos() {
       toast.error(`El archivo supera los ${MAX_FILE_MB} MB`);
       return;
     }
-    await procesarUpload(fila, file);
+    await procesarUpload(fila, file, esReemplazo);
   };
 
-  const procesarUpload = async (fila: FilaTransf, file: File) => {
+  const procesarUpload = async (fila: FilaTransf, file: File, esReemplazo = false) => {
     const transferenciaId = fila.transferencia.id;
     setUploadingId(transferenciaId);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const path = `transferencias/${transferenciaId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
     try {
+      if (esReemplazo && fila.transferencia.foto_comprobante_path) {
+        const ok = await quitarComprobante(fila);
+        if (!ok) return;
+      }
+
       const { error: upErr } = await supabase.storage
         .from('comprobantes-cobros')
         .upload(path, file, {
@@ -265,7 +336,9 @@ export default function SubirFotos() {
         return;
       }
 
-      toast.success('Comprobante adjuntado');
+      toast.success(esReemplazo ? 'Comprobante reemplazado' : 'Comprobante adjuntado');
+      setPreviewFila(null);
+      setPreviewUrl(null);
       // Auto-OCR con IA para autocompletar datos sin intervención del usuario.
       // Si el modelo no puede leer el PDF, la transferencia queda adjuntada igual.
       analizarConIA(transferenciaId, file).catch((e) => {
