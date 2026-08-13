@@ -656,6 +656,8 @@ interface FilaCardProps {
   onToggle?: () => void;
   onSubir?: () => void;
   onVer?: () => void;
+  onReemplazar?: () => void;
+  onEliminar?: () => void;
 }
 
 // Evita el corrimiento de un día: "2026-07-31" se parsea como fecha local, no UTC.
@@ -667,7 +669,7 @@ function parseFechaLocal(v?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer }: FilaCardProps) {
+function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, onToggle, onSubir, onVer, onReemplazar, onEliminar }: FilaCardProps) {
   const { transferencia: t, venta, clienteNombre } = fila;
   const fecha = t.fecha_transferencia || venta?.fecha || t.created_at;
   const fechaDate = parseFechaLocal(fecha);
@@ -740,6 +742,25 @@ function FilaCard({ fila, loading, analizando, conFoto, selectable, selected, on
               <><Camera className="h-4 w-4 mr-2" /> Subir comprobante (foto o PDF)</>
             )}
           </Button>
+        )}
+        {conFoto && (onVer || onReemplazar || onEliminar) && (
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            {onVer && (
+              <Button variant="outline" size="sm" className="flex-1" onClick={onVer}>
+                <Eye className="h-4 w-4 mr-1" /> Ver
+              </Button>
+            )}
+            {onReemplazar && (
+              <Button variant="outline" size="sm" className="flex-1" onClick={onReemplazar} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><RotateCcw className="h-4 w-4 mr-1" /> Reemplazar</>}
+              </Button>
+            )}
+            {onEliminar && (
+              <Button variant="outline" size="sm" className="text-destructive" onClick={onEliminar} disabled={loading}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
