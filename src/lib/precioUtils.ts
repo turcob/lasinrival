@@ -66,7 +66,7 @@ export function calcularPorcentajeProducto(
   
   // 1. Buscar excepción específica del producto (considerando vigencia)
   const hoy = new Date().toISOString().split('T')[0];
-  const excepcion = excepciones.find(e => {
+  const candidatas = excepciones.filter(e => {
     if (e.producto_id !== producto.id) return false;
     if (e.lista_precio_id !== listaId && e.lista_precio_id !== null) return false;
     // Verificar vigencia por fechas
@@ -74,6 +74,9 @@ export function calcularPorcentajeProducto(
     const finOk = !e.fecha_fin || e.fecha_fin >= hoy;
     return inicioOk && finOk;
   });
+  // La excepción específica de la lista gana sobre la global (lista_precio_id = null)
+  const excepcion =
+    candidatas.find(e => e.lista_precio_id === listaId) ?? candidatas[0];
   if (excepcion) {
     if (excepcion.precio_fijo !== null && excepcion.precio_fijo !== undefined) {
       return {
