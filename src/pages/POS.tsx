@@ -631,14 +631,26 @@ export default function POS() {
       return Math.round(precio * 100) / 100;
     }
 
-    const excepcion = excepciones.find(e => 
-      e.producto_id === producto.id && 
-      (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null)
-    );
+    // Excepciones: la específica de la lista gana sobre la global.
+    const excepcionesProducto = excepciones
+      .filter(
+        (e) =>
+          e.producto_id === producto.id &&
+          (e.lista_precio_id === selectedLista.id || e.lista_precio_id === null),
+      )
+      .sort((a, b) => (a.lista_precio_id === null ? 1 : 0) - (b.lista_precio_id === null ? 1 : 0));
+    const excepcion = excepcionesProducto[0];
     if (excepcion) {
-      return costo * (1 + excepcion.porcentaje / 100);
+      // Precio de venta fijo (no se calcula sobre el costo)
+      if (excepcion.precio_fijo !== null && excepcion.precio_fijo !== undefined) {
+        return Math.round(Number(excepcion.precio_fijo) * 100) / 100;
+      }
+      if (excepcion.porcentaje !== null && excepcion.porcentaje !== undefined) {
+        return costo * (1 + Number(excepcion.porcentaje) / 100);
+      }
+      // Excepción sin datos válidos: se ignora y sigue la jerarquía normal.
     }
-    
+
     if (producto.marca_id) {
       const porMarca = matrizPorcentajes.find(p => 
         p.lista_precio_id === selectedLista.id && 
@@ -666,8 +678,9 @@ export default function POS() {
     if (general) {
       return costo * (1 + general.porcentaje / 100);
     }
-    
-    return costo;
+
+    // Nunca vender al costo: sin porcentaje definido no hay precio válido.
+    return 0;
   };
 
   const isProductoPorPeso = (producto: Producto) => {
