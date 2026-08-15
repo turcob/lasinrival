@@ -104,7 +104,8 @@ interface ExcepcionProducto {
   id: string;
   lista_precio_id: string | null;
   producto_id: string;
-  porcentaje: number;
+  porcentaje: number | null;
+  precio_fijo?: number | null;
 }
 
 interface Cliente {
