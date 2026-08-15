@@ -167,9 +167,14 @@ export function obtenerPrecioVentaProducto(
   excepciones: ExcepcionProducto[]
 ): { precioVenta: number; porcentaje: number; origen: string; descripcion: string } {
   const resultado = calcularPorcentajeProducto(producto, listaId, matrizPorcentajes, excepciones);
-  const precioVenta = resultado.origen === 'fijo' && resultado.precioFijo !== undefined
-    ? resultado.precioFijo
-    : calcularPrecioVenta(producto.precio_costo, resultado.porcentaje);
+  const precioVenta =
+    resultado.origen === 'fijo' && resultado.precioFijo !== undefined
+      ? resultado.precioFijo
+      : resultado.origen === 'ninguno'
+        // Sin porcentaje ni precio fijo definido: no hay precio de venta válido.
+        // Devolver 0 evita vender al costo por una matriz incompleta o que no cargó.
+        ? 0
+        : calcularPrecioVenta(producto.precio_costo, resultado.porcentaje);
   
   return { 
     precioVenta, 
